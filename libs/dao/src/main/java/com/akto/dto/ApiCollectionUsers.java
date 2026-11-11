@@ -36,6 +36,7 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.CustomApiGroupSync;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
+import com.akto.dto.testing.custom_groups.UnauthenticatedMcpToolsGroup;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
@@ -287,6 +288,11 @@ public class ApiCollectionUsers {
             return;
         }
 
+        if(UnauthenticatedMcpToolsGroup.GROUP_ID == apiCollectionId){
+            UnauthenticatedMcpToolsGroup.updateCollections();
+            return;
+        }
+
         if(SensitiveDataEndpoints.API_GROUP_ID == apiCollectionId){
             SensitiveDataEndpoints.updateCollections();
             return;
@@ -304,6 +310,8 @@ public class ApiCollectionUsers {
     public static void syncCollectionsForCollectionId(ApiCollection collection) {
         if (UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID == collection.getId()) {
             UnauthenticatedEndpoint.updateCollections();
+        } else if (UnauthenticatedMcpToolsGroup.GROUP_ID == collection.getId()) {
+            UnauthenticatedMcpToolsGroup.updateCollections();
         } else if (SensitiveDataEndpoints.API_GROUP_ID == collection.getId()) {
             SensitiveDataEndpoints.updateCollections();
         } else {

@@ -99,6 +99,9 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
         return false;
     }
 
+    // MCP tools are left out of the group above; they have their own group (UnauthenticatedMcpToolsGroup)
+    public final static int UNAUTHENTICATED_MCP_TOOLS_GROUP_ID = 111_111_122;
+
     /**
      * The group follows api_info (the source of truth for auth types). Auth types only change in runtime upserts, which
      * bump lastSeen, so only the apis seen since the last sync are looked at.
