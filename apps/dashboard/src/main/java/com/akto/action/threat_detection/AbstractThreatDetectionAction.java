@@ -77,6 +77,33 @@ public class AbstractThreatDetectionAction extends UserAction {
   }
 
   /**
+   * POSTs a JSON body to one of the threat backend's dashboard endpoints and parses its proto
+   * response. Null when the call fails, or when the backend does not have the endpoint (an older
+   * backend answers 404), so a caller can tell "no data" apart from "no answer".
+   */
+  protected <T extends com.google.protobuf.Message> T postDashboardApi(String path, Map<String, Object> body, Class<T> responseClass) {
+    try {
+      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+      Request request = new Request.Builder()
+          .url(String.format("%s/api/dashboard/%s", this.getBackendUrl(), path))
+          .post(RequestBody.create(objectMapper.valueToTree(body).toString(), MediaType.parse("application/json; charset=utf-8")))
+          .addHeader("Authorization", "Bearer " + this.getApiToken())
+          .addHeader("Content-Type", "application/json")
+          .addHeader("x-context-source", contextSourceValue)
+          .build();
+      try (Response resp = httpClient.newCall(request).execute()) {
+        if (!resp.isSuccessful()) {
+          return null;
+        }
+        String responseBody = resp.body() != null ? resp.body().string() : "";
+        return ProtoMessageUtils.toProtoMessage(responseClass, responseBody).orElse(null);
+      }
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
    * Fetch malicious events from threat-backend service
    * @param startTimestamp Start timestamp for time range filter (0 or negative to skip)
    * @param endTimestamp End timestamp for time range filter (0 or negative to skip)

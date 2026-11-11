@@ -1,0 +1,31 @@
+/* Instant hover text from a data-tip attribute (the native title waits about a second). Put hover-tip on a positioned element. */
+.hover-tip:hover::after,
+.hover-tip:focus-visible::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--p-color-text);
+    color: var(--p-color-text-on-color);
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Near an edge the text hangs inward so it stays inside. */
+.hover-tip--start:hover::after,
+.hover-tip--start:focus-visible::after {
+    left: 0;
+    transform: none;
+}
+
+.hover-tip--end:hover::after,
+.hover-tip--end:focus-visible::after {
+    left: auto;
+    right: 0;
+    transform: none;
+}

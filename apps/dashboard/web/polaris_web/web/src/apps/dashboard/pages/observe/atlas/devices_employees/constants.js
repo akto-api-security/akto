@@ -12,6 +12,7 @@ export const ATLAS_EMPLOYEE_QUESTIONS = [
     "How does {name} compare to their team?",
 ];
 
+export const ATLAS_INVENTORY_CHAT_SCOPE = "atlas_ai_inventory";
 
 export const ASK_ATLAS_PLACEHOLDER = "Ask about AI agents, MCP servers, skills, models or browser AI on your devices";
 

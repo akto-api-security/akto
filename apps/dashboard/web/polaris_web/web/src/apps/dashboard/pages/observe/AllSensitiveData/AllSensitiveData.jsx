@@ -384,7 +384,7 @@ function AllSensitiveData() {
             />
             <InfoCard
                 title={"Top 5 sensitive datatype"}
-                titleToolTip={"Numbers of APIs having the corresponding data type in request or response"}
+                titleToolTip={"Numbers of " + mapLabel('APIs', getDashboardCategory()) + " having the corresponding data type in request or response"}
                 component={
                     <Box paddingBlockStart={"6"}>
                         <ChartypeComponent
@@ -435,7 +435,7 @@ function AllSensitiveData() {
             title={
                 <TitleWithInfo 
                     titleText={"Sensitive data exposure"} 
-                    tooltipContent={"Akto allows you to identify which sensitive data an API contains in request or response."}
+                    tooltipContent={"Akto allows you to identify which sensitive data an " + mapLabel('API', getDashboardCategory()) + " contains in request or response."}
                     docsUrl="https://docs.akto.io/api-inventory/concepts/sensitive-data" 
                 />
             }

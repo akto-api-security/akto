@@ -50,6 +50,8 @@ import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
+import SmartAgentsPage from "../dashboard/pages/testing/SmartAgents/SmartAgentsPage";
+import SmartAgentDetails from "../dashboard/pages/testing/SmartAgents/SmartAgentDetails";
 import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import DefaultPayloads from "../dashboard/pages/settings/default_payloads/DefaultPayloads";
@@ -102,6 +104,7 @@ import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPa
 import ConfigureExploitsPage from "../dashboard/pages/threat_detection/ConfigureExploitsPage";
 import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/ConfigureIgnoredEventsPage";
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
+import ScriptsPage from "../dashboard/pages/testing/scripts/ScriptsPage";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
 import Datadog from "../dashboard/pages/settings/integrations/Datadog";
@@ -127,6 +130,7 @@ import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetect
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 import GuardrailViolations from "../dashboard/pages/guardrails/violations/ViolationsPage";
+import GuardrailOverview from "../dashboard/pages/guardrails/overview/GuardrailOverview";
 import Misconfigurations from "../dashboard/pages/guardrails/Misconfigurations";
 import AtlasGuardrailsOverview from "../dashboard/pages/guardrails/atlasOverview/AtlasGuardrailsOverview";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
@@ -139,6 +143,7 @@ import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import AgenticAssetDevicesPage from "../dashboard/pages/observe/agentic/AgenticAssetDevicesPage.jsx";
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
 import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
+import AgenticDiscoveryOverview from "../dashboard/pages/observe/atlas/discovery/AgenticDiscoveryOverview.jsx";
 import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
@@ -218,6 +223,14 @@ const router = createBrowserRouter([
                                 element: <TestRoleSettings/>
                             },
                             {
+                                path: "smart-agents",
+                                element: <SmartAgentsPage/>
+                            },
+                            {
+                                path: "smart-agents/details",
+                                element: <SmartAgentDetails/>
+                            },
+                            {
                                 path: "roles/access-matrix",
                                 element: <TestRoleAccessMatrix/>
                             },
@@ -232,6 +245,10 @@ const router = createBrowserRouter([
                             {
                               path:"test-suite",
                               element:<TestSuite/>
+                            },
+                            {
+                              path:"scripts",
+                              element:<ScriptsPage/>
                             }
                         ]
                     },
@@ -258,6 +275,10 @@ const router = createBrowserRouter([
                             {
                                 path: "agentic-assets",
                                 element: <AgenticAssetsPage/>
+                            },
+                            {
+                                path: "agentic-discovery",
+                                element: <AgenticDiscoveryOverview/>
                             },
                             {
                                 path: "users-and-devices",
@@ -405,6 +426,10 @@ const router = createBrowserRouter([
                     {
                         path: "guardrails",
                         children: [
+                            {
+                                path: "overview",
+                                element: <GuardrailOverview/>
+                            },
                             {
                                 path: "atlas-overview",
                                 element: <AtlasGuardrailsOverview/>

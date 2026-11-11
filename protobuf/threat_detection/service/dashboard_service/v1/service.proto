@@ -665,3 +665,50 @@ message ActorCountsFromActorInfoResponse {
   int32 critical_actors = 1;  // Actors with isCritical=true (HIGH or CRITICAL severity)
   int32 active_actors = 2;    // Actors with status=ACTIVE
 }
+
+// Guardrail overview panels. One request shape for all of them: the same filter the violations list
+// takes (time range included), so a panel counts exactly the events the list shows for that filter,
+// plus paging for the panels that list rows.
+message GuardrailOverviewRequest {
+  ListMaliciousRequestsRequest.Filter filter = 1;
+  optional uint32 skip = 2;
+  optional uint32 limit = 3;
+  optional HostScope host_scope = 4;
+}
+
+message FetchGuardrailActionCountsResponse {
+  message ActionCounts {
+    uint32 blocked = 1;   // behaviour "block"
+    uint32 alerted = 2;   // behaviour "alert"
+    uint32 flagged = 3;   // "warn", "approval", "flag", or no behaviour recorded
+  }
+  message DayCounts {
+    uint32 ts = 1;  // start of the UTC day, in seconds
+    ActionCounts counts = 2;
+  }
+  repeated DayCounts days = 1;  // every day of the range, empty days included
+  ActionCounts total = 2;
+}
+
+message FetchGuardrailPolicyCountsResponse {
+  message PolicyCount {
+    string policy = 1;  // the policy name, which is the event's filter id
+    uint32 count = 2;
+  }
+  repeated PolicyCount policies = 1;  // the requested page, most events first
+  uint32 total = 2;                   // policies with any event, before paging
+}
+
+message FetchGuardrailHostPolicyCountsResponse {
+  message HostPolicyCount {
+    string host = 1;
+    string policy = 2;
+    uint32 count = 3;
+  }
+  repeated HostPolicyCount rows = 1;  // most events first, capped
+}
+
+message FetchGuardrailTriageTimeResponse {
+  uint32 median_seconds = 1;  // from detection to the first status or owner change of the case
+  uint32 triaged = 2;         // events that were triaged, which the median is taken over
+}

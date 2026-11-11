@@ -26,3 +26,25 @@ export function RiskFactorRow({ factor, onClick }) {
         </div>
     );
 }
+
+const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+const SEV_LABELS = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
+
+// Risk factors of an asset row (violations by severity, personal accounts, malicious skill), most
+// severe first; empty when nothing stands out. Moved from the old flyout Overview tab.
+export function computeAssetRiskFactors(asset) {
+    const factors = [];
+    Object.entries(SEV_LABELS).forEach(([sev, label]) => {
+        const count = asset.violations?.[sev] || 0;
+        if (count > 0) {
+            factors.push({ severity: sev, title: `${count} ${label} Violation${count > 1 ? "s" : ""}`, description: `Contains ${label.toLowerCase()} violations`, type: "violation" });
+        }
+    });
+    if (asset.hasPersonalAccount) {
+        factors.push({ severity: "high", title: "Personal Account", description: "Contains personal account", type: "personal_account" });
+    }
+    if (asset.isMalicious) {
+        factors.push({ severity: "critical", title: "Malicious Skill", description: "Contains malicious skill", type: "malicious_skill" });
+    }
+    return factors.sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
+}
