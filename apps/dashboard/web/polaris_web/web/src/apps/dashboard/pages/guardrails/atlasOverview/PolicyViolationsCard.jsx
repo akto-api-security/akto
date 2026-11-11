@@ -1,4 +1,5 @@
-import { Box, Card, HorizontalGrid, Link, Text, VerticalStack } from "@shopify/polaris";
+import { useEffect, useState } from "react";
+import { Box, Button, Card, HorizontalGrid, HorizontalStack, Link, Text, VerticalStack } from "@shopify/polaris";
 import { OverviewCardHeader, OverviewListRow } from "./OverviewCard";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import observeFunc from "../../observe/transform";
@@ -6,11 +7,15 @@ import observeFunc from "../../observe/transform";
 const NOISY_IGNORE_PCT = 40;
 const COLUMNS = "minmax(0, 1.3fr) minmax(0, 1fr) 80px 90px";
 
-export default function PolicyViolationsCard({ policies, loading, onPolicyClick, onTune }) {
+export default function PolicyViolationsCard({ policies, pageSize, loading, onPolicyClick, onTune }) {
+    const [visible, setVisible] = useState(pageSize);
+    useEffect(() => setVisible(pageSize), [policies, pageSize]);
+
     if (loading) return <Card><VerticalStack gap="3"><OverviewCardHeader title="Violations by policy" subtitle="High ignore rates usually mean a policy needs tuning" /><SpinnerCentered height="200px" /></VerticalStack></Card>;
 
-    const max = Math.max(1, ...policies.map((p) => p.count));
-    const countWidth = `${Math.max(3, ...policies.map((p) => String(observeFunc.formatNumberWithCommas(p.count)).length))}ch`;
+    const shown = policies.slice(0, visible);
+    const max = Math.max(1, ...shown.map((p) => p.count));
+    const countWidth = `${Math.max(3, ...shown.map((p) => String(observeFunc.formatNumberWithCommas(p.count)).length))}ch`;
     return (
         <Card padding="0">
             <Box padding="4" paddingBlockEnd="2">
@@ -24,7 +29,7 @@ export default function PolicyViolationsCard({ policies, loading, onPolicyClick,
                     <span />
                 </HorizontalGrid>
             </OverviewListRow>
-            {policies.map((policy) => {
+            {shown.map((policy) => {
                 const noisy = policy.ignoredPct >= NOISY_IGNORE_PCT;
                 return (
                     <OverviewListRow key={policy.name}>
@@ -44,6 +49,14 @@ export default function PolicyViolationsCard({ policies, loading, onPolicyClick,
                     </OverviewListRow>
                 );
             })}
+            {policies.length > pageSize && (
+                <Box padding="4" paddingBlockStart="2">
+                    <HorizontalStack gap="4">
+                        {shown.length < policies.length && <Button plain onClick={() => setVisible(visible + pageSize)}>{`Show more (${policies.length - shown.length} more)`}</Button>}
+                        {shown.length > pageSize && <Button plain onClick={() => setVisible(pageSize)}>Show less</Button>}
+                    </HorizontalStack>
+                </Box>
+            )}
         </Card>
     );
 }

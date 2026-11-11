@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import { Button, HorizontalGrid, HorizontalStack } from "@shopify/polaris";
@@ -73,7 +73,6 @@ function buildPolicyRows(rules) {
     });
     return Object.values(groups)
         .sort((a, b) => b.count - a.count)
-        .slice(0, POLICY_ROWS)
         .map((g) => ({ name: g.name, count: g.count, ignoredPct: Math.round((g.ignored * 100) / g.count) }));
 }
 
@@ -185,6 +184,7 @@ function AtlasGuardrailsOverview() {
     const [policies, setPolicies] = useState(null);
     const [violationsSources, setViolationsSources] = useState(null);
     const [topAgenticAssets, setTopAgenticAssets] = useState(null);
+    const policyRows = useMemo(() => buildPolicyRows(policies?.rules), [policies]);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
@@ -230,7 +230,7 @@ function AtlasGuardrailsOverview() {
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">
             <DecisionsTrendCard decisions={decisions} loading={decisions === null} />
-            <PolicyViolationsCard policies={buildPolicyRows(policies?.rules)} loading={policies === null} onPolicyClick={openActivity} onTune={openPolicies} />
+            <PolicyViolationsCard policies={policyRows} pageSize={POLICY_ROWS} loading={policies === null} onPolicyClick={openActivity} onTune={openPolicies} />
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
             <ViolationsSourcesCard rows={buildViolationsSourcesRows(violationsSources?.assetTypes)} periodDays={violationsSources?.periodDays} loading={violationsSources === null} onRowClick={openActivity} />
