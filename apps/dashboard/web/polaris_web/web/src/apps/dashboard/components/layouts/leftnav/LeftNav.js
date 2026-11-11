@@ -422,6 +422,18 @@ export default function LeftNav() {
                         selected: leftNavSelected === "dashboard_testing_scripts",
                         requires: pageRequires("/dashboard/testing/scripts"),
                     }] : []),
+                    // smart agents: same access as smart testing in the Run test modal
+                    ...((window?.STIGG_FEATURE_WISE_ALLOWED?.AUTOMATED_AGENTIC_TEST_RUN?.isGranted === true || window?.USER_NAME?.indexOf("@akto.io") !== -1) ? [{
+                        label: "Smart agents",
+                        badge: <Badge status="info">Beta</Badge>,
+                        onClick: () => {
+                            navigate("/dashboard/testing/smart-agents");
+                            handleSelect("dashboard_testing_smart_agents");
+                            setActive("active");
+                        },
+                        selected: typeof leftNavSelected === "string" && leftNavSelected.startsWith("dashboard_testing_smart_agents"),
+                        requires: pageRequires("/dashboard/testing/smart-agents"),
+                    }] : []),
                 ],
                 key: "4",
             }] : []),

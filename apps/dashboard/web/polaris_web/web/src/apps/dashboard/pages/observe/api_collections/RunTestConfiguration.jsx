@@ -3,13 +3,26 @@ import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack, Te
 import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
+import testingApi from "../../testing/api"
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import ScriptSelectDropdown from '../../testing/scripts/ScriptSelectDropdown';
 import { SCRIPT_TYPES } from '../../testing/scripts/scriptTypes';
 
+// value of the dropdown's default option (not empty: the dropdown matches values as patterns)
+const DEFAULT_SMART_TESTING = "DEFAULT_SMART_TESTING"
+
 const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration, scriptsState}) => {
     console.log("isAgenticCategory in config", isAgenticCategory)
+    // smart agents for the Smart agent dropdown, loaded once smart testing is switched on
+    const [smartAgentOptions, setSmartAgentOptions] = useState([{ label: "Default smart testing", value: DEFAULT_SMART_TESTING }])
+    useEffect(() => {
+        if (!testRun.runAutomatedTests || smartAgentOptions.length > 1) return
+        testingApi.fetchSmartAgentProfiles().then((res) => {
+            const agents = (res?.smartAgentProfiles || []).map(p => ({ label: p.name, value: p.hexId }))
+            if (agents.length > 0) setSmartAgentOptions([{ label: "Default smart testing", value: DEFAULT_SMART_TESTING }, ...agents])
+        }).catch(() => {})
+    }, [testRun.runAutomatedTests])
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
@@ -357,6 +370,17 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                         checked={testRun.runAutomatedTests}
                         onChange={(val) => setTestRun(prev => ({ ...prev, runAutomatedTests: val }))}
                     />
+                    {testRun.runAutomatedTests &&
+                        <HorizontalGrid columns={2}>
+                            <Dropdown
+                                id="smart-agent-dropdown"
+                                label="Smart agent"
+                                menuItems={smartAgentOptions}
+                                initial={testRun.smartAgentProfileId || DEFAULT_SMART_TESTING}
+                                selected={(value) => setTestRun(prev => ({ ...prev, smartAgentProfileId: value === DEFAULT_SMART_TESTING ? "" : value }))}
+                            />
+                        </HorizontalGrid>
+                    }
                     {testRun.runAutomatedTests &&
                         <TextField
                             label="Custom prompt for Smart Automated Testing (optional)"

@@ -50,6 +50,8 @@ import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
+import SmartAgentsPage from "../dashboard/pages/testing/SmartAgents/SmartAgentsPage";
+import SmartAgentDetails from "../dashboard/pages/testing/SmartAgents/SmartAgentDetails";
 import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import DefaultPayloads from "../dashboard/pages/settings/default_payloads/DefaultPayloads";
@@ -216,6 +218,14 @@ const router = createBrowserRouter([
                             {
                                 path: "roles/details",
                                 element: <TestRoleSettings/>
+                            },
+                            {
+                                path: "smart-agents",
+                                element: <SmartAgentsPage/>
+                            },
+                            {
+                                path: "smart-agents/details",
+                                element: <SmartAgentDetails/>
                             },
                             {
                                 path: "roles/access-matrix",

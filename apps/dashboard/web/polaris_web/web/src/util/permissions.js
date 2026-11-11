@@ -92,6 +92,7 @@ const PAGE_REQUIRES = {
     '/dashboard/nhi/policies': 'api/fetchNhiPolicies',
     '/dashboard/testing': 'api/retrieveAllCollectionTests',
     '/dashboard/testing/roles': 'api/fetchTestRoles',
+    '/dashboard/testing/smart-agents': 'api/fetchSmartAgentProfiles',
     '/dashboard/testing/user-config': 'api/fetchAuthMechanismData',
     '/dashboard/testing/test-suite': 'api/fetchAllTestSuites',
     '/dashboard/testing/scripts': 'api/fetchAllScripts',
