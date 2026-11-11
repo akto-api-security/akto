@@ -9612,7 +9612,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User started Copilot authorization</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -14857,7 +14858,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User regenerated an insight narrative</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">DASHBOARD_INSIGHTS</param>
@@ -17476,7 +17478,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User fetched ServiceNow tables</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
