@@ -1,10 +1,16 @@
 package com.akto.service.guardrails;
 
+import com.akto.action.AgenticObserveAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto.Status;
+import com.akto.service.atlas.AtlasAssetStatusService;
+import com.akto.service.atlas.AtlasToolRow;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.providers.SkillEvaluationConcentrationProvider;
 import com.akto.util.AgenticObserveUtil;
+import com.akto.util.McpClientRegistry;
 import com.akto.util.Pair;
 import com.akto.util.ThreatDetectionConstants;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -37,8 +43,6 @@ public class AtlasGuardrailUtils {
     private static final String EXAMPLE_COUNTS = "exampleCounts";
     static final List<String> AGENTIC_ASSET_TYPES = Arrays.asList(AgenticObserveUtil.CLIENT_TYPE_AI_AGENT,
             AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT, AgenticObserveUtil.CLIENT_TYPE_LLM, AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER);
-    private static final String VIOLATION_KEY = "violation";
-    private static final String SKILL_KEY_PREFIX = "skill:";
 
     static List<DashboardMaliciousEvent> collapseConfigFindings(List<DashboardMaliciousEvent> events) {
         Map<String, DashboardMaliciousEvent> latestConfigFinding = new LinkedHashMap<>();
@@ -178,22 +182,31 @@ public class AtlasGuardrailUtils {
         return events.stream().filter(e -> e != null && e.getTimestamp() >= startTs).collect(Collectors.toList());
     }
 
-    static String violationKey(DashboardMaliciousEvent e) {
-        String skill = SkillEvaluationConcentrationProvider.extractSkillName(e.getUrl());
-        return skill == null ? VIOLATION_KEY : SKILL_KEY_PREFIX + skill;
-    }
-
-    static long totalOf(Map<String, Integer> countsByKey) {
-        long total = 0;
-        for (Integer count : countsByKey.values()) total += count;
-        return total;
-    }
-
-    static List<String> skillNamesOf(Map<String, Integer> countsByKey) {
-        List<String> skills = new ArrayList<>();
-        for (String key : countsByKey.keySet()) {
-            if (key.startsWith(SKILL_KEY_PREFIX)) skills.add(key.substring(SKILL_KEY_PREFIX.length()));
+    static AtlasToolRow collectionAsset(ApiCollection c, String type) {
+        String rowType;
+        String groupKey;
+        String name;
+        if (AgenticObserveUtil.CLIENT_TYPE_LLM.equals(type)) {
+            rowType = AtlasAssetStatusService.ROW_TYPE_LLM;
+            groupKey = AgenticObserveAction.llmGroupKey(c);
+            name = groupKey;
+        } else if (AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER.equals(type)) {
+            rowType = AtlasAssetStatusService.ROW_TYPE_SERVICE;
+            groupKey = AgenticObserveAction.serviceGroupKey(c, AgenticObserveAction.agentGroupKey(c) != null);
+            name = groupKey;
+        } else {
+            rowType = AtlasAssetStatusService.ROW_TYPE_AGENT;
+            groupKey = AgenticObserveAction.agentGroupKey(c);
+            name = groupKey == null ? null : McpClientRegistry.formatDisplayName(groupKey);
         }
-        return skills;
+        if (groupKey == null) return null;
+        return AtlasToolRow.builder().rowType(rowType).groupKey(groupKey).name(name)
+                .vendorName(InsightUtil.endpointVendorNameOfHost(c.getHostName()))
+                .malicious(InsightUtil.isMaliciousMcpServer(c)).build();
+    }
+
+    static AtlasToolRow skillAsset(String skillName) {
+        return AtlasToolRow.builder().rowType(AtlasAssetStatusService.ROW_TYPE_SKILL)
+                .groupKey(skillName).name(skillName).build();
     }
 }

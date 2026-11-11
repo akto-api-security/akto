@@ -41,7 +41,15 @@ const AGENTIC_ASSET_KINDS = {
     [CLIENT_TYPES.AI_AGENT]: "AI agent CLI",
     [CLIENT_TYPES.SAAS_AGENT]: "SaaS agent",
     [CLIENT_TYPES.MCP_SERVER]: "MCP server",
+    [CLIENT_TYPES.SKILL]: "Skill",
 };
+const AGENTIC_ASSET_STATUS_TAGS = {
+    APPROVED: "Approved",
+    BLOCKED: "Blocked",
+    UNDER_REVIEW: "Under review",
+    UNAPPROVED: "Unapproved",
+};
+const AGENTIC_ASSET_STATUS_RANK = ["BLOCKED", "UNDER_REVIEW", "UNAPPROVED", "APPROVED"];
 
 function formatCount(n) {
     return n === undefined || n === null ? EMPTY_VALUE : Number(n).toLocaleString();
@@ -135,30 +143,30 @@ function buildViolationsSourcesRows(assetTypes) {
         .sort((a, b) => b.count - a.count);
 }
 
-function buildTopAgenticAssetRows(collections) {
+function buildTopAgenticAssetRows(collections, skills) {
     const groups = new Map();
     (collections || []).forEach((c) => {
         const name = formatAssetDisplayName(c.host) || c.host;
-        const group = groups.get(name) || { name, type: c.type, count: 0, devices: new Set(), skills: new Set(), unapproved: false, personal: false };
+        const group = groups.get(name) || { name, type: c.type, count: 0, devices: new Set(), status: c.status, personal: false };
         group.count += c.count;
         if (c.device) group.devices.add(c.device);
-        (c.skills || []).forEach((skill) => group.skills.add(skill));
-        if (!c.approved) group.unapproved = true;
         if (c.personal) group.personal = true;
+        if (AGENTIC_ASSET_STATUS_RANK.indexOf(c.status) < AGENTIC_ASSET_STATUS_RANK.indexOf(group.status)) group.status = c.status;
         groups.set(name, group);
+    });
+    (skills || []).forEach((s) => {
+        groups.set(`skill:${s.name}`, { name: s.name, type: CLIENT_TYPES.SKILL, count: s.count, devices: new Set(), status: s.status });
     });
     return [...groups.values()]
         .sort((a, b) => b.count - a.count)
         .slice(0, TOP_AGENTIC_ASSETS)
         .map((g) => {
-            const isMcpServer = g.type === CLIENT_TYPES.MCP_SERVER;
-            const detail = isMcpServer
-                ? plural(g.devices.size, "device", "devices")
-                : (g.skills.size ? plural(g.skills.size, "skill", "skills") : "");
+            const detail = g.type === CLIENT_TYPES.MCP_SERVER ? plural(g.devices.size, "device", "devices") : "";
             return {
                 name: g.name,
                 kind: [AGENTIC_ASSET_KINDS[g.type] || g.type, detail].filter(Boolean).join(" · "),
-                tag: isMcpServer ? (g.unapproved ? "Unapproved" : "Approved") : (g.personal ? "Personal" : undefined),
+                tag: AGENTIC_ASSET_STATUS_TAGS[g.status],
+                personal: g.personal,
                 count: formatCount(g.count),
             };
         });
@@ -226,7 +234,7 @@ function AtlasGuardrailsOverview() {
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
             <ViolationsSourcesCard rows={buildViolationsSourcesRows(violationsSources?.assetTypes)} periodDays={violationsSources?.periodDays} loading={violationsSources === null} onRowClick={openActivity} />
             <TopEmployeesCard employees={data.topEmployees} />
-            <TopAssetsCard assets={buildTopAgenticAssetRows(topAgenticAssets?.collections)} loading={topAgenticAssets === null} />
+            <TopAssetsCard assets={buildTopAgenticAssetRows(topAgenticAssets?.collections, topAgenticAssets?.skills)} loading={topAgenticAssets === null} />
         </HorizontalGrid>,
     ];
 

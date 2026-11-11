@@ -20,6 +20,7 @@ export default function TopAssetsCard({ assets, loading }) {
                                 <Text variant="bodySm" color="subdued">{asset.kind}</Text>
                             </VerticalStack>
                         </Box>
+                        {asset.personal && <AssetTagBadge tag="Personal" />}
                         <AssetTagBadge tag={asset.tag} />
                         <Box minWidth="40px">
                             <Text variant="bodyMd" fontWeight="semibold" alignment="end">{asset.count}</Text>

@@ -5,6 +5,9 @@ import com.akto.dao.context.Context;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto.Status;
 import com.akto.dto.ApiCollection;
 import com.akto.service.atlas.AtlasPeopleService;
+import com.akto.service.atlas.AtlasToolRow;
+import com.akto.service.atlas.AtlasAssetStatusService;
+import com.akto.service.atlas.AtlasAssetStatus;
 import com.akto.service.insights.HostCollectionResolver;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightUtil;
@@ -243,27 +246,47 @@ public class AtlasGuardrailsOverviewService {
     public BasicDBObject buildTopAgenticAssets(InsightDataBundle bundle) {
         BasicDBObject response = new BasicDBObject();
         List<BasicDBObject> collections = new ArrayList<>();
+        List<BasicDBObject> skills = new ArrayList<>();
         response.put("collections", collections);
+        response.put("skills", skills);
         List<DashboardMaliciousEvent> events = AtlasGuardrailUtils.currentPeriodEvents(bundle);
         if (events == null) return response;
+        events = AtlasGuardrailUtils.collapseConfigFindings(events);
 
         Map<Integer, ApiCollection> collectionsById = new HashMap<>();
         for (ApiCollection c : bundle.collections) collectionsById.put(c.getId(), c);
-        Map<String, String> remarksByServiceName = InsightUtil.remarksByServiceName(bundle.auditRows);
-        Map<Integer, Map<String, Integer>> byCollection = bundle.hostResolver().countByCollection(
-                AtlasGuardrailUtils.collapseConfigFindings(events), AtlasGuardrailUtils::violationKey);
+        Map<Integer, Map<String, Integer>> byCollection = bundle.hostResolver().countByCollection(events,
+                e -> AtlasGuardrailUtils.isSkillFinding(e) ? null : AtlasGuardrailUtils.PERIOD_CURRENT);
+        Map<String, Long> bySkill = new LinkedHashMap<>();
+        for (DashboardMaliciousEvent e : events) {
+            String skill = SkillEvaluationConcentrationProvider.extractSkillName(e.getUrl());
+            if (skill != null) bySkill.merge(skill, 1L, Long::sum);
+        }
+
+        AtlasAssetStatusService statusService = new AtlasAssetStatusService();
+        List<AtlasToolRow> skillAssets = new ArrayList<>();
+        for (String skill : bySkill.keySet()) skillAssets.add(AtlasGuardrailUtils.skillAsset(skill));
+        Map<String, AtlasAssetStatus> decisions = new HashMap<>(statusService.loadDecisions());
+        decisions.putAll(statusService.loadSkillDecisionsByName(bySkill.keySet()));
+
         for (Map.Entry<Integer, Map<String, Integer>> entry : byCollection.entrySet()) {
             ApiCollection c = collectionsById.get(entry.getKey());
             if (c == null) continue;
             String type = AgenticObserveUtil.getTypeFromCollection(c);
             if (!AtlasGuardrailUtils.AGENTIC_ASSET_TYPES.contains(type)) continue;
+            AtlasToolRow asset = AtlasGuardrailUtils.collectionAsset(c, type);
+            AtlasAssetStatus status = asset == null ? AtlasAssetStatus.UNAPPROVED : statusService.resolve(asset, decisions, bundle.allowlistNamesLower);
             collections.add(new BasicDBObject("host", c.getHostName())
                     .append("type", type)
                     .append("device", InsightUtil.deviceIdOf(c))
-                    .append("count", AtlasGuardrailUtils.totalOf(entry.getValue()))
-                    .append("skills", AtlasGuardrailUtils.skillNamesOf(entry.getValue()))
-                    .append("approved", AtlasPeopleService.isSanctioned(c, bundle.allowlistNamesLower, remarksByServiceName))
+                    .append("count", entry.getValue().getOrDefault(AtlasGuardrailUtils.PERIOD_CURRENT, 0))
+                    .append("status", AtlasAssetStatus.nameOf(status))
                     .append("personal", InsightUtil.isPersonalAccount(c)));
+        }
+        for (AtlasToolRow skill : skillAssets) {
+            skills.add(new BasicDBObject("name", skill.getName())
+                    .append("count", bySkill.get(skill.getName()))
+                    .append("status", AtlasAssetStatus.nameOf(statusService.resolve(skill, decisions, bundle.allowlistNamesLower))));
         }
         return response;
     }

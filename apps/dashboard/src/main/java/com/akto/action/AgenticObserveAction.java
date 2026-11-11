@@ -2139,8 +2139,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             boolean hasBrowserLlm = hasTagKey(envType, Constants.AKTO_BROWSER_LLM_TAG);
             if (hasBrowserLlm) {
-                String serviceName = extractServiceNameForGrouping(hostName);
-                if (StringUtils.isNotBlank(serviceName)) {
+                String serviceName = llmGroupKey(c);
+                if (serviceName != null) {
                     GroupSummary g = groups.computeIfAbsent("llm|" + serviceName, k -> {
                         GroupSummary gs = new GroupSummary(serviceName, "llm");
                         gs.name = serviceName;
@@ -2155,9 +2155,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             CollectionTags assetTag = AgenticObserveUtil.findAssetTag(c);
             boolean addedToAgentGroup = false;
-            if (assetTag != null && StringUtils.isNotBlank(assetTag.getValue())
-                    && !Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName())) {
-                String key = McpClientRegistry.resolveClientKey(assetTag.getValue());
+            String key = agentGroupKey(c);
+            if (key != null) {
                 boolean isSaasAgent = hasTagKey(envType, Constants.AKTO_SAAS_AGENT_TAG);
                 GroupSummary g = groups.computeIfAbsent("agent|" + key, k -> {
                     GroupSummary gs = new GroupSummary(key, "agent");
@@ -2171,21 +2170,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 addedToAgentGroup = true;
             }
 
-            CollectionTags typeTag = AgenticObserveUtil.findTypeTag(c);
-            if (typeTag == null) continue;
-
-            // constants.js's groupCollectionsByService only excludes an agent-owned collection from
-            // ALSO getting its own service row when the type tag is gen-ai — an agent-owned
-            // mcp-server collection (e.g. mcp-client=cursor + mcp-server) still gets a service row
-            // too, deliberately double-counted across the agent and service groups. Mirror that
-            // exact scoping rather than unconditionally skipping the service branch whenever a bound
-            // or orphaned (unbound) owner tag was found.
-            if (Constants.AKTO_GEN_AI_TAG.equals(typeTag.getKeyName())) {
-                if (addedToAgentGroup || hasAgentOwnerTag(envType)) continue;
-            }
-
-            String serviceName = extractServiceNameForGrouping(hostName);
-            if (StringUtils.isBlank(serviceName)) continue;
+            String serviceName = serviceGroupKey(c, addedToAgentGroup);
+            if (serviceName == null) continue;
             final ApiCollection fc = c;
             GroupSummary g = groups.computeIfAbsent("service|" + serviceName, k -> {
                 GroupSummary gs = new GroupSummary(serviceName, "service");
@@ -4374,5 +4360,36 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (vendor != null && !ATLAS_UNKNOWN_VENDOR.equalsIgnoreCase(vendor)) return vendor;
         }
         return null;
+    }
+
+    // The llm group a collection belongs to, as classifyAllGroups keys it; null when it has no browser-llm tag.
+    public static String llmGroupKey(ApiCollection c) {
+        if (!hasTagKey(c.getEnvType(), Constants.AKTO_BROWSER_LLM_TAG)) return null;
+        String serviceName = extractServiceNameForGrouping(c.getHostName());
+        return StringUtils.isNotBlank(serviceName) ? serviceName : null;
+    }
+
+    // The agent group a collection belongs to, as classifyAllGroups keys it; null when it has no agent tag.
+    public static String agentGroupKey(ApiCollection c) {
+        CollectionTags assetTag = AgenticObserveUtil.findAssetTag(c);
+        if (assetTag == null || StringUtils.isBlank(assetTag.getValue())
+                || Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName())) return null;
+        return McpClientRegistry.resolveClientKey(assetTag.getValue());
+    }
+
+    // The service group a collection belongs to, as classifyAllGroups keys it; null when it gets no service row.
+    // constants.js's groupCollectionsByService only excludes an agent-owned collection from
+    // ALSO getting its own service row when the type tag is gen-ai — an agent-owned
+    // mcp-server collection (e.g. mcp-client=cursor + mcp-server) still gets a service row
+    // too, deliberately double-counted across the agent and service groups. Mirror that
+    // exact scoping rather than unconditionally skipping the service branch whenever a bound
+    // or orphaned (unbound) owner tag was found.
+    public static String serviceGroupKey(ApiCollection c, boolean inAgentGroup) {
+        CollectionTags typeTag = AgenticObserveUtil.findTypeTag(c);
+        if (typeTag == null) return null;
+        if (Constants.AKTO_GEN_AI_TAG.equals(typeTag.getKeyName())
+                && (inAgentGroup || hasAgentOwnerTag(c.getEnvType()))) return null;
+        String serviceName = extractServiceNameForGrouping(c.getHostName());
+        return StringUtils.isNotBlank(serviceName) ? serviceName : null;
     }
 }

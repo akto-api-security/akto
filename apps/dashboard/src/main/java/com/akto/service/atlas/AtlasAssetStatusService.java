@@ -163,21 +163,15 @@ public class AtlasAssetStatusService {
 
     /** Decisions on the malicious skills among the tools, read by name so the many other skill rows are never scanned. */
     public Map<String, AtlasAssetStatus> loadSkillDecisions(Collection<AtlasToolRow> tools) {
-        Set<String> names = new HashSet<>();
+        List<String> names = new ArrayList<>();
         int skills = 0;
         for (AtlasToolRow tool : tools) {
             if (!ROW_TYPE_SKILL.equals(tool.getRowType()) || !tool.isMalicious()) continue;
             if (++skills > MAX_SKILL_DECISION_NAMES) continue;
-            // The audit row may differ in case from the skill group's name; names are matched exactly, so look up both spellings.
             names.add(tool.getGroupKey());
-            names.add(tool.getGroupKey().toLowerCase(Locale.ROOT));
         }
         if (skills > MAX_SKILL_DECISION_NAMES) logger.warnAndAddToDb("Atlas discovery: " + skills + " malicious skills, decisions read for the first " + MAX_SKILL_DECISION_NAMES);
-        Map<String, AtlasAssetStatus> decisions = new HashMap<>();
-        if (names.isEmpty()) return decisions;
-        readInto(decisions, Filters.and(Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL),
-                Filters.in(McpAuditInfo.RESOURCE_NAME, names), contextSourceFilter(Context.contextSource.get())));
-        return decisions;
+        return loadSkillDecisionsByName(names);
     }
 
     // Pages the matching rows by _id and keeps the strongest decision per tool, ranked like the Audit page.
@@ -367,5 +361,20 @@ public class AtlasAssetStatusService {
         McpAuditInfoDao.instance.getMCollection().updateOne(
                 Filters.and(Filters.eq(McpAuditInfo.TYPE, type), Filters.eq(McpAuditInfo.RESOURCE_NAME, tool.getGroupKey()), globalScope()),
                 Updates.combine(insert), new UpdateOptions().upsert(true));
+    }
+
+    public Map<String, AtlasAssetStatus> loadSkillDecisionsByName(Collection<String> skillNames) {
+        Set<String> names = new HashSet<>();
+        for (String name : skillNames) {
+            if (StringUtils.isBlank(name)) continue;
+            // The audit row may differ in case from the skill group's name; names are matched exactly, so look up both spellings.
+            names.add(name);
+            names.add(name.toLowerCase(Locale.ROOT));
+        }
+        Map<String, AtlasAssetStatus> decisions = new HashMap<>();
+        if (names.isEmpty()) return decisions;
+        readInto(decisions, Filters.and(Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL),
+                Filters.in(McpAuditInfo.RESOURCE_NAME, names), contextSourceFilter(Context.contextSource.get())));
+        return decisions;
     }
 }

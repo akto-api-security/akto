@@ -2,7 +2,9 @@ import Pill from "./Pill";
 
 const TAG_COLORS = {
     Approved: ["#AEE9D1", "#0C5132"],
-    Unapproved: ["#FED3D1", "#8E1F0B"],
+    Blocked: ["#FED3D1", "#8E1F0B"],
+    "Under review": ["#FFEA8A", "#5C4600"],
+    Unapproved: ["#E4E5E7", "#44474A"],
     Personal: ["#FFEA8A", "#5C4600"],
 };
 
