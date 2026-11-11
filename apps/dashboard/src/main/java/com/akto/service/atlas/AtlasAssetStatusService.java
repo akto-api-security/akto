@@ -92,7 +92,8 @@ public class AtlasAssetStatusService {
         AtlasAssetStatus decided = type == null ? null : decisions.get(decisionKey(type, tool.getGroupKey()));
         // Any decision someone made wins over the allowlist; only a tool nobody touched falls back to it.
         if (decided != null && decided != AtlasAssetStatus.UNAPPROVED) return decided;
-        return isAllowlisted(tool, allowlistNamesLower) ? AtlasAssetStatus.APPROVED : AtlasAssetStatus.UNAPPROVED;
+        // A flagged tool is never approved by its vendor being allowlisted.
+        return !tool.isMalicious() && isAllowlisted(tool, allowlistNamesLower) ? AtlasAssetStatus.APPROVED : AtlasAssetStatus.UNAPPROVED;
     }
 
     public Map<String, AtlasAssetStatus> loadDecisions() {

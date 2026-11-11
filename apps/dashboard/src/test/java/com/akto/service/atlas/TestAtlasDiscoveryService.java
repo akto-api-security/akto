@@ -76,6 +76,15 @@ public class TestAtlasDiscoveryService {
     }
 
     @Test
+    public void flaggedToolIsNotApprovedByAllowlistedVendor() {
+        AtlasToolRow skill = tool("skill", "flagged-skill", 0, NOW, "d1");
+        skill.setVendorName("Sample");
+        skill.setMalicious(true);
+
+        assertEquals(AtlasAssetStatus.UNAPPROVED, new AtlasAssetStatusService().resolve(skill, new HashMap<>(), new HashSet<>(Collections.singletonList("sample"))));
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     public void decisionsAreRankedAndCapped() {
         List<AtlasToolRow> rows = new ArrayList<>();
