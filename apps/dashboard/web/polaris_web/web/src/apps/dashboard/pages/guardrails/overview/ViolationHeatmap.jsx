@@ -1,69 +1,100 @@
-import { Badge, Box, Button, Card, HorizontalStack, IndexTable, Text, VerticalStack } from '@shopify/polaris'
-import { SEVERITY } from '../utils'
+import { Box, Button, Card, HorizontalGrid, HorizontalStack, Link, Text, Tooltip, VerticalStack } from '@shopify/polaris'
 
-// A cell has the hue of its policy's severity, and gets stronger as its count grows.
-const SEVERITY_LEVELS = [SEVERITY.LOW, SEVERITY.MEDIUM, SEVERITY.HIGH, SEVERITY.CRITICAL]
-// The full-strength end of each severity's colour, as r, g, b.
-const HEAT_RGB = { LOW: [140, 145, 150], MEDIUM: [255, 158, 44], HIGH: [240, 100, 79], CRITICAL: [185, 28, 12] }
-// The faintest cell stays readable.
-const MIN_ALPHA = 0.2
 const OTHER = 'Other'
+const LABEL_WIDTH = 240
 
-const severityRank = (severity) => SEVERITY_LEVELS.findIndex((level) => level.value === severity)
+// The design's colour scheme: a pale pink that deepens to a strong red as the count grows. Polaris's strong critical
+// red laid over the cell, from 0.1 to full opacity, follows it closely.
+const MIN_OPACITY = 0.1
+// As in the design, light cells have dark text and dark cells white. Past this opacity white is the more readable.
+const LIGHT_TEXT_FROM = 0.78
 
-// Counts are very uneven (one load-tested agent can hold 100x the rest), so strength is read on a log scale.
+// Counts are very uneven (one load-tested agent can hold 100x the rest), so strength is read on a log scale:
+// on a plain count / max, every cell but the top few would look the same.
 // It runs from 0 to 1, where 1 is the busiest cell.
 const strengthOf = (value, max) => Math.log(1 + value) / Math.log(1 + max)
 
-// The .heat-badge rule in dashboard.css applies these two variables to the Polaris badge.
-function heatStyle(severity, strength) {
-    const [r, g, b] = HEAT_RGB[severity]
-    const alpha = MIN_ALPHA + (1 - MIN_ALPHA) * strength
-    return {
-        '--heat-bg': `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)})`,
-        // Strong critical cells are dark red and need light text.
-        '--heat-text': severity === SEVERITY.CRITICAL.value && alpha > 0.6 ? '#FFFBFB' : '#202223',
-    }
+// A layer that covers its cell.
+function Fill({ background, opacity }) {
+    return (
+        <Box
+            position="absolute"
+            insetBlockStart="0"
+            insetBlockEnd="0"
+            insetInlineStart="0"
+            insetInlineEnd="0"
+            borderRadius="2"
+            background={background}
+            opacity={opacity.toFixed(2)}
+        />
+    )
 }
 
-// `severity` is missing for a policy that no longer exists, which stays a plain badge.
-function HeatBadge({ severity, strength, children }) {
-    return severity
-        ? <div className="heat-badge" style={heatStyle(severity, strength)}><Badge size="small">{children}</Badge></div>
-        : <Badge size="small">{children}</Badge>
+// A cell shaded by its count. onOpen is missing when there is nothing to open.
+function Cell({ count, strength, tip, onOpen }) {
+    const filled = count > 0
+    const opacity = MIN_OPACITY + (1 - MIN_OPACITY) * strength
+    const text = <Text as="span" variant="bodyMd" fontWeight="semibold">{filled ? count.toLocaleString() : '–'}</Text>
+    let color = 'text-disabled'
+    if (filled) color = opacity > LIGHT_TEXT_FROM ? 'text-on-color' : 'text'
+    return (
+        // The tooltip wraps its child in a flex container, so the child takes the full width to fill the cell.
+        <Tooltip content={tip} activatorWrapper="div" preferredPosition="above">
+            <Box width="100%" position="relative" borderRadius="2" background="bg-subdued" color={color}>
+                {filled && <Fill background="bg-critical-strong" opacity={opacity} />}
+                {/* Same padding either way, so a button and plain text sit at the same height. Top and bottom only,
+                    so the button spans the full width of the cell. (A large plain button is pulled 20px left by
+                    Polaris's negative margins, which puts its number off centre.) */}
+                <Box position="relative" paddingBlockStart="2" paddingBlockEnd="2">
+                    {onOpen ? (
+                        <Button plain monochrome removeUnderline fullWidth accessibilityLabel={tip} onClick={onOpen}>{text}</Button>
+                    ) : (
+                        <Text as="p" alignment="center">{text}</Text>
+                    )}
+                </Box>
+            </Box>
+        </Tooltip>
+    )
 }
 
-function CountBadge({ value, severity, strength }) {
-    if (!value) return <Text as="span" color="subdued">–</Text>
-    return <HeatBadge severity={severity} strength={strength}>{value.toLocaleString()}</HeatBadge>
+// One agent: its label, then a cell per policy column. An agent with no host to filter by has nothing to open.
+function AgentRow({ row, columns, max, onOpenAgent, onOpenCell }) {
+    const openable = row.hosts.length > 0
+    return (
+        <>
+            <VerticalStack gap="0" align="center">
+                <Text as="span" variant="bodyMd" fontWeight="semibold" breakWord>
+                    {openable ? <Link monochrome removeUnderline onClick={onOpenAgent}>{row.agent}</Link> : row.agent}
+                </Text>
+                {row.where && <Text as="span" variant="bodySm" color="subdued" breakWord>{row.where}</Text>}
+            </VerticalStack>
+            {row.cells.map((count, index) => (
+                <Cell
+                    key={columns[index]}
+                    count={count}
+                    strength={count > 0 ? strengthOf(count, max) : 0}
+                    tip={`${row.agent} · ${columns[index]}: ${count.toLocaleString()} violation${count === 1 ? '' : 's'}`}
+                    onOpen={openable && count > 0 ? () => onOpenCell(index) : undefined}
+                />
+            ))}
+        </>
+    )
 }
 
 // heatmap: { columns: [policy], otherPolicies: [policy], rows: [{ agent, where, hosts, cells: [count per column] }], total: agents in all }
-// policySeverity: { policy name: severity }
 // onOpen(hosts, policies) opens those violations; policies is empty for a whole agent.
-function ViolationHeatmap({ heatmap, policySeverity = {}, onOpen, onLoadMore, loadingMore }) {
+function ViolationHeatmap({ heatmap, onOpen, onLoadMore, loadingMore }) {
     const { columns, otherPolicies, rows, total } = heatmap
     const max = Math.max(1, ...rows.flatMap((r) => r.cells))
-    const headings = [{ title: 'Agent' }, ...columns.map((c) => ({ title: c, alignment: 'center' }))]
     // The Other column stands for every policy that has no column of its own.
     const policiesOf = (column) => (column === OTHER && otherPolicies.length > 0 ? otherPolicies : [column])
-    // Other mixes several policies, so it shows the highest severity among them.
-    const severityOf = (column) => policiesOf(column)
-        .map((policy) => policySeverity[policy])
-        .filter((severity) => severityRank(severity) >= 0)
-        .reduce((highest, severity) => (severityRank(severity) > severityRank(highest) ? severity : highest), undefined)
-    const columnSeverity = columns.map(severityOf)
-    // An agent with no host to filter by has nothing to open.
-    const openProps = (row, policies) => (row.hosts.length > 0
-        ? { className: 'cursor-pointer', onClick: () => onOpen(row.hosts, policies) }
-        : {})
 
     return (
         <Card padding="0">
             <Box padding="4">
                 <VerticalStack gap="1">
                     <Text variant="headingMd" as="h2">Where violations happen</Text>
-                    <Text variant="bodySm" color="subdued">Violations per agent for your busiest policies. The colour is the policy's severity and gets stronger with more violations. Select a cell to see those violations.</Text>
+                    <Text variant="bodySm" color="subdued">Violations per agent for your busiest policies. Select a cell to see those violations.</Text>
                 </VerticalStack>
             </Box>
             {rows.length === 0 ? (
@@ -71,46 +102,34 @@ function ViolationHeatmap({ heatmap, policySeverity = {}, onOpen, onLoadMore, lo
                     <Text variant="bodyMd" color="subdued" alignment="center">No violations in this period.</Text>
                 </Box>
             ) : (
-            <IndexTable
-                resourceName={{ singular: 'agent', plural: 'agents' }}
-                itemCount={rows.length}
-                headings={headings}
-                selectable={false}
-            >
-                {rows.map((row, index) => (
-                    <IndexTable.Row id={`${row.agent}-${index}`} key={`${row.agent}-${index}`} position={index}>
-                        <IndexTable.Cell>
-                            <Box {...openProps(row, [])}>
-                                <VerticalStack gap="0">
-                                    <Text variant="bodyMd" fontWeight="semibold">{row.agent}</Text>
-                                    <Text variant="bodySm" color="subdued">{row.where}</Text>
-                                </VerticalStack>
+                <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
+                    <HorizontalGrid columns={`${LABEL_WIDTH}px repeat(${columns.length}, minmax(0, 1fr))`} gap="1">
+                        <Box />
+                        {columns.map((column) => (
+                            <Box key={column} paddingBlockEnd="1">
+                                <Text as="p" variant="bodySm" color="subdued" alignment="center" breakWord>{column}</Text>
                             </Box>
-                        </IndexTable.Cell>
-                        {row.cells.map((count, i) => (
-                            <IndexTable.Cell key={columns[i]}>
-                                <Box {...openProps(row, policiesOf(columns[i]))}>
-                                    <HorizontalStack align="center">
-                                        <CountBadge value={count} severity={columnSeverity[i]} strength={strengthOf(count, max)} />
-                                    </HorizontalStack>
-                                </Box>
-                            </IndexTable.Cell>
                         ))}
-                    </IndexTable.Row>
-                ))}
-            </IndexTable>
+                        {rows.map((row, index) => (
+                            <AgentRow
+                                key={`${row.agent}-${index}`}
+                                row={row}
+                                columns={columns}
+                                max={max}
+                                onOpenAgent={() => onOpen(row.hosts, [])}
+                                onOpenCell={(columnIndex) => onOpen(row.hosts, policiesOf(columns[columnIndex]))}
+                            />
+                        ))}
+                    </HorizontalGrid>
+                </Box>
             )}
-            <Box padding="4">
-                <HorizontalStack align="space-between" blockAlign="center" gap="2">
-                    <HorizontalStack gap="2" blockAlign="center">
-                        <Text variant="bodySm" color="subdued">Policy severity</Text>
-                        {SEVERITY_LEVELS.map((level) => <HeatBadge key={level.value} severity={level.value} strength={1}>{level.label}</HeatBadge>)}
-                    </HorizontalStack>
-                    {rows.length < total && (
+            {rows.length < total && (
+                <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
+                    <HorizontalStack align="end">
                         <Button plain loading={loadingMore} onClick={onLoadMore}>{`Show more agents (${total - rows.length} more)`}</Button>
-                    )}
-                </HorizontalStack>
-            </Box>
+                    </HorizontalStack>
+                </Box>
+            )}
         </Card>
     )
 }
