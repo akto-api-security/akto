@@ -299,11 +299,13 @@ export default {
     // maliciousSkillKeys is NOT sent — AgenticObserveAction computes/caches it itself now
     // (getOrBuildSkillData) instead of requiring the whole account-wide set (14,218 entries /
     // ~500KB+ on Atlas Scale Test) to be re-POSTed on every paginated request.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName } = {}) {
+    // aiInventory: the AI inventory (new layout) — adds tool search and per-row tools, status,
+    // employees and category. Left off by the legacy Endpoints page.
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName, aiInventory } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName, aiInventory },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0, distinctUsernames: resp?.distinctUsernames || [] }
     },

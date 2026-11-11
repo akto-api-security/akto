@@ -200,6 +200,7 @@ export default function AgenticAssetsPage() {
       // is shared with the agent/device that invoked it, so collection-based attribution can't
       // give a skill its own count (see fetchAgenticSkillViolationCounts's own comment).
       skillViolationsByName,
+      aiInventory: true,
     }).then((res) => ({
       value: (res.rows || []).map((row) => shapeRow(row)),
       total: res.total || 0,

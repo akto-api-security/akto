@@ -109,6 +109,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private Map<String, Integer> trafficMap;
     @Setter private Map<String, Double> riskScoreMap;
     @Setter private Map<String, List<String>> filters; // AG Grid column filters, keyed by field name (e.g. "tags", "groupName")
+    // fetchAgenticAssetsSummary from the AI inventory (new layout): adds tool search and per-row tools,
+    // approval status, employees and category. The legacy Endpoints page leaves it off.
+    @Setter private boolean aiInventory;
 
     // ---- Server-side pagination for fetchUsersAndDevicesSummary ----
     @Setter private String groupBy; // "user" | "device"
@@ -2496,16 +2499,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             if (StringUtils.isNotBlank(queryValue)) {
                 String q = queryValue.toLowerCase(Locale.ROOT);
-                ToolNamesCacheEntry searchTools = getOrBuildToolNames(cached.groups.values());
+                ToolNamesCacheEntry searchTools = aiInventory ? getOrBuildToolNames(cached.groups.values()) : null;
                 all.removeIf(g -> {
                     if (g.name != null && g.name.toLowerCase(Locale.ROOT).contains(q)) return false;
-                    for (String t : toolNamesOf(g, searchTools)) if (t.toLowerCase(Locale.ROOT).contains(q)) return false;
+                    if (searchTools != null) {
+                        for (String t : toolNamesOf(g, searchTools)) if (t.toLowerCase(Locale.ROOT).contains(q)) return false;
+                    }
                     return true;
                 });
             }
 
             // Read fresh on every call (not part of the classification cache) so an Approve/Block shows immediately.
-            Map<String, ApprovalState> approvalStates = fetchApprovalStates(all);
+            Map<String, ApprovalState> approvalStates = aiInventory ? fetchApprovalStates(all) : Collections.emptyMap();
 
             // AG Grid column filters. "type" is a small fixed enum (AgenticObserveUtil.CLIENT_TYPE_*),
             // matched directly. "tags" mirrors AgenticAssetsPage.jsx's shapeRow tag derivation exactly
@@ -2603,7 +2608,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
             Map<String, String> usernameMap = getOrComputeUsernameMap();
-            ToolNamesCacheEntry rowTools = getOrBuildToolNames(cached.groups.values());
+            ToolNamesCacheEntry rowTools = aiInventory ? getOrBuildToolNames(cached.groups.values()) : null;
             SkillDataCacheEntry skillData = getOrBuildSkillData();
             Set<String> maliciousKeys = skillData.maliciousSkillKeys;
             List<BasicDBObject> rowsOut = new ArrayList<>();
@@ -2660,20 +2665,22 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     row.remove("baseRiskScore");
                     row.remove("baseRiskScoreReason");
                 }
-                row.put("inventoryCategory", inventoryCategory(g));
-                // Discovered tool names, for the Tool capabilities column and the asset panel's tools list.
-                row.put("tools", new ArrayList<>(toolNamesOf(g, rowTools)));
-                Set<String> employees = new HashSet<>();
-                for (String id : g.endpointIds) {
-                    String u = resolveUsernameByDeviceId(id, usernameMap);
-                    if (StringUtils.isNotBlank(u) && !"-".equals(u)) employees.add(u.toLowerCase(Locale.ROOT));
-                }
-                row.put("employeesCount", employees.size());
-                String approvalStatus = approvalStatusOf(g, approvalStates);
-                if (approvalStatus != null) {
-                    row.put("approvalStatus", approvalStatus);
-                    ApprovalState state = approvalStates.get(approvalAuditType(g) + "|" + g.groupKey);
-                    if ("llm".equals(g.rowType)) row.put("auditHexIds", state == null ? Collections.emptyList() : state.hexIds);
+                if (aiInventory) {
+                    row.put("inventoryCategory", inventoryCategory(g));
+                    // Discovered tool names, for the Tool capabilities column and the asset panel's tools list.
+                    row.put("tools", new ArrayList<>(toolNamesOf(g, rowTools)));
+                    Set<String> employees = new HashSet<>();
+                    for (String id : g.endpointIds) {
+                        String u = resolveUsernameByDeviceId(id, usernameMap);
+                        if (StringUtils.isNotBlank(u) && !"-".equals(u)) employees.add(u.toLowerCase(Locale.ROOT));
+                    }
+                    row.put("employeesCount", employees.size());
+                    String approvalStatus = approvalStatusOf(g, approvalStates);
+                    if (approvalStatus != null) {
+                        row.put("approvalStatus", approvalStatus);
+                        ApprovalState state = approvalStates.get(approvalAuditType(g) + "|" + g.groupKey);
+                        if ("llm".equals(g.rowType)) row.put("auditHexIds", state == null ? Collections.emptyList() : state.hexIds);
+                    }
                 }
                 rowsOut.add(row);
             }

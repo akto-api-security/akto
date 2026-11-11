@@ -33,12 +33,14 @@ export function getRiskLevel(score) {
     return "LOW";
 }
 
-const RISK_LEVEL_STATUS = { CRITICAL: "critical", HIGH: "attention", MEDIUM: "warning", LOW: "info" };
-
-// Polaris Badge status for a risk score, from the same buckets so badge colour and level agree.
+// Polaris Badge status for a risk score — matches the old Endpoints layout. Used by RiskPill on
+// other pages too (device flyout, components, tree view), so it keeps its own thresholds.
 export function getRiskStatus(score) {
-    if (!(score > 0)) return undefined;
-    return RISK_LEVEL_STATUS[getRiskLevel(score)];
+    if (score >= 4.5) return "critical";
+    if (score >= 4) return "attention";
+    if (score >= 2.5) return "warning";
+    if (score > 0) return "info";
+    return undefined;
 }
 
 // Human label derived from the bucket — no duplicated thresholds.
