@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, Badge, Banner, HorizontalStack, Text } from "@shopify/polaris";
 import AskBar from "@/apps/dashboard/components/shared/AskBar";
-import { getRiskLabel, getRiskLevel } from "@/apps/dashboard/pages/observe/agentic/agenticPageBuilders";
 import func from "@/util/func";
 import { THREAT_ACTIVITY_PATH, clearSavedActivityFilters, fetchActiveToolViolationCount, threatActivityLink } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
+import { HIGH_RISK_THRESHOLD } from "../../devices_employees/peopleConstants";
 import AtlasFlyout, { FlyoutRowList } from "../../shared/AtlasFlyout";
 import discoveryApi from "../discoveryApi";
 import AssetStatusBadge from "../shared/AssetStatusBadge";
@@ -12,7 +12,7 @@ import ToolAvatar from "../shared/ToolAvatar";
 import useAssetStatusUpdate from "../shared/useAssetStatusUpdate";
 import useToolCapabilities from "../useToolCapabilities";
 import {
-    ASSET_STATUS, ATLAS_DISCOVERY_CHAT_SCOPE, CAPABILITY_TITLES, CATEGORY_LABELS, GUARDRAIL_POLICIES_PATH, HIGH_RISK_LEVELS, INSTALL_METHODS, LOAD_STATE, VIOLATION_WINDOW_LABEL, VIOLATION_WINDOW_SECONDS,
+    ASSET_STATUS, ATLAS_DISCOVERY_CHAT_SCOPE, CAPABILITY_TITLES, CATEGORY_LABELS, GUARDRAIL_POLICIES_PATH, INSTALL_METHODS, LOAD_STATE, VIOLATION_WINDOW_LABEL, VIOLATION_WINDOW_SECONDS,
 } from "../constants";
 import { capabilityTags, formatDate, plural, signalsOf } from "../transform";
 
@@ -25,11 +25,11 @@ const violationWindow = () => {
 const askSuggestions = (name) => [`Who installed ${name} first?`, `What did ${name} access this week?`, `Is there an approved alternative to ${name}?`];
 
 function statsOf(detail) {
-    const level = getRiskLevel(detail.riskScore || 0);
     return [
         { title: "Devices", data: detail.devices, variant: "headingLg" },
         { title: "Employees", data: detail.employees, variant: "headingLg" },
-        { title: "Risk", data: detail.riskScore > 0 ? getRiskLabel(detail.riskScore).replace(" Risk", "") : "—", variant: "headingLg", color: HIGH_RISK_LEVELS.includes(level) ? "critical" : undefined },
+        // Same tile as the employee flyout: critical colour from the high-risk threshold.
+        { title: "Risk score", data: detail.riskScore > 0 ? detail.riskScore : "—", variant: "headingLg", color: detail.riskScore >= HIGH_RISK_THRESHOLD ? "critical" : undefined },
         { title: "First seen", data: formatDate(detail.firstSeen), variant: "headingLg" },
     ];
 }

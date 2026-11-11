@@ -1,5 +1,5 @@
 import { getRiskLevel } from "@/apps/dashboard/pages/observe/agentic/agenticPageBuilders";
-import { ASSET_STATUS, BUBBLE_STYLE, CAPABILITY_TAGS, CATEGORY_LABELS, DECISIONS_PAGING, MAX_NODE_LABEL, SIGNAL_META, STATUS_META } from "./constants";
+import { ASSET_STATUS, BUBBLE_STYLE, CAPABILITY_TAGS, CATEGORY_LABELS, DECISIONS_PAGING, MAX_NODE_LABEL, RISK_LEVEL_BADGE, SIGNAL_META, STATUS_META } from "./constants";
 
 const BAD = "bad";
 const PERCENT_MAX = 100;
@@ -70,6 +70,12 @@ export function capabilityTags(tool) {
     if (tool.hasPrivilegedAccess) tags.push({ label: "Privileged", critical: true });
     CAPABILITY_TAGS.filter((tag) => tag.pattern.test(tool.name || "")).forEach((tag) => tags.push({ label: tag.label, critical: tag.critical }));
     return tags;
+}
+
+// "High risk" for a score, with the Polaris badge status of its level.
+export function riskBadge(score) {
+    const level = getRiskLevel(score);
+    return { label: `${level.charAt(0)}${level.slice(1).toLowerCase()} risk`, status: RISK_LEVEL_BADGE[level] };
 }
 
 export function formatDate(epochSeconds) {

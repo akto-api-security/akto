@@ -57,14 +57,13 @@ export const BUBBLE_STYLE = Object.fromEntries(Object.entries(STATUS_PALETTE).ma
 }));
 
 export const RISK_LEVEL_LABELS = ["Low", "Medium", "High", "Critical"];
+// Badge colour per risk level, so a badge reads the same colour as its label.
+export const RISK_LEVEL_BADGE = { CRITICAL: "critical", HIGH: "attention", MEDIUM: "warning", LOW: "info" };
 // Statuses the trend chart stacks; blocked tools are decided, so they are left out.
 export const TREND_STATUSES = ["APPROVED", "UNDER_REVIEW", "UNAPPROVED"];
 
 // Adoption bar colours: the filled part and the empty track.
 export const ADOPTION_BAR = { fill: BRAND_PURPLE, track: "var(--p-color-bg-hover)" };
-
-// Risk levels that get the critical colour in stat cards.
-export const HIGH_RISK_LEVELS = ["CRITICAL", "HIGH"];
 
 // Flyout capabilities: which row types list tools, under what heading, and how names map to tags.
 export const CAPABILITY_TITLES = { service: "Tools exposed", agent: "Capabilities" };

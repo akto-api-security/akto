@@ -28,6 +28,8 @@ public class AtlasToolRow {
     private String vendorName;
     private String riskReason;
     private double riskScore;
+    // The collection's own score behind riskReason; the Agentic pages show the reason only when it is set.
+    private Double baseRiskScore;
     private int firstSeen;
     private int lastSeen;
     private boolean personal;

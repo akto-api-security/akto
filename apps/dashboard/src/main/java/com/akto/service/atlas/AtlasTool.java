@@ -54,6 +54,8 @@ public final class AtlasTool {
         summary.put("category", category);
         summary.put("status", status.name());
         summary.put("riskScore", row.getRiskScore());
+        summary.put("baseRiskScore", row.getBaseRiskScore());
+        summary.put("riskReason", row.getRiskReason());
         summary.put("devices", devices());
         summary.put("employees", users.size());
         return summary;

@@ -4088,6 +4088,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             row.setClientType(g.clientType);
             row.setVendorName(atlasVendorName(g));
             row.setRiskReason(g.baseRiskScoreReason);
+            row.setBaseRiskScore(g.baseRiskScore);
             // A skill carries its own score, kept per skill name apart from its collections' scores.
             double risk = AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType) ? Math.max(g.maxRiskScore, skillScores.getOrDefault(g.name, 0f)) : g.maxRiskScore;
             row.setRiskScore(risk > 0 ? AgenticObserveUtil.roundRiskScore(risk) : 0);

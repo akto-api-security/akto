@@ -1,21 +1,18 @@
 import { useEffect, useState } from "react";
 import { Badge, Box, HorizontalStack, Pagination, Text, VerticalStack } from "@shopify/polaris";
 import Pressable from "@/apps/dashboard/pages/dashboard/ask/components/Pressable";
-import { getRiskLevel, getRiskStatus } from "@/apps/dashboard/pages/observe/agentic/agenticPageBuilders";
+import observeFunc from "@/apps/dashboard/pages/observe/transform";
 import ActionChip from "../../shared/ActionChip";
 import discoveryApi from "../discoveryApi";
 import DiscoveryCard from "../shared/DiscoveryCard";
 import ToolAvatar from "../shared/ToolAvatar";
 import { LOAD_STATE, SUBTITLES } from "../constants";
+import { riskBadge } from "../transform";
 
 const PAGE_SIZE_SETTLE_MS = 300;
 
-const riskLabel = (score) => {
-    const level = getRiskLevel(score);
-    return `${level.charAt(0)}${level.slice(1).toLowerCase()} risk`;
-};
-
 function DecisionRow({ row, pending, onOpen, onApprove, onBlock }) {
+    const risk = row.riskScore > 0 ? riskBadge(row.riskScore) : null;
     return (
         <HorizontalStack align="space-between" blockAlign="center" gap="3" wrap={false}>
             <Pressable onClick={() => onOpen(row)} accessibilityLabel={`Open ${row.name}`} hoverBackground="bg-subdued" borderRadius="2" padding="1">
@@ -24,7 +21,7 @@ function DecisionRow({ row, pending, onOpen, onApprove, onBlock }) {
                     <VerticalStack gap="0" inlineAlign="start">
                         <HorizontalStack gap="2" blockAlign="center" align="start" wrap={false}>
                             <Text as="span" fontWeight="semibold">{row.name}</Text>
-                            {row.riskScore > 0 && <Badge size="small" status={getRiskStatus(row.riskScore)}>{riskLabel(row.riskScore)}</Badge>}
+                            {risk && observeFunc.wrapRiskScoreTooltip(<Badge size="small" status={risk.status}>{risk.label}</Badge>, row.riskScore, row.baseRiskScore, row.riskReason)}
                             {row.isNew && <Badge size="small" status="info">New</Badge>}
                         </HorizontalStack>
                         <Text as="p" color="subdued">{row.why}</Text>
