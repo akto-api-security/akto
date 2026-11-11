@@ -1,8 +1,9 @@
 import { Box, Button, Text, VerticalStack } from "@shopify/polaris";
 import BarGraph from "../../../../components/charts/BarGraph";
 import InfoCard from "../../../dashboard/new_components/InfoCard";
-import { HIGH_RISK_THRESHOLD, MEDIUM_RISK_THRESHOLD, RISK_BUCKET_WIDTH, RISK_COLORS, RISK_EXPLANATION } from "./peopleConstants";
+import { HIGH_RISK_THRESHOLD, RISK_BUCKET_WIDTH, RISK_EXPLANATION, SEVERITY_SEGMENTS } from "./peopleConstants";
 import transform from "./transform";
+import { getRiskLevel } from "../../agentic/agenticPageBuilders";
 import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const BAR_WIDTH = 36;
@@ -11,37 +12,45 @@ const CHART_OPTIONS = {
     yAxis: [{ title: { text: "" }, visible: false, gridLineWidth: 0, min: 0, maxPadding: 0.2 }],
 };
 
-function bucketLabel(index) {
-    return `${index * RISK_BUCKET_WIDTH}-${(index + 1) * RISK_BUCKET_WIDTH}`;
+// Each numeric bucket joins the level of its midpoint, so the thresholds stay in getRiskLevel only.
+// A score exactly on a boundary (2.0, 3.0, 4.0) sits in the higher bucket, so it can show one level above its badge.
+function levelOfBucket(index) {
+    return getRiskLevel((index + 0.5) * RISK_BUCKET_WIDTH).toLowerCase();
 }
 
-function bucketColor(index) {
-    const lowerBound = index * RISK_BUCKET_WIDTH;
-    if (lowerBound >= HIGH_RISK_THRESHOLD) return RISK_COLORS.high;
-    return lowerBound >= MEDIUM_RISK_THRESHOLD ? RISK_COLORS.medium : RISK_COLORS.low;
+function groupBucketsByLevel(counts) {
+    return SEVERITY_SEGMENTS.slice().reverse().map(({ key, name, color }, id) => {
+        const indexes = counts.map((_, index) => index).filter((index) => levelOfBucket(index) === key);
+        const value = indexes.reduce((sum, index) => sum + counts[index], 0);
+        const riskMin = indexes.length ? indexes[0] * RISK_BUCKET_WIDTH : 0;
+        const riskMax = indexes.length ? (indexes[indexes.length - 1] + 1) * RISK_BUCKET_WIDTH : 0;
+        return { text: name, value, color, id, riskMin, riskMax };
+    });
 }
 
 function RiskHistogramCard({ overview, status, onSelectBucket, onSelectHighRisk }) {
     const counts = overview?.riskHistogram || [];
     const highRisk = overview?.highRiskEmployees || 0;
-    const lastPopulated = counts.reduce((last, count, index) => (count > 0 ? index : last), 0);
-    const data = counts.slice(0, lastPopulated + 1).map((count, index) => ({ text: bucketLabel(index), value: count, color: bucketColor(index), id: index }));
+    const levels = groupBucketsByLevel(counts);
+    const data = levels.map(({ text, value, color, id }) => ({ text, value, color, id }));
+    const riskUnavailable = overview?.riskAvailable === false;
 
     const body = (
         <VerticalStack gap="2">
             <Text as="p" color="subdued">Highest {mapLabel('API', getDashboardCategory())} risk score (0 to 5) across each employee's AI tools</Text>
-            {overview?.riskAvailable === false && (
+            {riskUnavailable ? (
                 <Text as="p" variant="bodySm" color="critical">Risk scores are unavailable right now.</Text>
+            ) : (
+                <BarGraph
+                    data={data}
+                    height="280px"
+                    barWidth={BAR_WIDTH}
+                    showYAxis={false}
+                    showDataLabels
+                    defaultChartOptions={CHART_OPTIONS}
+                    onBarClick={(name, custom) => onSelectBucket(levels[custom.id])}
+                />
             )}
-            <BarGraph
-                data={data}
-                height="280px"
-                barWidth={BAR_WIDTH}
-                showYAxis={false}
-                showDataLabels
-                defaultChartOptions={CHART_OPTIONS}
-                onBarClick={(name, custom) => onSelectBucket(custom.id)}
-            />
             <Box>
                 <Button plain onClick={onSelectHighRisk}>{`${highRisk} employee${highRisk === 1 ? "" : "s"} score ${HIGH_RISK_THRESHOLD} or higher`}</Button>
             </Box>
