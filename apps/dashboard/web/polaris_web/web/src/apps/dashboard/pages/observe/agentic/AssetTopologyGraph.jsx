@@ -137,7 +137,7 @@ function buildDeviceItems(devices, deviceCount) {
     return items;
 }
 
-export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight, focusNodeId, onNodeClick, onPaneClick, fitKey, fitPadding }) {
+export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight, focusNodeId, onNodeClick, onPaneClick, fitKey, fitPadding, onFullscreenChange }) {
     // Each MCP's own tools, keyed by collection id — the extra hop the Endpoints graph shows.
     // Only for our own layout; a caller that supplies nodes reserves its own tool rows.
     const mcpCollectionIds = useMemo(() => {
@@ -293,6 +293,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
         document.addEventListener("fullscreenchange", sync);
         return () => document.removeEventListener("fullscreenchange", sync);
     }, []);
+    useEffect(() => { onFullscreenChange?.(fullscreen); }, [fullscreen]); // eslint-disable-line react-hooks/exhaustive-deps
     const toggleFullscreen = useCallback(() => {
         if (document.fullscreenElement) document.exitFullscreen();
         else containerRef.current?.requestFullscreen();
