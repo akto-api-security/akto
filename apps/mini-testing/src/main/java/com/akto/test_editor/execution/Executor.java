@@ -236,10 +236,15 @@ public class Executor {
         if (runAutomatedPentest) {
             String testSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
             RawApi preparedForPentest = applyPreRequestScript(origRawApi, testingRunConfig);
+            // tells smart testing which run this call belongs to, so the dashboard can show it live
+            Map<String, Object> runContext = AutomatedAgenticTestExecutor.runContext(testingRunResultSummaryIdHex,
+                    apiInfoKey != null ? apiInfoKey.getApiCollectionId() : null,
+                    apiInfoKey != null && apiInfoKey.getMethod() != null ? apiInfoKey.getMethod().name() : null,
+                    apiInfoKey != null ? apiInfoKey.getUrl() : null);
             PentestExecutionResult pentestResult =
                     automatedAgenticTestExecutor.executeAgenticTest(preparedForPentest, testSubType,
                             TestingConfigurations.getInstance().getAutomatedTestsCustomPrompt(),
-                            TestingConfigurations.getInstance().getSmartAgentConfig());
+                            TestingConfigurations.getInstance().getSmartAgentConfig(), runContext);
             List<TestResult> automatedAgenticResults = pentestResult.getTestResults();
             aiSummaryTraces = pentestResult.getAiSummaryTraces();
             smartTestingSkipReason = pentestResult.getSkipReason();

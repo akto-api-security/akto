@@ -75,8 +75,17 @@ public class AutomatedAgenticTestExecutor {
 
     /** smartAgent: the run's smart agent (skills, knowledge base, ...); null sends none. */
     public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType, String userPrompt, SmartAgentConfig smartAgent) {
+        return executeAgenticTest(testReq, testSubType, userPrompt, smartAgent, null);
+    }
+
+    /**
+     * runContext: which test run this call belongs to (see {@link #runContext}), so the service can show it live;
+     * null or empty sends none.
+     */
+    public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType, String userPrompt, SmartAgentConfig smartAgent,
+                                                     Map<String, Object> runContext) {
         try {
-            String body = buildRequestBody(testReq, testSubType, userPrompt, smartAgent);
+            String body = buildRequestBody(testReq, testSubType, userPrompt, smartAgent, runContext);
             RequestBody requestBody = RequestBody.create(body, MediaType.parse("application/json"));
 
             Request.Builder requestBuilder = new Request.Builder()
@@ -208,11 +217,32 @@ public class AutomatedAgenticTestExecutor {
         return entries.isEmpty() ? null : entries;
     }
 
+    /**
+     * The /pentest run context: the testing run result summary it belongs to and the API under test.
+     * Null when no summary id is known; null fields are left out.
+     */
+    public static Map<String, Object> runContext(String testingRunResultSummaryId, Integer apiCollectionId, String method, String url) {
+        if (testingRunResultSummaryId == null || testingRunResultSummaryId.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> out = new HashMap<>();
+        out.put("testingRunResultSummaryId", testingRunResultSummaryId);
+        if (apiCollectionId != null) out.put("apiCollectionId", apiCollectionId);
+        if (method != null) out.put("method", method);
+        if (url != null) out.put("url", url);
+        return out;
+    }
+
     private String buildRequestBody(RawApi testReq, String testSubType) throws Exception {
         return buildRequestBody(testReq, testSubType, null, null);
     }
 
     private String buildRequestBody(RawApi testReq, String testSubType, String userPrompt, SmartAgentConfig smartAgent) throws Exception {
+        return buildRequestBody(testReq, testSubType, userPrompt, smartAgent, null);
+    }
+
+    private String buildRequestBody(RawApi testReq, String testSubType, String userPrompt, SmartAgentConfig smartAgent,
+                                    Map<String, Object> runContext) throws Exception {
         OriginalHttpRequest req = testReq.getRequest();
         OriginalHttpResponse resp = testReq.getResponse();
 
@@ -249,6 +279,9 @@ public class AutomatedAgenticTestExecutor {
         }
         if (smartAgent != null) {
             payload.put("smartAgent", smartAgentOf(smartAgent));
+        }
+        if (runContext != null && !runContext.isEmpty()) {
+            payload.put("runContext", runContext);
         }
 
         return objectMapper.writeValueAsString(payload);

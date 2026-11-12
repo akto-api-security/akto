@@ -161,6 +161,27 @@ class AutomatedAgenticTestExecutorTest {
     }
 
     @Test
+    void theRunContextIsSentOnlyWhenTheRunIsKnown() throws Exception {
+        Map<String, Object> context = AutomatedAgenticTestExecutor.runContext("65a1b2c3d4e5f60718293a4b", 1111, "GET", "/api/v2/groups/STRING/alerts");
+        executor().executeAgenticTest(captured(), "X", null, null, context);
+        JsonNode sent = sent().get("runContext");
+        assertEquals("65a1b2c3d4e5f60718293a4b", sent.get("testingRunResultSummaryId").asText());
+        assertEquals(1111, sent.get("apiCollectionId").asInt());
+        assertEquals("GET", sent.get("method").asText());
+        assertEquals("/api/v2/groups/STRING/alerts", sent.get("url").asText());
+
+        // null fields are left out; no summary id means no run context at all
+        assertFalse(AutomatedAgenticTestExecutor.runContext("abc", null, null, null).containsKey("url"));
+        assertNull(AutomatedAgenticTestExecutor.runContext(null, 1111, "GET", "/x"));
+        executor().executeAgenticTest(captured(), "X", null, null, null);
+        assertFalse(sent().has("runContext"));
+        executor().executeAgenticTest(captured(), "X", "use org 7", null);
+        assertFalse(sent().has("runContext"));
+        executor().verifyFinding(captured(), captured(), "X");
+        assertFalse(sent().has("runContext"));
+    }
+
+    @Test
     void theDefaultExecutorUsesTheConfiguredService() {
         // only builds the client; nothing is sent
         assertNotNull(new AutomatedAgenticTestExecutor());
