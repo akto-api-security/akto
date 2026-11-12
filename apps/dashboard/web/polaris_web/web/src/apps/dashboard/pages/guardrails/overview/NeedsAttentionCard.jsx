@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Card, Divider, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Button, Card, Divider, HorizontalStack, Link, Text, VerticalStack } from '@shopify/polaris'
 import func from '@/util/func'
 import { usePermissions } from '@/util/permissions'
 import AllowedAction from '../../../components/shared/AllowedAction'
@@ -8,7 +8,7 @@ import { ownerLabel } from '../../threat_detection/utils/caseManagement'
 
 // rows: the loaded open issues, worst severity first; total counts all of them, so the rest load on demand.
 // collectionsMap names the agent when the event has one.
-function NeedsAttentionCard({ rows, total, collectionsMap, onViewAll, onReview, onAssign, onLoadMore, loadingMore }) {
+function NeedsAttentionCard({ rows, total, collectionsMap, onViewAll, onReview, onOpenPolicy, onAssign, onLoadMore, loadingMore }) {
     const { canCall } = usePermissions()
     const { owners } = useCaseOwners()
 
@@ -36,7 +36,9 @@ function NeedsAttentionCard({ rows, total, collectionsMap, onViewAll, onReview, 
                                 </Box>
                                 <Box minWidth="0" width="100%">
                                     <VerticalStack gap="0">
-                                        <Text variant="bodyMd" fontWeight="semibold" truncate>{row.policy}</Text>
+                                        <Text variant="bodyMd" fontWeight="semibold">
+                                            <Link removeUnderline onClick={() => onOpenPolicy(row)}>{row.policy}</Link>
+                                        </Text>
                                         <Text variant="bodySm" color="subdued" truncate>
                                             {`${agent} · ${row.count.toLocaleString()} occurrence${row.count === 1 ? '' : 's'} · last ${func.prettifyEpoch(row.ts)}`}
                                         </Text>

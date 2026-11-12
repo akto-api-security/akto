@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
-import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
+import { Banner, Box, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
 import AskBar from "@/apps/dashboard/components/shared/AskBar";
 import useGridColumnFilter from "@/apps/dashboard/components/tables/useGridColumnFilter";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
@@ -66,6 +66,22 @@ export default function AgenticAssetsPage() {
     violationsByCollectionId: {},
     skillViolationsByName: {},
   });
+
+  // Optional ?firstSeenStart=&firstSeenEnd= (epoch seconds) from the Atlas Overview's new-tools chart: only tools first seen in that window.
+  const [firstSeen, setFirstSeen] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const start = Number(params.get("firstSeenStart"));
+    const end = Number(params.get("firstSeenEnd"));
+    return start > 0 ? { firstSeenStart: start, firstSeenEnd: end > 0 ? end : undefined } : {};
+  });
+  const clearFirstSeen = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("firstSeenStart");
+    params.delete("firstSeenEnd");
+    navigate({ pathname: window.location.pathname, search: params.toString() }, { replace: true });
+    setFirstSeen({});
+  }, [navigate]);
+  const formatDay = (epochSeconds) => new Date(epochSeconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   useEffect(() => {
     if (!newLayout) {
@@ -201,11 +217,12 @@ export default function AgenticAssetsPage() {
       // give a skill its own count (see fetchAgenticSkillViolationCounts's own comment).
       skillViolationsByName,
       aiInventory: true,
+      ...firstSeen,
     }).then((res) => ({
       value: (res.rows || []).map((row) => shapeRow(row)),
       total: res.total || 0,
     }));
-  }, [startTimestamp, endTimestamp]);
+  }, [startTimestamp, endTimestamp, firstSeen]);
 
   // ─── Summary cards (kept from the earlier new layout) ──────────────────────
   const assetTypeBreakdown = useMemo(() => [
@@ -356,8 +373,18 @@ export default function AgenticAssetsPage() {
             chatScope={ATLAS_INVENTORY_CHAT_SCOPE}
           />,
           summaryCards,
+          firstSeen.firstSeenStart ? (
+            <Banner
+              key="first-seen"
+              status="info"
+              title={`Showing tools first seen ${formatDay(firstSeen.firstSeenStart)}${firstSeen.firstSeenEnd ? ` to ${formatDay(firstSeen.firstSeenEnd - 1)}` : " onward"}`}
+              onDismiss={clearFirstSeen}
+            >
+              <Text as="p">The tab counts still cover all tools.</Text>
+            </Banner>
+          ) : null,
           <AgenticInventoryTable
-            key="table"
+            key={`table-${firstSeen.firstSeenStart || 0}`}
             onServerFetch={onServerFetch}
             flyout={flyout}
             setFlyout={setFlyout}

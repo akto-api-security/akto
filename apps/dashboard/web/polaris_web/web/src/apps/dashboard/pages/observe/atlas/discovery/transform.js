@@ -128,13 +128,15 @@ export function chainModel(chain) {
 }
 
 export function agentMcpMatrix(matrix) {
-    const columns = matrix.servers.map((server) => ({ label: server.name, danger: server.status === ASSET_STATUS.UNAPPROVED }));
-    const rows = matrix.rows.map((row) => ({ label: row.name, cells: row.cells }));
+    // source is the MCP server, when discovered, so a cell click can open it.
+    const columns = matrix.servers.map((server) => ({ label: server.name, danger: server.status === ASSET_STATUS.UNAPPROVED, source: server.tool }));
+    // source is the agent, so a click can open it.
+    const rows = matrix.rows.map((row) => ({ label: row.name, cells: row.cells, source: row }));
     return { columns, rows, max: Math.max(1, ...rows.flatMap((row) => row.cells)) };
 }
 
 export function teamMatrix(matrix) {
-    const columns = matrix.categories.map((id) => ({ label: CATEGORY_LABELS[id] || id }));
+    const columns = matrix.categories.map((id) => ({ id, label: CATEGORY_LABELS[id] || id }));
     return { columns, rows: matrix.rows.map((row) => ({ label: row.name, cells: row.percents })), max: PERCENT_MAX };
 }
 

@@ -3,8 +3,8 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import { LOAD_STATE } from "../constants";
 import "./discovery.css";
 
-// Card frame with loading/error/empty states; flush drops body padding, fill pins a footer to the bottom, center middles the body; emptyIcon tops an empty message.
-export default function DiscoveryCard({ title, subtitle, legend, status, empty, emptyText, emptyIcon, flush, fill, center, children }) {
+// Card frame with loading/error/empty states; flush drops body padding, fill pins a footer to the bottom, center middles the body; emptyIcon (in emptyTone) tops an empty message.
+export default function DiscoveryCard({ title, subtitle, legend, status, empty, emptyText, emptyIcon, emptyTone = "success", flush, fill, center, children }) {
     let body = children;
     let isMessage = false;
     if (status === LOAD_STATE.LOADING) {
@@ -14,11 +14,14 @@ export default function DiscoveryCard({ title, subtitle, legend, status, empty, 
         body = <Text as="p" color="subdued">This section is unavailable right now.</Text>;
         isMessage = true;
     } else if (empty) {
+        // The message is centred in both card layouts; the roomy padding keeps a short message from looking cramped.
         body = (
-            <VerticalStack gap="2" inlineAlign={flush ? "center" : "start"}>
-                {emptyIcon && <Icon source={emptyIcon} tone="success" />}
-                <Text as="p" color="subdued" alignment={flush ? "center" : "start"}>{emptyText || "Nothing to show yet."}</Text>
-            </VerticalStack>
+            <Box paddingBlockStart={flush ? "0" : "6"} paddingBlockEnd={flush ? "0" : "6"}>
+                <VerticalStack gap="2" inlineAlign="center">
+                    {emptyIcon && <Icon source={emptyIcon} tone={emptyTone} />}
+                    <Text as="p" color="subdued" alignment="center">{emptyText || "Nothing to show yet."}</Text>
+                </VerticalStack>
+            </Box>
         );
         isMessage = true;
     }

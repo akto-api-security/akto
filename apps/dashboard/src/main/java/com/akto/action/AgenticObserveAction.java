@@ -15,6 +15,7 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.service.atlas.AtlasAssetStatusService;
+import com.akto.service.atlas.AtlasPeopleService;
 import com.akto.service.atlas.AtlasToolRow;
 import com.akto.service.insights.HostCollectionResolver;
 import com.akto.service.insights.InsightUtil;
@@ -103,6 +104,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     @Setter
     private int endTimestamp;
+
+    // Optional first-seen window of the inventory rows: [firstSeenStart, firstSeenEnd), 0 = no bound. The Atlas Overview's new-tools chart links here.
+    @Setter
+    private int firstSeenStart;
+
+    @Setter
+    private int firstSeenEnd;
 
     // ---- Server-side pagination for fetchAgenticAssetsSummary ----
     @Setter private int skip;
@@ -2378,6 +2386,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     static final String APPROVAL_BLOCKED = "Blocked";
     static final String APPROVAL_UNDER_REVIEW = "Under review";
 
+    // Filter values the AI inventory's Tags and Risk columns accept besides the ones the grid lists itself.
+    private static final String TAG_MALICIOUS_MCP_SERVER = "Malicious MCP Server";
+    private static final String RISK_BAND_HIGH = "High risk";
+
+    private static Set<Integer> maliciousServerCollectionIds(List<ApiCollection> collections) {
+        Set<Integer> ids = new HashSet<>();
+        for (ApiCollection c : collections) {
+            if (InsightUtil.isMaliciousMcpServer(c)) ids.add(c.getId());
+        }
+        return ids;
+    }
+
     // AI inventory tab of a row (keys; AgenticInventoryTable.jsx owns the labels).
     private static String inventoryCategory(GroupSummary g) {
         String t = g.clientType;
@@ -2504,6 +2524,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 int end = endTimestamp > 0 ? endTimestamp : (int) (System.currentTimeMillis() / 1000);
                 all.removeIf(g -> g.maxTrafficTimestamp < startTimestamp || g.maxTrafficTimestamp > end);
             }
+            // Same "first seen" the Atlas Overview counts; a group with no known start is left out once a bound is set.
+            if (firstSeenStart > 0) {
+                all.removeIf(g -> g.minStartTs < firstSeenStart || (firstSeenEnd > 0 && g.minStartTs >= firstSeenEnd));
+            }
 
             if (StringUtils.isNotBlank(queryValue)) {
                 String q = queryValue.toLowerCase(Locale.ROOT);
@@ -2543,6 +2567,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 if (filters.containsKey("tags")) {
                     Set<String> allowedTags = new HashSet<>(filters.get("tags"));
                     Set<String> maliciousKeys = getOrBuildSkillData().maliciousSkillKeys;
+                    Set<Integer> maliciousServers = allowedTags.contains(TAG_MALICIOUS_MCP_SERVER) ? maliciousServerCollectionIds(cached.collections) : Collections.<Integer>emptySet();
                     all.removeIf(g -> {
                         boolean isSkill = "skill".equals(g.rowType);
                         // Fan-out rows borrow their parent agent collection's flags, so suppress both.
@@ -2557,6 +2582,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                                     .anyMatch(cid -> maliciousKeys.contains(cid + "|" + lname));
                             if (malicious) groupTags.add("Malicious Skill");
                         }
+                        if ("service".equals(g.rowType) && g.collectionIds.stream().anyMatch(maliciousServers::contains)) groupTags.add(TAG_MALICIOUS_MCP_SERVER);
                         return groupTags.stream().noneMatch(allowedTags::contains);
                     });
                 }
@@ -2580,6 +2606,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                         if (v == null) return true;
                         return allowedSeverities.stream().noneMatch(s -> v.getInt(s, 0) > 0);
                     });
+                }
+                // "riskBand" — "High risk" keeps the rows at the Atlas Overview's high-risk score or above.
+                if (filters.containsKey("riskBand") && filters.get("riskBand").contains(RISK_BAND_HIGH)) {
+                    all.removeIf(g -> AgenticObserveUtil.roundRiskScore(g.maxRiskScore) < AtlasPeopleService.HIGH_RISK_SCORE);
                 }
                 // "category" — the AI inventory tabs (inventoryCategory keys).
                 if (filters.containsKey("category")) {

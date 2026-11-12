@@ -294,7 +294,7 @@ export default function AgenticAssetFlyout({
                             </Box>
                         )}
                         {selectedTab === 2 && (
-                            <Box padding="2">
+                            <Box padding="2" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                                 <ViolationsTab asset={asset} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset.type === "Skill" ? () => handleTabSelect(1) : undefined} onTotalChange={setViolationsTotal} />
                             </Box>
                         )}
