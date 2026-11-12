@@ -1044,14 +1044,18 @@ def parse_tripwire_result(body: dict[str, Any]) -> dict[str, Any]:
     """A /v1/detect reply as a scanner result. is_attack applies the server's own THRESHOLD; risk_score is the
     attack_score (1 - P(benign)), on the same scale as an LLM arbiter's risk_score."""
     score = float(body["attack_score"])
-    verdict = body.get("verdict", "")
+    verdict = body.get("verdict") or ""
+    is_attack = body.get("is_attack")
+    if is_attack is None:  # missing or null: fall back to the score
+        is_attack = score >= 0.5
     details: dict[str, Any] = {"verdict": verdict, "attack_score": score}
-    if body.get("is_attack"):
-        details["reason"] = f"Tripwire flagged this as {verdict.replace('_', ' ')} (attack score {score:.2f})."
+    if is_attack:
+        flagged = verdict.replace("_", " ") or "an attack"
+        details["reason"] = f"Tripwire flagged this as {flagged} (attack score {score:.2f})."
     if body.get("windows_skipped"):  # a long input the server read only part of
         details["windows_skipped"] = int(body["windows_skipped"])
     return {
-        "is_valid": not body.get("is_attack", score >= 0.5),
+        "is_valid": not is_attack,
         "risk_score": score,
         "decision_confidence": max(score, 1.0 - score),
         "details": details,

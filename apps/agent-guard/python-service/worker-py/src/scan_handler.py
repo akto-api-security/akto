@@ -21,6 +21,7 @@ from constants import (
     canonical_scanner,
     get_default_config,
     get_enrichment_config,
+    observes,
     single_model_config,
     strip_qwen_tier,
     with_deployment_tripwire,
@@ -142,7 +143,7 @@ async def scan_payload(
             config = {**config, "modelConfigs": single_model_config()}
         elif scanner_name in GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
-        elif scanner_name == "PromptInjection":
+        elif observes(scanner_name, scanner_type):
             tripwired = with_deployment_tripwire(config.get("modelConfigs"), settings.DEFAULT_MODEL_CONFIG_JSON)
             config = {**config, "modelConfigs": tripwired}
         config = {**config, "modelConfigs": apply_scanner_response_format(config.get("modelConfigs"))}
@@ -165,7 +166,9 @@ async def scan_payload(
             )
         scan_diag.log_backpressure_proceeding(scanner_name)
         try:
-            result = await scan_with_model_map(scanner_name, scanner_type, text, config, store_fn=store_fn)
+            result = await scan_with_model_map(
+                scanner_name, scanner_type, text, config, store_fn=store_fn, schedule_fn=schedule_fn
+            )
             elapsed = result.get("execution_time_ms")
             if isinstance(elapsed, (int, float)) and elapsed > 0:
                 cascade_backpressure.record_cascade_latency(float(elapsed))
