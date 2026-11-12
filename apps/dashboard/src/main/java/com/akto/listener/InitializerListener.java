@@ -2810,7 +2810,8 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
-                SingleTypeInfo.init();
+                // every account is loaded once now, then only the accounts that are not dormant are refreshed
+                SingleTypeInfo.init(DormantAccountFilter::fetchNotDormantTest);
                 
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {

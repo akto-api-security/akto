@@ -2,6 +2,7 @@ package com.akto.utils.crons;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import org.bson.conversions.Bson;
@@ -69,6 +70,15 @@ public class DormantAccountFilter {
         loggerMaker.info("Accounts with a non-Akto user login in the last " + LOGIN_STALE_SECONDS / (24 * 60 * 60) + " days: "
             + accountIds.size() + ", fetched in " + (System.currentTimeMillis() - startMs) + " ms");
         return accountIds;
+    }
+
+    /**
+     * Fetches the recent logins once and returns the test "this account is not dormant", for a cron that loops over
+     * accounts itself. The test must run with Context.accountId set.
+     */
+    public static Predicate<Integer> fetchNotDormantTest() {
+        Set<Integer> accountsWithRecentUserLogin = fetchAccountsWithRecentUserLogin();
+        return accountId -> !isDormant(accountId, accountsWithRecentUserLogin);
     }
 
     /** Must be called with Context.accountId set. */
