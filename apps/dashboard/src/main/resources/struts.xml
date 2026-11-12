@@ -4171,7 +4171,7 @@
             <interceptor-ref name="defaultStack"/>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param> 
+                <param name="accessType">READ_WRITE</param> 
                 <param name="actionDescription">User toggled collections testing scope status</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
@@ -9621,7 +9621,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User generated a runtime token for the helm command</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -9723,7 +9724,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User started Copilot authorization</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -10063,7 +10065,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User fetched or generated Burp credentials</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -10348,7 +10351,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User skipped onboarding</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -11171,7 +11175,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_EDITOR</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User saved common test template</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -12788,7 +12793,8 @@
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User scheduled a code analysis run</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -15300,7 +15306,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User regenerated an insight narrative</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">DASHBOARD_INSIGHTS</param>
@@ -15500,7 +15507,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User ran advanced traffic filters that clean stored sample data</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -16267,7 +16275,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User saved source code vulnerabilities</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -16297,7 +16306,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User created sensitive response data types</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -18876,7 +18886,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User created a Jira ticket</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
