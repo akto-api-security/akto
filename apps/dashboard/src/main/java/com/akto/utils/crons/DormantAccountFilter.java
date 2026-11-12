@@ -2,6 +2,7 @@ package com.akto.utils.crons;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -11,6 +12,7 @@ import com.akto.action.InviteUserAction;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.Account;
 import com.akto.dto.User;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
@@ -79,6 +81,19 @@ public class DormantAccountFilter {
     public static Predicate<Integer> fetchNotDormantTest() {
         Set<Integer> accountsWithRecentUserLogin = fetchAccountsWithRecentUserLogin();
         return accountId -> !isDormant(accountId, accountsWithRecentUserLogin);
+    }
+
+    /**
+     * Wraps the task of AccountTask so that it runs only for accounts that are not dormant. The recent logins are
+     * fetched once here, when the task is wrapped, so wrap it once per run, not once per account.
+     */
+    public static Consumer<Account> onlyNotDormant(Consumer<Account> task) {
+        Predicate<Integer> notDormant = fetchNotDormantTest();
+        return account -> {
+            if (notDormant.test(account.getId())) {
+                task.accept(account);
+            }
+        };
     }
 
     /** Must be called with Context.accountId set. */

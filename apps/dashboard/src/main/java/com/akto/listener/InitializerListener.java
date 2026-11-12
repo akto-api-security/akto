@@ -23,7 +23,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -842,13 +841,9 @@ public class InitializerListener implements ServletContextListener {
         scheduler.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                Predicate<Integer> notDormant = DormantAccountFilter.fetchNotDormantTest();
-                AccountTask.instance.executeTask(new Consumer<Account>() {
+                AccountTask.instance.executeTask(DormantAccountFilter.onlyNotDormant(new Consumer<Account>() {
                     @Override
                     public void accept(Account account) {
-                        if (!notDormant.test(account.getId())) {
-                            return;
-                        }
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(),
                                 Projections.include(AccountSettings.DEFAULT_PAYLOADS));
                         Map<String, DefaultPayload> defaultPayloadMap = accountSettings.getDefaultPayloads();
@@ -914,7 +909,7 @@ public class InitializerListener implements ServletContextListener {
                             }
                         }
                     }
-                }, "setUpDefaultPayloadRemover");
+                }), "setUpDefaultPayloadRemover");
             }
         }, 0, 5, TimeUnit.MINUTES);
     }
