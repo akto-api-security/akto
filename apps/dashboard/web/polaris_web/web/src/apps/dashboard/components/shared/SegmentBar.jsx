@@ -15,8 +15,9 @@ const DEFAULT_LABEL_THRESHOLD = 10;
  */
 export default function SegmentBar({ segments, height, showLabels, labelThreshold = DEFAULT_LABEL_THRESHOLD, onSegmentClick, activeKey }) {
     const total = showLabels ? segments.reduce((sum, s) => sum + s.count, 0) : 0;
+    const isEmpty = !segments.some((s) => s.count > 0);
     return (
-        <Box className="agentic-seg-bar" style={height ? { height } : undefined}>
+        <Box className="agentic-seg-bar" style={{ ...(height && { height }), ...(isEmpty && { background: "var(--p-color-bg-strong)" }) }}>
             {segments.map((s) => {
                 if (!(s.count > 0)) return null;
                 const key = s.key ?? s.label;
