@@ -976,13 +976,4 @@ export function getGuardrailCapabilityForRule(ruleViolated) {
     return null;
 }
 
-// Display group for a rule_violated value: the heading of the entry owning its compliance capability (so
-// credential-type PII such as PII-password groups with secrets), else the heading of the entry it matches.
-export function getGuardrailRuleGroupHeading(ruleViolated) {
-    const capability = getGuardrailCapabilityForRule(ruleViolated);
-    const owner = capability && GUARDRAIL_RULE_DEFINITIONS.find((def) => def.capability === capability);
-    if (owner) return owner.heading;
-    return getGuardrailRuleInfo(ruleViolated)?.heading || null;
-}
-
 export default GUARDRAIL_RULE_DEFINITIONS;

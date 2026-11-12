@@ -88,16 +88,16 @@ public class AtlasGuardrailsOverviewService {
         BasicDBObject response = new BasicDBObject();
         List<DashboardMaliciousEvent> events = AtlasGuardrailUtils.currentPeriodEvents(bundle);
         if (events == null) return response;
-        Map<String, BasicDBObject> byRule = new LinkedHashMap<>();
+        Map<String, BasicDBObject> byPolicy = new LinkedHashMap<>();
         for (DashboardMaliciousEvent e : AtlasGuardrailUtils.collapseConfigFindings(events)) {
             boolean misconfigured = AtlasGuardrailUtils.isConfigFinding(e);
-            String rule = misconfigured ? "" : (e.getSubCategory() == null ? "" : e.getSubCategory());
-            BasicDBObject row = byRule.computeIfAbsent(misconfigured + "|" + rule, k -> new BasicDBObject("rule", rule)
+            String policy = misconfigured ? "" : (e.getFilterId() == null ? "" : e.getFilterId());
+            BasicDBObject row = byPolicy.computeIfAbsent(misconfigured + "|" + policy, k -> new BasicDBObject("policy", policy)
                     .append("misconfigured", misconfigured).append("count", 0L).append("ignored", 0L));
             row.put("count", row.getLong("count") + 1);
             if (Status.IGNORED.name().equalsIgnoreCase(e.getStatus())) row.put("ignored", row.getLong("ignored") + 1);
         }
-        response.put("rules", new ArrayList<>(byRule.values()));
+        response.put("policies", new ArrayList<>(byPolicy.values()));
         return response;
     }
 
