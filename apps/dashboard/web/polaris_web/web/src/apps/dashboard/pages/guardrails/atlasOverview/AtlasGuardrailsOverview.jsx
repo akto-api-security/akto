@@ -12,7 +12,7 @@ import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import AttentionCard from "./AttentionCard";
 import TriageStatusCard from "./TriageStatusCard";
-import DecisionsTrendCard from "./DecisionsTrendCard";
+import ViolationsTrendCard from "../overview/ViolationsTrendCard";
 import PolicyViolationsCard from "./PolicyViolationsCard";
 import { initialsOf } from "@/apps/dashboard/components/shared/PeopleList";
 import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
@@ -57,6 +57,11 @@ const AGENTIC_ASSET_STATUS_TAGS = {
 const TOP_EMPLOYEES = 5;
 const TREND_UP_COLOR = "#8E1F0B";
 const TREND_DOWN_COLOR = "#0C5132";
+const DECISION_SERIES = [
+    { key: "blocked", name: "Blocked", color: "#6200EA" },
+    { key: "approval", name: "Needs approval", color: "#B38CFF" },
+    { key: "alerted", name: "Alerted or warned", color: "#D2D5D8" },
+];
 
 function formatCount(n) {
     return n === undefined || n === null ? EMPTY_VALUE : observeFunc.formatNumberWithCommas(n);
@@ -226,6 +231,7 @@ function AtlasGuardrailsOverview() {
     const [topAgenticAssets, setTopAgenticAssets] = useState(null);
     const [topEmployees, setTopEmployees] = useState(null);
     const policyRows = useMemo(() => buildPolicyRows(policies?.rules), [policies]);
+    const decisionPoints = useMemo(() => (decisions?.days || []).map((d) => ({ ...d, ts: d.ts * 1000 })), [decisions]);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
@@ -279,7 +285,9 @@ function AtlasGuardrailsOverview() {
             <TriageStatusCard triage={{ statuses: triage?.statuses || [], staleCriticalUnassigned: triage?.staleCriticalUnassigned || 0, staleAfterHours: triage?.staleAfterHours }} periodDays={triage?.periodDays} loading={triage === null} onStatusClick={openActivity} onAssign={openActivity} />
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">
-            <DecisionsTrendCard decisions={decisions} loading={decisions === null} />
+            {decisions === null
+                ? <Card><SpinnerCentered height="240px" /></Card>
+                : <ViolationsTrendCard title="Guardrail decisions" series={DECISION_SERIES} points={decisionPoints} onOpenRange={openActivity} />}
             <PolicyViolationsCard policies={policyRows} pageSize={POLICY_ROWS} loading={policies === null} onPolicyClick={openActivity} onTune={openPolicies} />
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
@@ -298,7 +306,7 @@ function AtlasGuardrailsOverview() {
     return (
         <PageWithMultipleCards
             title="Guardrail overview"
-            subtitle={`Violations across ${kpis?.managedDevices ? `${plural(kpis.managedDevices, "managed device", "managed devices")} and ` : ""}${formatCount(data.discoveredAssets)} discovered AI agents, apps and MCP servers`}
+            subtitle="Violations across all managed devices and discovered AI agents, apps and MCP servers"
             isFirstPage
             secondaryActions={
                 <HorizontalStack gap="2" blockAlign="center">

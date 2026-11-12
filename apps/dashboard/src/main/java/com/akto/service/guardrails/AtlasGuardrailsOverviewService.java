@@ -15,7 +15,6 @@ import com.akto.service.insights.providers.SkillEvaluationConcentrationProvider;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
-import com.akto.util.TimePeriodUtils;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
@@ -56,7 +55,8 @@ public class AtlasGuardrailsOverviewService {
 
     public BasicDBObject buildDecisions(InsightDataBundle bundle) {
         BasicDBObject response = new BasicDBObject();
-        response.put("periodDays", AtlasGuardrailUtils.periodDays(bundle));
+        List<BasicDBObject> days = new ArrayList<>();
+        response.put("days", days);
         List<DashboardMaliciousEvent> events = AtlasGuardrailUtils.currentPeriodEvents(bundle);
         if (events == null) return response;
         List<DashboardMaliciousEvent> current = AtlasGuardrailUtils.collapseConfigFindings(events);
@@ -67,21 +67,20 @@ public class AtlasGuardrailsOverviewService {
             if (current.isEmpty()) return response;
             startTs = current.stream().mapToLong(DashboardMaliciousEvent::getTimestamp).min().getAsLong();
         }
-        long daysBetween = (endTs - startTs) / Constants.ONE_DAY_TIMESTAMP;
 
-        List<Integer> blocked = new ArrayList<>();
-        List<Integer> approval = new ArrayList<>();
-        List<Integer> alerted = new ArrayList<>();
-        for (DashboardMaliciousEvent e : current) {
-            int ts = (int) e.getTimestamp();
-            if (AtlasGuardrailUtils.BEHAVIOUR_BLOCK.equalsIgnoreCase(e.getBehaviour())) blocked.add(ts);
-            else if (AtlasGuardrailUtils.BEHAVIOUR_APPROVAL.equalsIgnoreCase(e.getBehaviour())) approval.add(ts);
-            else alerted.add(ts);
+        Map<Long, BasicDBObject> byDay = new HashMap<>();
+        for (long day = startTs - startTs % Constants.ONE_DAY_TIMESTAMP; day <= endTs; day += Constants.ONE_DAY_TIMESTAMP) {
+            BasicDBObject point = new BasicDBObject("ts", day).append("blocked", 0L).append("approval", 0L).append("alerted", 0L);
+            byDay.put(day, point);
+            days.add(point);
         }
-        response.put("blocked", TimePeriodUtils.convertTimePeriodMapToTimeSeriesData(TimePeriodUtils.groupByTimePeriod(blocked, daysBetween), daysBetween));
-        response.put("approval", TimePeriodUtils.convertTimePeriodMapToTimeSeriesData(TimePeriodUtils.groupByTimePeriod(approval, daysBetween), daysBetween));
-        response.put("alerted", TimePeriodUtils.convertTimePeriodMapToTimeSeriesData(TimePeriodUtils.groupByTimePeriod(alerted, daysBetween), daysBetween));
-        response.put("granularity", TimePeriodUtils.getTimePeriodKey((int) startTs, daysBetween).substring(0, 1));
+        for (DashboardMaliciousEvent e : current) {
+            BasicDBObject point = byDay.get(e.getTimestamp() - e.getTimestamp() % Constants.ONE_DAY_TIMESTAMP);
+            if (point == null) continue;
+            String decision = AtlasGuardrailUtils.BEHAVIOUR_BLOCK.equalsIgnoreCase(e.getBehaviour()) ? "blocked"
+                    : AtlasGuardrailUtils.BEHAVIOUR_APPROVAL.equalsIgnoreCase(e.getBehaviour()) ? "approval" : "alerted";
+            point.put(decision, point.getLong(decision) + 1);
+        }
         return response;
     }
 

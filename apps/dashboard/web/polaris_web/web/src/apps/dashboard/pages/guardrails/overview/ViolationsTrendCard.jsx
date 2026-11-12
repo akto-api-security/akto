@@ -26,16 +26,16 @@ const X_AXIS = {
 }
 
 // The backend returns every day of the range, so a quiet range is a list of all-zero days.
-const hasViolations = (points) => points.some((p) => SERIES.some((s) => p[s.key] > 0))
+const hasViolations = (points, series) => points.some((p) => series.some((s) => p[s.key] > 0))
 
 // One bar per day, or per `step` days when the range is too long for a bar a day.
-function toBars(points) {
+function toBars(points, series) {
     const step = Math.max(1, Math.ceil(points.length / MAX_BARS))
     const bars = []
     for (let i = 0; i < points.length; i += step) {
         const chunk = points.slice(i, i + step)
         const bar = { ts: chunk[0].ts, days: chunk.length }
-        SERIES.forEach((s) => { bar[s.key] = chunk.reduce((sum, p) => sum + p[s.key], 0) })
+        series.forEach((s) => { bar[s.key] = chunk.reduce((sum, p) => sum + p[s.key], 0) })
         bars.push(bar)
     }
     return bars
@@ -45,17 +45,17 @@ const dayText = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short
 const barText = (bar) => (bar.days === 1 ? dayText(bar.ts) : `${dayText(bar.ts)} – ${dayText(bar.ts + (bar.days - 1) * DAY_MS)}`)
 
 // points: one per day, ts in ms. onOpenRange(start, end) opens the violations of a bar's days, in seconds.
-function ViolationsTrendCard({ points, onOpenRange }) {
+function ViolationsTrendCard({ points, onOpenRange, title = 'Violations over time', series = SERIES }) {
     // The parent passes a new function on every render. Reading it through a ref keeps the chart data below
     // the same until the points change, so the chart is not rebuilt when another card loads more rows.
     const openRange = useRef(onOpenRange)
     openRange.current = onOpenRange
 
     const { data, tooltip, openBar } = useMemo(() => {
-        const bars = toBars(points)
+        const bars = toBars(points, series)
         const byTs = new Map(bars.map((b) => [b.ts, b]))
         return {
-            data: SERIES.map((s) => ({ name: s.name, color: s.color, data: bars.map((b) => [b.ts, b[s.key]]) })),
+            data: series.map((s) => ({ name: s.name, color: s.color, data: bars.map((b) => [b.ts, b[s.key]]) })),
             // The hover card of the design: the bar's days, each action's count and the total.
             tooltip: function () {
                 const bar = byTs.get(this.x)
@@ -68,9 +68,9 @@ function ViolationsTrendCard({ points, onOpenRange }) {
                 if (bar) openRange.current(bar.ts / 1000, bar.ts / 1000 + bar.days * DAY_SECONDS - 1)
             },
         }
-    }, [points])
+    }, [points, series])
     return (
-        <CardWithHeader title="Violations over time" hasData={hasViolations(points)} emptyMessage="No violations in this period." minHeight="240px">
+        <CardWithHeader title={title} hasData={hasViolations(points, series)} emptyMessage="No violations in this period." minHeight="240px">
             <StackedChart
                 type="column"
                 height={240}

@@ -1,5 +1,4 @@
 const guardrailOverviewMock = {
-    discoveredAssets: 96,
     attention: [
         { severity: "CRITICAL", title: "Unapproved MCP server with production access", meta: "postgres-mcp (community) on 14 devices · MCP server allowlist · Alerted, not blocked", count: 14, secondaryAction: "Switch policy to Block" },
         { severity: "CRITICAL", title: "Cloud and SaaS credentials typed into agents", meta: "3 employees · Claude Code, Windsurf · Blocked, keys still need rotation", count: 3, secondaryAction: "Create ticket" },
