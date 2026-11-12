@@ -11,7 +11,6 @@ const BAR_COLOR = {
     ASSIGNED: "bg-magic-strong",
     TICKETED: "bg-interactive",
     IGNORED: "bg-strong",
-    RESOLVED: "bg-success-strong",
 };
 const STATUS_EVENT_STATUS = {
     OPEN: ACTIVITY_TAB.ACTIVE,

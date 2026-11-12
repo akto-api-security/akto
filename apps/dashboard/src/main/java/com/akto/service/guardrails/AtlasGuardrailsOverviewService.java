@@ -43,7 +43,6 @@ public class AtlasGuardrailsOverviewService {
         statuses.add(AtlasGuardrailUtils.triageStatus("ASSIGNED", "Assigned", current.stream().filter(e -> !AtlasGuardrailUtils.isUnassigned(e.getCaseOwner())).count()));
         statuses.add(AtlasGuardrailUtils.triageStatus("TICKETED", "Ticketed", current.stream().filter(AtlasGuardrailUtils::hasTicket).count()));
         statuses.add(AtlasGuardrailUtils.triageStatus("IGNORED", "Ignored", AtlasGuardrailUtils.countWithStatus(current, Status.IGNORED)));
-        statuses.add(AtlasGuardrailUtils.triageStatus("RESOLVED", "Resolved", AtlasGuardrailUtils.countWithStatus(current, Status.FIXED)));
         triage.put("statuses", statuses);
 
         long staleBefore = Context.now() - AtlasGuardrailUtils.TRIAGE_TARGET_HOURS * 3600L;
