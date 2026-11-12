@@ -21,10 +21,8 @@ from constants import (
     canonical_scanner,
     get_default_config,
     get_enrichment_config,
-    observes,
     single_model_config,
     strip_qwen_tier,
-    with_deployment_tripwire,
 )
 from llm_scanner import _clean_json, scan_with_model_map
 from model_map import build_arbiter
@@ -143,9 +141,6 @@ async def scan_payload(
             config = {**config, "modelConfigs": single_model_config()}
         elif scanner_name in GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
-        elif observes(scanner_name, scanner_type):
-            tripwired = with_deployment_tripwire(config.get("modelConfigs"), settings.DEFAULT_MODEL_CONFIG_JSON)
-            config = {**config, "modelConfigs": tripwired}
         config = {**config, "modelConfigs": apply_scanner_response_format(config.get("modelConfigs"))}
         store_fn = None
         if config.get("storeAllResults"):

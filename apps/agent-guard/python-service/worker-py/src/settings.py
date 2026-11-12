@@ -124,8 +124,10 @@ _FIELDS = (
     "QWEN3GUARD_VLLM_BASE_URL",
     "GEMMA_VLLM_BASE_URL",
     "GEMMA_VLLM_ARBITER_BASE_URL",
-    # Tripwire prompt-injection classifier (POST {url}/v1/detect); a "tripwire" modelConfigs entry's own
-    # "baseUrl" overrides it. The server has no auth of its own, so the URL must be internal only.
+    # Tripwire prompt-injection classifier: when TRIPWIRE_ENABLED is on ("true"/"1"/"yes"/"on") it observes
+    # every PromptInjection input scan (POST {TRIPWIRE_BASE_URL}/v1/detect). The server has no auth of its
+    # own, so the URL must be internal only.
+    "TRIPWIRE_ENABLED",
     "TRIPWIRE_BASE_URL",
     # Per-"_fast"-provider auth (sent as Authorization: Bearer) — one key per
     # container, matching the base URLs above.
@@ -202,6 +204,7 @@ class Settings:
     QWEN3GUARD_VLLM_BASE_URL: str
     GEMMA_VLLM_BASE_URL: str
     GEMMA_VLLM_ARBITER_BASE_URL: str
+    TRIPWIRE_ENABLED: str
     TRIPWIRE_BASE_URL: str
     QWEN_VLLM_KEY: str
     GEMMA_VLLM_KEY: str

@@ -6,7 +6,6 @@ env var (see get_default_config) so two workers sharing this code can run
 different model maps; BUILTIN_DEFAULT_CONFIG is the last-resort fallback.
 """
 
-import functools
 import json
 import logging
 from typing import Any
@@ -106,54 +105,19 @@ def _gemma_arbiter_provider() -> str:
 def strip_qwen_tier(model_configs):
     """Drop Qwen (FAST_THREAT_FILTER) providers so only the arbiter judges.
 
-    Returns the original list if filtering would leave nothing usable. Tripwire never counts as usable here:
-    it only observes PromptInjection input, so it can't judge these scans.
+    Returns the original list if filtering would leave nothing usable.
     """
-    configs = list(model_configs or [])
-    return [m for m in configs if not _is_qwen(m) and not is_tripwire(m)] or configs
+    filtered = [m for m in (model_configs or []) if not str(m.get("provider", "")).lower().startswith("qwen")]
+    return filtered or list(model_configs or [])
 
 
 def _is_qwen(entry: dict[str, Any]) -> bool:
     return str(entry.get("provider", "")).lower().startswith("qwen")
 
 
-def is_tripwire(entry: dict[str, Any]) -> bool:
-    return str(entry.get("provider", "")).strip().lower() == "tripwire"
-
-
 def observes(scanner_name: str, scanner_type: str) -> bool:
     """The scans Tripwire observes: PromptInjection input only."""
     return scanner_name == "PromptInjection" and scanner_type == "prompt"
-
-
-@functools.lru_cache(maxsize=8)
-def _deployment_tripwire(raw_json: str) -> tuple[dict[str, Any], ...]:
-    """The Tripwire entries of DEFAULT_MODEL_CONFIG_JSON, parsed once per value instead of on every scan."""
-    deployment = _parse_deployment_config(raw_json) or {}
-    return tuple(m for m in deployment.get("modelConfigs", []) if is_tripwire(m))
-
-
-@functools.cache
-def _warn_no_tripwire_url() -> None:
-    logger.warning("[constants] a tripwire entry has no baseUrl and TRIPWIRE_BASE_URL is unset; Tripwire is off")
-
-
-def with_deployment_tripwire(model_configs, raw_json: str):
-    """The modelConfigs of a scan Tripwire observes: the deployment's Tripwire entry added if there is none, and
-    Tripwire entries with no URL to call dropped (warned once, not on every scan).
-
-    A guardrail policy can send its own modelConfigs, which replace the deployment's; without this, Tripwire
-    would never observe those scans. It only observes, so the policy's verdict is unchanged.
-    """
-    configs = list(model_configs or [])
-    if not any(is_tripwire(m) for m in configs):
-        configs += [dict(m) for m in _deployment_tripwire(raw_json)]
-    usable = [
-        m for m in configs if not is_tripwire(m) or (m.get("baseUrl") or "").strip() or settings.TRIPWIRE_BASE_URL
-    ]
-    if len(usable) < len(configs):
-        _warn_no_tripwire_url()
-    return usable
 
 
 # Roles a single-model scanner draws its one model from, in preference order.
@@ -164,8 +128,8 @@ def _pick_single_model(model_configs: list[dict[str, Any]]) -> dict[str, Any] | 
     """Choose the one entry a single-model scanner runs on: the first
     FAST_FALLBACK_SAFE_FILTER entry, else the first FINAL_ARBITER entry.
     Qwen3Guard is never eligible — it emits a safety verdict, not a
-    secret-value judgement (see GEMMA_ONLY_SCANNERS), and Tripwire only observes."""
-    candidates = [m for m in model_configs if not _is_qwen(m) and not is_tripwire(m)]
+    secret-value judgement (see GEMMA_ONLY_SCANNERS)."""
+    candidates = [m for m in model_configs if not _is_qwen(m)]
     for role in _SINGLE_MODEL_ROLE_PREFERENCE:
         for entry in candidates:
             if entry.get("modelRole") == role:

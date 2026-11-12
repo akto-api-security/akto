@@ -8,12 +8,12 @@
                                      SAFE/INCONC. → ALLOW (best tier2 result)
     tier1 all INCONCLUSIVE       → FINAL_ARBITER decides
 
-A Tripwire classifier entry only observes, whatever its modelRole: on
-PromptInjection input it starts with the tiers and the scan never waits for it.
-If it has answered when the cascade decides, its verdict is in details.tripwire;
-otherwise it is recorded in the background once it answers (within its
-timeoutMs, counted from the scan's start), and the scan's model results are
-stored then, together. It never changes the verdict.
+With TRIPWIRE_ENABLED on, the Tripwire classifier observes every PromptInjection
+input scan, whatever its modelConfigs. It starts with the tiers and the scan
+never waits for it. If it has answered when the cascade decides, its verdict is
+in details.tripwire; otherwise it is recorded in the background once it answers
+(within 500 ms of the scan's start), and the scan's model results are stored
+then, together. It never changes the verdict.
 
 Verdict logic is identical to the container; only the executor changed
 (asyncio tasks + wait_for instead of a ThreadPoolExecutor).
@@ -26,8 +26,8 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 import metrics_push
-from constants import is_tripwire, observes
-from providers import FallbackProvider, build_provider_from_config
+from constants import observes
+from providers import FallbackProvider, build_provider_from_config, tripwire_provider
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,8 @@ _DEFAULT_TIER_TIMEOUT_MS = 5000
 _DEFAULT_ARBITER_TIMEOUT_MS = 10000
 _DEFAULT_ARBITER_BACKUP_TIMEOUT_MS = 5000
 
-_DEFAULT_OBSERVER_TIMEOUT_MS = 500
+_TRIPWIRE_TIMEOUT_MS = 500
+_TRIPWIRE = {"provider": "tripwire"}  # the observer's entry, for its timeout and error labels
 
 ScannerEntry = tuple[Any, dict[str, Any]]
 TaskMap = dict[asyncio.Task, dict[str, Any]]
@@ -62,8 +63,7 @@ def _spawn(coro: Coroutine[Any, Any, None]) -> None:
 
 
 def _role_entry(model_configs: Any, role: str) -> dict[str, Any] | None:
-    # Tripwire only observes, so it never fills a role (e.g. build_arbiter's LLM for /guardrails/llm and reasons).
-    return next((m for m in (model_configs or []) if m.get("modelRole") == role and not is_tripwire(m)), None)
+    return next((m for m in (model_configs or []) if m.get("modelRole") == role), None)
 
 
 def _timeout_s(entry: dict[str, Any], default_ms: int) -> float:
@@ -117,6 +117,7 @@ class ModelMapScanner:
         # The runtime's fire-and-forget hook (waitUntil on Cloudflare, a task on the container).
         self.schedule = schedule_fn or _spawn
         self.completed_all: list[dict[str, Any]] = []
+        self.tripwire_observes = False
 
     # ── Public entry point ──────────────────────────────────────────────────
 
@@ -128,15 +129,9 @@ class ModelMapScanner:
         from llm_scanner import LLMScanner
 
         scanners: list[ScannerEntry] = []
-        observers: list[ScannerEntry] = []
         for entry in model_map:
-            if self._skips(entry):
-                continue
             provider = build_provider_from_config(entry)
             if provider is not None:
-                if is_tripwire(entry):
-                    observers.append((LLMScanner(provider), entry))
-                    continue
                 if entry.get("modelRole") == _ROLE_ARBITER:
                     provider = _with_backup(provider, model_map, _timeout_s(entry, _DEFAULT_ARBITER_TIMEOUT_MS))
                 scanners.append((LLMScanner(provider, entry.get("responseFormat", "")), entry))
@@ -150,6 +145,10 @@ class ModelMapScanner:
                 )
         if not scanners:
             raise ValueError("ModelMapScanner: no usable providers in modelConfigs")
+
+        tripwire = tripwire_provider() if observes(self.scanner_name, self.scanner_type) else None
+        observers: list[ScannerEntry] = [(LLMScanner(tripwire), _TRIPWIRE)] if tripwire is not None else []
+        self.tripwire_observes = bool(observers)
 
         start = time.time()
         result, late = await self._run_pipeline(scanners, observers)
@@ -174,7 +173,7 @@ class ModelMapScanner:
         tier2 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER2]
         arbiters = [se for se in scanners if se[1].get("modelRole") == _ROLE_ARBITER]
 
-        observed = self._submit(observers, _DEFAULT_OBSERVER_TIMEOUT_MS)
+        observed = self._submit(observers, _TRIPWIRE_TIMEOUT_MS)
         try:
             t1 = self._submit(tier1, _DEFAULT_TIER_TIMEOUT_MS)
             t2 = self._submit(tier2, _DEFAULT_TIER_TIMEOUT_MS)
@@ -334,9 +333,6 @@ class ModelMapScanner:
         await self._observe(late, verdict)
         _fire_store(self.store_fn, self.completed_all, self.scanner_name)
 
-    def _skips(self, entry: dict[str, Any]) -> bool:
-        return is_tripwire(entry) and not observes(self.scanner_name, self.scanner_type)
-
     @staticmethod
     def _error_result(error: str) -> dict[str, Any]:
         # Fail OPEN: an arbiter that never answered is an infrastructure failure,
@@ -396,12 +392,13 @@ class ModelMapScanner:
             details["decision_confidence"] = winner["decision_confidence"]
         completed_by_stem = self._index_completed_by_stem()
         for entry in self.config.get("modelConfigs", []):
-            backup = entry.get("modelRole") == _ROLE_ARBITER_BACKUP and not is_tripwire(entry)
-            if backup or self._skips(entry):
+            if entry.get("modelRole") == _ROLE_ARBITER_BACKUP:
                 continue
             stem = self._stem(entry.get("provider", ""))
             if stem:
                 details.setdefault(stem, self._summarize(completed_by_stem.get(stem)))
+        if self.tripwire_observes:
+            details["tripwire"] = self._summarize(completed_by_stem.get("tripwire"))
         return {
             "is_valid": winner.get("is_valid", True),
             "risk_score": float(winner.get("risk_score", 0.0)),

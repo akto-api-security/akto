@@ -8,6 +8,7 @@ Differences from the container version:
 """
 
 import asyncio
+import functools
 import json
 import logging
 import math
@@ -1010,7 +1011,8 @@ class GemmaFastArbiterProvider(OpenAIProvider):
 class TripwireProvider(LLMProvider):
     """Tripwire, a prompt-injection classifier (akto-api-security/Tripwire): POST {base_url}/v1/detect with the
     raw text returns an attack_score in [0, 1]. Not an LLM, so LLMScanner sends it the text itself rather than a
-    scan prompt, it judges PromptInjection only, and long text is windowed by the server, not chunked here."""
+    scan prompt, and long text is windowed by the server, not chunked here. It only observes: see
+    tripwire_provider; it is never a modelConfigs entry."""
 
     name = "tripwire"
     # Its own connection pool: a hung Tripwire must not hold the shared pool's connections that Qwen/Gemma need.
@@ -1036,7 +1038,7 @@ class TripwireProvider(LLMProvider):
         return resp.json()
 
     async def complete(self, prompt: str) -> str:
-        """Satisfies LLMProvider; the startup self-check pings every provider through it."""
+        """Satisfies LLMProvider; the startup self-check pings Tripwire through it."""
         return json.dumps(await self.detect(prompt))
 
 
@@ -1060,6 +1062,22 @@ def parse_tripwire_result(body: dict[str, Any]) -> dict[str, Any]:
         "decision_confidence": max(score, 1.0 - score),
         "details": details,
     }
+
+
+def tripwire_provider() -> TripwireProvider | None:
+    """The Tripwire observer when TRIPWIRE_ENABLED is on and TRIPWIRE_BASE_URL is set, else None."""
+    if settings.TRIPWIRE_ENABLED.strip().lower() not in ("1", "true", "yes", "on"):
+        return None
+    return _tripwire_for(settings.TRIPWIRE_BASE_URL.strip())
+
+
+@functools.cache
+def _tripwire_for(base_url: str) -> TripwireProvider | None:
+    """One provider, so one connection pool, per URL. A missing URL is warned about once, not on every scan."""
+    if not base_url:
+        logger.warning("[Tripwire] TRIPWIRE_ENABLED is on but TRIPWIRE_BASE_URL is unset; Tripwire is off")
+        return None
+    return TripwireProvider(base_url)
 
 
 _FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
@@ -1191,7 +1209,6 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
         else None
     ),
     "bedrock": lambda model, base_url, _d: _build_bedrock(model, base_url),
-    "tripwire": lambda _m, base_url, _d: TripwireProvider(base_url) if base_url else None,
     "reachback": lambda model, _b, _d: _build_reachback(model),
 }
 
@@ -1347,8 +1364,6 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
         # model/baseUrl (e.g. a VPC interface endpoint) are routing, not secrets;
         # credentials and region stay env-only.
         return _dispatch(name, model, (entry.get("baseUrl") or "").strip())
-    if name == "tripwire":
-        return _dispatch(name, "", (entry.get("baseUrl") or "").strip() or settings.TRIPWIRE_BASE_URL)
     return _dispatch(name, model, "")
 
 
@@ -1382,6 +1397,10 @@ async def _startup_check_entry(entry: dict[str, Any]) -> None:
         # extra to say here, and staying silent avoids false-alarming on
         # providers this deployment was never meant to use.
         return
+    await _startup_ping(label, provider)
+
+
+async def _startup_ping(label: str, provider: LLMProvider) -> None:
     logger.info(f"[StartupCheck] {label}: pinging real endpoint...")
     t0 = time.time()
     try:
@@ -1402,5 +1421,9 @@ async def startup_self_check() -> None:
 
     entries = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON).get("modelConfigs", [])
     logger.info(f"[StartupCheck] checking {len(entries)} configured cascade entries")
-    await asyncio.gather(*(_startup_check_entry(e) for e in entries), return_exceptions=True)
+    checks = [_startup_check_entry(e) for e in entries]
+    tripwire = tripwire_provider()
+    if tripwire is not None:
+        checks.append(_startup_ping("tripwire[observer]", tripwire))
+    await asyncio.gather(*checks, return_exceptions=True)
     logger.info("[StartupCheck] done")
