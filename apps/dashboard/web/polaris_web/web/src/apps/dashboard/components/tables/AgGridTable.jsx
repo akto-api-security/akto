@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
-import { Box, HorizontalStack, Pagination, Text, VerticalStack, Button, TextField, Icon } from "@shopify/polaris";
+import { ActionList, Box, HorizontalGrid, HorizontalStack, Pagination, Popover, Text, VerticalStack, Button, TextField, Icon } from "@shopify/polaris";
 import { MobileCancelMajor, SearchMinor } from "@shopify/polaris-icons";
 import PersistStore from "@/apps/main/PersistStore";
 import "./rows/row.css";
@@ -40,7 +40,15 @@ export const agTableTheme = themeQuartz.withParams({
 
 function SearchBar({ value, onChange, placeholder, topRadius = true }) {
     return (
-        <Box borderWidth="1" borderColor="border-subdued" borderRadiusStartStart={topRadius ? 2 : 0} borderRadiusStartEnd={topRadius ? 2 : 0} padding={1} borderInlineStartWidth="1" borderBlockStartWidth="1" borderInlineEndWidth="1">
+        <Box
+            borderColor="border-subdued"
+            borderRadiusStartStart={topRadius ? 2 : 0}
+            borderRadiusStartEnd={topRadius ? 2 : 0}
+            padding={1}
+            {...(topRadius
+                ? { borderWidth: "1", borderInlineStartWidth: "1", borderBlockStartWidth: "1", borderInlineEndWidth: "1" }
+                : { borderBlockStartWidth: "1", borderBlockEndWidth: "1" })}
+        >
             <div className="ag-grid-search-bar">
             <TextField
                 prefix={<Box><Icon source={SearchMinor} /></Box>}
@@ -55,8 +63,26 @@ function SearchBar({ value, onChange, placeholder, topRadius = true }) {
     );
 }
 
-function BulkActionBar({ count, bulkActions = [], onClear, noRadius = false }) {
+// variant "inline": one row, "N selected" + plain buttons + "Clear selection" (AI inventory design).
+function BulkActionBar({ count, bulkActions = [], onClear, noRadius = false, variant = "default" }) {
     if (!count) return null;
+    if (variant === "inline") {
+        return (
+            <div style={{ padding: "8px 16px", background: "#F5F0FF", borderTop: "1px solid #DDD3FA", borderBottom: "1px solid #DDD3FA" }}>
+                <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Text variant="bodyMd" fontWeight="semibold">{count} selected</Text>
+                        {withPermissions(bulkActions).map(action => (
+                            <AllowedAction key={action.label} allowed={!action.disabled} reason={action.helpText}>
+                                <Button size="slim" onClick={action.onAction}>{action.label}</Button>
+                            </AllowedAction>
+                        ))}
+                    </HorizontalStack>
+                    <Button plain onClick={onClear}>Clear selection</Button>
+                </HorizontalStack>
+            </div>
+        );
+    }
     return (
         <Box paddingBlockEnd={noRadius ? "0" : "2"}>
             <div style={{
@@ -154,6 +180,10 @@ export default function AgGridTable({
     bulkActionCount = 0,
     bulkActions = [],
     onClearBulk,
+    // "default" | "inline" — see BulkActionBar.
+    bulkBarVariant = "default",
+    // Per-table overrides on top of agTableTheme (e.g. selected-row colour); keep the object stable.
+    themeParams,
     pagination,
     // Every table defaults to 50, regardless of whatever paginationPageSize a given page passes —
     // a page only keeps its own smaller size (e.g. a compact 10-row list) by also opting out of
@@ -181,7 +211,8 @@ export default function AgGridTable({
     serverSideRowModel = false,
     ...rest
 }) {
-    const paginationPageSize = hidePageSizeSelector ? (paginationPageSizeProp || 20) : 50;
+    const [paginationPageSize, setPaginationPageSize] = useState(hidePageSizeSelector ? (paginationPageSizeProp || 20) : 50);
+    const [pageSizePopoverActive, setPageSizePopoverActive] = useState(false);
     const hasSearch = !!searchPlaceholder || !!renderSearch;
     const isSearchControlled = searchValueProp !== undefined;
     const [uncontrolledSearch, setUncontrolledSearch] = useState("");
@@ -192,9 +223,12 @@ export default function AgGridTable({
     };
     const [debouncedSearchValue, setDebouncedSearchValue] = useState(searchValue || "");
     const skipMinSearchLength = !!renderSearch;
-    const theme = noOuterBorder
-        ? agTableTheme.withParams({ wrapperBorder: false, wrapperBorderRadius: 0 })
-        : agTableTheme;
+    const theme = useMemo(() => {
+        const base = noOuterBorder
+            ? agTableTheme.withParams({ wrapperBorder: false, wrapperBorderRadius: 0 })
+            : agTableTheme;
+        return themeParams ? base.withParams(themeParams) : base;
+    }, [noOuterBorder, themeParams]);
 
     const debouncedSetSearch = useRef(
         debounce((val, serverMode) => {
@@ -259,7 +293,7 @@ export default function AgGridTable({
                 }
             });
         }
-    }, [query.filters, query.sortKey, query.sortOrder, query.page, debouncedSearchValue, fetchTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [query.filters, query.sortKey, query.sortOrder, query.page, paginationPageSize, debouncedSearchValue, fetchTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleFilterChanged = useCallback((e) => {
         if (!isServerMode) return;
@@ -346,8 +380,9 @@ export default function AgGridTable({
 
     // Custom pagination bar — only rendered in the non-SSRM server mode; SSRM uses AG Grid's own footer.
     const serverPaginationBar = isServerMode && !useSSRM && query.total > 0 ? (
-        <Box padding="2">
-            <HorizontalStack align="center">    
+        <Box padding="2" borderBlockStartWidth="1" borderColor="border-subdued">
+            <HorizontalGrid columns="1fr auto 1fr" gap="4" alignItems="center">
+                <Box />
                 <Pagination
                     hasPrevious={query.page > 0}
                     onPrevious={() => dispatchQuery({ type: "SET_PAGE", page: query.page - 1 })}
@@ -355,7 +390,36 @@ export default function AgGridTable({
                     onNext={() => dispatchQuery({ type: "SET_PAGE", page: query.page + 1 })}
                     label={query.total === 0 ? "No results" : query.page * paginationPageSize + 1 + "-" + Math.min((query.page + 1) * paginationPageSize, query.total) + " of " + query.total}
                 />
-            </HorizontalStack>
+                {hidePageSizeSelector ? <Box /> : (
+                    <HorizontalStack align="end">
+                        <Popover
+                            active={pageSizePopoverActive}
+                            onClose={() => setPageSizePopoverActive(false)}
+                            preferredAlignment="right"
+                            fullWidth
+                            activator={
+                                <Box width="120px">
+                                    <Button disclosure="select" fullWidth onClick={() => setPageSizePopoverActive((active) => !active)}>
+                                        {`Show ${paginationPageSize}`}
+                                    </Button>
+                                </Box>
+                            }
+                        >
+                            <ActionList
+                                items={paginationPageSizeSelector.map((size) => ({
+                                    content: String(size),
+                                    active: size === paginationPageSize,
+                                    onAction: () => {
+                                        dispatchQuery({ type: "SET_PAGE", page: 0 });
+                                        setPaginationPageSize(size);
+                                        setPageSizePopoverActive(false);
+                                    },
+                                }))}
+                            />
+                        </Popover>
+                    </HorizontalStack>
+                )}
+            </HorizontalGrid>
         </Box>
     ) : null;
 
@@ -451,7 +515,7 @@ export default function AgGridTable({
                 )
             )}
             {searchBelow ? <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">{searchBelow}</Box> : null}
-            <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
+            <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius variant={bulkBarVariant} />
             <div style={height ? { height } : { flex: 1, minHeight: 0 }}>
                 {gridNode}
             </div>

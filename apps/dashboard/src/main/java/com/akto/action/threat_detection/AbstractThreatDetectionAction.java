@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import okhttp3.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -74,6 +75,33 @@ public class AbstractThreatDetectionAction extends UserAction {
 
   public String getBackendUrl() {
     return ThreatDetectionBackendClient.backendUrl();
+  }
+
+  /**
+   * POSTs a JSON body to one of the threat backend's dashboard endpoints and parses its proto
+   * response. Null when the call fails, or when the backend does not have the endpoint (an older
+   * backend answers 404), so a caller can tell "no data" apart from "no answer".
+   */
+  protected <T extends com.google.protobuf.Message> T postDashboardApi(String path, Map<String, Object> body, Class<T> responseClass) {
+    try {
+      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+      Request request = new Request.Builder()
+          .url(String.format("%s/api/dashboard/%s", this.getBackendUrl(), path))
+          .post(RequestBody.create(objectMapper.valueToTree(body).toString(), MediaType.parse("application/json; charset=utf-8")))
+          .addHeader("Authorization", "Bearer " + this.getApiToken())
+          .addHeader("Content-Type", "application/json")
+          .addHeader("x-context-source", contextSourceValue)
+          .build();
+      try (Response resp = httpClient.newCall(request).execute()) {
+        if (!resp.isSuccessful()) {
+          return null;
+        }
+        String responseBody = resp.body() != null ? resp.body().string() : "";
+        return ProtoMessageUtils.toProtoMessage(responseClass, responseBody).orElse(null);
+      }
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   /**
@@ -370,40 +398,52 @@ public class AbstractThreatDetectionAction extends UserAction {
    */
   protected List<com.akto.action.threat_detection.HostSeverityCount> fetchHostSeverityCounts(int startTimestamp, int endTimestamp) {
     try {
-      String url = String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl());
-      MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-
-      Map<String, Object> body = new HashMap<String, Object>() {
-        {
-          put("start_ts", startTimestamp);
-          put("end_ts", endTimestamp);
-        }
-      };
-      String msg = objectMapper.valueToTree(body).toString();
-      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
-
-      RequestBody requestBody = RequestBody.create(msg, JSON);
-      Request request = new Request.Builder()
-          .url(url)
-          .post(requestBody)
-          .addHeader("Authorization", "Bearer " + this.getApiToken())
-          .addHeader("Content-Type", "application/json")
-          .addHeader("x-context-source", contextSourceValue)
-          .build();
-
-      try (Response resp = httpClient.newCall(request).execute()) {
-        String responseBody = resp.body() != null ? resp.body().string() : "";
-        return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse>toProtoMessage(
-            com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse.class,
-            responseBody
-        ).map(m -> m.getHostCountsList().stream()
-            .map(smr -> new com.akto.action.threat_detection.HostSeverityCount(
-                smr.getHost(), smr.getCritical(), smr.getHigh(), smr.getMedium(), smr.getLow()))
-            .collect(Collectors.toList()))
-         .orElse(new ArrayList<>());
-      }
+      return fetchHostSeverityCountsOrThrow(startTimestamp, endTimestamp);
     } catch (Exception e) {
       return new ArrayList<>();
+    }
+  }
+
+  /**
+   * Same call as fetchHostSeverityCounts, but a failure (network error, non-2xx, unparseable body)
+   * throws instead of coming back as an empty list, so a caller can tell "the threat backend
+   * failed" apart from "no violations" (InsightDataLoader turns the throw into threatBackendAvailable=false).
+   */
+  protected List<com.akto.action.threat_detection.HostSeverityCount> fetchHostSeverityCountsOrThrow(int startTimestamp, int endTimestamp) throws IOException {
+    String url = String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl());
+    MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTimestamp);
+        put("end_ts", endTimestamp);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+    String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+
+    RequestBody requestBody = RequestBody.create(msg, JSON);
+    Request request = new Request.Builder()
+        .url(url)
+        .post(requestBody)
+        .addHeader("Authorization", "Bearer " + this.getApiToken())
+        .addHeader("Content-Type", "application/json")
+        .addHeader("x-context-source", contextSourceValue)
+        .build();
+
+    try (Response resp = httpClient.newCall(request).execute()) {
+      if (!resp.isSuccessful()) {
+        throw new IOException("get_host_severity_counts returned HTTP " + resp.code());
+      }
+      String responseBody = resp.body() != null ? resp.body().string() : "";
+      return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse>toProtoMessage(
+          com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse.class,
+          responseBody
+      ).orElseThrow(() -> new IOException("get_host_severity_counts returned an unparseable body"))
+          .getHostCountsList().stream()
+          .map(smr -> new com.akto.action.threat_detection.HostSeverityCount(
+              smr.getHost(), smr.getCritical(), smr.getHigh(), smr.getMedium(), smr.getLow()))
+          .collect(Collectors.toList());
     }
   }
 

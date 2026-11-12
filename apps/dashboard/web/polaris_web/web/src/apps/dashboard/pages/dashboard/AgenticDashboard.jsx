@@ -1099,7 +1099,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No security posture data available for the selected time period</Text>}
                 itemId='security-posture-chart'
                 onRemoveComponent={removeComponent}
-                tooltipContent="Track the overall security posture over time, including API discovery, issues, and threat detection trends"
+                tooltipContent={"Track the overall security posture over time, including " + mapLabel('API', getDashboardCategory()) + " discovery, issues, and threat detection trends"}
             />
         ) : (
             <CustomLineChart
@@ -1112,7 +1112,7 @@ const AgenticDashboard = () => {
                 ]}
                 itemId='security-posture-chart'
                 onRemoveComponent={removeComponent}
-                tooltipContent="Track the overall security posture over time, including API discovery, issues, and threat detection trends"
+                tooltipContent={"Track the overall security posture over time, including " + mapLabel('API', getDashboardCategory()) + " discovery, issues, and threat detection trends"}
                 graphPointClick={handleSecurityPostureLineClick}
             />
         ),
@@ -1122,7 +1122,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No {mapLabel('API Discovery', getDashboardCategory())} data available for the selected time period</Text>}
                 itemId='api-discovery-pie'
                 onRemoveComponent={removeComponent}
-                tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered APIs categorized by shadow, sensitive, no auth, and normal'}
+                tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered ' + mapLabel('APIs', getDashboardCategory()) + ' categorized by shadow, sensitive, no auth, and normal'}
             />
         ) : (
             <CustomPieChart
@@ -1131,7 +1131,7 @@ const AgenticDashboard = () => {
                 graphData={apiDiscoveryData}
                 itemId='api-discovery-pie'
                 onRemoveComponent={removeComponent}
-                tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered APIs categorized by shadow, sensitive, no auth, and normal'}
+                tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered ' + mapLabel('APIs', getDashboardCategory()) + ' categorized by shadow, sensitive, no auth, and normal'}
                 onSegmentClick={handleApiDiscoveryPieClick}
             />
         ),
@@ -1213,7 +1213,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No testing data available for the selected time period</Text>}
                 itemId='tested-vs-non-tested'
                 onRemoveComponent={removeComponent}
-                tooltipContent="Track the number of APIs that have been tested vs those that haven't been tested over time"
+                tooltipContent={"Track the number of " + mapLabel('APIs', getDashboardCategory()) + " that have been tested vs those that haven't been tested over time"}
             />
         ) : (
             <CustomLineChart
@@ -1225,7 +1225,7 @@ const AgenticDashboard = () => {
                 ]}
                 itemId='tested-vs-non-tested'
                 onRemoveComponent={removeComponent}
-                tooltipContent="Track the number of APIs that have been tested vs those that haven't been tested over time"
+                tooltipContent={"Track the number of " + mapLabel('APIs', getDashboardCategory()) + " that have been tested vs those that haven't been tested over time"}
                 graphPointClick={handleTestedVsNonTestedClick}
             />
         ),

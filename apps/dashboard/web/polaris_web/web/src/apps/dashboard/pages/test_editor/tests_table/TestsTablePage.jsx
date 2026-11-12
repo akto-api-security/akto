@@ -13,7 +13,7 @@ import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip";
 import TooltipText from "../../../components/shared/TooltipText";
 import LocalStore from "../../../../main/LocalStorageStore";
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
-import { getDashboardCategory } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 import {getCategoriesBasedOnDashboardCategory, filterSubCategoriesBasedOnCategories} from "./categoryUtil";
 
 const sortOptions = [
@@ -28,7 +28,7 @@ const severityObj = {
     "High": "Urgent action; significant security risk",
     "Medium": "Moderate risk; potential for exploitation",
     "Low": "Minor concerns; limited impact",
-    "Dynamic Severity": "Severity changes based on API context"
+    "Dynamic Severity": "Severity changes based on " + mapLabel('API', getDashboardCategory()) + " context"
 }
 
 const headings = [

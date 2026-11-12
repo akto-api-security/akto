@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
-import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
-import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor } from "@shopify/polaris-icons";
+import { Box, Button, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
+import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor, MaximizeMajor, MinimizeMajor, DesktopMajor, RiskMajor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import PluginIcon from "@/assets/Plugin.svg";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
@@ -18,6 +18,7 @@ export function topoColors(category) {
         case "ai-model": return { borderColor: "#ec4899", backgroundColor: "#fdf2f8" };
         case "skill":    return { borderColor: "#7C3AED", backgroundColor: "#F3E8FF" };
         case "plugin":   return { borderColor: "#4F46E5", backgroundColor: "#EEF2FF" };
+        case "violation": return { borderColor: "#D72C0D", backgroundColor: "#FFF4F4" };
         default:         return { borderColor: "#6b7280", backgroundColor: "#f9fafb" };
     }
 }
@@ -31,6 +32,8 @@ export function topoIcon(category) {
         case "ai-model": return MagicMajor;
         case "skill":    return AutomationMajor;
         case "plugin":   return PluginIcon;
+        case "device":   return DesktopMajor;
+        case "violation": return RiskMajor;
         default:         return CustomersMinor;
     }
 }
@@ -43,7 +46,7 @@ export function TopoNode({ data }) {
     const colors = topoColors(component.category);
     const borderColor = component.selected ? TOPO_SELECTED_BORDER : TOPO_STATUS_BORDERS[component.status] || colors.borderColor;
     const borderWidth = component.selected ? 2 : 1;
-    const IconComponent = topoIcon(component.category);
+    const IconComponent = component.iconSrc || topoIcon(component.category);
     const isDevice = component.category === "external";
 
     return (
@@ -60,11 +63,11 @@ export function TopoNode({ data }) {
                             </Box>
                             <HorizontalStack gap={1} blockAlign="center">
                                 {typeof IconComponent === "string"
-                                    ? <Avatar source={IconComponent} size="extraSmall" />
+                                    ? <Avatar source={IconComponent} size="extraSmall" shape="square" />
                                     : <Icon source={IconComponent} />
                                 }
                                 <Box width={component.category === "ai-model" ? "140px" : "110px"}>
-                                    <Tooltip content={component.label} preferredWidth={400}>
+                                    <Tooltip content={component.tooltip || component.label} preferredWidth={400}>
                                         <Text variant="bodySm" color="base" truncate>{component.label}</Text>
                                     </Tooltip>
                                 </Box>
@@ -134,7 +137,7 @@ function buildDeviceItems(devices, deviceCount) {
     return items;
 }
 
-export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight, focusNodeId, onNodeClick, onPaneClick, fitKey, fitPadding }) {
+export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight, focusNodeId, onNodeClick, onPaneClick, fitKey, fitPadding, onFullscreenChange }) {
     // Each MCP's own tools, keyed by collection id — the extra hop the Endpoints graph shows.
     // Only for our own layout; a caller that supplies nodes reserves its own tool rows.
     const mcpCollectionIds = useMemo(() => {
@@ -283,13 +286,25 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
     // Re-centres on every graph change, not just init — the flyouts' detail and tool fetches land
     // after the first render, and the view should still be on the focus node once they do.
     const flow = useRef(null);
+    const containerRef = useRef(null);
+    const [fullscreen, setFullscreen] = useState(false);
+    useEffect(() => {
+        const sync = () => setFullscreen(document.fullscreenElement === containerRef.current);
+        document.addEventListener("fullscreenchange", sync);
+        return () => document.removeEventListener("fullscreenchange", sync);
+    }, []);
+    useEffect(() => { onFullscreenChange?.(fullscreen); }, [fullscreen]); // eslint-disable-line react-hooks/exhaustive-deps
+    const toggleFullscreen = useCallback(() => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else containerRef.current?.requestFullscreen();
+    }, []);
     const recenterOn = fitKey !== undefined ? fitKey : nodes;
     useEffect(() => {
         if (flow.current) centerOnFocus(flow.current, nodes, focusId, fitPadding);
-    }, [recenterOn, focusId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [recenterOn, focusId, fullscreen]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
-        <Box style={{ height, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
+        <Box ref={containerRef} style={{ height: fullscreen ? "100vh" : height, position: "relative", borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -310,6 +325,11 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 <Background color="#E1E5E9" gap={16} />
                 <Controls showInteractive={false} />
             </ReactFlow>
+            <Box position="absolute" insetBlockStart="2" insetInlineEnd="2" zIndex="5">
+                <Tooltip content={fullscreen ? "Exit full screen" : "Full screen"} dismissOnMouseOut>
+                    <Button size="slim" icon={fullscreen ? MinimizeMajor : MaximizeMajor} onClick={toggleFullscreen} accessibilityLabel={fullscreen ? "Exit full screen" : "Full screen"} />
+                </Tooltip>
+            </Box>
         </Box>
     );
 }

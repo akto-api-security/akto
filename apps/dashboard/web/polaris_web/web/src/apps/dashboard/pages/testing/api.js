@@ -570,25 +570,39 @@ export default {
             data: {reportId, organizationName, reportDate, reportUrl, username, firstPollRequest}
         })
     },
-    fetchScript(scriptType = 'PRE_REQUEST') {
+    fetchAllScripts() {
+        return request({
+            url: '/api/fetchAllScripts',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchScript(scriptId) {
         return request({
             url: '/api/fetchScript',
             method: 'post',
-            data: { scriptType }
+            data: { scriptId }
         })
     },
-    addScript({ javascript, scriptType = 'PRE_REQUEST' }) {
+    addScript({ name, scriptType, javascript }) {
         return request({
             url: '/api/addScript',
             method: 'post',
-            data: { testScript: { javascript, type: scriptType } }
+            data: { name, scriptType, javascript }
         })
     },
-    updateScript(id, javascript) {
+    updateScript(scriptId, javascript) {
         return request({
             url: '/api/updateScript',
             method: 'post',
-            data: {testScript:{id, javascript}}
+            data: { scriptId, javascript }
+        })
+    },
+    deleteScript(scriptId) {
+        return request({
+            url: '/api/deleteScript',
+            method: 'post',
+            data: { scriptId }
         })
     },
     updateDeltaTimeForSummaries(deltaTimeForScheduledSummaries){
@@ -763,5 +777,23 @@ export default {
             }
         })
         return resp
+    },
+    // Smart agents
+    async fetchSmartAgentProfiles() {
+        return await request({ url: '/api/fetchSmartAgentProfiles', method: 'post', data: {} })
+    },
+    async fetchSmartAgentProfile(hexId) {
+        return await request({ url: '/api/fetchSmartAgentProfile', method: 'post', data: { hexId } })
+    },
+    async saveSmartAgentProfile(profile) {
+        const { hexId, name, description, skills, customSkills, allowCreateIdentities, instructions, knowledgeFiles, knowledgeLinks } = profile
+        return await request({
+            url: '/api/saveSmartAgentProfile',
+            method: 'post',
+            data: { hexId, name, description, skills, customSkills, allowCreateIdentities, instructions, knowledgeFiles, knowledgeLinks }
+        })
+    },
+    async deleteSmartAgentProfile(hexId) {
+        return await request({ url: '/api/deleteSmartAgentProfile', method: 'post', data: { hexId } })
     },
 }

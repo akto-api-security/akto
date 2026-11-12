@@ -1,7 +1,8 @@
 import React from "react";
-import { Badge, Box, HorizontalStack, Text } from "@shopify/polaris";
+import { Badge, Box, HorizontalStack, Text, Tooltip } from "@shopify/polaris";
 import observeFunc from "../transform";
-import { getRiskStatus } from "./agenticPageBuilders";
+import { getRiskLevel, getRiskStatus } from "./agenticPageBuilders";
+import func from "@/util/func";
 import AssetIcon from "./AssetIcon";
 import { TypeBadge } from "@/apps/dashboard/components/tables/rows/AgGridRow";
 import MisconfiguredBadge from "./MisconfiguredBadge";
@@ -69,13 +70,13 @@ export function ParamDescCellRenderer({ data }) {
 
 export function AssetNameCellRenderer({ data }) {
     if (!data) return null;
-    // Match old UI: personal-account + local-MCP tags for non-Skill rows; malicious tag for Skills
+    // Match old UI: personal-account + local-MCP tags for non-Skill rows; malicious tag for Skills and MCP servers
     const isSkill = data.type === "Skill";
     // Skill/Plugin rows fan out from the agent collection, so they'd inherit its markers otherwise.
     const isFanout = isSkill || data.type === "Plugin";
     const showLocalMcp = data.hasLocalMcpServer && !isFanout;
     const showPersonal = data.hasPersonalAccount && !isFanout;
-    const showMalicious = data.isMalicious && isSkill;
+    const showMalicious = data.isMalicious && (isSkill || data.type === "MCP Server");
     // Misconfigured is an Agent/MCP-server-only concept — Skill (and Plugin) rows never show it.
     const showMisconfigured = data.hasMisconfiguredConfig && !isFanout;
     return (
@@ -83,6 +84,7 @@ export function AssetNameCellRenderer({ data }) {
             <AssetIcon type={data.type} assetTagValue={data.assetTagValue} size={24} />
             <Box width="100%" overflowX="hidden">
                 <Text variant="bodySm" fontWeight="medium" truncate>{data.name}</Text>
+                {data.subtitle && <Text variant="bodySm" color="subdued" truncate>{data.subtitle}</Text>}
             </Box>
             {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
             {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
@@ -125,6 +127,46 @@ export function RiskScoreCellRenderer({ value, data }) {
         data?.riskScoreFactors,
         data?.riskScoreNote,
     );
+}
+
+// MCP server / LLM / AI agent rows only (AgenticObserveAction's approvalStatus); Blocked stays neutral.
+const APPROVAL_BADGE_STATUS = { Approved: "success", Unapproved: "critical", "Under review": "attention" };
+
+export function ApprovalStatusBadge({ status }) {
+    if (!status) return null;
+    return <Badge size="small" status={APPROVAL_BADGE_STATUS[status]}>{status}</Badge>;
+}
+
+export function ApprovalStatusCellRenderer({ value }) {
+    if (!value) return <Text variant="bodyMd" color="subdued">-</Text>;
+    return <ApprovalStatusBadge status={value} />;
+}
+
+// Discovered tool names (an agent's built-in tools, an MCP server's tools); the full list on hover.
+const MAX_TOOLTIP_TOOLS = 20;
+
+export function ToolsCellRenderer({ value }) {
+    const tools = value || [];
+    if (!tools.length) return <Text variant="bodyMd" color="subdued">-</Text>;
+    const toolList = tools.slice(0, MAX_TOOLTIP_TOOLS).join(", ") + (tools.length > MAX_TOOLTIP_TOOLS ? `, and ${tools.length - MAX_TOOLTIP_TOOLS} more` : "");
+    return (
+        <Tooltip content={toolList}>
+            <Text variant="bodyMd" truncate>{tools.join(", ")}</Text>
+        </Tooltip>
+    );
+}
+
+// Coloured dot + risk level; same score tooltip as RiskScoreCellRenderer.
+export function RiskLevelCellRenderer({ value, data }) {
+    if (!value) return null;
+    const level = getRiskLevel(value);
+    const label = (
+        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+            <LegendDot color={observeFunc.getColorForSensitiveData(level)} />
+            <Text variant="bodySm">{func.toSentenceCase(level)}</Text>
+        </HorizontalStack>
+    );
+    return observeFunc.wrapRiskScoreTooltip(label, value, data?.baseRiskScore, data?.baseRiskScoreReason);
 }
 
 export function ViolationsCellRenderer({ value }) {

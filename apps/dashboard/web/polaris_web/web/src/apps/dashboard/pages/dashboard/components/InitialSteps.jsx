@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import transform from '../transform';
 import func from '@/util/func';
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function InitialSteps({initialSteps}) {
 
@@ -16,7 +17,7 @@ function InitialSteps({initialSteps}) {
 
     const steps = [
         {
-            text: 'Use mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs.',
+            text: 'Use mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze ' + mapLabel('APIs', getDashboardCategory()) + '.',
             title: 'Automated traffic',
             url: '/dashboard/quick-start',
             id: 'automatedTraffic',

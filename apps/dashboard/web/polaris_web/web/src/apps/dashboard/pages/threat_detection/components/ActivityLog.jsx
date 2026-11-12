@@ -15,7 +15,6 @@ import func from '@/util/func';
 import {useState, useEffect} from 'react';
 import GetPrettifyEndpoint from '../../observe/GetPrettifyEndpoint';
 import PersistStore from "../../../../main/PersistStore";
-import { labelMap } from '../../../../main/labelHelperMap';
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel } from '../../../../main/labelHelper';
 import { extractRuleViolated, extractBehaviour, getBehaviourTone } from '../utils/formatUtils';
   
@@ -189,12 +188,12 @@ import { extractRuleViolated, extractBehaviour, getBehaviourTone } from '../util
               itemCount={data.length}
               headings={[
                   {title: 'Time'},
-                  {title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"]},
+                  {title: mapLabel("Attack type", PersistStore.getState().dashboardCategory)},
                   ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{title: 'Rule Violated'}] : []),
                   ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{title: 'Behaviour'}] : []),
                   {title: 'Severity'},
                   {title: 'Host'},
-                  {title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"]},
+                  {title: mapLabel("API endpoint", PersistStore.getState().dashboardCategory)},
               ]}
           >
             {rowMarkup}

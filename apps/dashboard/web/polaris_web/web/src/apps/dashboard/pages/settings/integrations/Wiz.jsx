@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import settingFunctions from "../module"
 import func from "@/util/func"
 import { usePermissions, whenAllowed } from "@/util/permissions"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function Wiz() {
 
@@ -86,7 +87,7 @@ function Wiz() {
                (clientSecret === null ? true : !clientSecret?.trim())
     }
 
-    const cardContent = "Seamlessly enhance your API security posture with Akto's Wiz integration. Connect Wiz as a traffic source to periodically import your API endpoints into Akto's inventory, and enrich your Wiz dashboard with API vulnerabilities discovered by Akto."
+    const cardContent = "Seamlessly enhance your " + mapLabel('API', getDashboardCategory()) + " security posture with Akto's Wiz integration. Connect Wiz as a traffic source to periodically import your " + mapLabel('API endpoints', getDashboardCategory()) + " into Akto's inventory, and enrich your Wiz dashboard with " + mapLabel('API', getDashboardCategory()) + " vulnerabilities discovered by Akto."
 
     const wizCard = (
         <LegacyCard
