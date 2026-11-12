@@ -41,7 +41,7 @@ export default function TopAgenticAssetsCard({ data, onOpenActivity }) {
     return (
         <CardWithHeader title="Top agents, apps and servers involved" hasData>
             {data === null ? <SpinnerCentered height="200px" />
-                : <ItemListCard items={buildRows(data?.assets, onOpenActivity)} limit={TOP_AGENTIC_ASSETS} emptyText="No agents, apps or servers involved in this period." />}
+                : <ItemListCard items={buildRows(data?.assets?.slice(0, TOP_AGENTIC_ASSETS), onOpenActivity)} emptyText="No agents, apps or servers involved in this period." />}
         </CardWithHeader>
     );
 }

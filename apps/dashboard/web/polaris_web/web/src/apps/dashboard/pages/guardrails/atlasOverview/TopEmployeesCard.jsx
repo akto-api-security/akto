@@ -32,7 +32,7 @@ export default function TopEmployeesCard({ data, onOpenActivity }) {
     return (
         <CardWithHeader title="Employees with most violations" hasData>
             {data === null ? <SpinnerCentered height="200px" />
-                : <ItemListCard items={buildRows(data?.employees, onOpenActivity)} limit={TOP_EMPLOYEES} emptyText="No employees with violations in this period." />}
+                : <ItemListCard items={buildRows(data?.employees?.slice(0, TOP_EMPLOYEES), onOpenActivity)} emptyText="No employees with violations in this period." />}
         </CardWithHeader>
     );
 }
