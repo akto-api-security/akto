@@ -39,20 +39,32 @@ BUILTIN_DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 
-def _parse_deployment_config(raw_json: str) -> dict[str, Any] | None:
-    """The per-deployment DEFAULT_MODEL_CONFIG_JSON, or None when it's unset,
-    unparseable, or doesn't carry a modelConfigs list."""
+def _parse_deployment_config(
+    raw_json: str, name: str = "DEFAULT_MODEL_CONFIG_JSON", fallback: str = "built-in"
+) -> dict[str, Any] | None:
+    """A per-deployment model config env value (DEFAULT_MODEL_CONFIG_JSON unless
+    named otherwise), or None when it's unset, unparseable, or doesn't carry a
+    modelConfigs list."""
     if not raw_json or not raw_json.strip():
         return None
     try:
         cfg = json.loads(raw_json)
     except Exception as exc:
-        logger.warning(f"[constants] DEFAULT_MODEL_CONFIG_JSON parse failed ({exc}); using built-in")
+        logger.warning(f"[constants] {name} parse failed ({exc}); using {fallback}")
         return None
     if isinstance(cfg, dict) and cfg.get("modelConfigs"):
         return cfg
-    logger.warning("[constants] DEFAULT_MODEL_CONFIG_JSON has no modelConfigs; using built-in")
+    logger.warning(f"[constants] {name} has no modelConfigs; using {fallback}")
     return None
+
+
+def get_enrichment_config() -> dict[str, Any] | None:
+    """The model config for post-verdict enrichment (evidence line, remediation,
+    reason), or None when ENRICHMENT_MODEL_CONFIG_JSON is unset or invalid — the
+    caller then keeps its pre-existing core-model behaviour unchanged."""
+    return _parse_deployment_config(
+        settings.ENRICHMENT_MODEL_CONFIG_JSON, "ENRICHMENT_MODEL_CONFIG_JSON", "the core model config"
+    )
 
 
 def get_default_config(raw_json: str = "") -> dict[str, Any]:

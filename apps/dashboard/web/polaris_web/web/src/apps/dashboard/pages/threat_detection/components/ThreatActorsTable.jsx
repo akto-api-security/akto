@@ -10,9 +10,7 @@ import Store from "../../../store";
 import dayjs from "dayjs";
 import { flags } from "./flags/index.mjs";
 import { Tooltip } from "@shopify/polaris";
-import { useSearchParams } from "react-router-dom";
-import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
-import { labelMap } from "../../../../main/labelHelperMap";
+import { isAgenticSecurityCategory, isEndpointSecurityCategory, isMCPSecurityCategory, mapLabel } from "../../../../main/labelHelper";
 import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
 import IpReputationScore from "./IpReputationScore";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
@@ -63,13 +61,13 @@ const getBaseHeaders = () => {
       value: "latestHost",
     },
     {
-      text: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
-      title: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
+      text: "Latest " + mapLabel("API", PersistStore.getState().dashboardCategory),
+      title: "Latest " + mapLabel("API", PersistStore.getState().dashboardCategory),
       value: "latestApi",
     },
     {
-      text: labelMap[PersistStore.getState().dashboardCategory]["Latest Attack"],
-      title: labelMap[PersistStore.getState().dashboardCategory]["Latest Attack"],
+      text: mapLabel("Latest Attack", PersistStore.getState().dashboardCategory),
+      title: mapLabel("Latest Attack", PersistStore.getState().dashboardCategory),
       value: "latestAttack",
     },
   );
@@ -151,7 +149,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick, refreshCount, o
     },
     {
       key: 'latestAttack',
-      label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
+      label: mapLabel("Latest attack sub-category", PersistStore.getState().dashboardCategory),
       type: 'select',
       choices: [],
       multiple: true
@@ -360,7 +358,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick, refreshCount, o
       },
       {
         key: 'latestAttack',
-        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
+        label: mapLabel("Latest attack sub-category", PersistStore.getState().dashboardCategory),
         type: 'select',
         choices: attackTypeChoices,
         multiple: true

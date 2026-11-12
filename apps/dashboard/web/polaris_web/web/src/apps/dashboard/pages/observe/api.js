@@ -299,11 +299,13 @@ export default {
     // maliciousSkillKeys is NOT sent — AgenticObserveAction computes/caches it itself now
     // (getOrBuildSkillData) instead of requiring the whole account-wide set (14,218 entries /
     // ~500KB+ on Atlas Scale Test) to be re-POSTed on every paginated request.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName } = {}) {
+    // aiInventory: the AI inventory (new layout) — adds tool search and per-row tools, status,
+    // employees and category. Left off by the legacy Endpoints page.
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName, aiInventory, firstSeenStart, firstSeenEnd } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName, aiInventory, firstSeenStart, firstSeenEnd },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0, distinctUsernames: resp?.distinctUsernames || [] }
     },
@@ -452,6 +454,7 @@ export default {
             totalAssets: resp?.totalAssets || 0,
             totalEndpoints: resp?.totalEndpoints || 0,
             countsByType: resp?.countsByType || {},
+            countsByCategory: resp?.countsByCategory || {},
             monthLabels: resp?.monthLabels || [],
             assetSparkline: resp?.assetSparkline || [],
             assetDelta: resp?.assetDelta || 0,
@@ -1008,29 +1011,29 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens = -1, runAutomatedTests = false) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens = -1, runAutomatedTests = false, automatedTestsCustomPrompt, scriptSelection = {}) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests}
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests, automatedTestsCustomPrompt, ...scriptSelection}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests = false) {
+    scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests = false, automatedTestsCustomPrompt, scriptSelection = {}) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionIds, type: "MULTI_COLLECTION", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests}
+            data: { apiCollectionIds, type: "MULTI_COLLECTION", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests, automatedTestsCustomPrompt, ...scriptSelection}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens = -1, runAutomatedTests = false) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens = -1, runAutomatedTests = false, automatedTestsCustomPrompt, scriptSelection = {}) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests, automatedTestsCustomPrompt, ...scriptSelection}
         }).then((resp) => {
             return resp
         })

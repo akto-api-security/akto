@@ -5,13 +5,23 @@ import com.akto.action.AgenticObserveAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.monitoring.InstalledAppVulnerability;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.dto.monitoring.ModuleInfoConstants;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.service.atlas.AtlasPeopleService;
+import com.akto.service.insights.InsightContext;
+import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightService;
+import com.akto.service.insights.InsightsThreatBackendAccess;
+import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.utils.vulnerability.InstalledAppVulnerabilityAnalysis;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -35,11 +45,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class ModuleInfoAction extends UserAction {
     private List<ModuleInfo> moduleInfos;
@@ -88,6 +101,35 @@ public class ModuleInfoAction extends UserAction {
     @Setter private int endTimestamp;
     @Getter private long total;
     @Getter private Map<String, Object> filterOptions;
+    @Getter private Map<String, Object> deviceStats;
+    @Setter private String deviceScope;
+    private static final LoggerMaker statsLogger = new LoggerMaker(ModuleInfoAction.class, LogDb.DASHBOARD);
+    private final InsightService insightService = new InsightService();
+    // Builds and caches the Atlas Devices & Employees snapshot; every fetchAtlas* action delegates to it.
+    private final AtlasPeopleService atlasPeopleService = new AtlasPeopleService();
+    @Setter private String atlasQuery;
+    @Setter private List<String> atlasOs;
+    @Setter private List<String> atlasBrowsers;
+    @Setter private List<String> toolCategories;
+    @Setter private List<String> healthStates;
+    @Setter private boolean hasUnapproved;
+    @Setter private boolean usesPersonal;
+    @Setter private boolean agentIssues;
+    @Setter private boolean agentActive;
+    @Setter private boolean usesAi;
+    @Setter private List<String> guardrailModes;
+    @Setter private double riskMin;
+    @Setter private double riskMax = AtlasPeopleService.RISK_MAX;
+    @Setter private List<String> teams;
+    @Setter private List<String> tagPairs;
+    @Setter private List<String> violationSeverities;
+    @Getter private Map<String, Object> atlasOverview;
+    @Getter private Map<String, Object> atlasTrend;
+    @Getter private List<Map<String, Object>> atlasRows;
+    @Getter private long atlasTotal;
+    @Setter private String atlasKind;
+    @Setter private String atlasId;
+    @Getter private Map<String, Object> atlasDetail;
 
     @Override
     public String execute() {
@@ -171,9 +213,11 @@ public class ModuleInfoAction extends UserAction {
     private static final String STATUS_INACTIVE = "inactive";
     private static final String STATUS_ERROR = "error";
     private static final String ORIG_ID_FIELD = "origId";
+    private static final String NAME_LOWER_FIELD = "nameLower";
 
     // A physical host can show up as multiple ModuleInfo docs per {name, os} (reinstall/reconnect) — this
     // is the dedup key used to collapse those down to one row per host.
+    // One logical device per {name, os}; the Devices table, stats and trend all group the same way.
     private static Bson endpointShieldGroupId() {
         return new Document(ModuleInfo.NAME, "$" + ModuleInfo.NAME).append("os", "$" + AD_OS);
     }
@@ -253,19 +297,43 @@ public class ModuleInfoAction extends UserAction {
         Bson filter = buildEndpointShieldFilter();
         Bson groupId = endpointShieldGroupId();
 
-        Document countResult = ModuleInfoDao.instance.getMCollection().aggregate(Arrays.asList(
-                Aggregates.match(filter),
-                Aggregates.group(groupId),
-                Aggregates.count("total")
-        ), Document.class).first();
-        total = countResult == null ? 0 : ((Number) countResult.get("total")).longValue();
+        total = countEndpointShieldModules(filter, groupId, Context.now(), statuses);
 
         String sortField = mapEndpointShieldSortField(sortKey);
         Bson finalSort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
         int lim = (limit <= 0) ? 20 : Math.min(limit, 200);
         int sk = Math.max(skip, 0);
 
-        List<Bson> pipeline = Arrays.asList(
+        moduleInfos = aggregateEndpointShieldModules(filter, groupId, Context.now(), statuses, finalSort, sk, lim);
+
+        filterEnvironmentVariables(moduleInfos);
+        allowedEnvFields = computeAllowedEnvFields();
+        return SUCCESS.toUpperCase();
+    }
+
+    private static final String SCOPE_DESKTOP = "desktop";
+    private static final String SCOPE_BROWSER = "browser";
+
+    // Desktop means no browserName and no 'extension' version, browser is the opposite, anything else means all.
+    private static Bson endpointShieldScopeFilter(String scope) {
+        Bson isExtension = Filters.or(
+                Filters.exists(AD_BROWSER_NAME, true),
+                Filters.regex(ModuleInfo.CURRENT_VERSION, "extension"));
+        if (SCOPE_DESKTOP.equals(scope)) return Filters.nor(isExtension);
+        if (SCOPE_BROWSER.equals(scope)) return isExtension;
+        return new Document();
+    }
+
+    private InsightContext buildInsightContext() {
+        Integer userId = Context.userId.get();
+        int windowEnd = Context.now() / 300 * 300;
+        return new InsightContext(Context.accountId.get(), userId == null ? 0 : userId,
+                Context.contextSource.get(), windowEnd - AtlasPeopleService.VIOLATION_WINDOW_SECONDS, windowEnd);
+    }
+
+    // Picks the newest deployment per device group and computes live status; shared by the agents list and Atlas.
+    private static List<Bson> endpointShieldGroupedStages(Bson filter, Bson groupId, int now, List<String> statuses) {
+        return Arrays.asList(
                 Aggregates.match(filter),
                 // Dedup on the newest DEPLOYMENT, not the newest heartbeat. A reinstall that
                 // failed never heartbeats (lastHeartbeatReceived stays 0), so ordering by
@@ -290,36 +358,261 @@ public class ModuleInfoAction extends UserAction {
                         Accumulators.first(ModuleInfo.MINI_RUNTIME_NAME, "$" + ModuleInfo.MINI_RUNTIME_NAME)),
                 Aggregates.addFields(
                         new Field<>(ModuleInfoDao.ID, "$" + ORIG_ID_FIELD),
-                        new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(Context.now())),
+                        new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(now)),
                         new Field<>(AD_LAST_DEPLOYED_TS, endpointShieldLastDeployedExpr())),
-                Aggregates.match(statuses == null || statuses.isEmpty() ? new Document() : Filters.in(AD_CURRENT_STATUS, statuses)),
-                Aggregates.project(Projections.exclude(ORIG_ID_FIELD)),
-                Aggregates.sort(finalSort),
-                Aggregates.skip(sk),
-                Aggregates.limit(lim)
+                Aggregates.match(statuses == null || statuses.isEmpty() ? new Document() : Filters.in(AD_CURRENT_STATUS, statuses))
         );
+    }
 
-        if (statuses != null && !statuses.isEmpty()) {
-            List<Bson> countPipeline = new ArrayList<>(pipeline.subList(0, pipeline.size() - 3));
-            countPipeline.add(Aggregates.count("total"));
-            Document statusCount = ModuleInfoDao.instance.getMCollection()
-                    .aggregate(countPipeline, Document.class).allowDiskUse(true).first();
-            total = statusCount == null ? 0 : ((Number) statusCount.get("total")).longValue();
+    // Runs the grouped pipeline with optional sort, skip and limit (used by the agents list and the Atlas snapshot load).
+    private List<ModuleInfo> aggregateEndpointShieldModules(Bson filter, Bson groupId, int now, List<String> statuses, Bson sort, int skip, int limit) {
+        List<Bson> pipeline = new ArrayList<>(endpointShieldGroupedStages(filter, groupId, now, statuses));
+        pipeline.add(Aggregates.project(Projections.exclude(ORIG_ID_FIELD)));
+        if (sort != null) {
+            pipeline.add(Aggregates.addFields(new Field<>(NAME_LOWER_FIELD, new Document("$toLower", new Document("$ifNull", Arrays.asList("$" + ModuleInfo.NAME, ""))))));
+            pipeline.add(Aggregates.sort(sort));
         }
-
-        moduleInfos = new ArrayList<>();
-        // The dedup sorts on a computed deployment timestamp, so the planner cannot serve it
-        // from the {moduleType, lastHeartbeatReceived} index and sorts the matched docs in
-        // memory. Spilling beats failing at the 100MB sort limit on a large fleet.
-        MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection()
-                .aggregate(pipeline, ModuleInfo.class).allowDiskUse(true).cursor();
-        while (cursor.hasNext()) {
-            moduleInfos.add(cursor.next());
+        if (skip > 0) pipeline.add(Aggregates.skip(skip));
+        if (limit > 0) pipeline.add(Aggregates.limit(limit));
+        if (sort != null) pipeline.add(Aggregates.project(Projections.exclude(NAME_LOWER_FIELD)));
+        List<ModuleInfo> modules = new ArrayList<>();
+        try (MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection()
+                .aggregate(pipeline, ModuleInfo.class).allowDiskUse(true).cursor()) {
+            while (cursor.hasNext()) modules.add(cursor.next());
         }
+        return modules;
+    }
 
-        filterEnvironmentVariables(moduleInfos);
-        allowedEnvFields = computeAllowedEnvFields();
-        return SUCCESS.toUpperCase();
+    private long countEndpointShieldModules(Bson filter, Bson groupId, int now, List<String> statuses) {
+        List<Bson> pipeline = new ArrayList<>();
+        if (statuses == null || statuses.isEmpty()) {
+            pipeline.add(Aggregates.match(filter));
+            pipeline.add(Aggregates.group(groupId));
+        } else {
+            pipeline.addAll(endpointShieldGroupedStages(filter, groupId, now, statuses));
+        }
+        pipeline.add(Aggregates.count("total"));
+        Document result = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, Document.class).allowDiskUse(true).first();
+        return result == null ? 0 : ((Number) result.get("total")).longValue();
+    }
+
+    // Flattens a grouped ModuleInfo into the plain row AtlasPeopleService.build expects.
+    private static Document toAtlasModuleRow(ModuleInfo module) {
+        Map<String, Object> additional = module.getAdditionalData() == null ? new HashMap<>() : module.getAdditionalData();
+        return new Document("deviceName", module.getName())
+                .append("moduleId", module.getId())
+                .append("status", additional.get("currentStatus"))
+                .append("username", additional.get("username"))
+                .append("os", additional.get("os"))
+                .append("platform", additional.get("platform"))
+                .append("browserName", additional.get("browserName"))
+                .append(ModuleInfo.LAST_HEARTBEAT_RECEIVED, module.getLastHeartbeatReceived())
+                .append(ModuleInfo.CURRENT_VERSION, module.getCurrentVersion());
+    }
+
+    private Bson atlasModuleFilter() {
+        return Filters.and(buildEndpointShieldFilter(), endpointShieldScopeFilter(deviceScope));
+    }
+
+    // Loads every grouped device row (no paging) for the snapshot, each with its first-seen time.
+    private List<Document> loadEndpointShieldDeviceRows(int now) {
+        Map<String, Integer> firstSeen = loadFirstSeenByGroup();
+        List<Document> rows = new ArrayList<>();
+        for (ModuleInfo module : aggregateEndpointShieldModules(atlasModuleFilter(), endpointShieldGroupId(), now, null, null, 0, 0)) {
+            Document row = toAtlasModuleRow(module);
+            row.append(FIRST_SEEN_FIELD, firstSeen.getOrDefault(firstSeenKey(row.get("deviceName"), row.get("os")), 0));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private Map<String, String> loadLatestVersionByOs() {
+        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        return AtlasPeopleService.latestVersionByOs(settings == null ? null : settings.getEndpointShieldSettings());
+    }
+
+    // Returns the cached Atlas snapshot, loading device rows and the insights bundle on a miss.
+    private AtlasPeopleService.Snapshot loadAtlasSnapshot() {
+        int now = Context.now();
+        InsightContext ctx = buildInsightContext();
+        String cacheKey = ctx.bundleCacheKey() + "_" + deviceScope + "_" + startTimestamp + "_" + endTimestamp;
+        return atlasPeopleService.getOrBuild(cacheKey, () -> {
+            List<Document> rows = loadEndpointShieldDeviceRows(now);
+            InsightDataBundle bundle = null;
+            try {
+                bundle = insightService.getOrLoadBundle(ctx);
+            } catch (Exception e) {
+                statsLogger.error("atlas snapshot insights bundle failed: " + e.getMessage());
+            }
+            return atlasPeopleService.build(rows, bundle, loadLatestVersionByOs(), now, startTimestamp, endTimestamp);
+        });
+    }
+
+
+    // All-time per-host violation counts, cached apart from the 7-day insights bundle. A failed fetch throws (and is not cached), so the request errors instead of showing no rows.
+    private List<HostSeverityCount> loadAllTimeHostSeverityCounts() {
+        String key = Context.accountId.get() + "_" + Context.contextSource.get();
+        return atlasPeopleService.getOrLoadAllTimeHostCounts(key, () -> {
+            try {
+                return new InsightsThreatBackendAccess().hostSeverityCounts(ALL_TIME_TS, ALL_TIME_TS);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
+    // Copies the request parameters (filters, search, sort, paging) into a PeopleQuery.
+    private AtlasPeopleService.PeopleQuery buildPeopleQuery() {
+        AtlasPeopleService.PeopleQuery query = new AtlasPeopleService.PeopleQuery();
+        query.text = atlasQuery;
+        query.osList = atlasOs;
+        query.browserList = atlasBrowsers;
+        query.categories = toolCategories;
+        query.healthStates = healthStates;
+        query.hasUnapproved = hasUnapproved;
+        query.usesPersonal = usesPersonal;
+        query.agentIssues = agentIssues;
+        query.agentActive = agentActive;
+        query.usesAi = usesAi;
+        query.guardrailModes = guardrailModes;
+        query.teams = teams == null ? null : teams.stream().map(team -> team.trim().toLowerCase()).collect(Collectors.toList());
+        query.tagPairs = tagPairs;
+        query.violationSeverities = violationSeverities == null ? null : violationSeverities.stream().map(severity -> severity.trim().toLowerCase()).collect(Collectors.toList());
+        query.riskMin = riskMin;
+        query.riskMax = riskMax;
+        query.sortKey = sortKey;
+        query.sortOrder = sortOrder == 0 ? -1 : sortOrder;
+        query.skip = skip;
+        query.limit = limit <= 0 ? 50 : limit;
+        return query;
+    }
+
+    // Chart data and filter options for the Atlas page.
+    public String fetchAtlasOverview() {
+        atlasOverview = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            atlasOverview = atlasPeopleService.overview(loadAtlasSnapshot());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasOverview failed: " + e.getMessage());
+            addActionError("Unable to load the Atlas overview");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    private static final String FIRST_SEEN_FIELD = "firstSeenTs";
+    // start_ts = end_ts = 0 means no detectedAt filter in the threat backend (ThreatActorService.fetchHostSeverityCounts), i.e. all time.
+    private static final int ALL_TIME_TS = 0;
+
+    // Earliest positive startedTs per device group, i.e. when its first heartbeat row was inserted.
+    private Map<String, Integer> loadFirstSeenByGroup() {
+        Document startedTs = new Document("$cond", Arrays.asList(
+                new Document("$gt", Arrays.asList(ifNullExpr(ModuleInfo.STARTED_TS, 0), 0)),
+                "$" + ModuleInfo.STARTED_TS,
+                null));
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(atlasModuleFilter()),
+                Aggregates.group(endpointShieldGroupId(), Accumulators.min(FIRST_SEEN_FIELD, startedTs)));
+        Map<String, Integer> firstSeen = new HashMap<>();
+        try (MongoCursor<Document> cursor = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, Document.class).allowDiskUse(true).cursor()) {
+            while (cursor.hasNext()) {
+                Document group = cursor.next();
+                Document id = group.get("_id", Document.class);
+                Number ts = (Number) group.get(FIRST_SEEN_FIELD);
+                if (id != null && ts != null) firstSeen.put(firstSeenKey(id.get(ModuleInfo.NAME), id.get("os")), ts.intValue());
+            }
+        }
+        return firstSeen;
+    }
+
+    private static String firstSeenKey(Object name, Object os) {
+        return (name == null ? "" : String.valueOf(name)) + "|" + (os == null ? "" : String.valueOf(os));
+    }
+
+    // Devices-over-time series for the trend chart, from the snapshot's first-seen dates.
+    public String fetchAtlasTrend() {
+        atlasTrend = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            atlasTrend = atlasPeopleService.trend(loadAtlasSnapshot(), startTimestamp, endTimestamp, Context.now());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasTrend failed: " + e.getMessage());
+            addActionError("Unable to load the device trend");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Paged Employees tab; always served from the in-memory snapshot.
+    public String fetchAtlasEmployees() {
+        atlasRows = new ArrayList<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            long[] total = new long[1];
+            atlasRows = atlasPeopleService.pageEmployees(loadAtlasSnapshot(), buildPeopleQuery(), total);
+            atlasTotal = total[0];
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasEmployees failed: " + e.getMessage());
+            addActionError("Unable to load employees");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Devices tab: filtered, sorted and paged from the cached snapshot.
+    public String fetchAtlasDevices() {
+        atlasRows = new ArrayList<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            long[] total = new long[1];
+            AtlasPeopleService.Snapshot snapshot = loadAtlasSnapshot();
+            AtlasPeopleService.PeopleQuery query = buildPeopleQuery();
+            // The severity donut counts all time, so its drill-down filters on all-time counts, not the snapshot's 7-day ones.
+            if (query.violationSeverities != null && !query.violationSeverities.isEmpty()) {
+                query.violationsOverride = atlasPeopleService.violationsByDeviceKey(snapshot, loadAllTimeHostSeverityCounts());
+            }
+            atlasRows = atlasPeopleService.pageDevices(snapshot, query, total);
+            atlasTotal = total[0];
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasDevices failed: " + e.getMessage());
+            addActionError("Unable to load devices");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Stat card totals (managed devices, active agents, unapproved, monitor-only) from the snapshot.
+    public String fetchEndpointShieldStats() {
+        deviceStats = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            deviceStats = atlasPeopleService.stats(loadAtlasSnapshot());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchEndpointShieldStats failed: " + e.getMessage());
+            addActionError("Unable to load device stats");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Flyout detail for one device or employee.
+    public String fetchAtlasPersonDetail() {
+        atlasDetail = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            Map<String, Object> detail = atlasPeopleService.detail(loadAtlasSnapshot(), atlasKind, atlasId);
+            if (detail == null) {
+                addActionError("Not found");
+                return ERROR.toUpperCase();
+            }
+            atlasDetail = detail;
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasPersonDetail failed: " + e.getMessage());
+            addActionError("Unable to load details");
+            return ERROR.toUpperCase();
+        }
     }
 
     /** Distinct filter-dropdown values across ALL endpoint-shield agents (for the paginated table). */

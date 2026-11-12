@@ -15,6 +15,7 @@ import TitleWithInfo from "../../../../components/shared/TitleWithInfo"
 import { usePermissions, whenAllowed } from "@/util/permissions"
 import AllowedAction from "../../../../components/shared/AllowedAction"
 import SensitiveDataAlertRules, { invalidRuleMessage } from "./SensitiveDataAlertRules"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const SENSITIVE_DATA_THRESHOLD_ALERTS = "SENSITIVE_DATA_THRESHOLD_ALERTS"
 
@@ -146,7 +147,7 @@ function WebhookCore(props) {
         { "type":"TRAFFIC", "title": "New sensitive endpoint count", "value": "NEW_SENSITIVE_ENDPOINT_COUNT", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "New sensitive parameter count", "value": "NEW_SENSITIVE_PARAMETER_COUNT", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "New parameter count", "value": "NEW_PARAMETER_COUNT", "collectionSelection": false },
-        { "type":"TRAFFIC", "title": "New API runtime threats", "value": "API_THREAT_PAYLOADS", "collectionSelection": false },
+        { "type":"TRAFFIC", "title": "New " + mapLabel('API', getDashboardCategory()) + " runtime threats", "value": "API_THREAT_PAYLOADS", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "Pending tests alerts", "value": "PENDING_TESTS_ALERTS", "collectionSelection": false }
     ]
 

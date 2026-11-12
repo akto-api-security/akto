@@ -83,6 +83,15 @@ const headingsEndpointSecurity = [
     },
 ]
 
+// A row nobody decided on: "under review" once someone touched it, else unapproved.
+const UNDECIDED = { review: { text: "Under review", color: "warning" }, unreviewed: { text: "Unapproved", color: "subdued" } };
+const isUndecided = (row) => !row?.remarks;
+const undecidedStatus = (row) => (row?.markedBy ? UNDECIDED.review : UNDECIDED.unreviewed);
+const statusTextOf = (row) => {
+    if (row?.remarks === 'Rejected') return { text: 'Blocked', color: 'critical' };
+    return isUndecided(row) ? undecidedStatus(row) : { text: 'Allowed', color: 'success' };
+};
+
 const headingsDefault = [
     {
         title: 'Type',
@@ -343,7 +352,8 @@ let filtersLlms = [
         title: 'Status',
         choices: [
             { label: "Allowed", value: "Approved" },
-            { label: "Blocked", value: "Rejected" }
+            { label: "Blocked", value: "Rejected" },
+            { label: "Under review", value: "Under review" }
         ],
     }
 ]
@@ -437,7 +447,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['remarksComp'] = (
         (temp?.remarks === null || temp?.remarks === "" || !temp?.remarks) ?
             <HorizontalStack gap="1" blockAlign="center">
-                <Text variant="bodyMd">Approved</Text>
+                <Text variant="bodyMd" color={undecidedStatus(temp).color}>{undecidedStatus(temp).text}</Text>
                 <Tooltip content="Audit Pending">
                     <Icon source={ClockMinor} color="warning" />
                 </Tooltip>
@@ -783,7 +793,7 @@ function AuditData() {
         const countPhrase = `${n} selected ${rowNoun}${n === 1 ? "" : "s"}`;
         const actions = [];
         // Only offer the action that changes something, like the Skills tab.
-        if (rows.some((r) => r?.isBlocked)) {
+        if (rows.some((r) => r?.isBlocked || r?.remarks === "Under review")) {
             actions.push({
                 content: n === 1 ? `Allow this ${rowNoun}` : `Allow ${countPhrase}`,
                 onAction: () => bulkUpdateLlms("Approved", selectedIds),
@@ -1136,11 +1146,10 @@ function AuditData() {
                     dataObj.negatedTargetDeviceIds = r.negatedTargetDeviceIds;
                     dataObj.negatedTargetUserNames = r.negatedTargetUserNames;
                     // Same Status cell as the Skills tab.
+                    const status = statusTextOf(r);
                     dataObj.statusComp = (
                         <VerticalStack gap="0">
-                            <Text variant="bodyMd" color={isBlocked ? 'critical' : 'success'}>
-                                {isBlocked ? 'Blocked' : 'Allowed'}
-                            </Text>
+                            <Text variant="bodyMd" color={status.color}>{status.text}</Text>
                             {isBlocked && <BlockScopeSummary row={r} />}
                         </VerticalStack>
                     );
@@ -1224,9 +1233,7 @@ function AuditData() {
                             </HorizontalStack>
                         ),
                         statusComp: (
-                            <Text variant="bodyMd" color={isBlocked ? 'critical' : 'success'}>
-                                {isBlocked ? 'Blocked' : 'Allowed'}
-                            </Text>
+                            <Text variant="bodyMd" color={statusTextOf(r).color}>{statusTextOf(r).text}</Text>
                         ),
                         isTerminal: false,
                         name: skillName,

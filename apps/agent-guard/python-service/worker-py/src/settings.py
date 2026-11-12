@@ -81,6 +81,9 @@ _FIELDS = (
     "DATABASE_ABSTRACTOR_SERVICE_URL",
     # Per-deployment cascade default modelMap (JSON). Empty → built-in default.
     "DEFAULT_MODEL_CONFIG_JSON",
+    # Model for post-verdict enrichment (/guardrails/llm/async, /scan enrichment=reason), same JSON
+    # shape. Empty → those calls use the core model exactly as before (see get_enrichment_config).
+    "ENRICHMENT_MODEL_CONFIG_JSON",
     "SCANNER_RESPONSE_FORMAT",
     # PromptInjection input-side rules: "v1" (default) or "v2" (prompts/prompt_injection.py).
     "PROMPT_INJECTION_PROMPT_VERSION",
@@ -190,6 +193,7 @@ class Settings:
     FALLBACK_SLACK_WEBHOOK_URL: str
     DATABASE_ABSTRACTOR_SERVICE_URL: str
     DEFAULT_MODEL_CONFIG_JSON: str
+    ENRICHMENT_MODEL_CONFIG_JSON: str
     SCANNER_RESPONSE_FORMAT: str
     PROMPT_INJECTION_PROMPT_VERSION: str
     ANONYMIZER_URL: str

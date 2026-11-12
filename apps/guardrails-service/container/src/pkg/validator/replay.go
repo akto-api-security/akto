@@ -369,6 +369,9 @@ func (s *Service) replaySide(
 
 	valCtx := s.validationContextFromParams(
 		params, "", reqCtxPayload, respCtxPayload, "ReplayWithPolicy", mcpAllowedHostList, prepared.compiledRules)
+	// Replay asks whether the policy detects this payload, so an alert policy's verdict must come
+	// back rather than being detached into a background report (which replay skips anyway).
+	valCtx.InlineAlerts = true
 
 	procCtx, cancel := s.withReplayDeadline(ctx)
 	defer cancel()

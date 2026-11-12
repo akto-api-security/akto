@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Tag, Text, TextField, VerticalStack } from "@shopify/polaris";
 import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents, showsActivityGrouping } from "../utils/activityGroups";
 import SessionStore from "../../../../main/SessionStore";
-import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, isBackfillRefId, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords, truncateToChars } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
-import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
+import { isAgenticSecurityCategory, isApiSecurityCategory, isEndpointSecurityCategory, mapLabel } from "../../../../main/labelHelper";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection, getBrowserExtensionActorEmail } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
 import guardrailApi from "../../guardrails/api";
@@ -124,9 +123,9 @@ const getHeaders = () => {
       title: "Severity",
     },
     {
-      text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+      text: mapLabel("API endpoint", PersistStore.getState().dashboardCategory),
       value: "endpointComp",
-      title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+      title: mapLabel("API endpoint", PersistStore.getState().dashboardCategory),
     },
     {
       text: "Host",
@@ -171,7 +170,7 @@ const getHeaders = () => {
   baseHeaders.push({
     text: "Filter",
     value: "filterId",
-    title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"],
+    title: mapLabel("Attack type", PersistStore.getState().dashboardCategory),
   });
 
   // Only show detection type for Agentic Security (Argus) and Endpoint Security (Atlas), not for API Security
@@ -284,6 +283,17 @@ const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLO
 
 function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch, onRegisterExport, refreshNonce = 0 }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  // An Atlas tool picked on the discovery overview; its events only.
+  const searchParams = new URLSearchParams(location.search);
+  const atlasToolKey = searchParams.get("tool") || "";
+  const atlasToolName = searchParams.get("toolName") || atlasToolKey;
+  const clearAtlasTool = () => {
+    const params = new URLSearchParams(location.search);
+    params.delete("tool");
+    params.delete("toolName");
+    navigate({ search: params.toString(), hash: location.hash }, { replace: true });
+  };
   const { canCall } = usePermissions();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -581,6 +591,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   // Helper function to validate filter requirements for bulk operations
   const validateFiltersForBulkOperation = (operationType = 'operation') => {
+    // Filter-based bulk calls cannot carry the tool filter, so they would reach rows outside it.
+    if (atlasToolKey) {
+      func.setToast(true, true, 'Remove the Tool filter to run bulk actions on filtered events. Select rows to act on them directly.');
+      return false;
+    }
+
     // Check if both URL and Attack Type filters are present
     if (!currentFilters.url || currentFilters.url.length === 0 ||
         !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
@@ -1059,7 +1075,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       riskScoreFilterType,
       riskScoreFilterValue,
       isNeedsApproval,
-      caseFilters: caseFilterRequestParams(currentTab, filters),
+      caseFilters: { ...caseFilterRequestParams(currentTab, filters), atlasToolKey: atlasToolKey || undefined },
     };
 
     const res = await api.fetchSuspectSampleData(
@@ -1087,7 +1103,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       riskScoreFilterValue,
       undefined,
       !groupActivities,
-      caseFilterRequestParams(currentTab, filters)
+      { ...caseFilterRequestParams(currentTab, filters), atlasToolKey: atlasToolKey || undefined }
     );
 
     // Store the total count for filtered results
@@ -1412,7 +1428,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       },
       {
         key: 'latestAttack',
-        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
+        label: mapLabel("Latest attack sub-category", PersistStore.getState().dashboardCategory),
         type: 'select',
         choices: attackTypeChoices,
         multiple: true
@@ -1495,7 +1511,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   // Recompute rows once the async guardrail compliance map has loaded (same pattern as usernameMapLoaded).
   const guardrailComplianceLoaded = !needsGuardrailCompliance || Object.keys(guardrailComplianceMap).length > 0;
   // Owners' names fill the Owner column, so the Under Review tab refetches once they have loaded (as for usernames).
-  const key = startTimestamp + endTimestamp + currentTab + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '') + (currentTab === 'under_review' && caseOwnersLoaded ? '_co' : '');
+  const key = startTimestamp + endTimestamp + currentTab + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '') + (currentTab === 'under_review' && caseOwnersLoaded ? '_co' : '') + atlasToolKey;
   const headers = getHeaders();
   // Under Review is where cases live: its table also shows each case's owner and notes.
   if (currentTab === 'under_review') {
@@ -1559,7 +1575,18 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             />
           </HorizontalStack>
         }
-        searchBelow={advancedFilters.length > 0 ? (
+        searchBelow={atlasToolKey ? (
+          <HorizontalStack gap="2" blockAlign="center">
+            <Tag onRemove={clearAtlasTool}>{`Tool: ${atlasToolName}`}</Tag>
+            {advancedFilters.length > 0 && (
+              <AdvancedPayloadSearch
+                filters={advancedFilters}
+                onChange={handleAdvancedFiltersChange}
+                showButton={false}
+              />
+            )}
+          </HorizontalStack>
+        ) : advancedFilters.length > 0 ? (
           <AdvancedPayloadSearch
             filters={advancedFilters}
             onChange={handleAdvancedFiltersChange}
