@@ -512,7 +512,7 @@ public class InitializerListener implements ServletContextListener {
 
         try {
             for (GuardrailLatencyInfo.GuardrailServiceTarget target : GuardrailLatencyInfo.GUARDRAIL_SERVICE_TARGETS) {
-                String baseUrl = target.getUrl();
+                String baseUrl = target.getUrl().trim();
                 String requestPath = target.getRequestPath();
                 String url = baseUrl.endsWith("/")
                         ? baseUrl.substring(0, baseUrl.length() - 1) + requestPath
@@ -2810,7 +2810,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
-                // every account is loaded once now, then only the accounts that are not dormant are refreshed
+                // only the accounts that are not dormant are loaded and refreshed; dormant accounts are never read
                 SingleTypeInfo.init(DormantAccountFilter::fetchNotDormantTest);
                 
                 int now = Context.now();

@@ -86,7 +86,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
      * An api is unauthenticated when one of the auth type sets found for it is only UNAUTHENTICATED. The sets are read as
      * plain names, not as the AuthType enum, so a name this code does not know (x-api-key) cannot fail the read.
      */
-    private static boolean isUnauthenticated(Object allAuthTypesFound) {
+    static boolean isUnauthenticated(Object allAuthTypesFound) {
         if (!(allAuthTypesFound instanceof List)) {
             return false;
         }
@@ -97,6 +97,12 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
             }
         }
         return false;
+    }
+
+    /** The api key of an api_info _id read as a plain document, for reads that must not fail on values this code does not know. */
+    static ApiInfoKey apiInfoKeyOf(Document id) {
+        return new ApiInfoKey(((Number) id.get(ApiInfo.ApiInfoKey.API_COLLECTION_ID)).intValue(),
+                id.getString(ApiInfo.ApiInfoKey.URL), Method.valueOf(id.getString(ApiInfo.ApiInfoKey.METHOD)));
     }
 
     // MCP tools are left out of the group above; they have their own group (UnauthenticatedMcpToolsGroup)
@@ -133,9 +139,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
                         .batchSize(limit).cursor()) {
                     while (cursor.hasNext()) {
                         Document apiInfo = cursor.next();
-                        Document id = apiInfo.get("_id", Document.class);
-                        ApiInfoKey key = new ApiInfoKey(((Number) id.get(ApiInfo.ApiInfoKey.API_COLLECTION_ID)).intValue(),
-                                id.getString(ApiInfo.ApiInfoKey.URL), Method.valueOf(id.getString(ApiInfo.ApiInfoKey.METHOD)));
+                        ApiInfoKey key = apiInfoKeyOf(apiInfo.get("_id", Document.class));
                         boolean isUnauthenticated = isUnauthenticated(apiInfo.get(ApiInfo.ALL_AUTH_TYPES_FOUND));
                         List<Integer> apiGroupIds = apiInfo.getList(ApiInfo.COLLECTION_IDS, Integer.class);
                         boolean inGroup = apiGroupIds != null && apiGroupIds.contains(UNAUTHENTICATED_GROUP_ID);

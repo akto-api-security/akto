@@ -89,21 +89,17 @@ public class SingleTypeInfo {
     }
 
     /**
-     * Loads every account once on the first run, then every 5 minutes refreshes only the accounts the test lets through,
-     * so accounts nobody uses are not read again and again.
+     * Every 5 minutes loads the data types and auth types of only the accounts the test lets through, so accounts
+     * nobody uses are never read, not even on the first run.
      *
      * @param accountsToRefresh called once per run, outside the account loop, to get the test for that run; the test
      *                          runs with Context.accountId set. null refreshes every account on every run.
      */
     public static void init(Supplier<Predicate<Integer>> accountsToRefresh) {
         scheduler.scheduleAtFixedRate(new Runnable() {
-            private boolean firstRun = true;
-
             public void run() {
                 long startMs = System.currentTimeMillis();
-                Predicate<Integer> refresh = firstRun || accountsToRefresh == null ? accountId -> true : accountsToRefresh.get();
-                boolean allAccounts = firstRun || accountsToRefresh == null;
-                firstRun = false;
+                Predicate<Integer> refresh = accountsToRefresh == null ? accountId -> true : accountsToRefresh.get();
                 AtomicInteger refreshed = new AtomicInteger();
                 AtomicInteger skipped = new AtomicInteger();
                 AccountTask.instance.executeTask(t -> {
@@ -115,7 +111,7 @@ public class SingleTypeInfo {
                     fetchCustomDataTypes(t.getId());
                     fetchCustomAuthTypes(t.getId());
                 }, "populate-data-types-info");
-                logger.info(Constants.CRON_STATS_LOG_TAG + " populate-data-types-info run finished: " + (allAccounts ? "all accounts" : "active accounts only")
+                logger.info(Constants.CRON_STATS_LOG_TAG + " populate-data-types-info run finished: " + (accountsToRefresh == null ? "all accounts" : "active accounts only")
                     + ", accounts refreshed: " + refreshed.get() + ", skipped: " + skipped.get() + ", total: " + (System.currentTimeMillis() - startMs) + " ms");
             }
         }, 0, 5, TimeUnit.MINUTES);
