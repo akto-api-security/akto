@@ -12,7 +12,7 @@ public class SmartAgentConfig {
     public static final int MAX_LIST_ITEMS = 20;
     public static final int MAX_KNOWLEDGE_FILES = 10;
     public static final int MAX_KNOWLEDGE_FILE_CHARS = 50_000;
-    public static final int MAX_CUSTOM_SKILL_CHARS = 5_000;
+    public static final int MAX_CUSTOM_SKILL_CHARS = 50_000; // skill files live in blob storage (only {name, sha256, size} in Mongo), so they can hold real content
     public static final int MAX_INSTRUCTIONS_CHARS = 2_000;
 
     private String profileId;

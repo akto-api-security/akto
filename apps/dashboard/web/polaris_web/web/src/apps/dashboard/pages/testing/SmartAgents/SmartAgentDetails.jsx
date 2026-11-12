@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Banner, Box, Button, Checkbox, DropZone, HorizontalStack, Icon, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { DeleteMinor, NoteMinor } from "@shopify/polaris-icons"
 import { useNavigate, useSearchParams } from "react-router-dom"
@@ -8,7 +8,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import { usePermissions } from "@/util/permissions"
 import func from "@/util/func"
 import api from "../api"
-import { BUILT_IN_SKILLS, KNOWLEDGE_FILE_TYPES, LIMITS, emptyProfile, fromForm, toForm, validate } from "./smartAgentUtils"
+import { BUILT_IN_SKILLS, KNOWLEDGE_FILE_TYPES, SKILL_FILE_TYPES, LIMITS, emptyProfile, fromForm, toForm, validate } from "./smartAgentUtils"
 
 function SmartAgentDetails() {
     const navigate = useNavigate()
@@ -66,12 +66,25 @@ function SmartAgentDetails() {
         }
     }
 
-    // custom skills
-    const addCustomSkill = () => setForm(prev => ({ ...prev, customSkills: [...prev.customSkills, { name: "", content: "" }] }))
-    const setCustomSkill = (index, key) => (value) => setForm(prev => ({
-        ...prev, customSkills: prev.customSkills.map((skill, i) => i === index ? { ...skill, [key]: value } : skill),
-    }))
-    const removeCustomSkill = (index) => setForm(prev => ({ ...prev, customSkills: prev.customSkills.filter((_, i) => i !== index) }))
+    // custom skills: one file per skill (a skills folder flattens into the list); content goes to blob storage
+    const folderInput = useRef(null)
+    async function addSkillFiles(incoming) {
+        const room = LIMITS.customSkills - form.customSkills.length
+        const added = []
+        for (const file of Array.from(incoming || []).slice(0, Math.max(room, 0))) {
+            const content = await file.text()
+            if (!content.trim()) continue
+            if (content.length > LIMITS.fileChars) {
+                func.setToast(true, true, `${file.name} is too large (at most ${LIMITS.fileChars} characters)`)
+                continue
+            }
+            added.push({ name: file.name, content, size: content.length })
+        }
+        if (added.length) {
+            setForm(prev => ({ ...prev, customSkills: [...prev.customSkills.filter(s => !added.some(a => a.name === s.name)), ...added] }))
+        }
+    }
+    const removeSkill = (name) => setForm(prev => ({ ...prev, customSkills: prev.customSkills.filter(s => s.name !== name) }))
 
     // knowledge base files
     async function addFiles(_dropFiles, acceptedFiles, rejectedFiles) {
@@ -144,24 +157,29 @@ function SmartAgentDetails() {
                 ) : <Text color="subdued">No built-in skill selected.</Text>}
                 <VerticalStack gap="3">
                     <Text fontWeight="medium">Custom skills</Text>
-                    {form.customSkills.map((skill, index) => (
-                        <Box key={index} padding="3" borderWidth="1" borderColor="border-subdued" borderRadius="2">
-                            <VerticalStack gap="2">
-                                <HorizontalStack align="space-between" blockAlign="center">
-                                    <Box width="70%">
-                                        <TextField label="Skill name" labelHidden placeholder="Skill name, e.g. Refund abuse" value={skill.name}
-                                            onChange={setCustomSkill(index, "name")} maxLength={LIMITS.name} autoComplete="off" disabled={!canSave} />
-                                    </Box>
-                                    {canSave ? <Button plain destructive icon={DeleteMinor} accessibilityLabel={`Remove custom skill ${skill.name}`} onClick={() => removeCustomSkill(index)} /> : null}
-                                </HorizontalStack>
-                                <TextField label="What the skill does" labelHidden multiline={3} value={skill.content}
-                                    onChange={setCustomSkill(index, "content")} maxLength={LIMITS.customSkill} autoComplete="off"
-                                    placeholder="What the agent should try and what counts as a finding, e.g. refund the same order twice and check the balance"
-                                    disabled={!canSave} />
-                            </VerticalStack>
-                        </Box>
+                    <Text color="subdued">Skill files (Markdown or text), one file per skill; a file may start with a name and description. Only smart testing reads their content.</Text>
+                    {form.customSkills.map(skill => (
+                        <HorizontalStack key={skill.name} align="space-between" blockAlign="center">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Box><Icon source={NoteMinor} color="subdued" /></Box>
+                                <Text>{skill.name}</Text>
+                                <Text color="subdued">{`${Math.max(1, Math.ceil((skill.size || 0) / 1000))}k characters`}</Text>
+                            </HorizontalStack>
+                            {canSave ? <Button plain destructive icon={DeleteMinor} accessibilityLabel={`Remove skill ${skill.name}`} onClick={() => removeSkill(skill.name)} /> : null}
+                        </HorizontalStack>
                     ))}
-                    {canSave ? <Box><Button onClick={addCustomSkill}>Add custom skill</Button></Box> : null}
+                    {canSave && form.customSkills.length < LIMITS.customSkills ? (
+                        <VerticalStack gap="2">
+                            <DropZone accept={SKILL_FILE_TYPES} type="file" allowMultiple onDrop={(_dropFiles, acceptedFiles) => addSkillFiles(acceptedFiles)} accessibilityLabel="Add skill files">
+                                <DropZone.FileUpload actionTitle="Add skill files" actionHint={`Markdown or text files, up to ${LIMITS.customSkills} skills`} />
+                            </DropZone>
+                            <Box>
+                                <input ref={folderInput} type="file" multiple hidden webkitdirectory="" directory=""
+                                    onChange={(e) => { addSkillFiles(e.target.files); e.target.value = "" }} />
+                                <Button onClick={() => folderInput.current && folderInput.current.click()}>Import skills folder</Button>
+                            </Box>
+                        </VerticalStack>
+                    ) : null}
                 </VerticalStack>
             </VerticalStack>
         </LegacyCard>
