@@ -18,14 +18,18 @@ export { DEVICE_SCOPES, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT } from "../devices_em
 // Mirrors RISK_REACH_LIMIT in AtlasDiscoveryService.
 const RISK_REACH_LIMIT = 50;
 
+export const DEFAULT_ADOPTION_DAYS = 30;
+export const DEFAULT_TREND_WEEKS = 12;
+export const windowLabel = (days) => (days >= 365 ? "year" : `${days} days`);
+
 export const SUBTITLES = {
     decisions: "Newly discovered or unreviewed tools, ranked by risk and spread",
-    adoption: "Employees using each tool, last 30 days",
-    trend: "Per week, last 12 weeks, by current status",
+    adoption: (days) => `Employees using each tool, last ${windowLabel(days)}`,
+    trend: (weeks) => `Per week, last ${weeks} weeks, by current status`,
     reach: `Top ${RISK_REACH_LIMIT} tools by devices. Each circle is a tool, sized by its employees. The shaded corner is high risk on many devices. Select a circle for details.`,
     chain: "Teams reaching MCP servers through AI tools. Top 10 of each, busiest first. Line width shows devices.",
     agentMcp: "Devices where an agent has each MCP server configured; darker means more devices. Shows up to 5 agents and 8 MCP servers, the busiest first.",
-    teams: "Share of each team's employees using a category, last 30 days",
+    teams: (days) => `Share of each team's employees using a category, last ${windowLabel(days)}`,
 };
 
 // Every status colour once: color is the status key, bubble the lighter circle tint, stroke the circle outline when it differs.
@@ -124,7 +128,6 @@ export const RISKY_CONFIG_META = {
     misconfigured: { label: "Misconfigured tool configs", sub: "Agents, servers or skills flagged with a risky config", question: "Which agents, MCP servers or skills have a risky configuration?", filters: { tags: ["Misconfigured"] } },
     localMcp: { label: "Local MCP servers", sub: "Running on employee devices, outside any gateway", question: "Which MCP servers run locally on employee devices?", filters: { tags: ["Local MCP Server"] } },
     personal: { label: "Personal AI accounts", sub: "Tools signed in with a personal account", question: "Who is using personal AI accounts?", filters: { tags: ["Contains personal account"] } },
-    highRiskUnreviewed: { label: "High-risk tools not reviewed", sub: "Unapproved or under review, risk 4.0 or higher", question: "Which high-risk tools have not been reviewed yet?", filters: { approvalStatus: ["Unapproved", "Under review"], riskBand: ["High risk"] } },
 };
 
 export const MAX_NODE_LABEL = 22;

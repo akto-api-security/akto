@@ -126,7 +126,7 @@ export default function AssetFlyout({ row, deviceScope, refreshKey, onClose, onU
             )}
             stats={detail && statsOf(detail)}
             details={detail && detailsOf(detail, rowType)}
-            trailing={detail && <FlyoutRowList title="Top employees" rows={employeeRows(detail)} />}
+            trailing={detail && <FlyoutRowList title="Last used by" rows={employeeRows(detail)} />}
         >
             {violations?.count > 0 && violations.key === key && (
                 <Banner

@@ -3,7 +3,7 @@ import { CustomersMajor } from "@shopify/polaris-icons";
 import SegmentBar from "@/apps/dashboard/components/shared/SegmentBar";
 import Pressable from "@/apps/dashboard/pages/dashboard/ask/components/Pressable";
 import DiscoveryCard from "../shared/DiscoveryCard";
-import { ADOPTION_BAR, CATEGORY_SHORT, SUBTITLES } from "../constants";
+import { ADOPTION_BAR, CATEGORY_SHORT, DEFAULT_ADOPTION_DAYS, SUBTITLES, windowLabel } from "../constants";
 import observeFunc from "@/apps/dashboard/pages/observe/transform";
 
 const BAR_HEIGHT = "6px";
@@ -13,18 +13,18 @@ const barOf = (employees, top) => [
     { label: "Rest", count: top - employees, color: ADOPTION_BAR.track, tooltip: `${employees} employees` },
 ];
 
-export default function AdoptionCard({ rows, status, onOpen }) {
+export default function AdoptionCard({ rows, windowDays = DEFAULT_ADOPTION_DAYS, status, onOpen }) {
     // Bars are relative to the most-used tool, so the leader fills the row.
     const topEmployees = Math.max(1, ...(rows || []).map((row) => row.employees));
     return (
         <DiscoveryCard
             title="Adoption"
-            subtitle={SUBTITLES.adoption}
+            subtitle={SUBTITLES.adoption(windowDays)}
             status={status}
             empty={!rows || rows.length === 0}
             emptyIcon={CustomersMajor}
             emptyTone="subdued"
-            emptyText="No employee has used an AI tool in the last 30 days."
+            emptyText={`No employee has used an AI tool in the last ${windowLabel(windowDays)}.`}
         >
             <VerticalStack gap="3">
                 {(rows || []).map((row) => (
