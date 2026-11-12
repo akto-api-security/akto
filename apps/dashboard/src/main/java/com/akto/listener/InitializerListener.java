@@ -2547,8 +2547,13 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "context-initializer");
 
-                // only the accounts that are not dormant are loaded and refreshed; dormant accounts are never read
-                SingleTypeInfo.init(DormantAccountFilter::fetchNotDormantTest);
+                if (runJobFunctions > 0) {
+                    // a container for the jobs: only the accounts that are not dormant are loaded and refreshed, dormant accounts are never read
+                    SingleTypeInfo.init(DormantAccountFilter::fetchNotDormantTest);
+                } else {
+                    // a container with users: every account is loaded, so the screens of a dormant account an Akto user opens are complete
+                    SingleTypeInfo.init();
+                }
 
                 int now = Context.now();
 

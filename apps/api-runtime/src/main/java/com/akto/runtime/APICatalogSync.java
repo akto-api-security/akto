@@ -1886,10 +1886,10 @@ public class APICatalogSync {
         }
 
         counter++;
+        // the same for every collection of this sync, so it is read once here and not once per collection
+        Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
-
-            Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
 
             Pair<SyncLimit, MetricTypes> syncLimitPair = getSyncLimitForApiCollection(
                 apiCollectionMap.get(apiCollectionId), apiSyncLimit,
