@@ -2,6 +2,7 @@ import { Box, Button, HorizontalGrid, HorizontalStack, Text, VerticalStack } fro
 import CardWithHeader from "@/apps/dashboard/pages/dashboard/new_components/CardWithHeader";
 import SeverityPill from "@/apps/dashboard/components/shared/SeverityPill";
 import CompactButton from "@/apps/dashboard/components/shared/CompactButton";
+import { ComingSoonOverlay } from "@/apps/dashboard/pages/dashboard/agenticPostureShared";
 import { OverviewListRow } from "./OverviewCard";
 
 export default function AttentionCard({ rows, onReview, onViewAll }) {
@@ -12,6 +13,7 @@ export default function AttentionCard({ rows, onReview, onViewAll }) {
             headerAction={<Button plain onClick={onViewAll}>View all</Button>}
             hasData
         >
+            <ComingSoonOverlay panelId="needsAttention">
             <Box>
                 {rows.map((row) => (
                     <OverviewListRow key={row.title}>
@@ -31,6 +33,7 @@ export default function AttentionCard({ rows, onReview, onViewAll }) {
                     </OverviewListRow>
                 ))}
             </Box>
+            </ComingSoonOverlay>
         </CardWithHeader>
     );
 }

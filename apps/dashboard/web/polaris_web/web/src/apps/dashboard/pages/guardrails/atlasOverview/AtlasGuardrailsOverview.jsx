@@ -1,20 +1,20 @@
 import { useEffect, useReducer, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
-import { Button, HorizontalGrid } from "@shopify/polaris";
+import { Badge, Button, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import { ACTIVITY_TAB, THREAT_ACTIVITY_PATH, clearSavedActivityFilters, openThreatActivityPage } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import func from "@/util/func";
 import KpiStrip from "./KpiStrip";
 import AttentionCard from "./AttentionCard";
+import guardrailOverviewMock from "./guardrailOverviewMock";
 import TriageStatusCard from "./TriageStatusCard";
 import DecisionsTrendCard from "./DecisionsTrendCard";
 import PolicyViolationsCard from "./PolicyViolationsCard";
 import ViolationsSourcesCard from "./ViolationsSourcesCard";
 import TopEmployeesCard from "./TopEmployeesCard";
 import TopAgenticAssetsCard from "./TopAgenticAssetsCard";
-import guardrailOverviewMock from "./guardrailOverviewMock";
 import guardrailsApi from "../api";
 import { policyLink } from "../overview/GuardrailOverview";
 
@@ -70,7 +70,6 @@ function AtlasGuardrailsOverview() {
         return () => { cancelled = true; };
     }, [startTimestamp, endTimestamp]);
 
-    const data = guardrailOverviewMock;
     const openActivity = (filters = {}) => {
         clearSavedActivityFilters(THREAT_ACTIVITY_PATH);
         openThreatActivityPage({ startTimestamp, endTimestamp, ...filters });
@@ -84,7 +83,7 @@ function AtlasGuardrailsOverview() {
     const components = [
         <KpiStrip key="kpis" kpis={kpis} onOpenActivity={openActivity} />,
         <HorizontalGrid key="attention" columns={{ xs: 1, md: ["twoThirds", "oneThird"] }} gap="4">
-            <AttentionCard rows={data.attention} onReview={() => openActivity()} onViewAll={() => openActivity()} />
+            <AttentionCard rows={guardrailOverviewMock.attention} onReview={() => openActivity()} onViewAll={() => openActivity()} />
             <TriageStatusCard triage={triage} onOpenActivity={openActivity} />
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">
@@ -100,7 +99,12 @@ function AtlasGuardrailsOverview() {
 
     return (
         <PageWithMultipleCards
-            title="Guardrail overview"
+            title={
+                <HorizontalStack gap="2" blockAlign="center">
+                    <Text as="h1" variant="headingLg">Guardrail overview</Text>
+                    <Badge status="info">Beta</Badge>
+                </HorizontalStack>
+            }
             subtitle="Violations across all managed devices and discovered AI agents, apps and MCP servers"
             isFirstPage
             secondaryActions={
