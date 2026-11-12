@@ -64,7 +64,7 @@ function AgenticDiscoveryOverview() {
         askRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, []);
 
-    // A team's employees on Devices & employees, narrowed to a tool type when that page has one for the category (IDE assistants and skills do not).
+    // A team's employees on Devices & employees, narrowed to a tool type when that page has one for the category (skills do not).
     const openTeam = (team, category) => {
         const toolType = PEOPLE_TOOL_TYPES.includes(category) ? `&category=${category}` : "";
         openNewLayoutPage(navigate, `${DEVICES_PATH}?team=${encodeURIComponent(team)}${toolType}`);

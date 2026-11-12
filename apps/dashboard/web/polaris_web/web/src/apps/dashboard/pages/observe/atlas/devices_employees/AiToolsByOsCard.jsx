@@ -5,16 +5,17 @@ import SegmentBar from "../../../../components/shared/SegmentBar";
 import { CATEGORY_BACKGROUNDS, CATEGORY_LABELS, CATEGORY_ORDER, osLabel, tokenVar } from "./peopleConstants";
 import transform from "./transform";
 
-const OS_CATEGORIES = ["agents", "mcp"];
+const OS_CATEGORIES = ["agents", "ide", "mcp"];
+const INFERENCE_HOOKS_CARD_LABEL = "Claude inference hooks";
 const DARK_CATEGORIES = ["agents"];
 const DARK_TEXT_OS = ["linux"];
 const BROWSER_COLORS = ["bg-info-strong", "bg-success-strong", "bg-caution-strong", "bg-info"];
 const LIGHT_TEXT_BROWSER_COLORS = ["bg-info-strong", "bg-success-strong"];
 const OS_BAR_HEIGHT = "22px";
 const OS_COLORS = {
-    macos: ["bg-magic-strong", "bg-magic-active"],
-    windows: ["bg-interactive", "bg-interactive-subdued-active"],
-    linux: ["bg-caution-strong", "bg-caution"],
+    macos: { agents: "bg-magic-strong", ide: "bg-magic-hover", mcp: "bg-magic-active" },
+    windows: { agents: "bg-interactive", ide: "bg-info-subdued-hover", mcp: "bg-interactive-subdued-active" },
+    linux: { agents: "bg-caution-strong", ide: "bg-caution-subdued", mcp: "bg-caution" },
 };
 
 const browserLabel = (browser) => browser.charAt(0).toUpperCase() + browser.slice(1);
@@ -37,7 +38,7 @@ function BarRow({ label, meta, segments, onSegmentClick, activeKey, divider }) {
     );
 }
 
-function AiToolsByOsCard({ overview, status, activeCategory, activeBrowser, onSelect, onSelectBrowser, onSelectCategory }) {
+function AiToolsByOsCard({ overview, status, activeCategory, activeBrowser, onSelect, onSelectBrowser, onSelectCategory, onSelectHook }) {
     const osRows = (overview?.osMatrix || []).filter((row) => row.os !== "unknown");
     const browserRows = (overview?.browserMatrix || []).map((row, index) => ({
         ...row,
@@ -47,6 +48,7 @@ function AiToolsByOsCard({ overview, status, activeCategory, activeBrowser, onSe
         color: browserColor(index),
     }));
     const browserAiDevices = browserRows.reduce((sum, row) => sum + row.count, 0);
+    const hookRow = overview?.hookMatrix;
     const toolsAvailable = overview?.toolsAvailable !== false;
     const activeCategorySet = new Set(activeCategory ? [activeCategory] : []);
     const activeBrowserSet = new Set(activeBrowser ? [activeBrowser] : []);
@@ -54,28 +56,44 @@ function AiToolsByOsCard({ overview, status, activeCategory, activeBrowser, onSe
     const body = (
         <VerticalStack gap="4">
             {!toolsAvailable && <Text as="p" color="subdued">Tool data is unavailable right now.</Text>}
-            {toolsAvailable && osRows.length === 0 && browserRows.length === 0 && <Text as="p" color="subdued">No managed devices in this scope.</Text>}
+            {toolsAvailable && osRows.length === 0 && browserRows.length === 0 && !hookRow && <Text as="p" color="subdued">No managed devices in this scope.</Text>}
             {toolsAvailable && osRows.map((row, index) => (
                 <BarRow
                     key={row.os}
                     divider={index > 0}
                     label={osLabel(row.os)}
                     meta={`${formatCount(row.devicesWithTools)} with AI tools`}
-                    segments={OS_CATEGORIES.map((category, index) => ({
+                    segments={OS_CATEGORIES.map((category) => ({
                         key: category,
                         label: CATEGORY_LABELS[category],
                         count: row.toolsByCategory[category] || 0,
-                        color: tokenVar(OS_COLORS[row.os]?.[index] || CATEGORY_BACKGROUNDS[category]),
+                        color: tokenVar(OS_COLORS[row.os]?.[category] || CATEGORY_BACKGROUNDS[category]),
                         lightText: DARK_CATEGORIES.includes(category) && !DARK_TEXT_OS.includes(row.os),
                         tooltip: `${CATEGORY_LABELS[category]} on ${osLabel(row.os)}: ${devicesLabel(row.toolsByCategory[category] || 0)}`,
                     }))}
                     onSegmentClick={(category) => onSelect(row.os, category)}
                 />
             ))}
+            {toolsAvailable && hookRow && (
+                <BarRow
+                    label={INFERENCE_HOOKS_CARD_LABEL}
+                    divider={osRows.length > 0}
+                    meta={`${formatCount(hookRow.devicesWithTools)} with AI tools`}
+                    segments={OS_CATEGORIES.map((category) => ({
+                        key: category,
+                        label: CATEGORY_LABELS[category],
+                        count: hookRow.toolsByCategory[category] || 0,
+                        color: tokenVar(CATEGORY_BACKGROUNDS[category]),
+                        lightText: DARK_CATEGORIES.includes(category),
+                        tooltip: `${CATEGORY_LABELS[category]} via ${INFERENCE_HOOKS_CARD_LABEL}: ${devicesLabel(hookRow.toolsByCategory[category] || 0)}`,
+                    }))}
+                    onSegmentClick={onSelectHook}
+                />
+            )}
             {toolsAvailable && browserRows.length > 0 && (
                 <BarRow
                     label="Browsers"
-                    divider={osRows.length > 0}
+                    divider={osRows.length > 0 || !!hookRow}
                     meta={`${formatCount(browserAiDevices)} with Browser AI`}
                     segments={browserRows.map((row) => ({
                         key: row.browser,

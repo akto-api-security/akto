@@ -60,6 +60,7 @@ function deviceDetails(device) {
 function employeeDetails(employee) {
     return [
         { label: "User", value: employee.username },
+        ...(employee.inferenceHooksOnly ? [{ label: "Coverage", value: "Inference hooks only (no Atlas agent)" }] : []),
         { label: "Team", value: (employee.teams || []).join(", ") || "Not tagged" },
         { label: "Personal AI accounts", value: employee.personalAccounts ? `${employee.personalAccounts} detected` : "None", isWarning: employee.personalAccounts > 0 },
         { label: "Unapproved tools", value: employee.unapprovedTools ? String(employee.unapprovedTools) : "None", isWarning: employee.unapprovedTools > 0 },
@@ -236,7 +237,7 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated, queuedI
 
     const subtitle = !ready ? undefined : isDevice
         ? [osLabel(detail.os), detail.owner || "No owner"].filter(Boolean).join(" · ")
-        : `${(detail.teams || []).join(", ") || "No team"} · ${plural(detail.deviceCount, "device")}`;
+        : `${(detail.teams || []).join(", ") || "No team"} · ${detail.inferenceHooksOnly ? "Inference hooks only" : plural(detail.deviceCount, "device")}`;
     const displayName = ready ? (detail.label || detail.name || detail.username || target.id) : target.id;
     const questions = (isDevice ? ATLAS_DEVICE_QUESTIONS : ATLAS_EMPLOYEE_QUESTIONS).map((question) => question.replace("{name}", displayName));
     const tabs = !ready ? [] : [
