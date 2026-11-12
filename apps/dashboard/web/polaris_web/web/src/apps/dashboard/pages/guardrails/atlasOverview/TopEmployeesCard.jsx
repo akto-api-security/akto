@@ -1,12 +1,11 @@
+import { useEffect, useState } from "react";
 import { Avatar, Text, VerticalStack } from "@shopify/polaris";
 import CardWithHeader from "@/apps/dashboard/pages/dashboard/new_components/CardWithHeader";
-import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { initialsOf } from "@/apps/dashboard/components/shared/PeopleList";
 import func from "@/util/func";
+import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
 import { formatCount, plural } from "./atlasOverviewUtils";
-
-const TOP_EMPLOYEES = 5;
 
 function buildRows(employees, onOpenActivity) {
     return (employees || []).map((e) => {
@@ -28,11 +27,20 @@ function buildRows(employees, onOpenActivity) {
     });
 }
 
-export default function TopEmployeesCard({ data, onOpenActivity }) {
+export default function TopEmployeesCard({ data, pageSize, onOpenActivity }) {
+    const [expanded, setExpanded] = useState(false);
+    useEffect(() => setExpanded(false), [data, pageSize]);
+    const rows = buildRows(data?.employees, onOpenActivity);
     return (
         <CardWithHeader title="Employees with most violations" hasData>
             {data === null ? <SpinnerCentered height="200px" />
-                : <ItemListCard items={buildRows(data?.employees?.slice(0, TOP_EMPLOYEES), onOpenActivity)} emptyText="No employees with violations in this period." />}
+                : <ItemListCard
+                    items={rows}
+                    limit={expanded ? undefined : pageSize}
+                    onViewAll={!expanded && rows.length > pageSize ? () => setExpanded(true) : undefined}
+                    onViewLess={expanded ? () => setExpanded(false) : undefined}
+                    emptyText="No employees with violations in this period."
+                />}
         </CardWithHeader>
     );
 }

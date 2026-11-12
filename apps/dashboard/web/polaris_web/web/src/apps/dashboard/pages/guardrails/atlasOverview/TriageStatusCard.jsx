@@ -31,7 +31,7 @@ export default function TriageStatusCard({ triage, onOpenActivity }) {
             hasData
         >
             {triage === null ? <SpinnerCentered height="200px" /> : (
-                <VerticalStack gap="3">
+                <VerticalStack gap="5">
                     {statuses.map((status) => (
                         <div key={status.key} onClick={() => onOpenActivity({ eventStatus: STATUS_EVENT_STATUS[status.key] })} style={{ cursor: "pointer" }}>
                             <VerticalStack gap="1">

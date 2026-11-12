@@ -1,9 +1,10 @@
+import { useEffect, useState } from "react";
 import { Text, VerticalStack } from "@shopify/polaris";
 import CardWithHeader from "@/apps/dashboard/pages/dashboard/new_components/CardWithHeader";
-import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { CLIENT_TYPES } from "../../observe/agentic/mcpClientHelper";
 import { formatAssetDisplayName } from "../violations/ViolationsPage";
+import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
 import { formatCount, plural } from "./atlasOverviewUtils";
 
 const ASSET_TYPE_LABELS = {
@@ -52,11 +53,20 @@ function buildRows(assetTypes, periodDays, onOpenActivity) {
         .sort((a, b) => b.count - a.count);
 }
 
-export default function ViolationsSourcesCard({ data, onOpenActivity }) {
+export default function ViolationsSourcesCard({ data, pageSize, onOpenActivity }) {
+    const [expanded, setExpanded] = useState(false);
+    useEffect(() => setExpanded(false), [data, pageSize]);
+    const rows = buildRows(data?.assetTypes, data?.periodDays, onOpenActivity);
     return (
         <CardWithHeader title="Where violations happen" hasData>
             {data === null ? <SpinnerCentered height="200px" />
-                : <ItemListCard items={buildRows(data?.assetTypes, data?.periodDays, onOpenActivity)} emptyText="No violations in this period." />}
+                : <ItemListCard
+                    items={rows}
+                    limit={expanded ? undefined : pageSize}
+                    onViewAll={!expanded && rows.length > pageSize ? () => setExpanded(true) : undefined}
+                    onViewLess={expanded ? () => setExpanded(false) : undefined}
+                    emptyText="No violations in this period."
+                />}
         </CardWithHeader>
     );
 }

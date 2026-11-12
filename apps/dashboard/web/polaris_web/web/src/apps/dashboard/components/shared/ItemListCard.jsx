@@ -15,7 +15,7 @@ import Pressable from "../../pages/dashboard/ask/components/Pressable";
  *     onViewAll={openComponents}
  * />
  */
-function ItemListCard({ items = [], emptyText, limit, onViewAll }) {
+function ItemListCard({ items = [], emptyText, limit, onViewAll, onViewLess }) {
     if (!items.length) {
         return <Text variant="bodySm" color="subdued">{emptyText}</Text>;
     }
@@ -50,6 +50,11 @@ function ItemListCard({ items = [], emptyText, limit, onViewAll }) {
             {onViewAll && (
                 <Box padding="3" borderBlockStartWidth="1" borderColor="border-subdued">
                     <Button plain onClick={onViewAll}>{hidden > 0 ? `View all ${items.length}` : "View details"}</Button>
+                </Box>
+            )}
+            {!onViewAll && onViewLess && (
+                <Box padding="3" borderBlockStartWidth="1" borderColor="border-subdued">
+                    <Button plain onClick={onViewLess}>View less</Button>
                 </Box>
             )}
         </Box>

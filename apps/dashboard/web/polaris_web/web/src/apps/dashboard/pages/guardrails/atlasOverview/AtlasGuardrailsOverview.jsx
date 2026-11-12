@@ -1,13 +1,11 @@
 import { useEffect, useReducer, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
-import { Button, HorizontalGrid, HorizontalStack } from "@shopify/polaris";
-import { ExportMinor } from "@shopify/polaris-icons";
+import { Button, HorizontalGrid } from "@shopify/polaris";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import { ACTIVITY_TAB, THREAT_ACTIVITY_PATH, clearSavedActivityFilters, openThreatActivityPage } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import func from "@/util/func";
-import values from "@/util/values";
 import KpiStrip from "./KpiStrip";
 import AttentionCard from "./AttentionCard";
 import TriageStatusCard from "./TriageStatusCard";
@@ -20,11 +18,13 @@ import guardrailOverviewMock from "./guardrailOverviewMock";
 import guardrailsApi from "../api";
 import { policyLink } from "../overview/GuardrailOverview";
 
+const LIST_PAGE_SIZE = 5;
+
 function AtlasGuardrailsOverview() {
     const navigate = useNavigate();
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[2],
+        func.getLast30DaysRange(),
     );
     const [kpis, setKpis] = useState(null);
     const [triage, setTriage] = useState(null);
@@ -75,6 +75,10 @@ function AtlasGuardrailsOverview() {
         clearSavedActivityFilters(THREAT_ACTIVITY_PATH);
         openThreatActivityPage({ startTimestamp, endTimestamp, ...filters });
     };
+    const listSizes = [violationsSources?.assetTypes, topEmployees?.employees, topAgenticAssets?.assets]
+        .map((list) => list?.length || 0)
+        .filter((n) => n > 0);
+    const listPageSize = Math.min(LIST_PAGE_SIZE, ...listSizes);
     const openPolicy = (policy) => navigate(policyLink(policy.misconfigured ? null : policy.name));
 
     const components = [
@@ -88,9 +92,9 @@ function AtlasGuardrailsOverview() {
             <PolicyViolationsCard data={policies} onOpenActivity={openActivity} onTune={openPolicy} />
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
-            <ViolationsSourcesCard data={violationsSources} onOpenActivity={openActivity} />
-            <TopEmployeesCard data={topEmployees} onOpenActivity={openActivity} />
-            <TopAgenticAssetsCard data={topAgenticAssets} onOpenActivity={openActivity} />
+            <ViolationsSourcesCard data={violationsSources} pageSize={listPageSize} onOpenActivity={openActivity} />
+            <TopEmployeesCard data={topEmployees} pageSize={listPageSize} onOpenActivity={openActivity} />
+            <TopAgenticAssetsCard data={topAgenticAssets} pageSize={listPageSize} onOpenActivity={openActivity} />
         </HorizontalGrid>,
     ];
 
@@ -100,15 +104,12 @@ function AtlasGuardrailsOverview() {
             subtitle="Violations across all managed devices and discovered AI agents, apps and MCP servers"
             isFirstPage
             secondaryActions={
-                <HorizontalStack gap="2" blockAlign="center">
-                    <DateRangeFilter
-                        initialDispatch={currDateRange}
-                        dispatch={(dateObj) =>
-                            dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })
-                        }
-                    />
-                    <Button icon={ExportMinor}>Export report</Button>
-                </HorizontalStack>
+                <DateRangeFilter
+                    initialDispatch={currDateRange}
+                    dispatch={(dateObj) =>
+                        dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })
+                    }
+                />
             }
             primaryAction={<Button primary onClick={() => openActivity({ eventStatus: ACTIVITY_TAB.ACTIVE })}>Triage open violations</Button>}
             components={components}

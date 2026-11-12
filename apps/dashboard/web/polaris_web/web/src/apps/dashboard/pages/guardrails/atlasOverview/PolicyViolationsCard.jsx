@@ -9,7 +9,7 @@ import { ACTIVITY_TAB } from "@/apps/dashboard/pages/threat_detection/utils/thre
 const NOISY_IGNORE_PCT = 40;
 const COLUMNS = "minmax(0, 1.3fr) minmax(0, 1fr) 80px";
 const COLUMNS_WITH_TUNE = `${COLUMNS} 90px`;
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 5;
 const MISCONFIGURED_LABEL = "Misconfigured settings";
 
 function buildPolicyRows(policies) {

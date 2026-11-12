@@ -1,13 +1,13 @@
+import { useEffect, useState } from "react";
 import { HorizontalStack, Text } from "@shopify/polaris";
 import CardWithHeader from "@/apps/dashboard/pages/dashboard/new_components/CardWithHeader";
-import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import AssetTagBadge from "@/apps/dashboard/components/shared/AssetTagBadge";
 import { CLIENT_TYPES } from "../../observe/agentic/mcpClientHelper";
 import { ACTIVITY_TAB, SKILL_URL_PREFIX } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
+import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
 import { formatCount, plural } from "./atlasOverviewUtils";
 
-const TOP_AGENTIC_ASSETS = 5;
 const AGENTIC_ASSET_KINDS = {
     [CLIENT_TYPES.LLM]: "Browser AI app",
     [CLIENT_TYPES.AI_AGENT]: "AI agent CLI",
@@ -44,11 +44,20 @@ function buildRows(assets, onOpenActivity) {
     }));
 }
 
-export default function TopAgenticAssetsCard({ data, onOpenActivity }) {
+export default function TopAgenticAssetsCard({ data, pageSize, onOpenActivity }) {
+    const [expanded, setExpanded] = useState(false);
+    useEffect(() => setExpanded(false), [data, pageSize]);
+    const rows = buildRows(data?.assets, onOpenActivity);
     return (
         <CardWithHeader title="Top agents, apps and servers involved" hasData>
             {data === null ? <SpinnerCentered height="200px" />
-                : <ItemListCard items={buildRows(data?.assets?.slice(0, TOP_AGENTIC_ASSETS), onOpenActivity)} emptyText="No agents, apps or servers involved in this period." />}
+                : <ItemListCard
+                    items={rows}
+                    limit={expanded ? undefined : pageSize}
+                    onViewAll={!expanded && rows.length > pageSize ? () => setExpanded(true) : undefined}
+                    onViewLess={expanded ? () => setExpanded(false) : undefined}
+                    emptyText="No agents, apps or servers involved in this period."
+                />}
         </CardWithHeader>
     );
 }

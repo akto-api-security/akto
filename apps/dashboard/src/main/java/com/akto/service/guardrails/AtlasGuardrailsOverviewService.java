@@ -29,6 +29,8 @@ import java.util.stream.Collectors;
 
 public class AtlasGuardrailsOverviewService {
 
+    private static final int TOP_ROWS_LIMIT = 10;
+
     public BasicDBObject buildTriage(InsightDataBundle bundle) {
         BasicDBObject triage = new BasicDBObject();
         triage.put("periodDays", AtlasGuardrailUtils.periodDays(bundle));
@@ -229,6 +231,7 @@ public class AtlasGuardrailsOverviewService {
         byAsset.values().stream()
                 .sorted(Comparator.comparingInt((TopAgenticAssetRow row) -> AtlasGuardrailUtils.assetStatusPriority(row.status))
                         .thenComparing(Comparator.comparingLong((TopAgenticAssetRow row) -> row.count).reversed()))
+                .limit(TOP_ROWS_LIMIT)
                 .forEach(row -> assets.add(row.toResponse()));
         return response;
     }
@@ -250,6 +253,7 @@ public class AtlasGuardrailsOverviewService {
 
         response.put("employees", byEmployee.values().stream()
                 .sorted(Comparator.comparingLong((TopEmployeeRow row) -> row.critical).thenComparingLong(row -> row.count).reversed())
+                .limit(TOP_ROWS_LIMIT)
                 .map(TopEmployeeRow::toResponse)
                 .collect(Collectors.toList()));
         return response;
