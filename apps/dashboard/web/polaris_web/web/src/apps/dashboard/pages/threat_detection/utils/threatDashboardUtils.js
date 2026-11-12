@@ -24,6 +24,7 @@ export const ACTIVITY_TAB = {
     MISCONFIGURED_SETTINGS: "misconfigured_settings",
 };
 export const CRITICAL_SEVERITY = "CRITICAL";
+export const SKILL_URL_PREFIX = "/skills/";
 
 const setTimeRangeParams = (params, filters, startKey, endKey) => {
     if (!filters.startTimestamp || !filters.endTimestamp) return;

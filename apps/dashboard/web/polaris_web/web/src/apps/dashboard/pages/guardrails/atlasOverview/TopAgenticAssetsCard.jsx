@@ -4,6 +4,7 @@ import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import AssetTagBadge from "@/apps/dashboard/components/shared/AssetTagBadge";
 import { CLIENT_TYPES } from "../../observe/agentic/mcpClientHelper";
+import { ACTIVITY_TAB, SKILL_URL_PREFIX } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import { formatCount, plural } from "./atlasOverviewUtils";
 
 const TOP_AGENTIC_ASSETS = 5;
@@ -21,11 +22,17 @@ const AGENTIC_ASSET_STATUS_TAGS = {
     UNAPPROVED: "Unapproved",
 };
 
+function assetFilters(asset) {
+    if (asset.type === CLIENT_TYPES.SKILL) return { eventStatus: ACTIVITY_TAB.SKILLS_EVALUATIONS, url: `${SKILL_URL_PREFIX}${asset.name}` };
+    if (asset.host) return { host: asset.host };
+    return { atlasTool: asset.key, atlasToolName: asset.name };
+}
+
 function buildRows(assets, onOpenActivity) {
     return (assets || []).map((a) => ({
         id: a.key,
         title: a.name,
-        onClick: () => onOpenActivity(a.host ? { host: a.host } : { atlasTool: a.key, atlasToolName: a.name }),
+        onClick: () => onOpenActivity(assetFilters(a)),
         description: [AGENTIC_ASSET_KINDS[a.type] || a.type, plural(a.people, "person", "people"), plural(a.devices, "device", "devices")].join(" · "),
         tag: (
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>
