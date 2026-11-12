@@ -25,6 +25,9 @@ import io.swagger.v3.parser.core.models.SwaggerParseResult;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.SmartTestingEventDao;
+import com.akto.dao.testing.SmartTestingMessageDao;
+import com.akto.dao.testing.SmartTestingRunDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -394,6 +397,15 @@ public class DbAction extends ActionSupport {
     String hostName;
     BasicDBObject log;
     List<BasicDBObject> logs;
+    // Live smart-testing runs (startSmartTestingRun / insertSmartTestingEvents / finishSmartTestingRun / fetchSmartTestingMessages)
+    BasicDBObject smartTestingRun;
+    String runKey;
+    List<BasicDBObject> smartTestingEvents;
+    String smartTestingRunStatus;
+    String smartTestingRunStatusReason;
+    int messagesAfter;
+    String smartTestingSummaryId;
+    List<BasicDBObject> smartTestingMessages;
     boolean isHybridSaas;
     Setup setup;
     Organization organization;
@@ -4428,6 +4440,158 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    static final int MAX_SMART_TESTING_EVENTS_PER_CALL = 200;
+    static final int MAX_SMART_TESTING_EVENT_CONTENT = 20000;
+    static final int MAX_SMART_TESTING_STATUS_REASON = 1000;
+    static final int MAX_SMART_TESTING_MESSAGES_PER_FETCH = 50;
+
+    private static String cutTo(String value, int max) {
+        if (value == null || value.length() <= max) return value;
+        return value.substring(0, max);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    public String startSmartTestingRun() {
+        try {
+            String key = smartTestingRun == null ? null : smartTestingRun.getString(SmartTestingRun.RUN_KEY);
+            if (isBlank(key)) {
+                addActionError("smartTestingRun.runKey is required");
+                return Action.ERROR.toUpperCase();
+            }
+            int now = Context.now();
+            SmartTestingRunDao.instance.updateOne(
+                Filters.eq(SmartTestingRun.RUN_KEY, key),
+                Updates.combine(
+                    Updates.set(SmartTestingRun.TESTING_RUN_RESULT_SUMMARY_ID, smartTestingRun.getString(SmartTestingRun.TESTING_RUN_RESULT_SUMMARY_ID)),
+                    Updates.set("apiCollectionId", smartTestingRun.getInt("apiCollectionId", 0)),
+                    Updates.set("method", smartTestingRun.getString("method")),
+                    Updates.set("url", smartTestingRun.getString("url")),
+                    Updates.set("testSubType", smartTestingRun.getString("testSubType")),
+                    Updates.set(SmartTestingRun.STATUS, SmartTestingRun.Status.RUNNING.name()),
+                    Updates.set(SmartTestingRun.STARTED_TS, now),
+                    Updates.set(SmartTestingRun.UPDATED_TS, now)
+                )
+            );
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in startSmartTestingRun " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String insertSmartTestingEvents() {
+        try {
+            if (isBlank(runKey)) {
+                addActionError("runKey is required");
+                return Action.ERROR.toUpperCase();
+            }
+            if (smartTestingEvents != null && smartTestingEvents.size() > MAX_SMART_TESTING_EVENTS_PER_CALL) {
+                addActionError("too many smartTestingEvents in one request: " + smartTestingEvents.size() + " > " + MAX_SMART_TESTING_EVENTS_PER_CALL);
+                return Action.ERROR.toUpperCase();
+            }
+            int now = Context.now();
+            List<SmartTestingEvent> events = new ArrayList<>();
+            if (smartTestingEvents != null) {
+                for (BasicDBObject obj : smartTestingEvents) {
+                    if (obj == null) continue;
+                    SmartTestingEvent event = new SmartTestingEvent();
+                    event.setRunKey(runKey);
+                    event.setSeq(obj.getInt(SmartTestingEvent.SEQ, 0));
+                    event.setPhase(obj.getString(SmartTestingEvent.PHASE));
+                    event.setAttempt(obj.getInt(SmartTestingEvent.ATTEMPT, 0));
+                    event.setContent(cutTo(obj.getString(SmartTestingEvent.CONTENT), MAX_SMART_TESTING_EVENT_CONTENT));
+                    event.setTimestamp(now); // stored time, not the sender's: the live view reads new events by this time
+                    events.add(event);
+                }
+            }
+            if (!events.isEmpty()) {
+                try {
+                    SmartTestingEventDao.instance.getMCollection().insertMany(events, new InsertManyOptions().ordered(false));
+                } catch (com.mongodb.MongoBulkWriteException e) {
+                    // A retried call re-sends events already stored (unique runKey+seq): those duplicates are fine.
+                    for (com.mongodb.bulk.BulkWriteError error : e.getWriteErrors()) {
+                        if (error.getCode() != 11000) throw e;
+                    }
+                }
+            }
+            SmartTestingRunDao.instance.updateOneNoUpsert(
+                Filters.eq(SmartTestingRun.RUN_KEY, runKey),
+                Updates.set(SmartTestingRun.UPDATED_TS, now)
+            );
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertSmartTestingEvents " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String finishSmartTestingRun() {
+        try {
+            if (isBlank(runKey)) {
+                addActionError("runKey is required");
+                return Action.ERROR.toUpperCase();
+            }
+            SmartTestingRun.Status status;
+            try {
+                status = SmartTestingRun.Status.valueOf(smartTestingRunStatus);
+            } catch (Exception e) {
+                status = null;
+            }
+            if (status == null || status == SmartTestingRun.Status.RUNNING) {
+                addActionError("unknown smartTestingRunStatus: " + smartTestingRunStatus);
+                return Action.ERROR.toUpperCase();
+            }
+            int now = Context.now();
+            SmartTestingRunDao.instance.updateOneNoUpsert(
+                Filters.eq(SmartTestingRun.RUN_KEY, runKey),
+                Updates.combine(
+                    Updates.set(SmartTestingRun.STATUS, status.name()),
+                    Updates.set("statusReason", cutTo(smartTestingRunStatusReason, MAX_SMART_TESTING_STATUS_REASON)),
+                    Updates.set(SmartTestingRun.ENDED_TS, now),
+                    Updates.set(SmartTestingRun.UPDATED_TS, now)
+                )
+            );
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in finishSmartTestingRun " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSmartTestingMessages() {
+        try {
+            if (isBlank(runKey)) {
+                addActionError("runKey is required");
+                return Action.ERROR.toUpperCase();
+            }
+            List<SmartTestingMessage> found = SmartTestingMessageDao.instance.findAll(
+                Filters.and(
+                    // this run's own messages, and those sent to its whole test run
+                    isBlank(smartTestingSummaryId)
+                        ? Filters.eq(SmartTestingMessage.RUN_KEY, runKey)
+                        : Filters.in(SmartTestingMessage.RUN_KEY, runKey, SmartTestingMessage.summaryRunKey(smartTestingSummaryId)),
+                    Filters.gt(SmartTestingMessage.TIMESTAMP, messagesAfter)
+                ),
+                0, MAX_SMART_TESTING_MESSAGES_PER_FETCH, Sorts.ascending(SmartTestingMessage.TIMESTAMP)
+            );
+            smartTestingMessages = new ArrayList<>();
+            for (SmartTestingMessage message : found) {
+                BasicDBObject obj = new BasicDBObject();
+                obj.put(SmartTestingMessage.KIND, message.getKind() == null ? null : message.getKind().name());
+                obj.put(SmartTestingMessage.TEXT, message.getText());
+                obj.put(SmartTestingMessage.TIMESTAMP, message.getTimestamp());
+                smartTestingMessages.add(obj);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchSmartTestingMessages " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     // Tracks which accounts' dast_logs capped collection has already been verified/created in
     // this JVM's lifetime, so the (relatively expensive) existence check in createIndicesIfAbsent()
     // runs at most once per account per process instead of on every single log insert.
@@ -5453,6 +5617,38 @@ public class DbAction extends ActionSupport {
 
     public void setLog(BasicDBObject log) {
         this.log = log;
+    }
+
+    public void setSmartTestingRun(BasicDBObject smartTestingRun) {
+        this.smartTestingRun = smartTestingRun;
+    }
+
+    public void setRunKey(String runKey) {
+        this.runKey = runKey;
+    }
+
+    public void setSmartTestingEvents(List<BasicDBObject> smartTestingEvents) {
+        this.smartTestingEvents = smartTestingEvents;
+    }
+
+    public void setSmartTestingRunStatus(String smartTestingRunStatus) {
+        this.smartTestingRunStatus = smartTestingRunStatus;
+    }
+
+    public void setSmartTestingRunStatusReason(String smartTestingRunStatusReason) {
+        this.smartTestingRunStatusReason = smartTestingRunStatusReason;
+    }
+
+    public void setSmartTestingSummaryId(String smartTestingSummaryId) {
+        this.smartTestingSummaryId = smartTestingSummaryId;
+    }
+
+    public void setMessagesAfter(int messagesAfter) {
+        this.messagesAfter = messagesAfter;
+    }
+
+    public List<BasicDBObject> getSmartTestingMessages() {
+        return smartTestingMessages;
     }
 
     public List<BasicDBObject> getLogs() {
