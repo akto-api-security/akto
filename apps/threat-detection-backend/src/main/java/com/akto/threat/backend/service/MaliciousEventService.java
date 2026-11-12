@@ -242,7 +242,7 @@ public class MaliciousEventService {
 
   // A negated regex can't be answered from index keys, so counting it fetches every doc in the range.
   // Count the range once, then subtract the small excluded partitions, matched positively.
-  private long countWithEvaluationModes(String accountId, Document scope, List<Document> evaluationModeConditions, long maxTimeMs) {
+  long countWithEvaluationModes(String accountId, Document scope, List<Document> evaluationModeConditions, long maxTimeMs) {
     List<Document> included = new ArrayList<>();
     List<Document> excluded = new ArrayList<>();
     for (Document condition : evaluationModeConditions) {
