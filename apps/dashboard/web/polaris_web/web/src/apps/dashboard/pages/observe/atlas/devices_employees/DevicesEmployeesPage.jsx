@@ -230,6 +230,7 @@ function DevicesEmployeesPage() {
                         onSelectCategory={(category) => toggleView("devices", { categories: [category] })}
                         onSelect={(os, category) => toggleView("devices", { osList: [os], categories: [category] })}
                         onSelectBrowser={(browser, category) => toggleView("devices", { browserList: [browser], categories: [category] })}
+                        onSelectHook={(category) => toggleView("devices", { inferenceHooksOnly: true, categories: [category] })}
                     />
                     <RiskHistogramCard
                         overview={overview}

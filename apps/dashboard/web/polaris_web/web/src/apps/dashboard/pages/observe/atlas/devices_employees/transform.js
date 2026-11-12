@@ -2,11 +2,11 @@ import { Box, Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import SpinnerCentered from "../../../../components/progress/SpinnerCentered";
 import {
-    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, EMPTY_PEOPLE_FILTERS, FLYOUT_GRAPH_LIMIT, INFERENCE_HOOKS_LABEL, INFERENCE_HOOKS_OPTION, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
+    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, EMPTY_PEOPLE_FILTERS, FLYOUT_GRAPH_LIMIT, INFERENCE_HOOKS_LABEL, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
 } from "./peopleConstants";
 import { getDomainForFavicon } from "../../agentic/mcpClientHelper";
 
-const ALL_CATEGORIES = ["agents", "mcp", "browser"];
+const ALL_CATEGORIES = ["agents", "ide", "mcp", "browser"];
 
 const STAT_CARD_TARGETS = {
     managedDevices: { tab: "devices", filters: {} },
@@ -63,7 +63,7 @@ function statSubtexts(deviceStats) {
     const managedParts = [];
     if (desktopDevices > 0) managedParts.push(`${formatCount(desktopDevices)} desktop`);
     if (browserDevices > 0) managedParts.push(`${formatCount(browserDevices)} browsers`);
-    if (inferenceHookDevices > 0) managedParts.push(`${formatCount(inferenceHookDevices)} via inference hooks`);
+    if (inferenceHookDevices > 0) managedParts.push(`${formatCount(inferenceHookDevices)} via Claude inference hooks`);
     return {
         managedDevices: managedParts.length ? { text: managedParts.join(" · ") } : null,
         agentActive: agentActiveParts.length ? { text: agentActiveParts.join(" · "), color: offlineDevices > 0 ? "critical" : undefined } : null,
@@ -132,8 +132,8 @@ function moreNode(id, category, count, noun) {
     return { id, category, label: `+${count} more ${noun}`, sub: "Select to show more", status: "neutral" };
 }
 
-const faviconUrl = (name) => {
-    const domain = getDomainForFavicon(name);
+const faviconUrl = (name, agent) => {
+    const domain = getDomainForFavicon(name) || getDomainForFavicon(agent);
     return domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : undefined;
 };
 
@@ -167,7 +167,7 @@ function footprintModel(root, devices, heads, view) {
             return parentTool ? `tool-${parentTool.collectionId}` : deviceId;
         };
         agents.forEach((tool) => {
-            agentNodes.push({ id: `tool-${tool.collectionId}`, category: "agent", iconSrc: faviconUrl(tool.name), label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: deviceId });
+            agentNodes.push({ id: `tool-${tool.collectionId}`, category: "agent", iconSrc: faviconUrl(tool.name, tool.agent), label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: deviceId });
         });
         tools.filter((tool) => tool.category === "mcp" && !tool.plugin).forEach((tool) => {
             mcpNodes.push({ id: `tool-${tool.collectionId}`, category: "mcp", iconSrc: faviconUrl(tool.name), label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: parentOf(tool) });
@@ -305,9 +305,10 @@ const transform = {
         return (Object.keys(target.filters).length > 0 || id === clickedId) && target.tab === tab && JSON.stringify({ ...EMPTY_PEOPLE_FILTERS, ...target.filters }) === JSON.stringify(filters);
     }),
     filterOptions: (overview) => ({
+        hasInferenceHooks: overview?.inferenceHookDevices > 0,
         teams: overview?.teamOptions || [],
         tags: overview?.tagOptions || [],
-        osBrowser: [...(overview?.osMatrix || []).filter((row) => row.os !== "unknown").map((row) => `os:${row.os}`), ...(overview?.browserMatrix || []).map((row) => `browser:${row.browser}`), ...(overview?.inferenceHookDevices > 0 ? [INFERENCE_HOOKS_OPTION] : [])],
+        osBrowser: [...(overview?.osMatrix || []).filter((row) => row.os !== "unknown").map((row) => `os:${row.os}`), ...(overview?.browserMatrix || []).map((row) => `browser:${row.browser}`)],
         healthStates: HEALTH_ORDER.filter((state) => (overview?.agentHealth?.[state] || 0) > 0),
         guardrailModes: Object.keys(MODE_LABELS).filter((mode) => (overview?.guardrailModes?.[mode] || 0) > 0),
         categories: CATEGORY_ORDER.filter((category) => (overview?.categoryTotals?.[category] || 0) > 0),

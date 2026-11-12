@@ -60,7 +60,7 @@ function deviceDetails(device) {
 function employeeDetails(employee) {
     return [
         { label: "User", value: employee.username },
-        { label: "Coverage", value: employee.inferenceHooksOnly ? "Inference hooks only (no Atlas agent)" : "Atlas agent" },
+        ...(employee.inferenceHooksOnly ? [{ label: "Coverage", value: "Inference hooks only (no Atlas agent)" }] : []),
         { label: "Team", value: (employee.teams || []).join(", ") || "Not tagged" },
         { label: "Personal AI accounts", value: employee.personalAccounts ? `${employee.personalAccounts} detected` : "None", isWarning: employee.personalAccounts > 0 },
         { label: "Unapproved tools", value: employee.unapprovedTools ? String(employee.unapprovedTools) : "None", isWarning: employee.unapprovedTools > 0 },

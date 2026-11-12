@@ -22,7 +22,7 @@ export const OS_ICON_KEYS = { macos: "mac", windows: "windows", linux: "linux" }
 
 export const HEALTH_ORDER = ["healthy", "outdated", "offline"];
 export const MODE_ORDER = ["enforce", "monitor", "none"];
-export const CATEGORY_ORDER = ["agents", "mcp", "browser"];
+export const CATEGORY_ORDER = ["agents", "ide", "mcp", "browser"];
 
 export const OS_LABELS = {
     macos: "macOS",
@@ -34,12 +34,14 @@ export const osLabel = (os) => OS_LABELS[os] || "";
 
 export const CATEGORY_LABELS = {
     agents: "Agents & CLIs",
+    ide: "IDE assistants",
     mcp: "MCP servers",
     browser: "Browser AI",
 };
 
 export const CATEGORY_BACKGROUNDS = {
     agents: "bg-inverse-hover",
+    ide: "bg-strong",
     mcp: "bg-strong-active",
     browser: "bg-inverse-active",
 };
@@ -83,14 +85,13 @@ export const HIGH_RISK_THRESHOLD = 4;
 export const RISK_EXPLANATION = "The highest " + mapLabel('API', getDashboardCategory()) + " risk score (0 to 5, from the stored api_info risk score) across the AI tools on an employee's devices.";
 
 export const INFERENCE_HOOKS_LABEL = "inference-hooks";
-export const INFERENCE_HOOKS_OPTION = "hook:inference-hooks";
 
 export const EMPLOYEE_CHIPS = [
     { key: "usesAi", label: "Uses AI tools" },
     { key: "hasUnapproved", label: "Has unapproved tools" },
     { key: "usesPersonal", label: "Uses personal AI accounts" },
     { key: "highRisk", label: "Has risk 4+" },
-    { key: "inferenceHooksOnly", label: "Inference hooks only" },
+    { key: "inferenceHooksOnly", label: "Inference hooks" },
 ];
 
 export const DEVICE_CHIPS = [
@@ -99,6 +100,7 @@ export const DEVICE_CHIPS = [
     { key: "monitorMode", label: "Monitor mode" },
     { key: "hasUnapproved", label: "Has unapproved tools" },
     { key: "usesPersonal", label: "Uses personal AI accounts" },
+    { key: "inferenceHooksOnly", label: "Inference hooks" },
 ];
 
 export const SEARCH_HINTS = {
