@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
-import { Button, Card, HorizontalGrid, HorizontalStack, Link, Text, VerticalStack } from "@shopify/polaris";
+import { Avatar, Button, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
@@ -14,8 +14,7 @@ import AttentionCard from "./AttentionCard";
 import TriageStatusCard from "./TriageStatusCard";
 import DecisionsTrendCard from "./DecisionsTrendCard";
 import PolicyViolationsCard from "./PolicyViolationsCard";
-import ViolationsSourcesCard from "./ViolationsSourcesCard";
-import TopEmployeesCard from "./TopEmployeesCard";
+import { initialsOf } from "@/apps/dashboard/components/shared/PeopleList";
 import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
 import AssetTagBadge from "@/apps/dashboard/components/shared/AssetTagBadge";
 import DiscoveryCard from "../../observe/atlas/discovery/shared/DiscoveryCard";
@@ -56,6 +55,8 @@ const AGENTIC_ASSET_STATUS_TAGS = {
     UNAPPROVED: "Unapproved",
 };
 const TOP_EMPLOYEES = 5;
+const TREND_UP_COLOR = "#8E1F0B";
+const TREND_DOWN_COLOR = "#0C5132";
 
 function formatCount(n) {
     return n === undefined || n === null ? EMPTY_VALUE : observeFunc.formatNumberWithCommas(n);
@@ -141,17 +142,30 @@ function plural(count, one, many) {
     return `${formatCount(count)} ${count === 1 ? one : many}`;
 }
 
-function buildViolationsSourcesRows(assetTypes) {
+function buildViolationsSourcesRows(assetTypes, periodDays, openActivity) {
     return (assetTypes || [])
         .map((s) => {
             const examples = s.type === CLIENT_TYPES.MCP_SERVER
                 ? (s.servers ? `${plural(s.servers, "server", "servers")} on ${plural(s.devices, "device", "devices")} · ${formatCount(s.unapproved)} unapproved` : "")
                 : [...new Set((s.examples || []).map((x) => x.name || formatAssetDisplayName(x.host)).filter(Boolean))].join(", ");
             return {
-                name: ASSET_TYPE_LABELS[s.type] || s.type,
-                examples,
+                id: s.type,
+                title: ASSET_TYPE_LABELS[s.type] || s.type,
+                description: examples || undefined,
                 count: s.count,
-                changePct: s.changePct,
+                onClick: openActivity,
+                tag: (
+                    <VerticalStack gap="0" inlineAlign="end">
+                        <Text variant="bodyMd" fontWeight="semibold">{formatCount(s.count)}</Text>
+                        {s.changePct !== undefined && s.changePct !== null && (
+                            <Text variant="bodySm" color={s.changePct === 0 ? "subdued" : undefined}>
+                                <span style={{ whiteSpace: "nowrap", ...(s.changePct === 0 ? {} : { color: s.changePct > 0 ? TREND_UP_COLOR : TREND_DOWN_COLOR }) }}>
+                                    {`${formatChange(s.changePct)} vs previous ${periodDays} ${periodDays === 1 ? "day" : "days"}`}
+                                </span>
+                            </Text>
+                        )}
+                    </VerticalStack>
+                ),
             };
         })
         .sort((a, b) => b.count - a.count);
@@ -160,7 +174,8 @@ function buildViolationsSourcesRows(assetTypes) {
 function buildTopAgenticAssetRows(assets, openActivity) {
     return (assets || []).map((a) => ({
         id: a.key,
-        title: <Link monochrome removeUnderline onClick={openActivity}>{a.name}</Link>,
+        title: a.name,
+        onClick: openActivity,
         description: [AGENTIC_ASSET_KINDS[a.type] || a.type, plural(a.people, "person", "people"), plural(a.devices, "device", "devices")].join(" · "),
         tag: (
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>
@@ -172,14 +187,17 @@ function buildTopAgenticAssetRows(assets, openActivity) {
     }));
 }
 
-function buildTopEmployeeRows(employees) {
+function buildTopEmployeeRows(employees, openActivity) {
     return (employees || []).map((e) => {
         const tags = (e.tags || []).map((t) => func.toSentenceCase(t));
         const team = tags.length > 0 ? `${tags[0]}${tags.length > 1 ? ` +${tags.length - 1}` : ""}` : "";
         return {
-            name: e.name,
-            secondary: [team, plural(e.devices, "device", "devices")].filter(Boolean).join(" · "),
-            trailing: (
+            id: e.name,
+            media: <Avatar size="small" initials={initialsOf(e.name)} name={e.name} />,
+            title: e.name,
+            onClick: openActivity,
+            description: [team, plural(e.devices, "device", "devices")].filter(Boolean).join(" · "),
+            tag: (
                 <VerticalStack gap="0" inlineAlign="end">
                     <Text variant="bodyMd" fontWeight="semibold">{formatCount(e.count)}</Text>
                     {e.critical > 0 && <Text variant="bodySm" color="critical">{`${formatCount(e.critical)} critical`}</Text>}
@@ -187,6 +205,11 @@ function buildTopEmployeeRows(employees) {
             ),
         };
     });
+}
+
+function formatChange(pct) {
+    if (pct === 0) return "0%";
+    return pct > 0 ? `+${pct}%` : `−${Math.abs(pct)}%`;
 }
 
 function AtlasGuardrailsOverview() {
@@ -203,7 +226,6 @@ function AtlasGuardrailsOverview() {
     const [topAgenticAssets, setTopAgenticAssets] = useState(null);
     const [topEmployees, setTopEmployees] = useState(null);
     const policyRows = useMemo(() => buildPolicyRows(policies?.rules), [policies]);
-    const topEmployeeRows = useMemo(() => buildTopEmployeeRows(topEmployees?.employees), [topEmployees]);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
@@ -244,6 +266,8 @@ function AtlasGuardrailsOverview() {
     const data = guardrailOverviewMock;
     const openActivity = () => openViolationInGuardrailViolations();
     const topAssetRows = buildTopAgenticAssetRows(topAgenticAssets?.assets, openActivity);
+    const topEmployeeRows = buildTopEmployeeRows(topEmployees?.employees, openActivity);
+    const violationsSourcesRows = buildViolationsSourcesRows(violationsSources?.assetTypes, violationsSources?.periodDays, openActivity);
     const openPolicies = () => navigate(POLICIES_PATH);
 
     const components = [
@@ -259,8 +283,12 @@ function AtlasGuardrailsOverview() {
             <PolicyViolationsCard policies={policyRows} pageSize={POLICY_ROWS} loading={policies === null} onPolicyClick={openActivity} onTune={openPolicies} />
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
-            <ViolationsSourcesCard rows={buildViolationsSourcesRows(violationsSources?.assetTypes)} periodDays={violationsSources?.periodDays} loading={violationsSources === null} onRowClick={openActivity} />
-            <TopEmployeesCard employees={topEmployeeRows} pageSize={TOP_EMPLOYEES} loading={topEmployees === null} />
+            <DiscoveryCard title="Where violations happen" status={violationsSources === null ? LOAD_STATE.LOADING : LOAD_STATE.READY}>
+                <ItemListCard items={violationsSourcesRows} emptyText="No violations in this period." />
+            </DiscoveryCard>
+            <DiscoveryCard title="Employees with most violations" status={topEmployees === null ? LOAD_STATE.LOADING : LOAD_STATE.READY}>
+                <ItemListCard items={topEmployeeRows} limit={TOP_EMPLOYEES} emptyText="No employees with violations in this period." />
+            </DiscoveryCard>
             <DiscoveryCard title="Top agents, apps and servers involved" status={topAgenticAssets === null ? LOAD_STATE.LOADING : LOAD_STATE.READY}>
                 <ItemListCard items={topAssetRows} limit={TOP_AGENTIC_ASSETS} emptyText="No agents, apps or servers involved in this period." />
             </DiscoveryCard>

@@ -1,10 +1,12 @@
 import { Box, Button, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import ShowListInBadge from "./ShowListInBadge";
+import Pressable from "../../pages/dashboard/ask/components/Pressable";
 
 /*
  * Bordered list of rows (title, optional description, optional right-side tag), e.g. the tools an
  * MCP server exposes. Shows up to `limit` rows; the rest open from a "View all" link when onViewAll is
- * given, otherwise from a "+N" badge whose tooltip lists their titles.
+ * given, otherwise from a "+N" badge whose tooltip lists their titles. An item may also carry `media` (shown before
+ * the title, e.g. an avatar) and `onClick` (makes the row clickable).
  *
  * <ItemListCard
  *     items={[{ id: "bash", title: "Bash", description: "Runs shell commands", tag: <Badge>Local</Badge> }]}
@@ -21,17 +23,25 @@ function ItemListCard({ items = [], emptyText, limit, onViewAll }) {
     const hidden = items.length - shown.length;
     return (
         <Box borderWidth="1" borderColor="border-subdued" borderRadius="2">
-            {shown.map((item, i) => (
-                <Box key={item.id ?? item.title} padding="3" borderBlockStartWidth={i > 0 ? "1" : undefined} borderColor="border-subdued">
+            {shown.map((item, i) => {
+                const text = (
+                    <VerticalStack gap="05">
+                        <Text variant="bodyMd">{item.title}</Text>
+                        {item.description && <Text variant="bodySm" color="subdued">{item.description}</Text>}
+                    </VerticalStack>
+                );
+                const row = (
                     <HorizontalStack align="space-between" blockAlign="center" wrap={false} gap="3">
-                        <VerticalStack gap="05">
-                            <Text variant="bodyMd">{item.title}</Text>
-                            {item.description && <Text variant="bodySm" color="subdued">{item.description}</Text>}
-                        </VerticalStack>
+                        {item.media ? <HorizontalStack gap="3" blockAlign="center" wrap={false}>{item.media}{text}</HorizontalStack> : text}
                         {item.tag}
                     </HorizontalStack>
-                </Box>
-            ))}
+                );
+                const key = item.id ?? item.title;
+                const border = i > 0 ? "1" : undefined;
+                return item.onClick
+                    ? <Pressable key={key} onClick={item.onClick} accessibilityLabel={String(item.title)} hoverBackground="bg-subdued" padding="3" borderBlockStartWidth={border} borderColor="border-subdued">{row}</Pressable>
+                    : <Box key={key} padding="3" borderBlockStartWidth={border} borderColor="border-subdued">{row}</Box>;
+            })}
             {!onViewAll && hidden > 0 && (
                 <Box padding="3" borderBlockStartWidth="1" borderColor="border-subdued">
                     <ShowListInBadge itemsArr={items.slice(shown.length).map((item) => item.title)} maxItems={0} useTooltip />
