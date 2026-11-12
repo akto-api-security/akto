@@ -50,7 +50,7 @@ export default function TopAgenticAssetsCard({ data, pageSize, onOpenActivity })
     useEffect(() => setExpanded(false), [data, pageSize]);
     const rows = buildRows(data?.assets, onOpenActivity);
     return (
-        <CardWithHeader title="Top agents, apps and servers involved" hasData>
+        <CardWithHeader title="Top agents, apps and servers involved" tooltipContent="Unapproved ones come first, then by number of violations. Violations from the MCP servers an agent uses are counted on those servers, not on the agent." hasData>
             {data === null ? <SpinnerCentered height="200px" />
                 : data?.failed ? <OverviewLoadError />
                 : <ItemListCard

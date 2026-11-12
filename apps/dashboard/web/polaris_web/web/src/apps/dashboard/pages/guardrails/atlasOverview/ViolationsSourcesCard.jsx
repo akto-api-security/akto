@@ -59,7 +59,7 @@ export default function ViolationsSourcesCard({ data, pageSize, onOpenActivity }
     useEffect(() => setExpanded(false), [data, pageSize]);
     const rows = buildRows(data?.assetTypes, data?.periodDays, onOpenActivity);
     return (
-        <CardWithHeader title="Where violations happen" hasData>
+        <CardWithHeader title="Where violations happen" tooltipContent="All violations, whether open, in review or ignored. A config file that was scanned many times counts once." hasData>
             {data === null ? <SpinnerCentered height="200px" />
                 : data?.failed ? <OverviewLoadError />
                 : <ItemListCard

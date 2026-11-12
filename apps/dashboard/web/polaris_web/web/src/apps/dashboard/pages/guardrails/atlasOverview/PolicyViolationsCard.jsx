@@ -42,7 +42,7 @@ export default function PolicyViolationsCard({ data, onOpenActivity, onTune }) {
     const columns = hasNoisy ? COLUMNS_WITH_TUNE : COLUMNS;
     const countWidth = `${Math.max(3, ...shown.map((p) => String(formatCount(p.count)).length))}ch`;
     return (
-        <CardWithHeader title="Violations by policy" tooltipContent="High ignore rates usually mean a policy needs tuning" hasData>
+        <CardWithHeader title="Violations by policy" tooltipContent="Counts every violation of the policy, including ignored and in-review ones. Clicking a policy shows only its open violations, so you will see fewer. A high Ignored % usually means the policy needs tuning." hasData>
             {data === null ? <SpinnerCentered height="200px" /> : data?.failed ? <OverviewLoadError /> : (
                 <Box>
                     <OverviewListRow>

@@ -33,7 +33,7 @@ export default function TopEmployeesCard({ data, pageSize, onOpenActivity }) {
     useEffect(() => setExpanded(false), [data, pageSize]);
     const rows = buildRows(data?.employees, onOpenActivity);
     return (
-        <CardWithHeader title="Employees with most violations" hasData>
+        <CardWithHeader title="Employees with most violations" tooltipContent="Employees with the most critical violations come first, then by total." hasData>
             {data === null ? <SpinnerCentered height="200px" />
                 : data?.failed ? <OverviewLoadError />
                 : <ItemListCard
