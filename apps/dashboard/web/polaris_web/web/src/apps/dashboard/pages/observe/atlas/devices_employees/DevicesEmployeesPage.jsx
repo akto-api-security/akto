@@ -34,7 +34,6 @@ function DevicesEmployeesPage() {
     const [tab, setTab] = useState("employees");
     const [filters, setFilters] = useState(EMPTY_PEOPLE_FILTERS);
     const [search, setSearch] = useState("");
-    const [discovery, setDiscovery] = useState(null);
     const [openTarget, setOpenTarget] = useState(null);
     const [exporting, setExporting] = useState(false);
     const [trendStats, setTrendStats] = useState(null);
@@ -84,18 +83,6 @@ function DevicesEmployeesPage() {
             });
         return () => { ignore = true; };
     }, [deviceScope]);
-
-    useEffect(() => {
-        let ignore = false;
-        observeApi.fetchUsersAndDevicesStats()
-            .then((res) => {
-                if (!ignore) setDiscovery(res);
-            })
-            .catch(() => {
-                if (!ignore) func.setToast(true, true, "Failed to load AI discovery counts");
-            });
-        return () => { ignore = true; };
-    }, []);
 
     useEffect(() => {
         let ignore = false;
@@ -223,7 +210,7 @@ function DevicesEmployeesPage() {
                     suggestions={ASK_ATLAS_SUGGESTIONS}
                     chatScope={ATLAS_CHAT_SCOPE}
                 />,
-                <SummaryCardInfo key="stats-row" summaryItems={transform.buildStatItems(stats, onSelectStat, discovery, transform.activeStatCard(tab, filters, clickedStat))} />,
+                <SummaryCardInfo key="stats-row" summaryItems={transform.buildStatItems(stats, onSelectStat, transform.activeStatCard(tab, filters, clickedStat))} />,
                 <HorizontalGrid key="overview-cards" columns={{ xs: 1, md: 3 }} gap="4">
                     <AgentHealthCard
                         overview={overview}
