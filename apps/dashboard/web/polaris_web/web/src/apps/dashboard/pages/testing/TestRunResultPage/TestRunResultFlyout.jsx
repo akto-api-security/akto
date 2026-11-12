@@ -21,6 +21,7 @@ import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
+import LinearTicketCreationModal from '../../../components/shared/LinearTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
@@ -42,7 +43,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, createLinearTicket, linearIssueUrl, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
     const [remediationText, setRemediationText] = useState("")
     const { canCall, canCallAll } = usePermissions()
     const [fullDescription, setFullDescription] = useState(false)
@@ -67,6 +68,10 @@ function TestRunResultFlyout(props) {
     const [devrevParts, setDevRevParts] = useState([])
     const [devrevPartId, setDevRevPartId] = useState('')
     const [devrevWorkItemType, setDevRevWorkItemType] = useState('issue')
+
+    const [linearModalActive, setLinearModalActive] = useState(false)
+    const [linearTeams, setLinearTeams] = useState([])
+    const [linearTeamId, setLinearTeamId] = useState('')
 
     const [description, setDescription] = useState("")
     const [editDescription, setEditDescription] = useState("")
@@ -126,7 +131,7 @@ function TestRunResultFlyout(props) {
                 })
             })
 
-            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl, issueDetails.wizFindingUrl))
+            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl, issueDetails.wizFindingUrl, issueDetails.linearIssueUrl))
         }
     }, [issueDetails])
 
@@ -383,6 +388,27 @@ function TestRunResultFlyout(props) {
             }
         }
         setDevRevModalActive(!devrevModalActive)
+    }
+
+    const handleLinearClick = async () => {
+        if (!linearModalActive) {
+            const linearIntegration = await settingFunctions.fetchLinearIntegration()
+            const teamsArray = Object.entries(linearIntegration?.teamsMap || {}).map(([id, name]) => ({ id, name }))
+            if (teamsArray.length > 0) {
+                setLinearTeams(teamsArray)
+                setLinearTeamId(teamsArray[0].id)
+            }
+        }
+        setLinearModalActive(!linearModalActive)
+    }
+
+    const handleLinearTicketCreation = async () => {
+        if (linearTeamId && linearTeamId.length > 0) {
+            await createLinearTicket(issueDetails.id, linearTeamId)
+            setLinearModalActive(false)
+        } else {
+            func.setToast(true, true, "Invalid Linear team")
+        }
     }
 
     const handleDevRevTicketCreation = async (issueId, labels) => {
@@ -666,6 +692,16 @@ function TestRunResultFlyout(props) {
                                 issueType={devrevWorkItemType}
                                 issueId={issueDetails.id}
                                 isDevRevModal={true}
+                            />
+                            <LinearTicketCreationModal
+                                activator={window.LINEAR_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchLinearIntegration', 'api/createLinearTickets')}><Button id={"create-linear-ticket-button"} primary onClick={handleLinearClick} disabled={!!linearIssueUrl}>Create Linear Ticket</Button></AllowedAction> : <></>}
+                                modalActive={linearModalActive}
+                                setModalActive={setLinearModalActive}
+                                handleSaveAction={handleLinearTicketCreation}
+                                teams={linearTeams}
+                                teamId={linearTeamId}
+                                setTeamId={setLinearTeamId}
+                                issueId={issueDetails.id}
                             />
                            
                             { window?.WIZ_INTEGRATED === 'true' ? 

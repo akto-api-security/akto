@@ -44,6 +44,7 @@ import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.DeleteTestRunUtils;
@@ -1051,6 +1052,9 @@ public class StartTestAction extends UserAction {
     @Getter
     private Map<String, String> devrevIssuesMapForResults;
 
+    @Getter
+    private Map<String, String> linearIssuesMapForResults;
+
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
@@ -1093,6 +1097,7 @@ public class StartTestAction extends UserAction {
                 this.issuesDescriptionMap = (Map<String, String>) issueMetaDataMap.get("descriptions");
                 this.jiraIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("jiraIssues");
                 this.devrevIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("devrevIssues");
+                this.linearIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("linearIssues");
             }
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
@@ -1107,6 +1112,7 @@ public class StartTestAction extends UserAction {
         response.put("issuesDescriptionMap", this.issuesDescriptionMap);
         response.put("jiraIssuesMapForResults", this.jiraIssuesMapForResults);
         response.put("devrevIssuesMapForResults", this.devrevIssuesMapForResults);
+        response.put("linearIssuesMapForResults", this.linearIssuesMapForResults);
 
         return SUCCESS.toUpperCase();
     }
@@ -1128,7 +1134,7 @@ public class StartTestAction extends UserAction {
                 Filters.and(
                     Filters.in(Constants.ID, idToResultMap.keySet())
                 ),
-                Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.DESCRIPTION, TestingRunIssues.JIRA_ISSUE_URL, TestingRunIssues.DEVREV_WORK_URL)
+                Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.DESCRIPTION, TestingRunIssues.JIRA_ISSUE_URL, TestingRunIssues.DEVREV_WORK_URL, TestingRunIssues.LINEAR_ISSUE_URL)
             );
 
             return buildIssueMetaDataMap(issues, idToResultMap, ignoreStatuses);
@@ -1761,6 +1767,12 @@ public class StartTestAction extends UserAction {
                 "JIRA_INTEGRATION");
             if (!featureAccess.getIsGranted()) {
                 addActionError("Auto Create Tickets plan is not activated for this account.");
+                return false;
+            }
+
+            String ticketSource = autoTicketingDetails.getTicketSource();
+            if (!TicketSource.JIRA.name().equals(ticketSource) && !TicketSource.LINEAR.name().equals(ticketSource)) {
+                addActionError("Invalid parameter: ticketSource.");
                 return false;
             }
 

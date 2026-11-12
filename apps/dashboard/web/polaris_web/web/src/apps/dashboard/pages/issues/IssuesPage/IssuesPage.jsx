@@ -34,6 +34,7 @@ import IssuesByCollection from './IssuesByCollection.jsx';
 import CriticalUnresolvedApisByAge from './CriticalUnresolvedApisByAge.jsx';
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
+import LinearTicketCreationModal from "../../../components/shared/LinearTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
@@ -216,6 +217,9 @@ function IssuesPage() {
     const [devrevParts, setDevRevParts] = useState([])
     const [devrevPartId, setDevRevPartId] = useState('')
     const [devrevWorkItemType, setDevRevWorkItemType] = useState('issue')
+    const [linearModalActive, setLinearModalActive] = useState(false)
+    const [linearTeams, setLinearTeams] = useState([])
+    const [linearTeamId, setLinearTeamId] = useState('')
 
     // Compulsory description modal states
     const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
@@ -487,6 +491,21 @@ function IssuesPage() {
         })
     }
 
+    const handleSaveBulkLinearTicketsAction = () => {
+        setToast(true, false, "Please wait while we create your Linear tickets.")
+        setLinearModalActive(false)
+        api.createLinearTickets(selectedIssuesItems, linearTeamId, window.location.origin).then((res) => {
+            if (res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} Linear ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        }).catch((err) => {
+            setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating Linear tickets")
+        })
+    }
+
     // Use keys directly for reasons and compulsorySettings
     const requiresDescription = (reasonKey) => {
         return compulsorySettings[reasonKey] || false;
@@ -654,6 +673,18 @@ function IssuesPage() {
             })
         }
 
+        function createLinearTicketBulk() {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchLinearIntegration().then((linearIntegration) => {
+                const teamsArray = Object.entries(linearIntegration?.teamsMap || {}).map(([id, name]) => ({ id, name }))
+                if (teamsArray.length > 0) {
+                    setLinearTeams(teamsArray)
+                    setLinearTeamId(teamsArray[0].id)
+                }
+                setLinearModalActive(true)
+            })
+        }
+
         async function createWizFindings() {
             await api.createWizFindings(items).then((res) => {
                 setToast(true, false, `${items.length} Wiz finding${items.length === 1 ? "" : "s"} creation initiated.`)
@@ -740,6 +771,12 @@ function IssuesPage() {
                 onAction: () => { createDevRevTicketBulk() },
                 disabled: (window.DEVREV_INTEGRATED === 'false'),
                 requires: ['api/fetchDevRevIntegration', 'api/createDevRevTickets']
+            },
+            {
+                content: 'Create Linear ticket',
+                onAction: () => { createLinearTicketBulk() },
+                disabled: (window.LINEAR_INTEGRATED === 'false'),
+                requires: ['api/fetchLinearIntegration', 'api/createLinearTickets']
             },
             {
                 content: 'Create Wiz finding(s)',
@@ -991,6 +1028,7 @@ function IssuesPage() {
                             issueDescription: item?.description,
                             jiraIssueUrl: item?.jiraIssueUrl || "",
                             devrevWorkUrl: item?.devrevWorkUrl || "",
+                            linearIssueUrl: item?.linearIssueUrl || "",
                         }],
                         numberOfEndpoints: 1
                     })
@@ -1008,7 +1046,8 @@ function IssuesPage() {
                         id: item?.id ? JSON.stringify(item.id) : '',
                         issueDescription: item?.description,
                         jiraIssueUrl: item?.jiraIssueUrl || "",
-                        devrevWorkUrl: item?.devrevWorkUrl || ""
+                        devrevWorkUrl: item?.devrevWorkUrl || "",
+                        linearIssueUrl: item?.linearIssueUrl || ""
                     })
                     existingIssue.numberOfEndpoints = (existingIssue.numberOfEndpoints || 1) + 1
                 }
@@ -1341,6 +1380,15 @@ function IssuesPage() {
                 projId={devrevPartId}
                 issueType={devrevWorkItemType}
                 isDevRevModal={true}
+            />
+
+            <LinearTicketCreationModal
+                modalActive={linearModalActive}
+                setModalActive={setLinearModalActive}
+                handleSaveAction={handleSaveBulkLinearTicketsAction}
+                teams={linearTeams}
+                teamId={linearTeamId}
+                setTeamId={setLinearTeamId}
             />
 
             <CompulsoryDescriptionModal

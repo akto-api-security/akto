@@ -725,6 +725,10 @@
         <mongodb:createCollection collectionName="jira_integration"/>
     </changeSet>
 
+    <changeSet id="baseline-linear-integration-collection" author="akto">
+        <mongodb:createCollection collectionName="linear_integration"/>
+    </changeSet>
+
     <changeSet id="baseline-loaders-collection" author="akto">
         <mongodb:createCollection collectionName="loaders"/>
     </changeSet>
