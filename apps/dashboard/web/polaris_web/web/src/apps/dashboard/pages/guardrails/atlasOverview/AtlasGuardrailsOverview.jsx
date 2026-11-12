@@ -1,21 +1,25 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
-import { Button, HorizontalGrid, HorizontalStack } from "@shopify/polaris";
+import { Button, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import { openViolationInGuardrailViolations } from "@/apps/dashboard/pages/observe/agentic/agenticObserveApi";
 import func from "@/util/func";
 import values from "@/util/values";
-import KpiStrip from "./KpiStrip";
+import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import AttentionCard from "./AttentionCard";
 import TriageStatusCard from "./TriageStatusCard";
 import DecisionsTrendCard from "./DecisionsTrendCard";
 import PolicyViolationsCard from "./PolicyViolationsCard";
 import ViolationsSourcesCard from "./ViolationsSourcesCard";
 import TopEmployeesCard from "./TopEmployeesCard";
-import TopAssetsCard from "./TopAssetsCard";
+import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
+import AssetTagBadge from "@/apps/dashboard/components/shared/AssetTagBadge";
+import DiscoveryCard from "../../observe/atlas/discovery/shared/DiscoveryCard";
+import { LOAD_STATE } from "../../observe/atlas/discovery/constants";
 import guardrailOverviewMock from "./guardrailOverviewMock";
 import guardrailsApi from "../api";
 import { formatDurationMs } from "../../observe/llm/constants";
@@ -78,6 +82,15 @@ function buildPolicyRows(rules) {
         .map((g) => ({ name: g.name, count: g.count, ignoredPct: Math.round((g.ignored * 100) / g.count) }));
 }
 
+function kpiValue(value, sub, critical) {
+    return (
+        <VerticalStack gap="1">
+            <Text as="p" variant="heading2xl" color={critical ? "critical" : undefined}>{value}</Text>
+            {sub && <Text as="p" variant="bodySm" color="subdued">{sub}</Text>}
+        </VerticalStack>
+    );
+}
+
 function buildKpis(kpis, openActivity) {
     const k = kpis || {};
     const open = k.openViolations || {};
@@ -122,7 +135,7 @@ function buildKpis(kpis, openActivity) {
             value: triage.seconds !== undefined && triage.seconds !== null ? formatTriageDuration(triage.seconds) : EMPTY_VALUE,
             sub: triage.targetHours ? `Target is ${formatTriageDuration(triage.targetHours * 3600)}` : "",
         },
-    ];
+    ].map((item) => ({ title: item.label, isComp: true, data: kpiValue(item.value, item.sub, item.critical), onClick: item.onClick }));
 }
 
 function plural(count, one, many) {
@@ -165,11 +178,16 @@ function buildTopAgenticAssetRows(collections, skills) {
         .map((g) => {
             const detail = g.type === CLIENT_TYPES.MCP_SERVER ? plural(g.devices.size, "device", "devices") : "";
             return {
-                name: g.name,
-                kind: [AGENTIC_ASSET_KINDS[g.type] || g.type, detail].filter(Boolean).join(" · "),
-                tag: AGENTIC_ASSET_STATUS_TAGS[g.status],
-                personal: g.personal,
-                count: formatCount(g.count),
+                id: g.name,
+                title: g.name,
+                description: [AGENTIC_ASSET_KINDS[g.type] || g.type, detail].filter(Boolean).join(" · "),
+                tag: (
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        {g.personal && <AssetTagBadge tag="Personal" />}
+                        <AssetTagBadge tag={AGENTIC_ASSET_STATUS_TAGS[g.status]} />
+                        <Text variant="bodyMd" fontWeight="semibold">{formatCount(g.count)}</Text>
+                    </HorizontalStack>
+                ),
             };
         });
 }
@@ -180,9 +198,13 @@ function buildTopEmployeeRows(employees) {
         const team = tags.length > 0 ? `${tags[0]}${tags.length > 1 ? ` +${tags.length - 1}` : ""}` : "";
         return {
             name: e.name,
-            detail: [team, plural(e.devices, "device", "devices")].filter(Boolean).join(" · "),
-            count: formatCount(e.count),
-            critical: e.critical > 0 ? `${formatCount(e.critical)} critical` : null,
+            secondary: [team, plural(e.devices, "device", "devices")].filter(Boolean).join(" · "),
+            trailing: (
+                <VerticalStack gap="0" inlineAlign="end">
+                    <Text variant="bodyMd" fontWeight="semibold">{formatCount(e.count)}</Text>
+                    {e.critical > 0 && <Text variant="bodySm" color="critical">{`${formatCount(e.critical)} critical`}</Text>}
+                </VerticalStack>
+            ),
         };
     });
 }
@@ -201,6 +223,7 @@ function AtlasGuardrailsOverview() {
     const [topAgenticAssets, setTopAgenticAssets] = useState(null);
     const [topEmployees, setTopEmployees] = useState(null);
     const policyRows = useMemo(() => buildPolicyRows(policies?.rules), [policies]);
+    const topAssetRows = useMemo(() => buildTopAgenticAssetRows(topAgenticAssets?.collections, topAgenticAssets?.skills), [topAgenticAssets]);
     const topEmployeeRows = useMemo(() => buildTopEmployeeRows(topEmployees?.employees), [topEmployees]);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
@@ -244,7 +267,9 @@ function AtlasGuardrailsOverview() {
     const openPolicies = () => navigate(POLICIES_PATH);
 
     const components = [
-        <KpiStrip key="kpis" items={buildKpis(kpis, openActivity)} loading={kpis === null} />,
+        kpis === null
+            ? <Card key="kpis"><SpinnerCentered height="96px" /></Card>
+            : <SummaryCardInfo key="kpis" summaryItems={buildKpis(kpis, openActivity)} />,
         <HorizontalGrid key="attention" columns={{ xs: 1, md: ["twoThirds", "oneThird"] }} gap="4">
             <AttentionCard rows={data.attention} onReview={openActivity} onViewAll={openActivity} />
             <TriageStatusCard triage={{ statuses: triage?.statuses || [], staleCriticalUnassigned: triage?.staleCriticalUnassigned || 0, staleAfterHours: triage?.staleAfterHours }} periodDays={triage?.periodDays} loading={triage === null} onStatusClick={openActivity} onAssign={openActivity} />
@@ -256,7 +281,9 @@ function AtlasGuardrailsOverview() {
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
             <ViolationsSourcesCard rows={buildViolationsSourcesRows(violationsSources?.assetTypes)} periodDays={violationsSources?.periodDays} loading={violationsSources === null} onRowClick={openActivity} />
             <TopEmployeesCard employees={topEmployeeRows} pageSize={TOP_EMPLOYEES} loading={topEmployees === null} />
-            <TopAssetsCard assets={buildTopAgenticAssetRows(topAgenticAssets?.collections, topAgenticAssets?.skills)} loading={topAgenticAssets === null} />
+            <DiscoveryCard title="Top agents, apps and servers involved" status={topAgenticAssets === null ? LOAD_STATE.LOADING : LOAD_STATE.READY}>
+                <ItemListCard items={topAssetRows} emptyText="No agents, apps or servers involved in this period." />
+            </DiscoveryCard>
         </HorizontalGrid>,
     ];
 

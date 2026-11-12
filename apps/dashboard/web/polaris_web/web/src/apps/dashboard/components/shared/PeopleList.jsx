@@ -4,6 +4,7 @@ const initialsOf = (name = "") => name.split(/[\s._@-]+/).filter(Boolean).slice(
 
 /*
  * People rows: initials avatar, name, a secondary line and right-aligned text (with an optional tooltip).
+ * `trailing` may also be an element, which is rendered as is.
  *
  * <PeopleList people={[{ name: "rahul.verma", secondary: "3 devices", trailing: "10 minutes ago", trailingTooltip: "11/5/2026, 1:20:00 PM" }]} emptyText="No users" />
  */
@@ -20,9 +21,11 @@ function PeopleList({ people = [], emptyText }) {
                             {p.secondary && <Text variant="bodySm" color="subdued">{p.secondary}</Text>}
                         </VerticalStack>
                     </HorizontalStack>
-                    {p.trailing && (p.trailingTooltip
-                        ? <Tooltip content={p.trailingTooltip}><Text variant="bodySm" color="subdued">{p.trailing}</Text></Tooltip>
-                        : <Text variant="bodySm" color="subdued">{p.trailing}</Text>)}
+                    {p.trailing && (typeof p.trailing !== "string"
+                        ? p.trailing
+                        : p.trailingTooltip
+                            ? <Tooltip content={p.trailingTooltip}><Text variant="bodySm" color="subdued">{p.trailing}</Text></Tooltip>
+                            : <Text variant="bodySm" color="subdued">{p.trailing}</Text>)}
                 </HorizontalStack>
             ))}
         </VerticalStack>

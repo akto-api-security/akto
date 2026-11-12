@@ -1,6 +1,7 @@
-import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
-import { OverviewCardHeader, OverviewListRow } from "./OverviewCard";
-import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
+import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { OverviewListRow } from "./OverviewCard";
+import DiscoveryCard from "../../observe/atlas/discovery/shared/DiscoveryCard";
+import { LOAD_STATE } from "../../observe/atlas/discovery/constants";
 import observeFunc from "../../observe/transform";
 
 const TREND_UP_COLOR = "#8E1F0B";
@@ -12,13 +13,8 @@ function formatChange(pct) {
 }
 
 export default function ViolationsSourcesCard({ rows, periodDays, loading, onRowClick }) {
-    if (loading) return <Card><VerticalStack gap="3"><OverviewCardHeader title="Where violations happen" /><SpinnerCentered height="200px" /></VerticalStack></Card>;
-
     return (
-        <Card padding="0">
-            <Box padding="4" paddingBlockEnd="2">
-                <OverviewCardHeader title="Where violations happen" />
-            </Box>
+        <DiscoveryCard flush title="Where violations happen" status={loading ? LOAD_STATE.LOADING : LOAD_STATE.READY}>
             {rows.map((row) => (
                 <OverviewListRow key={row.name} onClick={() => onRowClick(row)}>
                     <HorizontalStack align="space-between" blockAlign="center" wrap={false} gap="2">
@@ -39,6 +35,6 @@ export default function ViolationsSourcesCard({ rows, periodDays, loading, onRow
                     </HorizontalStack>
                 </OverviewListRow>
             ))}
-        </Card>
+        </DiscoveryCard>
     );
 }

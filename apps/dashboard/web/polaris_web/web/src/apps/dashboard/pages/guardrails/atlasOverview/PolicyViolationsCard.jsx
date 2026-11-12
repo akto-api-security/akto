@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Box, Card, HorizontalGrid, Link, Text, VerticalStack } from "@shopify/polaris";
-import { OverviewCardHeader, OverviewListRow, OverviewShowMore } from "./OverviewCard";
-import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
+import { Box, HorizontalGrid, Link, Text } from "@shopify/polaris";
+import { OverviewListRow, OverviewShowMore } from "./OverviewCard";
+import DiscoveryCard from "../../observe/atlas/discovery/shared/DiscoveryCard";
+import { LOAD_STATE } from "../../observe/atlas/discovery/constants";
 import observeFunc from "../../observe/transform";
 
 const NOISY_IGNORE_PCT = 40;
@@ -11,16 +12,11 @@ export default function PolicyViolationsCard({ policies, pageSize, loading, onPo
     const [visible, setVisible] = useState(pageSize);
     useEffect(() => setVisible(pageSize), [policies, pageSize]);
 
-    if (loading) return <Card><VerticalStack gap="3"><OverviewCardHeader title="Violations by policy" subtitle="High ignore rates usually mean a policy needs tuning" /><SpinnerCentered height="200px" /></VerticalStack></Card>;
-
     const shown = policies.slice(0, visible);
     const max = Math.max(1, ...shown.map((p) => p.count));
     const countWidth = `${Math.max(3, ...shown.map((p) => String(observeFunc.formatNumberWithCommas(p.count)).length))}ch`;
     return (
-        <Card padding="0">
-            <Box padding="4" paddingBlockEnd="2">
-                <OverviewCardHeader title="Violations by policy" subtitle="High ignore rates usually mean a policy needs tuning" />
-            </Box>
+        <DiscoveryCard flush title="Violations by policy" subtitle="High ignore rates usually mean a policy needs tuning" status={loading ? LOAD_STATE.LOADING : LOAD_STATE.READY}>
             <OverviewListRow>
                 <HorizontalGrid columns={COLUMNS} gap="2">
                     <Text variant="bodySm" color="subdued">Policy</Text>
@@ -50,6 +46,6 @@ export default function PolicyViolationsCard({ policies, pageSize, loading, onPo
                 );
             })}
             <OverviewShowMore total={policies.length} shown={shown.length} pageSize={pageSize} onChange={setVisible} />
-        </Card>
+        </DiscoveryCard>
     );
 }
