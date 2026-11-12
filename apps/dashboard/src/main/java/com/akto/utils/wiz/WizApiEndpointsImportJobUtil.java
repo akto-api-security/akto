@@ -23,7 +23,7 @@ public class WizApiEndpointsImportJobUtil {
     private static final LoggerMaker logger = new LoggerMaker(WizApiEndpointsImportJobUtil.class, LogDb.DASHBOARD);
 
     public static void setupBeforeImport(int accountId) {
-        SingleTypeInfo.fetchCustomDataTypes(accountId);
+        SingleTypeInfo.fetchDataTypesAndAuthTypes(accountId);
         AccountHTTPCallParserAktoPolicyInfo aktoPolicyInfo = new AccountHTTPCallParserAktoPolicyInfo();
         HttpCallParser httpCallParser = new HttpCallParser("userIdentifier", 10, 5, 30, false, true);
         httpCallParser.setSkipDependencyAnalysis(true);

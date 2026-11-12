@@ -12,6 +12,9 @@ public class Constants {
 
     public static final String ID = "_id";
 
+    // prefix of the log line a cron writes for each run or account it went through, so all of them are found with one grep
+    public static final String CRON_STATS_LOG_TAG = "[CRON-STATS]";
+
     public static final String TIMESTAMP = "timestamp";
 
     public static final String AWS_REGION = "AWS_REGION";

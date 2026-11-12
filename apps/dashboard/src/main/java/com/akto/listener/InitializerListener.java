@@ -23,6 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -841,10 +842,15 @@ public class InitializerListener implements ServletContextListener {
         scheduler.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
+                Predicate<Integer> notDormant = DormantAccountFilter.fetchNotDormantTest();
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account account) {
-                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        if (!notDormant.test(account.getId())) {
+                            return;
+                        }
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(),
+                                Projections.include(AccountSettings.DEFAULT_PAYLOADS));
                         Map<String, DefaultPayload> defaultPayloadMap = accountSettings.getDefaultPayloads();
                         if (defaultPayloadMap == null || defaultPayloadMap.isEmpty()) {
                             return;
@@ -2546,7 +2552,8 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "context-initializer");
 
-                SingleTypeInfo.init();
+                // only the accounts that are not dormant are loaded and refreshed; dormant accounts are never read
+                SingleTypeInfo.init(DormantAccountFilter::fetchNotDormantTest);
 
                 int now = Context.now();
 

@@ -610,7 +610,7 @@ public class Utils {
                 Context.accountId.set(accountId);
             }
 
-            SingleTypeInfo.fetchCustomDataTypes(accountId);
+            SingleTypeInfo.fetchDataTypesAndAuthTypes(accountId);
             AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
             if (info == null) { // account created after docker run
                 info = new AccountHTTPCallParserAktoPolicyInfo();

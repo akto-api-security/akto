@@ -9,6 +9,7 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.CustomDataType;
 import com.akto.types.CappedSet;
 import com.akto.util.AccountTask;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
@@ -26,6 +27,9 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import static com.google.common.primitives.Longs.min;
 import static java.lang.Long.max;
@@ -79,13 +83,35 @@ public class SingleTypeInfo {
     public static Map<Integer, AccountDataTypesInfo> getAccountToDataTypesInfo () {
         return accountToDataTypesInfo;
     }
+    /** Refreshes the data types and auth types of every account every 5 minutes. */
     public static void init() {
+        init(null);
+    }
+
+    /**
+     * Every 5 minutes loads the data types and auth types of only the accounts the test lets through, so accounts
+     * nobody uses are never read, not even on the first run.
+     *
+     * @param accountsToRefresh called once per run, outside the account loop, to get the test for that run; the test
+     *                          runs with Context.accountId set. null refreshes every account on every run.
+     */
+    public static void init(Supplier<Predicate<Integer>> accountsToRefresh) {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                long startMs = System.currentTimeMillis();
+                Predicate<Integer> refresh = accountsToRefresh == null ? accountId -> true : accountsToRefresh.get();
+                AtomicInteger refreshed = new AtomicInteger();
+                AtomicInteger skipped = new AtomicInteger();
                 AccountTask.instance.executeTask(t -> {
-                    fetchCustomDataTypes(t.getId());
-                    fetchCustomAuthTypes(t.getId());
+                    if (!refresh.test(t.getId())) {
+                        skipped.incrementAndGet();
+                        return;
+                    }
+                    refreshed.incrementAndGet();
+                    fetchDataTypesAndAuthTypes(t.getId());
                 }, "populate-data-types-info");
+                logger.info(Constants.CRON_STATS_LOG_TAG + " populate-data-types-info run finished: " + (accountsToRefresh == null ? "all accounts" : "active accounts only")
+                    + ", accounts refreshed: " + refreshed.get() + ", skipped: " + skipped.get() + ", total: " + (System.currentTimeMillis() - startMs) + " ms");
             }
         }, 0, 5, TimeUnit.MINUTES);
 
@@ -209,6 +235,12 @@ public class SingleTypeInfo {
 
     public static void fetchCustomAuthTypes(int accountId) {
         activeCustomAuthTypes.put(accountId, CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true));
+    }
+
+    /** Loads what parsing the traffic of an account needs. Run it before parsing an account that init() may not refresh. */
+    public static void fetchDataTypesAndAuthTypes(int accountId) {
+        fetchCustomDataTypes(accountId);
+        fetchCustomAuthTypes(accountId);
     }
 
     public static void fetchCustomAuthTypes(int accountId, List<CustomAuthType> customAuthTypes) {

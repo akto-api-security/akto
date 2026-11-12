@@ -26,7 +26,7 @@ public class TraceProcessingServiceImpl implements TraceProcessingService {
             Map<String, List<HttpResponseParams>> responseParamsToAccountIdMap = new HashMap<>();
             responseParamsToAccountIdMap.put(String.valueOf(accountId), traces);
 
-            SingleTypeInfo.fetchCustomDataTypes(accountId);
+            SingleTypeInfo.fetchDataTypesAndAuthTypes(accountId);
             AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
             if (info == null) { // account created after docker run
                 info = new AccountHTTPCallParserAktoPolicyInfo();
