@@ -4,6 +4,7 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import func from "@/util/func";
 import { formatDurationMs } from "../../observe/llm/constants";
 import { EMPTY_VALUE, formatCount } from "./atlasOverviewUtils";
+import { ACTIVITY_TAB, CRITICAL_SEVERITY } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 
 function formatTriageDuration(seconds) {
     const days = Math.floor(seconds / 86400);
@@ -36,20 +37,20 @@ function buildKpis(kpis, onOpenActivity) {
             sub: open.change !== undefined && open.change !== null
                 ? `${open.change > 0 ? "+" : ""}${formatCount(open.change)} vs previous ${days} ${days === 1 ? "day" : "days"}`
                 : "",
-            onClick: onOpenActivity,
+            onClick: () => onOpenActivity({ eventStatus: ACTIVITY_TAB.ACTIVE }),
         },
         {
             label: "Critical, unassigned",
             value: formatCount(critical.count),
             sub: critical.oldestAgeSeconds !== undefined && critical.oldestAgeSeconds !== null ? `Oldest ${func.prettifyEpochDuration(Math.max(1, critical.oldestAgeSeconds))} ago` : "",
             critical: true,
-            onClick: onOpenActivity,
+            onClick: () => onOpenActivity({ eventStatus: ACTIVITY_TAB.ACTIVE, severity: CRITICAL_SEVERITY }),
         },
         {
             label: "Blocked",
             value: formatCount(blocked.count),
             sub: blocked.sharePct !== undefined && blocked.sharePct !== null ? `${blocked.sharePct}% of all guardrail decisions` : "",
-            onClick: onOpenActivity,
+            onClick: () => onOpenActivity(),
         },
         {
             label: "Employees involved",

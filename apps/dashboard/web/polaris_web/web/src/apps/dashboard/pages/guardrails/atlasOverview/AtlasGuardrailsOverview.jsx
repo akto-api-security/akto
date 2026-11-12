@@ -5,7 +5,7 @@ import { Button, HorizontalGrid, HorizontalStack } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
-import { openViolationInGuardrailViolations } from "@/apps/dashboard/pages/observe/agentic/agenticObserveApi";
+import { ACTIVITY_TAB, THREAT_ACTIVITY_PATH, clearSavedActivityFilters, openThreatActivityPage } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import func from "@/util/func";
 import values from "@/util/values";
 import KpiStrip from "./KpiStrip";
@@ -71,18 +71,21 @@ function AtlasGuardrailsOverview() {
     }, [startTimestamp, endTimestamp]);
 
     const data = guardrailOverviewMock;
-    const openActivity = () => openViolationInGuardrailViolations();
+    const openActivity = (filters = {}) => {
+        clearSavedActivityFilters(THREAT_ACTIVITY_PATH);
+        openThreatActivityPage({ startTimestamp, endTimestamp, ...filters });
+    };
     const openPolicy = (policy) => navigate(policyLink(policy.misconfigured ? null : policy.name));
 
     const components = [
         <KpiStrip key="kpis" kpis={kpis} onOpenActivity={openActivity} />,
         <HorizontalGrid key="attention" columns={{ xs: 1, md: ["twoThirds", "oneThird"] }} gap="4">
-            <AttentionCard rows={data.attention} onReview={openActivity} onViewAll={openActivity} />
-            <TriageStatusCard triage={triage} onStatusClick={openActivity} onAssign={openActivity} />
+            <AttentionCard rows={data.attention} onReview={() => openActivity()} onViewAll={() => openActivity()} />
+            <TriageStatusCard triage={triage} onOpenActivity={openActivity} />
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">
             <DecisionsTrendCard decisions={decisions} onOpenActivity={openActivity} />
-            <PolicyViolationsCard data={policies} onPolicyClick={openActivity} onTune={openPolicy} />
+            <PolicyViolationsCard data={policies} onOpenActivity={openActivity} onTune={openPolicy} />
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
             <ViolationsSourcesCard data={violationsSources} onOpenActivity={openActivity} />
@@ -107,7 +110,7 @@ function AtlasGuardrailsOverview() {
                     <Button icon={ExportMinor}>Export report</Button>
                 </HorizontalStack>
             }
-            primaryAction={<Button primary onClick={openActivity}>Triage open violations</Button>}
+            primaryAction={<Button primary onClick={() => openActivity({ eventStatus: ACTIVITY_TAB.ACTIVE })}>Triage open violations</Button>}
             components={components}
         />
     );

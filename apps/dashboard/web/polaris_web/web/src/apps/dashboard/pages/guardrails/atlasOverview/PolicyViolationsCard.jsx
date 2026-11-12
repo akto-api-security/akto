@@ -4,6 +4,7 @@ import CardWithHeader from "@/apps/dashboard/pages/dashboard/new_components/Card
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { OverviewListRow, OverviewShowMore } from "./OverviewCard";
 import { formatCount } from "./atlasOverviewUtils";
+import { ACTIVITY_TAB } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 
 const NOISY_IGNORE_PCT = 40;
 const COLUMNS = "minmax(0, 1.3fr) minmax(0, 1fr) 80px";
@@ -15,16 +16,22 @@ function buildPolicyRows(policies) {
     const groups = {};
     (policies || []).forEach((r) => {
         const name = r.misconfigured ? MISCONFIGURED_LABEL : (r.policy || "-");
-        const group = groups[name] || (groups[name] = { name, misconfigured: r.misconfigured, count: 0, ignored: 0 });
+        const group = groups[name] || (groups[name] = { name, misconfigured: r.misconfigured, skill: r.skill, count: 0, ignored: 0 });
         group.count += r.count;
         group.ignored += r.ignored;
     });
     return Object.values(groups)
         .sort((a, b) => b.count - a.count)
-        .map((g) => ({ name: g.name, misconfigured: g.misconfigured, count: g.count, ignoredPct: Math.round((g.ignored * 100) / g.count) }));
+        .map((g) => ({ name: g.name, misconfigured: g.misconfigured, skill: g.skill, count: g.count, ignoredPct: Math.round((g.ignored * 100) / g.count) }));
 }
 
-export default function PolicyViolationsCard({ data, onPolicyClick, onTune }) {
+function policyFilters(policy) {
+    if (policy.misconfigured) return { eventStatus: ACTIVITY_TAB.MISCONFIGURED_SETTINGS };
+    if (policy.skill) return { eventStatus: ACTIVITY_TAB.SKILLS_EVALUATIONS, latestAttack: policy.name };
+    return { latestAttack: policy.name };
+}
+
+export default function PolicyViolationsCard({ data, onOpenActivity, onTune }) {
     const policies = useMemo(() => buildPolicyRows(data?.policies), [data]);
     const [visible, setVisible] = useState(PAGE_SIZE);
     useEffect(() => setVisible(PAGE_SIZE), [policies]);
@@ -51,7 +58,7 @@ export default function PolicyViolationsCard({ data, onPolicyClick, onTune }) {
                         return (
                             <OverviewListRow key={policy.name}>
                                 <HorizontalGrid columns={columns} gap="2" alignItems="center">
-                                    <Link monochrome removeUnderline onClick={() => onPolicyClick(policy)}>
+                                    <Link monochrome removeUnderline onClick={() => onOpenActivity(policyFilters(policy))}>
                                         <Text variant="bodyMd" as="span" truncate>{policy.name}</Text>
                                     </Link>
                                     <HorizontalGrid columns={`1fr ${countWidth}`} gap="2" alignItems="center">

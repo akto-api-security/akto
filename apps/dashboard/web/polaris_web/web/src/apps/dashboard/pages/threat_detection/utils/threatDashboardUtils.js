@@ -16,6 +16,15 @@ const getCategoryParam = () => categoryToShortName[getDashboardCategory()];
 const allTimeRange = values.ranges.find((r) => r.alias === "allTime");
 const allTimeStartTs = allTimeRange ? Math.floor(allTimeRange.period.since.getTime() / 1000) : 1;
 
+export const ACTIVITY_TAB = {
+    ACTIVE: "ACTIVE",
+    UNDER_REVIEW: "UNDER_REVIEW",
+    IGNORED: "IGNORED",
+    SKILLS_EVALUATIONS: "skills_evaluations",
+    MISCONFIGURED_SETTINGS: "misconfigured_settings",
+};
+export const CRITICAL_SEVERITY = "CRITICAL";
+
 const setTimeRangeParams = (params, filters, startKey, endKey) => {
     if (!filters.startTimestamp || !filters.endTimestamp) return;
     if (filters.startTimestamp <= allTimeStartTs) {
@@ -188,7 +197,7 @@ const activityLink = (path, filters) => {
     if (filters.severity) filterParts.push(`severity__${filters.severity}`);
     if (filterParts.length > 0) params.set("filters", filterParts.join("&"));
     const eventStatus = filters.eventStatus
-        || (isMisconfigurationCategory(resolvedFilterId) ? "misconfigured_settings" : null);
+        || (isMisconfigurationCategory(resolvedFilterId) ? ACTIVITY_TAB.MISCONFIGURED_SETTINGS : null);
     if (eventStatus) params.set("eventStatus", eventStatus);
     setTimeRangeParams(params, filters, "startTimestamp", "endTimestamp");
     const categoryParam = getCategoryParam();

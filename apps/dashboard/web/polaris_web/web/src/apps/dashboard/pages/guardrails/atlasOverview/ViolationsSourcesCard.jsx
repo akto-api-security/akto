@@ -34,7 +34,7 @@ function buildRows(assetTypes, periodDays, onOpenActivity) {
                 title: ASSET_TYPE_LABELS[s.type] || s.type,
                 description: examples || undefined,
                 count: s.count,
-                onClick: onOpenActivity,
+                onClick: () => onOpenActivity(),
                 tag: (
                     <VerticalStack gap="0" inlineAlign="end">
                         <Text variant="bodyMd" fontWeight="semibold">{formatCount(s.count)}</Text>

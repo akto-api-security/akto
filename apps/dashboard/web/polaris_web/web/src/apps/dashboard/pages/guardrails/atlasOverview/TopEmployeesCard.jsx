@@ -16,7 +16,7 @@ function buildRows(employees, onOpenActivity) {
             id: e.name,
             media: <Avatar size="small" initials={initialsOf(e.name)} name={e.name} />,
             title: e.name,
-            onClick: onOpenActivity,
+            onClick: () => onOpenActivity({ host: (e.hosts || []).join(",") }),
             description: [team, plural(e.devices, "device", "devices")].filter(Boolean).join(" · "),
             tag: (
                 <VerticalStack gap="0" inlineAlign="end">

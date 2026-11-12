@@ -25,7 +25,7 @@ function buildRows(assets, onOpenActivity) {
     return (assets || []).map((a) => ({
         id: a.key,
         title: a.name,
-        onClick: onOpenActivity,
+        onClick: () => onOpenActivity(a.host ? { host: a.host } : { atlasTool: a.key, atlasToolName: a.name }),
         description: [AGENTIC_ASSET_KINDS[a.type] || a.type, plural(a.people, "person", "people"), plural(a.devices, "device", "devices")].join(" · "),
         tag: (
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>

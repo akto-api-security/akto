@@ -91,9 +91,10 @@ public class AtlasGuardrailsOverviewService {
         Map<String, BasicDBObject> byPolicy = new LinkedHashMap<>();
         for (DashboardMaliciousEvent e : AtlasGuardrailUtils.collapseConfigFindings(events)) {
             boolean misconfigured = AtlasGuardrailUtils.isConfigFinding(e);
+            boolean skill = !misconfigured && AtlasGuardrailUtils.isSkillFinding(e);
             String policy = misconfigured ? "" : (e.getFilterId() == null ? "" : e.getFilterId());
-            BasicDBObject row = byPolicy.computeIfAbsent(misconfigured + "|" + policy, k -> new BasicDBObject("policy", policy)
-                    .append("misconfigured", misconfigured).append("count", 0L).append("ignored", 0L));
+            BasicDBObject row = byPolicy.computeIfAbsent(misconfigured + "|" + skill + "|" + policy, k -> new BasicDBObject("policy", policy)
+                    .append("misconfigured", misconfigured).append("skill", skill).append("count", 0L).append("ignored", 0L));
             row.put("count", row.getLong("count") + 1);
             if (Status.IGNORED.name().equalsIgnoreCase(e.getStatus())) row.put("ignored", row.getLong("ignored") + 1);
         }
@@ -191,7 +192,7 @@ public class AtlasGuardrailsOverviewService {
             String skill = SkillEvaluationConcentrationProvider.extractSkillName(e.getUrl());
             if (skill == null) continue;
             TopAgenticAssetRow row = skills.computeIfAbsent(skill, k -> new TopAgenticAssetRow(
-                    AtlasAssetStatusService.toolKey(AtlasAssetStatusService.ROW_TYPE_SKILL, k), k, AgenticObserveUtil.CLIENT_TYPE_SKILL));
+                    AtlasAssetStatusService.toolKey(AtlasAssetStatusService.ROW_TYPE_SKILL, k), k, AgenticObserveUtil.CLIENT_TYPE_SKILL, null));
             row.addCount(1);
             row.addDevice(AgenticObserveUtil.extractEndpointId(e.getHost()), bundle);
         }
@@ -214,7 +215,7 @@ public class AtlasGuardrailsOverviewService {
             AtlasToolRow asset = AtlasGuardrailUtils.collectionAsset(c, type);
             String key = asset == null ? AtlasAssetStatusService.toolKey(type, c.getHostName())
                     : AtlasAssetStatusService.toolKey(asset.getRowType(), asset.getGroupKey());
-            TopAgenticAssetRow row = byAsset.computeIfAbsent(key, k -> new TopAgenticAssetRow(k, asset == null ? c.getHostName() : asset.getName(), type));
+            TopAgenticAssetRow row = byAsset.computeIfAbsent(key, k -> new TopAgenticAssetRow(k, asset == null ? c.getHostName() : asset.getName(), type, asset == null ? c.getHostName() : null));
             row.addCount(entry.getValue().getOrDefault(AtlasGuardrailUtils.PERIOD_CURRENT, 0));
             if (InsightUtil.isPersonalAccount(c)) row.markPersonal();
             row.addStatus(asset == null ? AtlasAssetStatus.UNAPPROVED : statusService.resolve(asset, decisions, bundle.allowlistNamesLower));
@@ -245,7 +246,7 @@ public class AtlasGuardrailsOverviewService {
             String username = bundle.usernameForDevice(deviceId);
             TopEmployeeRow row = byEmployee.computeIfAbsent(username != null ? username : deviceId,
                     k -> new TopEmployeeRow(k, AtlasGuardrailUtils.employeeTags(bundle, username)));
-            row.addViolation(deviceId, AtlasGuardrailUtils.isCritical(e));
+            row.addViolation(deviceId, e.getHost(), AtlasGuardrailUtils.isCritical(e));
         }
 
         response.put("employees", byEmployee.values().stream()
@@ -324,16 +325,18 @@ public class AtlasGuardrailsOverviewService {
         private final String key;
         private final String name;
         private final String type;
+        private final String host;
         private final Set<String> devices = new HashSet<>();
         private final Set<String> people = new HashSet<>();
         private long count;
         private boolean personal;
         private String status;
 
-        private TopAgenticAssetRow(String key, String name, String type) {
+        private TopAgenticAssetRow(String key, String name, String type, String host) {
             this.key = key;
             this.name = name;
             this.type = type;
+            this.host = host;
         }
 
         private void addCount(long violations) {
@@ -361,7 +364,7 @@ public class AtlasGuardrailsOverviewService {
         private BasicDBObject toResponse() {
             return new BasicDBObject("key", key).append("name", name).append("type", type).append("count", count)
                     .append("personal", personal).append("status", status)
-                    .append("devices", devices.size()).append("people", people.size());
+                    .append("devices", devices.size()).append("people", people.size()).append("host", host);
         }
     }
 
@@ -369,6 +372,7 @@ public class AtlasGuardrailsOverviewService {
         private final String name;
         private final List<String> tags;
         private final Set<String> devices = new HashSet<>();
+        private final Set<String> hosts = new HashSet<>();
         private long count;
         private long critical;
 
@@ -377,15 +381,16 @@ public class AtlasGuardrailsOverviewService {
             this.tags = tags;
         }
 
-        private void addViolation(String deviceId, boolean isCritical) {
+        private void addViolation(String deviceId, String host, boolean isCritical) {
             count++;
             if (isCritical) critical++;
             devices.add(deviceId);
+            hosts.add(host);
         }
 
         private BasicDBObject toResponse() {
             return new BasicDBObject("name", name).append("tags", tags).append("count", count)
-                    .append("critical", critical).append("devices", devices.size());
+                    .append("critical", critical).append("devices", devices.size()).append("hosts", hosts);
         }
     }
 }

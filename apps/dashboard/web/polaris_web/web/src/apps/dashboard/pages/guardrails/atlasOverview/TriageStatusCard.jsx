@@ -3,6 +3,7 @@ import CardWithHeader from "@/apps/dashboard/pages/dashboard/new_components/Card
 import CalloutStrip from "@/apps/dashboard/components/shared/CalloutStrip";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { formatCount } from "./atlasOverviewUtils";
+import { ACTIVITY_TAB, CRITICAL_SEVERITY } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 
 const BAR_COLOR = {
     OPEN: "bg-inverse-active",
@@ -12,8 +13,13 @@ const BAR_COLOR = {
     IGNORED: "bg-strong",
     RESOLVED: "bg-success-strong",
 };
+const STATUS_EVENT_STATUS = {
+    OPEN: ACTIVITY_TAB.ACTIVE,
+    IN_REVIEW: ACTIVITY_TAB.UNDER_REVIEW,
+    IGNORED: ACTIVITY_TAB.IGNORED,
+};
 
-export default function TriageStatusCard({ triage, onStatusClick, onAssign }) {
+export default function TriageStatusCard({ triage, onOpenActivity }) {
     const statuses = triage?.statuses || [];
     const max = Math.max(1, ...statuses.map((s) => s.count));
     const stale = triage?.staleCriticalUnassigned || 0;
@@ -28,7 +34,7 @@ export default function TriageStatusCard({ triage, onStatusClick, onAssign }) {
             {triage === null ? <SpinnerCentered height="200px" /> : (
                 <VerticalStack gap="3">
                     {statuses.map((status) => (
-                        <div key={status.key} onClick={() => onStatusClick(status)} style={{ cursor: "pointer" }}>
+                        <div key={status.key} onClick={() => onOpenActivity({ eventStatus: STATUS_EVENT_STATUS[status.key] })} style={{ cursor: "pointer" }}>
                             <VerticalStack gap="1">
                                 <HorizontalStack align="space-between">
                                     <Text variant="bodyMd">{status.label}</Text>
@@ -47,7 +53,7 @@ export default function TriageStatusCard({ triage, onStatusClick, onAssign }) {
                             <Text as="span" fontWeight="semibold">{`${hours} ${hours === 1 ? "hour" : "hours"}`}</Text>
                             {". "}
                             <Text as="span" fontWeight="semibold">
-                                <Link onClick={onAssign} removeUnderline>Assign now</Link>
+                                <Link onClick={() => onOpenActivity({ eventStatus: ACTIVITY_TAB.ACTIVE, severity: CRITICAL_SEVERITY })} removeUnderline>Assign now</Link>
                             </Text>
                         </CalloutStrip>
                     )}
