@@ -20,6 +20,8 @@ final class AtlasGraphSections {
     private static final int MATRIX_AGENTS = 5;
     private static final int MATRIX_SERVERS = 8;
     private static final int MATRIX_TEAMS = 8;
+    // Skills have no people-page filter to open from a cell, so they are left out of the team matrix.
+    private static final List<String> TEAM_MATRIX_CATEGORIES = AtlasCategory.ORDER.stream().filter(c -> !AtlasCategory.SKILLS.equals(c)).collect(Collectors.toList());
     private static final int CHAIN_COLUMN_LIMIT = 10;
     // Categories that appear as nodes in the "AI tools" column of the supply chain.
     private static final List<String> CHAIN_TOOL_CATEGORIES = Arrays.asList(AtlasCategory.AGENTS, AtlasCategory.IDE, AtlasCategory.BROWSER);
@@ -93,7 +95,7 @@ final class AtlasGraphSections {
         for (String team : busiest(members, MATRIX_TEAMS)) {
             int size = members.get(team).size();
             List<Long> percents = new ArrayList<>();
-            for (String category : AtlasCategory.ORDER) {
+            for (String category : TEAM_MATRIX_CATEGORIES) {
                 Set<String> using = adopters.getOrDefault(team, new HashMap<>()).get(category);
                 percents.add(using == null ? 0L : Math.min(100L, Math.round(100.0 * using.size() / size)));
             }
@@ -104,7 +106,7 @@ final class AtlasGraphSections {
             rows.add(row);
         }
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("categories", AtlasCategory.ORDER);
+        out.put("categories", TEAM_MATRIX_CATEGORIES);
         out.put("rows", rows);
         return out;
     }

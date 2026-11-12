@@ -176,21 +176,10 @@ public class SmartAgentProfileAction extends UserAction {
         return null;
     }
 
-    /** Custom skills ({name, content}, kept in Mongo: short typed text) into out; the problem, or null. */
+    /** Custom skills: skill files stored in blob storage exactly like knowledge files — only {name, sha256,
+     * size} is kept in Mongo and only smart testing reads the content. The problem to show the user, or null. */
     private static String storeCustomSkills(List<Map<String, Object>> items, List<SmartAgentKnowledgeFile> out) {
-        for (Map<String, Object> item : orEmpty(items)) {
-            if (item == null) continue;
-            String skillName = StringUtils.left(StringUtils.trimToEmpty(String.valueOf(item.getOrDefault("name", ""))), MAX_NAME_CHARS);
-            Object raw = item.get("content");
-            String content = raw != null ? raw.toString() : "";
-            if (skillName.isEmpty() || content.trim().isEmpty()) continue;
-            if (content.length() > SmartAgentConfig.MAX_CUSTOM_SKILL_CHARS) {
-                return skillName + " is too long (at most " + SmartAgentConfig.MAX_CUSTOM_SKILL_CHARS + " characters)";
-            }
-            out.add(new SmartAgentKnowledgeFile(skillName, content));
-        }
-        if (out.size() > SmartAgentConfig.MAX_LIST_ITEMS) return "Add at most " + SmartAgentConfig.MAX_LIST_ITEMS + " skills";
-        return null;
+        return storeBlobFiles(items, out, SmartAgentConfig.MAX_CUSTOM_SKILL_CHARS, SmartAgentConfig.MAX_SKILL_FILES, "skill files");
     }
 
     /** Where knowledge base files go: Azure blob storage, as for file inspection content. Tests replace it. */
@@ -207,17 +196,21 @@ public class SmartAgentProfileAction extends UserAction {
         };
     };
 
-    /**
-     * Knowledge base files: a new file (with content) is stored in blob storage under its sha256, like file inspection
-     * content, and only {name, sha256, size} is kept; a file saved before comes back as {name, sha256, size}. Without
-     * blob storage (not configured) the content stays inline. The problem to show the user, or null.
-     */
     private static String storeKnowledgeFiles(List<Map<String, Object>> items, List<SmartAgentKnowledgeFile> out) {
+        return storeBlobFiles(items, out, SmartAgentConfig.MAX_KNOWLEDGE_FILE_CHARS, SmartAgentConfig.MAX_KNOWLEDGE_FILES, "files");
+    }
+
+    /**
+     * Files (knowledge base files and skill files): a new file (with content) is stored in blob storage under its
+     * sha256, like file inspection content, and only {name, sha256, size} is kept; a file saved before comes back as
+     * {name, sha256, size}. Without blob storage (not configured) the content stays inline. The problem, or null.
+     */
+    private static String storeBlobFiles(List<Map<String, Object>> items, List<SmartAgentKnowledgeFile> out, int maxChars, int maxCount, String label) {
         BlobStore store = null;
         boolean blobsAvailable = true;
         for (Map<String, Object> item : orEmpty(items)) {
             if (item == null) continue;
-            String fileName = StringUtils.left(StringUtils.trimToEmpty(String.valueOf(item.getOrDefault("name", ""))), MAX_NAME_CHARS);
+            String fileName = StringUtils.left(StringUtils.trimToEmpty(String.valueOf(item.getOrDefault("name", ""))), SmartAgentConfig.MAX_FILE_NAME_CHARS);
             if (fileName.isEmpty()) continue;
             Object rawContent = item.get("content");
             String content = rawContent != null ? rawContent.toString() : null;
@@ -229,8 +222,8 @@ public class SmartAgentProfileAction extends UserAction {
                 out.add(new SmartAgentKnowledgeFile(fileName, null, sha256, size));
                 continue;
             }
-            if (content.length() > SmartAgentConfig.MAX_KNOWLEDGE_FILE_CHARS) {
-                return fileName + " is too long (at most " + SmartAgentConfig.MAX_KNOWLEDGE_FILE_CHARS + " characters)";
+            if (content.length() > maxChars) {
+                return fileName + " is too long (at most " + maxChars + " characters)";
             }
             byte[] data = content.getBytes(StandardCharsets.UTF_8);
             String hash = sha256Hex(data);
@@ -251,12 +244,12 @@ public class SmartAgentProfileAction extends UserAction {
                     store.upload(blobName, data);
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "smart agent: knowledge file upload failed: " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "smart agent: " + label + " upload failed: " + e.getMessage(), LogDb.DASHBOARD);
                 return "Could not store " + fileName + ", try again";
             }
             out.add(new SmartAgentKnowledgeFile(fileName, null, hash, content.length()));
         }
-        if (out.size() > SmartAgentConfig.MAX_KNOWLEDGE_FILES) return "Add at most " + SmartAgentConfig.MAX_KNOWLEDGE_FILES + " files";
+        if (out.size() > maxCount) return "Add at most " + maxCount + " " + label;
         return null;
     }
 

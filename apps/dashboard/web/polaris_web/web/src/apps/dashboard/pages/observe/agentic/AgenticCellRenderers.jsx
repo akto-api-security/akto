@@ -70,13 +70,13 @@ export function ParamDescCellRenderer({ data }) {
 
 export function AssetNameCellRenderer({ data }) {
     if (!data) return null;
-    // Match old UI: personal-account + local-MCP tags for non-Skill rows; malicious tag for Skills
+    // Match old UI: personal-account + local-MCP tags for non-Skill rows; malicious tag for Skills and MCP servers
     const isSkill = data.type === "Skill";
     // Skill/Plugin rows fan out from the agent collection, so they'd inherit its markers otherwise.
     const isFanout = isSkill || data.type === "Plugin";
     const showLocalMcp = data.hasLocalMcpServer && !isFanout;
     const showPersonal = data.hasPersonalAccount && !isFanout;
-    const showMalicious = data.isMalicious && isSkill;
+    const showMalicious = data.isMalicious && (isSkill || data.type === "MCP Server");
     // Misconfigured is an Agent/MCP-server-only concept — Skill (and Plugin) rows never show it.
     const showMisconfigured = data.hasMisconfiguredConfig && !isFanout;
     return (

@@ -2649,6 +2649,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             ToolNamesCacheEntry rowTools = aiInventory ? getOrBuildToolNames(cached.groups.values()) : null;
             SkillDataCacheEntry skillData = getOrBuildSkillData();
             Set<String> maliciousKeys = skillData.maliciousSkillKeys;
+            Set<Integer> maliciousServerIds = maliciousServerCollectionIds(cached.collections);
             List<BasicDBObject> rowsOut = new ArrayList<>();
             for (GroupSummary g : page) {
                 BasicDBObject row = g.toSummaryResponse();
@@ -2681,9 +2682,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                         ? null
                         : sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
                 if (violations != null) row.put("violations", violations);
+                if ("service".equals(g.rowType) && g.collectionIds.stream().anyMatch(maliciousServerIds::contains)) row.put("isMalicious", true);
                 // Misconfigured is an Agent/MCP-server-only concept (a bad tool/config setup on that
-                // asset) — Skill rows never show it, regardless of any tag collision. isMalicious is
-                // the only skill-specific risk flag.
+                // asset) — Skill rows never show it, regardless of any tag collision. isMalicious flags
+                // skills (below) and, set above, MCP servers.
                 if ("skill".equals(g.rowType) && StringUtils.isNotBlank(g.name)) {
                     String lname = g.name.toLowerCase(Locale.ROOT);
                     boolean malicious = g.collectionIds.stream().anyMatch(cid -> maliciousKeys.contains(cid + "|" + lname));
@@ -4362,6 +4364,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     // A malicious-tagged MCP server collection, or a skill the skill scan flagged ("<collectionId>|<skill>" keys).
     private static boolean atlasIsMalicious(GroupSummary g, Set<Integer> maliciousCollectionIds, Set<String> maliciousSkillKeys) {
+        // An agent row also holds its MCP servers' collections, so only servers and skills are flagged (as in the inventory).
+        if (!AtlasAssetStatusService.ROW_TYPE_SERVICE.equals(g.rowType) && !AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType)) return false;
         boolean skill = AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType) && StringUtils.isNotBlank(g.name);
         String skillKeySuffix = skill ? "|" + g.name.toLowerCase(Locale.ROOT) : null;
         for (Integer collectionId : g.collectionIds) {

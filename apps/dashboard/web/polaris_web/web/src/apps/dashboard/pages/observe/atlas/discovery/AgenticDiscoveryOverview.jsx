@@ -6,7 +6,7 @@ import AskBar from "@/apps/dashboard/components/shared/AskBar";
 import useElementSize from "@/apps/dashboard/components/shared/useElementSize";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS } from "../devices_employees/constants";
 import { CATEGORY_ORDER as PEOPLE_TOOL_TYPES } from "../devices_employees/peopleConstants";
-import { ASSET_STATUS, ATLAS_DISCOVERY_CHAT_SCOPE, DEVICES_PATH, LOAD_STATE, SUBTITLES } from "./constants";
+import { ASSET_STATUS, ATLAS_DISCOVERY_CHAT_SCOPE, DEFAULT_ADOPTION_DAYS, DEVICES_PATH, LOAD_STATE, SUBTITLES } from "./constants";
 import { agentMcpMatrix, decisionsPageSize, teamMatrix } from "./transform";
 import DiscoveryHeaderActions from "./shared/DiscoveryHeaderActions";
 import { openNewLayoutPage } from "./shared/openInventory";
@@ -64,7 +64,7 @@ function AgenticDiscoveryOverview() {
         askRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, []);
 
-    // A team's employees on Devices & employees, narrowed to a tool type when that page has one for the category (IDE assistants and skills do not).
+    // A team's employees on Devices & employees, narrowed to a tool type when that page has one for the category (skills do not).
     const openTeam = (team, category) => {
         const toolType = PEOPLE_TOOL_TYPES.includes(category) ? `&category=${category}` : "";
         openNewLayoutPage(navigate, `${DEVICES_PATH}?team=${encodeURIComponent(team)}${toolType}`);
@@ -105,7 +105,7 @@ function AgenticDiscoveryOverview() {
                 {/* Measured: the decisions list fits as many rows as this column is tall. */}
                 <div ref={sideColumnRef}>
                     <VerticalStack gap="4">
-                        <AdoptionCard rows={data?.adoption} status={statusOf("adoption")} onOpen={setOpenRow} />
+                        <AdoptionCard rows={data?.adoption} windowDays={data?.adoptionWindowDays} status={statusOf("adoption")} onOpen={setOpenRow} />
                         <RiskyConfigsCard rows={data?.riskyConfigs} status={statusOf("riskyConfigs")} onAsk={askAtlas} />
                     </VerticalStack>
                 </div>
@@ -136,7 +136,7 @@ function AgenticDiscoveryOverview() {
             />
             <MatrixCard
                 title="Adoption by team"
-                subtitle={SUBTITLES.teams}
+                subtitle={SUBTITLES.teams(data?.adoptionWindowDays || DEFAULT_ADOPTION_DAYS)}
                 showScale
                 status={statusOf("teamCategoryMatrix")}
                 matrix={teamsMatrix}

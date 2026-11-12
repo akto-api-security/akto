@@ -117,6 +117,7 @@ public class ModuleInfoAction extends UserAction {
     @Setter private boolean agentIssues;
     @Setter private boolean agentActive;
     @Setter private boolean usesAi;
+    @Setter private boolean inferenceHooksOnly;
     @Setter private List<String> guardrailModes;
     @Setter private double riskMin;
     @Setter private double riskMax = AtlasPeopleService.RISK_MAX;
@@ -474,6 +475,7 @@ public class ModuleInfoAction extends UserAction {
         query.agentIssues = agentIssues;
         query.agentActive = agentActive;
         query.usesAi = usesAi;
+        query.inferenceHooksOnly = inferenceHooksOnly;
         query.guardrailModes = guardrailModes;
         query.teams = teams == null ? null : teams.stream().map(team -> team.trim().toLowerCase()).collect(Collectors.toList());
         query.tagPairs = tagPairs;

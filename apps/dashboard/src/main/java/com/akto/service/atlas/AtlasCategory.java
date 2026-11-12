@@ -16,8 +16,7 @@ public final class AtlasCategory {
     public static final String MCP = AtlasPeopleService.CAT_MCP;
     public static final String BROWSER = AtlasPeopleService.CAT_BROWSER;
     public static final String SKILLS = "skills";
-    // Same key as the AI inventory's IDE assistants tab.
-    public static final String IDE = "ide";
+    public static final String IDE = AtlasPeopleService.CAT_IDE;
     public static final List<String> ORDER = Arrays.asList(AGENTS, IDE, MCP, BROWSER, SKILLS);
 
     public static String of(AtlasToolRow row) {

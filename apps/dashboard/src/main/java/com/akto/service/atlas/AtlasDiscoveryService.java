@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 /**
  * Builds the Atlas discovery overview from per-tool rows; every list is a fixed top-N.
- * Counts are all-time; adoption looks at the last 30 days and the new-tools trend at the last 12 weeks.
+ * Counts are all-time; adoption looks at the last 30 days and the new-tools trend at the last 12 weeks (a year / 52 weeks for demo accounts).
  */
 public class AtlasDiscoveryService {
 
@@ -34,20 +34,30 @@ public class AtlasDiscoveryService {
     private static final int DAY_SECONDS = 24 * 60 * 60;
     private static final int WEEK_SECONDS = 7 * DAY_SECONDS;
     private static final int TREND_WEEKS = 12;
-    private static final int ADOPTION_WINDOW_SECONDS = 30 * DAY_SECONDS;
+    private static final int ADOPTION_WINDOW_DAYS = 30;
+    private static final int DEMO_TREND_WEEKS = 52;
+    private static final int DEMO_ADOPTION_WINDOW_DAYS = 365;
     private static final int NEW_TOOL_SECONDS = WEEK_SECONDS;
-    private static final double HIGH_RISK_SCORE = 4.0;
 
     private final List<AtlasTool> tools = new ArrayList<>();
     private final AtlasPeople people;
     private final int now;
+    private final int trendWeeks;
+    private final int adoptionWindowDays;
     private final Map<String, AtlasAssetStatus> serverStatuses = new HashMap<>();
     private final AtlasGraphSections graphs;
 
     public AtlasDiscoveryService(List<AtlasToolRow> rows, Map<String, AtlasAssetStatus> decisions, Set<String> allowlistNamesLower,
                                  AtlasPeople people, int now) {
+        this(rows, decisions, allowlistNamesLower, people, now, false);
+    }
+
+    public AtlasDiscoveryService(List<AtlasToolRow> rows, Map<String, AtlasAssetStatus> decisions, Set<String> allowlistNamesLower,
+                                 AtlasPeople people, int now, boolean demoWindows) {
         this.people = people;
         this.now = now;
+        this.trendWeeks = demoWindows ? DEMO_TREND_WEEKS : TREND_WEEKS;
+        this.adoptionWindowDays = demoWindows ? DEMO_ADOPTION_WINDOW_DAYS : ADOPTION_WINDOW_DAYS;
         AtlasAssetStatusService statuses = new AtlasAssetStatusService();
         for (AtlasToolRow row : rows) {
             AtlasAssetStatus status = statuses.resolve(row, decisions, allowlistNamesLower);
@@ -59,7 +69,7 @@ public class AtlasDiscoveryService {
 
     // Employees on devices that used the tool in the adoption window; a tool with no per-device times falls back to its own last-seen.
     private Set<String> recentUsersOf(AtlasToolRow row) {
-        int since = now - ADOPTION_WINDOW_SECONDS;
+        int since = now - adoptionWindowDays * DAY_SECONDS;
         if (row.getDeviceLastSeen().isEmpty()) {
             // An unknown last-seen (0) is not recent.
             boolean recent = row.getLastSeen() >= since;
@@ -85,6 +95,7 @@ public class AtlasDiscoveryService {
         section(out, unavailable, "agentMcpMatrix", graphs::agentMcpMatrix);
         section(out, unavailable, "teamCategoryMatrix", graphs::teamCategoryMatrix);
         section(out, unavailable, "supplyChain", graphs::supplyChain);
+        out.put("adoptionWindowDays", adoptionWindowDays);
         out.put("unavailableSources", unavailable);
         return out;
     }
@@ -174,7 +185,7 @@ public class AtlasDiscoveryService {
         return out;
     }
 
-    /** One tool for the flyout: its row, top employees and connections; null when the key is unknown. */
+    /** One tool for the flyout: its row, the employees who used it most recently and its connections; null when the key is unknown. */
     public Map<String, Object> detail(String key) {
         AtlasTool tool = tools.stream().filter(t -> t.key().equals(key)).findFirst().orElse(null);
         if (tool == null) return null;
@@ -324,21 +335,19 @@ public class AtlasDiscoveryService {
     }
 
     private List<Map<String, Object>> riskyConfigs() {
-        int malicious = 0, misconfigured = 0, localMcp = 0, personal = 0, highRisk = 0;
+        int malicious = 0, misconfigured = 0, localMcp = 0, personal = 0;
         for (AtlasTool tool : tools) {
             AtlasToolRow row = tool.getRow();
             if (row.isMalicious()) malicious++;
             if (row.isMisconfigured()) misconfigured++;
             if (row.isLocalMcp()) localMcp++;
             if (row.isPersonal()) personal++;
-            if (tool.needsDecision() && row.getRiskScore() >= HIGH_RISK_SCORE) highRisk++;
         }
         List<Map<String, Object>> rows = new ArrayList<>();
         rows.add(configRow("malicious", malicious));
         rows.add(configRow("misconfigured", misconfigured));
         rows.add(configRow("localMcp", localMcp));
         rows.add(configRow("personal", personal));
-        rows.add(configRow("highRiskUnreviewed", highRisk));
         return rows;
     }
 
@@ -364,11 +373,11 @@ public class AtlasDiscoveryService {
         return counts;
     }
 
-    // Tools first seen in each of the last TREND_WEEKS weeks, split by current status (there is no status history).
+    // Tools first seen in each of the last trendWeeks weeks, split by current status (there is no status history).
     private List<Map<String, Object>> newToolsTrend() {
-        int start = now - TREND_WEEKS * WEEK_SECONDS;
+        int start = now - trendWeeks * WEEK_SECONDS;
         List<Map<String, Object>> weeks = new ArrayList<>();
-        for (int i = 0; i < TREND_WEEKS; i++) {
+        for (int i = 0; i < trendWeeks; i++) {
             Map<String, Object> week = new LinkedHashMap<>();
             week.put("periodStart", start + i * WEEK_SECONDS);
             for (AtlasAssetStatus status : AtlasAssetStatus.values()) week.put(status.name(), 0);
@@ -377,7 +386,7 @@ public class AtlasDiscoveryService {
         for (AtlasTool tool : tools) {
             int firstSeen = tool.getRow().getFirstSeen();
             if (!tool.governable() || firstSeen < start) continue;
-            weeks.get(Math.min(TREND_WEEKS - 1, (firstSeen - start) / WEEK_SECONDS)).merge(tool.getStatus().name(), 1, (a, b) -> (Integer) a + (Integer) b);
+            weeks.get(Math.min(trendWeeks - 1, (firstSeen - start) / WEEK_SECONDS)).merge(tool.getStatus().name(), 1, (a, b) -> (Integer) a + (Integer) b);
         }
         return weeks;
     }

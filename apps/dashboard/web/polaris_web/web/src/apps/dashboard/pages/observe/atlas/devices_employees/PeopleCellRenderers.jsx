@@ -4,7 +4,7 @@ import AgGridRow from "../../../../components/tables/rows/AgGridRow";
 import { OsIcon } from "../../agentic/DeviceEndpoints";
 import MisconfiguredBadge from "../../agentic/MisconfiguredBadge";
 import { RiskScoreCellRenderer, SeverityBadge } from "../../agentic/AgenticCellRenderers";
-import { BROWSER_ICONS, GENERIC_BROWSER_ICON, HEALTH_BADGE_STATUS, HEALTH_LABELS, MODE_LABELS, OS_ICON_KEYS, formatNumber, osLabel } from "./peopleConstants";
+import { BROWSER_ICONS, GENERIC_BROWSER_ICON, HEALTH_BADGE_STATUS, HEALTH_LABELS, INFERENCE_HOOKS_LABEL, MODE_LABELS, OS_ICON_KEYS, formatNumber, osLabel } from "./peopleConstants";
 
 function Unavailable({ what }) {
     return (
@@ -72,6 +72,7 @@ export function TagsCellRenderer({ value }) {
 
 export function OsCellRenderer({ data }) {
     if (!data) return null;
+    if (data.hook) return <AgGridRow icon={<OsIcon />} label={INFERENCE_HOOKS_LABEL} />;
     if (data.extension) return <AgGridRow icon={<BrowserIcon browser={data.browser} />} label={browserLabel(data.browser)} />;
     return <AgGridRow icon={<OsIcon os={OS_ICON_KEYS[data.os]} />} label={osLabel(data.os) || "—"} />;
 }
