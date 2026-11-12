@@ -30,6 +30,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
@@ -264,7 +265,7 @@ public class RiskScoreOfCollections {
 
         riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();
 
-        loggerMaker.info("Severity score incremental update AccountId: " + Context.accountId.get() + " since: " + timeStampFilter
+        loggerMaker.info(Constants.CRON_STATS_LOG_TAG + " Severity score incremental update AccountId: " + Context.accountId.get() + " since: " + timeStampFilter
             + " apis with updated issues: " + severityScoreMapSize + " (fetched in " + issuesMs + " ms)"
             + " api infos not found: " + apiInfoNotFoundCount + " bulk updates: " + bulkUpdatesSize
             + " riskScore group updates: " + riskScoreGroupUpdateCount + " total: " + (System.currentTimeMillis() - startMs) + " ms");
@@ -362,18 +363,21 @@ public class RiskScoreOfCollections {
     }
 
     // groups the matching STIs per api and writes sensitivity in chunks, so neither STIs nor writes pile up in memory
-    private static void updateSensitiveInfoFromStis(Bson stiFilter, boolean onlyMarkSensitive, LazyMcpRiskScoreContext mcpRiskScoreContext){
+    // @return how many apis had matching STIs
+    private static int updateSensitiveInfoFromStis(Bson stiFilter, boolean onlyMarkSensitive, LazyMcpRiskScoreContext mcpRiskScoreContext){
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(stiFilter));
         pipeline.add(Aggregates.group(stiApiInfoKeyGroupId(), Accumulators.addToSet("subTypes", "$" + SingleTypeInfo.SUB_TYPE)));
 
         Map<ApiInfoKey, List<String>> subTypesByApi = new HashMap<>();
+        int apisRead = 0;
         try (MongoCursor<BasicDBObject> stiCursor = SingleTypeInfoDao.instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).allowDiskUse(true).cursor()) {
             while(stiCursor.hasNext()){
                 try {
                     BasicDBObject group = stiCursor.next();
                     subTypesByApi.put(apiInfoKeyFromGroupId((BasicDBObject) group.get("_id")), (List<String>) group.get("subTypes"));
+                    apisRead++;
                     if (subTypesByApi.size() >= QUERY_CHUNK_SIZE) {
                         Map<ApiInfoKey, List<String>> chunk = new HashMap<>(subTypesByApi);
                         subTypesByApi.clear();
@@ -385,10 +389,12 @@ public class RiskScoreOfCollections {
             }
         }
         writeSensitiveInfoInApiInfo(subTypesByApi, onlyMarkSensitive, mcpRiskScoreContext);
+        return apisRead;
     }
 
     // data types edited since the timestamp can make already mapped apis flip either way: re-evaluate just the apis carrying them
-    private static void reevaluateApisOfModifiedDataTypes(int modifiedSince, LazyMcpRiskScoreContext mcpRiskScoreContext){
+    // @return how many apis were re-evaluated
+    private static int reevaluateApisOfModifiedDataTypes(int modifiedSince, LazyMcpRiskScoreContext mcpRiskScoreContext){
         // both AktoDataType and CustomDataType keep their last edit time in "timestamp"
         Bson modifiedFilter = Filters.gte(CustomDataType.TIMESTAMP, modifiedSince);
         Set<String> modifiedDataTypes = new HashSet<>();
@@ -399,7 +405,7 @@ public class RiskScoreOfCollections {
             modifiedDataTypes.add(dataType.getName());
         }
         if (modifiedDataTypes.isEmpty()) {
-            return;
+            return 0;
         }
 
         List<String> allDataTypeNames = allDataTypeNames();
@@ -429,6 +435,7 @@ public class RiskScoreOfCollections {
             );
             updateSensitiveInfoFromStis(stiFilter, false, mcpRiskScoreContext);
         }
+        return apiInfoKeys.size();
     }
 
     /**
@@ -442,18 +449,20 @@ public class RiskScoreOfCollections {
 
         int stiTimeStampFilter = lastSyncedTs == 0 ? 0 : lastSyncedTs - SENSITIVE_SYNC_BUFFER_SECONDS;
         List<String> sensitiveSubTypes = sensitiveSubTypeNamesInResponse();
+        int newStiApis = 0;
+        int reevaluatedApis = 0;
         if (!sensitiveSubTypes.isEmpty()) {
             Bson stiFilter = Filters.and(
                 Filters.in(SingleTypeInfo.SUB_TYPE, sensitiveSubTypes),
                 Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1),
                 Filters.gte(SingleTypeInfo._TIMESTAMP, stiTimeStampFilter)
             );
-            updateSensitiveInfoFromStis(stiFilter, true, mcpRiskScoreContext);
+            newStiApis = updateSensitiveInfoFromStis(stiFilter, true, mcpRiskScoreContext);
         }
         long newStisMs = System.currentTimeMillis() - startMs;
 
         if (lastSyncedTs != 0) {
-            reevaluateApisOfModifiedDataTypes(lastSyncedTs, mcpRiskScoreContext);
+            reevaluatedApis = reevaluateApisOfModifiedDataTypes(lastSyncedTs, mcpRiskScoreContext);
         }
         long totalMs = System.currentTimeMillis() - startMs;
 
@@ -462,9 +471,9 @@ public class RiskScoreOfCollections {
             Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_UPDATED_SENSITIVE_MAP), startTs),
             new UpdateOptions().upsert(true)
         );
-        loggerMaker.info("Sensitive info mapping AccountId: " + Context.accountId.get() + " mode: " + (lastSyncedTs == 0 ? "first run" : "incremental")
-            + " since: " + stiTimeStampFilter + " new STIs: " + newStisMs + " ms"
-            + " modified data types re-evaluation: " + (totalMs - newStisMs) + " ms total: " + (System.currentTimeMillis() - startMs) + " ms");
+        loggerMaker.info(Constants.CRON_STATS_LOG_TAG + " Sensitive info mapping AccountId: " + Context.accountId.get() + " mode: " + (lastSyncedTs == 0 ? "first run" : "incremental")
+            + " since: " + stiTimeStampFilter + " new STIs: " + newStisMs + " ms (" + newStiApis + " apis)"
+            + " modified data types re-evaluation: " + (totalMs - newStisMs) + " ms (" + reevaluatedApis + " apis) total: " + (System.currentTimeMillis() - startMs) + " ms");
     }
 
     public void calculateRiskScoreForAllApis() {
@@ -548,7 +557,7 @@ public class RiskScoreOfCollections {
 
         riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();
 
-        loggerMaker.info("Risk score full reset AccountId: " + Context.accountId.get() + " apis with open issues: " + initialSeverityScoreMapSize
+        loggerMaker.info(Constants.CRON_STATS_LOG_TAG + " Risk score full reset AccountId: " + Context.accountId.get() + " apis with open issues: " + initialSeverityScoreMapSize
             + " (aggregated in " + severityScoreMapMs + " ms) apis processed: " + totalApisProcessed + " in " + count + " batches"
             + " riskScore group updates: " + riskScoreGroupUpdates + " total: " + (System.currentTimeMillis() - startMs) + " ms");
     }

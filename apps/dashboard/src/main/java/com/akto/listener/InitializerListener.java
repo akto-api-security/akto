@@ -466,10 +466,10 @@ public class InitializerListener implements ServletContextListener {
                         processedAccounts.incrementAndGet();
                         long accountStartMs = System.currentTimeMillis();
                         backFillStatusCodeType();
-                        logger.info("backfill-status-code-type AccountId: " + t.getId() + " took: " + (System.currentTimeMillis() - accountStartMs) + " ms");
+                        logger.info(Constants.CRON_STATS_LOG_TAG + " backfill-status-code-type AccountId: " + t.getId() + " took: " + (System.currentTimeMillis() - accountStartMs) + " ms");
                     }
                 }, "backfill-status-code-type");
-                logger.info("backfill-status-code-type run finished: accounts processed: " + processedAccounts.get()
+                logger.info(Constants.CRON_STATS_LOG_TAG + " backfill-status-code-type run finished: accounts processed: " + processedAccounts.get()
                         + ", skipped as dormant: " + dormantAccounts.get() + ", total: " + (System.currentTimeMillis() - runStartMs) + " ms");
             }
         }, 0, 4, TimeUnit.HOURS);
@@ -3528,7 +3528,7 @@ public class InitializerListener implements ServletContextListener {
             Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_STATUS_CODE_BACKFILL, startedAt),
             new UpdateOptions().upsert(true));
 
-        logger.info("AccountId: " + accountId + " backfill-status-code-type: since=" + since
+        logger.info(Constants.CRON_STATS_LOG_TAG + " AccountId: " + accountId + " backfill-status-code-type: since=" + since
             + (lastBackFill == 0 ? " (no last back fill, last " + STATUS_CODE_BACKFILL_FIRST_RUN_DAYS + " days)" : "")
             + ", apis without api type checked=" + apisChecked + ", sample docs read=" + sampleDocsRead
             + ", took=" + (Context.now() - startedAt) + " s");

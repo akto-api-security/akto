@@ -153,7 +153,7 @@ public class DiscoveredTimestampBackfillJob {
                     }
                 }, "discovered-timestamp-backfill-job");
 
-                loggerMaker.warnAndAddToDb("Discovered timestamp backfill CYCLE END at=" + Context.now()
+                loggerMaker.warnAndAddToDb(Constants.CRON_STATS_LOG_TAG + " Discovered timestamp backfill CYCLE END at=" + Context.now()
                         + " durationSeconds=" + (Context.now() - cycleStart)
                         + " accountsRun=" + accountsRun.get()
                         + " accountsSkipped=" + accountsSkipped.get()

@@ -12,6 +12,7 @@ import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
 import com.akto.util.AccountTask;
 import com.akto.util.LastCronRunInfo;
 import com.akto.utils.RiskScoreOfCollections;
@@ -52,7 +53,7 @@ public class UpdateSensitiveInfoInApiInfo {
                         }
                     }
                 }, "map-sensitiveInfo-in-ApiInfo");
-                loggerMaker.info("map-sensitiveInfo-in-ApiInfo run finished: accounts processed: " + processedAccounts.get()
+                loggerMaker.info(Constants.CRON_STATS_LOG_TAG + " map-sensitiveInfo-in-ApiInfo run finished: accounts processed: " + processedAccounts.get()
                     + ", skipped as dormant: " + dormantAccounts.get() + ", total: " + (System.currentTimeMillis() - runStartMs) + " ms");
             }
         }, 0, cronTime, TimeUnit.MINUTES);
