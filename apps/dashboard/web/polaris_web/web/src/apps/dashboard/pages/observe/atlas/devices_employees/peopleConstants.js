@@ -84,14 +84,14 @@ export const RISK_BUCKET_WIDTH = RISK_MAX / RISK_BUCKET_COUNT;
 export const HIGH_RISK_THRESHOLD = 4;
 export const RISK_EXPLANATION = "The highest " + mapLabel('API', getDashboardCategory()) + " risk score (0 to 5, from the stored api_info risk score) across the AI tools on an employee's devices.";
 
-export const INFERENCE_HOOKS_LABEL = "inference-hooks";
+export const INFERENCE_HOOKS_LABEL = "Claude inference hooks";
+export const INFERENCE_HOOKS_OPTION = "hook:inference-hooks";
 
 export const EMPLOYEE_CHIPS = [
     { key: "usesAi", label: "Uses AI tools" },
     { key: "hasUnapproved", label: "Has unapproved tools" },
     { key: "usesPersonal", label: "Uses personal AI accounts" },
     { key: "highRisk", label: "Has risk 4+" },
-    { key: "inferenceHooksOnly", label: "Inference hooks" },
 ];
 
 export const DEVICE_CHIPS = [
@@ -100,7 +100,6 @@ export const DEVICE_CHIPS = [
     { key: "monitorMode", label: "Monitor mode" },
     { key: "hasUnapproved", label: "Has unapproved tools" },
     { key: "usesPersonal", label: "Uses personal AI accounts" },
-    { key: "inferenceHooksOnly", label: "Inference hooks" },
 ];
 
 export const SEARCH_HINTS = {
@@ -139,7 +138,7 @@ export const EXPORT_ROW_LIMIT = 10000;
 
 export const FILTER_LABELS = {
     teams: "Team",
-    osBrowser: "OS/Browser",
+    osBrowser: "Source",
     healthStates: "Agent",
     guardrailModes: "Guardrail mode",
     categories: "Asset type",

@@ -2,7 +2,7 @@ import { Box, Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import SpinnerCentered from "../../../../components/progress/SpinnerCentered";
 import {
-    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, EMPTY_PEOPLE_FILTERS, FLYOUT_GRAPH_LIMIT, INFERENCE_HOOKS_LABEL, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
+    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, EMPTY_PEOPLE_FILTERS, FLYOUT_GRAPH_LIMIT, INFERENCE_HOOKS_LABEL, INFERENCE_HOOKS_OPTION, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
 } from "./peopleConstants";
 import { getDomainForFavicon } from "../../agentic/mcpClientHelper";
 
@@ -34,7 +34,7 @@ const CSV_COLUMNS = {
     ],
     devices: [
         ["Device", (row) => row.label || row.name],
-        ["OS/Browser", (row) => (row.extension ? row.browser : osLabel(row.os))],
+        ["Source", (row) => (row.hook ? INFERENCE_HOOKS_LABEL : row.extension ? row.browser : osLabel(row.os))],
         ["Owner", (row) => row.owner],
         ["Tags", (row) => (row.tags || []).map((tag) => `${tag.key}=${tag.value}`)],
         ["Atlas agent", (row) => HEALTH_LABELS[row.health] || row.health],
@@ -305,10 +305,9 @@ const transform = {
         return (Object.keys(target.filters).length > 0 || id === clickedId) && target.tab === tab && JSON.stringify({ ...EMPTY_PEOPLE_FILTERS, ...target.filters }) === JSON.stringify(filters);
     }),
     filterOptions: (overview) => ({
-        hasInferenceHooks: overview?.inferenceHookDevices > 0,
         teams: overview?.teamOptions || [],
         tags: overview?.tagOptions || [],
-        osBrowser: [...(overview?.osMatrix || []).filter((row) => row.os !== "unknown").map((row) => `os:${row.os}`), ...(overview?.browserMatrix || []).map((row) => `browser:${row.browser}`)],
+        osBrowser: [...(overview?.osMatrix || []).filter((row) => row.os !== "unknown").map((row) => `os:${row.os}`), ...(overview?.browserMatrix || []).map((row) => `browser:${row.browser}`), ...(overview?.inferenceHookDevices > 0 ? [INFERENCE_HOOKS_OPTION] : [])],
         healthStates: HEALTH_ORDER.filter((state) => (overview?.agentHealth?.[state] || 0) > 0),
         guardrailModes: Object.keys(MODE_LABELS).filter((mode) => (overview?.guardrailModes?.[mode] || 0) > 0),
         categories: CATEGORY_ORDER.filter((category) => (overview?.categoryTotals?.[category] || 0) > 0),

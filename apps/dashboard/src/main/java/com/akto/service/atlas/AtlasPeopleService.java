@@ -1128,11 +1128,11 @@ public class AtlasPeopleService {
 
     // Applies the structured filters (OS or browser, health, mode, category, tags, violation severity) to one device.
     private static boolean matchesDeviceFilters(DeviceRow device, PeopleQuery query) {
-        if (query.inferenceHooksOnly && !device.hook) return false;
-        if (notEmpty(query.osList) || notEmpty(query.browserList)) {
+        if (notEmpty(query.osList) || notEmpty(query.browserList) || query.inferenceHooksOnly) {
             boolean osMatch = !device.extension && !device.hook && notEmpty(query.osList) && query.osList.contains(device.os);
             boolean browserMatch = device.extension && notEmpty(query.browserList) && query.browserList.contains(device.browser.isEmpty() ? "other" : device.browser);
-            if (!osMatch && !browserMatch) return false;
+            boolean hookMatch = device.hook && query.inferenceHooksOnly;
+            if (!osMatch && !browserMatch && !hookMatch) return false;
         }
         if (device.hook && (notEmpty(query.healthStates) || notEmpty(query.guardrailModes))) return false;
         if (notEmpty(query.healthStates) && !query.healthStates.contains(device.health)) return false;

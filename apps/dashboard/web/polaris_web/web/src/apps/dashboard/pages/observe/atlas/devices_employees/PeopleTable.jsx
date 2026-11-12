@@ -10,7 +10,7 @@ import {
     LastSeenCellRenderer, OsCellRenderer, OwnerCellRenderer, RiskCellRenderer, FlagsCellRenderer, TagsCellRenderer, TeamsCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
 } from "./PeopleCellRenderers";
 import {
-    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel, PEOPLE_TABLE_CHROME_HEIGHT, PEOPLE_TABLE_HEIGHT, PEOPLE_TABLE_MIN_HEIGHT, RISK_MAX, SEARCH_HINTS,
+    CATEGORY_LABELS, DEVICE_CHIPS, INFERENCE_HOOKS_LABEL, INFERENCE_HOOKS_OPTION, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel, PEOPLE_TABLE_CHROME_HEIGHT, PEOPLE_TABLE_HEIGHT, PEOPLE_TABLE_MIN_HEIGHT, RISK_MAX, SEARCH_HINTS,
 } from "./peopleConstants";
 import EditDeviceTagsModal from "../../agentic/EditDeviceTagsModal";
 import transform from "./transform";
@@ -39,9 +39,9 @@ const deviceColumns = (dataOptions) => [
     { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },
     { field: "violations", headerName: "Violations (7d)", width: 150, cellRenderer: ViolationsCellRenderer },
     {
-        field: "os", headerName: "OS/Browser", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer,
+        field: "os", headerName: "Source", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer,
         ...setFilter(dataOptions.osBrowser, osBrowserLabel),
-        filterValueGetter: (params) => (params.data ? (params.data.extension ? `browser:${params.data.browser || "other"}` : `os:${params.data.os}`) : null),
+        filterValueGetter: (params) => (params.data ? (params.data.hook ? INFERENCE_HOOKS_OPTION : params.data.extension ? `browser:${params.data.browser || "other"}` : `os:${params.data.os}`) : null),
     },
     { field: "hasPersonalAccount", headerName: "Flags", flex: 1.4, minWidth: 260, sortable: false, cellRenderer: FlagsCellRenderer },
     { field: "tags", headerName: "Tags", flex: 1.2, minWidth: 220, sortable: false, cellRenderer: TagsCellRenderer, ...setFilter(dataOptions.tags, (value) => value), filterValueGetter: (params) => (params.data?.tags || []).map((tag) => `${tag.key}=${tag.value}`) },
@@ -137,6 +137,7 @@ const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
 function osBrowserLabel(value) {
     const [type, name] = value.split(":");
+    if (type === "hook") return INFERENCE_HOOKS_LABEL;
     return type === "os" ? (osLabel(name) || name) : capitalize(name);
 }
 
@@ -145,12 +146,12 @@ function filterOptions(field, dataOptions) {
 }
 
 function selectedOsBrowser(filters) {
-    return [...filters.osList.map((os) => `os:${os}`), ...filters.browserList.map((browser) => `browser:${browser}`)];
+    return [...filters.osList.map((os) => `os:${os}`), ...filters.browserList.map((browser) => `browser:${browser}`), ...(filters.inferenceHooksOnly ? [INFERENCE_HOOKS_OPTION] : [])];
 }
 
 function splitOsBrowser(values) {
     const pick = (type) => values.filter((value) => value.startsWith(`${type}:`)).map((value) => value.slice(type.length + 1));
-    return { osList: pick("os"), browserList: pick("browser") };
+    return { osList: pick("os"), browserList: pick("browser"), inferenceHooksOnly: values.includes(INFERENCE_HOOKS_OPTION) };
 }
 
 const COLUMN_FILTER_FIELDS = {
@@ -188,7 +189,7 @@ const normalized = (value) => (Array.isArray(value) ? [...value].sort() : value)
 const sameValues = (a, b) => JSON.stringify(normalized(a)) === JSON.stringify(normalized(b));
 
 function FilterRow({ tab, filters, onFiltersChange, dataOptions, openFilter, setOpenFilter }) {
-    const chips = (tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS).filter((chip) => chip.key !== "inferenceHooksOnly" || dataOptions.hasInferenceHooks);
+    const chips = tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS;
     const tags = appliedTags(filters);
     return (
         <HorizontalStack gap="2" blockAlign="center">
