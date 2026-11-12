@@ -203,7 +203,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     <Dropdown
                         menuItems={maxConcurrentRequestsOptions}
                         label="Max Concurrent Requests"
-                        initial={getLabel(maxConcurrentRequestsOptions, testRun.maxConcurrentRequests.toString()).label}
+                        initial={getLabel(maxConcurrentRequestsOptions, testRun.maxConcurrentRequests.toString())?.label ?? testRun.maxConcurrentRequests.toString()}
                         selected={(requests) => {
                             let maxConcurrentRequests;
                             if (requests === "Default") maxConcurrentRequests = -1;
@@ -241,7 +241,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     <Dropdown
                         menuItems={maxAgentTokensOptions}
                         label="Max Agent Tokens"
-                        initial={getLabel(maxAgentTokensOptions, (testRun.maxAgentTokens ?? -1).toString()).label}
+                        initial={getLabel(maxAgentTokensOptions, (testRun.maxAgentTokens ?? -1).toString())?.label ?? (testRun.maxAgentTokens ?? -1).toString()}
                         selected={(val) => {
                             setTestRun(prev => ({
                                 ...prev,
