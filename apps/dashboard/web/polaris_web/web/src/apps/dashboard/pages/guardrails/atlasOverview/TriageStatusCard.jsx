@@ -6,11 +6,11 @@ import { formatCount } from "./atlasOverviewUtils";
 import { ACTIVITY_TAB, CRITICAL_SEVERITY } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 
 const BAR_COLOR = {
-    OPEN: "bg-inverse-active",
-    IN_REVIEW: "bg-info-strong",
-    ASSIGNED: "bg-magic-strong",
-    TICKETED: "bg-interactive",
-    IGNORED: "bg-strong",
+    OPEN: "bg-critical-strong",
+    IN_REVIEW: "bg-caution-strong",
+    ASSIGNED: "bg-info-strong",
+    TICKETED: "bg-magic-strong",
+    IGNORED: "bg-inverse-active",
 };
 const STATUS_EVENT_STATUS = {
     OPEN: ACTIVITY_TAB.ACTIVE,
@@ -40,7 +40,7 @@ export default function TriageStatusCard({ triage, onOpenActivity }) {
                                     <Text variant="bodyMd" fontWeight="semibold">{formatCount(status.count)}</Text>
                                 </HorizontalStack>
                                 <Box background="bg-inset" borderRadius="1" minHeight="6px">
-                                    <Box background={BAR_COLOR[status.key]} borderRadius="1" minHeight="6px" width={`${Math.round((status.count / max) * 100)}%`} />
+                                    <Box background={BAR_COLOR[status.key]} borderRadius="1" minHeight="6px" width={status.count > 0 ? `max(6px, ${(status.count / max) * 100}%)` : "0"} />
                                 </Box>
                             </VerticalStack>
                         </div>

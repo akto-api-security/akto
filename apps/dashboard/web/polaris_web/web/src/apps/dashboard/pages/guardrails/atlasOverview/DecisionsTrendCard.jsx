@@ -4,9 +4,9 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import ViolationsTrendCard from "../overview/ViolationsTrendCard";
 
 const DECISION_SERIES = [
-    { key: "blocked", name: "Blocked", color: "#6200EA" },
-    { key: "approval", name: "Needs approval", color: "#B38CFF" },
-    { key: "alerted", name: "Alerted or warned", color: "#D2D5D8" },
+    { key: "blocked", name: "Blocked", color: "#F24122" },
+    { key: "approval", name: "Needs approval", color: "#F2B322" },
+    { key: "alerted", name: "Alerted or warned", color: "#3BC3D3" },
 ];
 
 export default function DecisionsTrendCard({ decisions, onOpenActivity }) {
