@@ -64,6 +64,7 @@ const Linear = () => {
     const [isSavingTeams, setIsSavingTeams] = useState(false)
     const [loadingTeams, setLoadingTeams] = useState(false)
     const [createModalActive, setCreateModalActive] = useState(false)
+    const [rowToReveal, setRowToReveal] = useState(null)
     const [newTeamName, setNewTeamName] = useState('')
     const [newTeamKey, setNewTeamKey] = useState('')
     const [isCreatingTeam, setIsCreatingTeam] = useState(false)
@@ -101,6 +102,17 @@ const Linear = () => {
     useEffect(() => {
         loadIntegration()
     }, [])
+
+    useEffect(() => {
+        if (rowToReveal === null) {
+            return
+        }
+        const card = document.getElementById(`linear-team-card-${rowToReveal}`)
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            setRowToReveal(null)
+        }
+    }, [rowToReveal, teams])
 
     async function saveApiKey() {
         setIsSavingKey(true)
@@ -171,6 +183,12 @@ const Linear = () => {
         return workspaceTeams.filter(option => !chosenElsewhere.has(option.value))
     }
 
+    function addTeam() {
+        const row = newTeamRow()
+        setTeams(prev => [...prev, row])
+        setRowToReveal(row.rowId)
+    }
+
     function closeCreateModal() {
         setCreateModalActive(false)
         setNewTeamName('')
@@ -183,13 +201,15 @@ const Linear = () => {
             const teamsMap = await settingFunctions.createLinearTeam(null, newTeamName.trim(), newTeamKey.trim() || null)
             const created = toOptions(teamsMap)
             setWorkspaceTeams(prev => [...prev, ...created.filter(option => !prev.some(existing => existing.value === option.value))])
-            setTeams(prev => {
-                const emptyIndex = prev.findIndex(team => !team.teamId)
-                if (emptyIndex >= 0) {
-                    return prev.map((team, index) => index === emptyIndex ? { ...team, teamId: created[0].value } : team)
-                }
-                return [...prev, newTeamRow(created[0].value)]
-            })
+            const emptyRow = teams.find(team => !team.teamId)
+            if (emptyRow) {
+                updateTeam(emptyRow.rowId, { teamId: created[0].value })
+                setRowToReveal(emptyRow.rowId)
+            } else {
+                const row = newTeamRow(created[0].value)
+                setTeams(prev => [...prev, row])
+                setRowToReveal(row.rowId)
+            }
             closeCreateModal()
             func.setToast(true, false, 'Team created in Linear. Save to start using it for tickets.')
         } catch (error) {
@@ -233,7 +253,8 @@ const Linear = () => {
         const selected = workspaceTeams.find(option => option.value === team.teamId)
 
         return (
-            <Card key={`team-${team.rowId}`} roundedAbove="sm">
+            <Box key={`team-${team.rowId}`} id={`linear-team-card-${team.rowId}`}>
+            <Card roundedAbove="sm">
                 <VerticalStack gap="4">
                     <HorizontalStack align="space-between">
                         <Text fontWeight="semibold" variant="headingSm">{`Team ${index + 1}`}</Text>
@@ -272,6 +293,7 @@ const Linear = () => {
                     </VerticalStack>
                 </VerticalStack>
             </Card>
+            </Box>
         )
     })
 
@@ -335,7 +357,7 @@ const Linear = () => {
                             <AllowedAction allowed={canCall('api/createLinearTeam')}>
                                 <Button plain monochrome onClick={() => setCreateModalActive(true)}>Create Team</Button>
                             </AllowedAction>
-                            <Button plain monochrome onClick={() => setTeams(prev => [...prev, newTeamRow()])}>Add Team</Button>
+                            <Button plain monochrome onClick={addTeam}>Add Team</Button>
                         </HorizontalStack>
                     </HorizontalStack>
                     {TeamCards}
