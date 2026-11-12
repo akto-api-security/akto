@@ -360,7 +360,7 @@ export default function AgenticAssetsPage() {
   return (
     <>
       <PageWithMultipleCards
-        title="AI inventory"
+        title="AI Inventory"
         subtitle="All discovered AI tools across your devices. Approve, block or review each one."
         isFirstPage={true}
         secondaryActions={headerActions}
