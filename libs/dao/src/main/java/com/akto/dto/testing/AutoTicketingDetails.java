@@ -1,6 +1,7 @@
 package com.akto.dto.testing;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.akto.util.enums.GlobalEnums.TicketSource;
 import java.util.List;
 import java.util.Set;
 import lombok.Getter;
@@ -15,4 +16,5 @@ public class AutoTicketingDetails {
     private List<String> severities;
     private String projectId;
     private String issueType;
+    private String ticketSource = TicketSource.JIRA.name();
 }
