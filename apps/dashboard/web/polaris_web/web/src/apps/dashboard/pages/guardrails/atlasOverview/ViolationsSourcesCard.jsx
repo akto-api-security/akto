@@ -5,6 +5,7 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import { CLIENT_TYPES } from "../../observe/agentic/mcpClientHelper";
 import { formatAssetDisplayName } from "../violations/ViolationsPage";
 import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
+import { OverviewLoadError } from "./OverviewCard";
 import { formatCount, plural } from "./atlasOverviewUtils";
 
 const ASSET_TYPE_LABELS = {
@@ -60,6 +61,7 @@ export default function ViolationsSourcesCard({ data, pageSize, onOpenActivity }
     return (
         <CardWithHeader title="Where violations happen" hasData>
             {data === null ? <SpinnerCentered height="200px" />
+                : data?.failed ? <OverviewLoadError />
                 : <ItemListCard
                     items={rows}
                     limit={expanded ? undefined : pageSize}

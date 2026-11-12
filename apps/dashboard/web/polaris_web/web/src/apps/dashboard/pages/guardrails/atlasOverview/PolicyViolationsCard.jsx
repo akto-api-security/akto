@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Box, HorizontalGrid, Link, Text } from "@shopify/polaris";
 import CardWithHeader from "@/apps/dashboard/pages/dashboard/new_components/CardWithHeader";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
-import { OverviewListRow, OverviewShowMore } from "./OverviewCard";
+import { OverviewListRow, OverviewLoadError, OverviewShowMore } from "./OverviewCard";
 import { formatCount } from "./atlasOverviewUtils";
 import { ACTIVITY_TAB } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 
@@ -43,7 +43,7 @@ export default function PolicyViolationsCard({ data, onOpenActivity, onTune }) {
     const countWidth = `${Math.max(3, ...shown.map((p) => String(formatCount(p.count)).length))}ch`;
     return (
         <CardWithHeader title="Violations by policy" tooltipContent="High ignore rates usually mean a policy needs tuning" hasData>
-            {data === null ? <SpinnerCentered height="200px" /> : (
+            {data === null ? <SpinnerCentered height="200px" /> : data?.failed ? <OverviewLoadError /> : (
                 <Box>
                     <OverviewListRow>
                         <HorizontalGrid columns={columns} gap="2">

@@ -3,6 +3,7 @@ import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import func from "@/util/func";
 import { formatDurationMs } from "../../observe/llm/constants";
+import { OverviewLoadError } from "./OverviewCard";
 import { EMPTY_VALUE, formatCount } from "./atlasOverviewUtils";
 import { ACTIVITY_TAB, CRITICAL_SEVERITY } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 
@@ -71,5 +72,6 @@ function buildKpis(kpis, onOpenActivity) {
 
 export default function KpiStrip({ kpis, onOpenActivity }) {
     if (kpis === null) return <Card><SpinnerCentered height="96px" /></Card>;
+    if (kpis?.failed) return <Card><OverviewLoadError /></Card>;
     return <SummaryCardInfo summaryItems={buildKpis(kpis, onOpenActivity)} />;
 }

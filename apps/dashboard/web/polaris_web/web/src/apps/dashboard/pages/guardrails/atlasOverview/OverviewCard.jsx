@@ -1,4 +1,4 @@
-import { Box, Button, HorizontalStack } from "@shopify/polaris";
+import { Banner, Box, Button, HorizontalStack } from "@shopify/polaris";
 
 export function OverviewListRow({ onClick, children }) {
     const row = (
@@ -19,4 +19,8 @@ export function OverviewShowMore({ total, shown, pageSize, onChange }) {
             </HorizontalStack>
         </Box>
     );
+}
+
+export function OverviewLoadError() {
+    return <Banner status="critical" title="Couldn't load this section">Try again in a moment.</Banner>;
 }

@@ -2,6 +2,7 @@ import { Box, HorizontalStack, Link, Text, VerticalStack } from "@shopify/polari
 import CardWithHeader from "@/apps/dashboard/pages/dashboard/new_components/CardWithHeader";
 import CalloutStrip from "@/apps/dashboard/components/shared/CalloutStrip";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
+import { OverviewLoadError } from "./OverviewCard";
 import { formatCount } from "./atlasOverviewUtils";
 import { ACTIVITY_TAB, CRITICAL_SEVERITY } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 
@@ -30,7 +31,7 @@ export default function TriageStatusCard({ triage, onOpenActivity }) {
             tooltipContent={periodDays ? `All violations in the last ${periodDays} ${periodDays === 1 ? "day" : "days"}` : "All violations"}
             hasData
         >
-            {triage === null ? <SpinnerCentered height="200px" /> : (
+            {triage === null ? <SpinnerCentered height="200px" /> : triage?.failed ? <OverviewLoadError /> : (
                 <VerticalStack gap="5">
                     {statuses.map((status) => (
                         <div key={status.key} onClick={() => onOpenActivity({ eventStatus: STATUS_EVENT_STATUS[status.key] })} style={{ cursor: "pointer" }}>

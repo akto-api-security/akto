@@ -16,6 +16,7 @@ import ViolationsSourcesCard from "./ViolationsSourcesCard";
 import TopEmployeesCard from "./TopEmployeesCard";
 import TopAgenticAssetsCard from "./TopAgenticAssetsCard";
 import guardrailsApi from "../api";
+import { LOAD_FAILED } from "./atlasOverviewUtils";
 import { policyLink } from "../overview/GuardrailOverview";
 
 const LIST_PAGE_SIZE = 5;
@@ -43,30 +44,30 @@ function AtlasGuardrailsOverview() {
         setTriage(null);
         guardrailsApi.fetchSummary(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setKpis(resp); })
-            .catch(() => { if (!cancelled) setKpis({}); });
+            .catch(() => { if (!cancelled) setKpis(LOAD_FAILED); });
         guardrailsApi.fetchTriageStatus(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setTriage(resp); })
-            .catch(() => { if (!cancelled) setTriage({}); });
+            .catch(() => { if (!cancelled) setTriage(LOAD_FAILED); });
         setDecisions(null);
         guardrailsApi.fetchDecisionsTrend(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setDecisions(resp); })
-            .catch(() => { if (!cancelled) setDecisions({}); });
+            .catch(() => { if (!cancelled) setDecisions(LOAD_FAILED); });
         setPolicies(null);
         guardrailsApi.fetchViolationsByPolicy(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setPolicies(resp); })
-            .catch(() => { if (!cancelled) setPolicies({}); });
+            .catch(() => { if (!cancelled) setPolicies(LOAD_FAILED); });
         setViolationsSources(null);
         guardrailsApi.fetchViolationsSources(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setViolationsSources(resp); })
-            .catch(() => { if (!cancelled) setViolationsSources({}); });
+            .catch(() => { if (!cancelled) setViolationsSources(LOAD_FAILED); });
         setTopAgenticAssets(null);
         guardrailsApi.fetchTopAgenticAssets(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setTopAgenticAssets(resp); })
-            .catch(() => { if (!cancelled) setTopAgenticAssets({}); });
+            .catch(() => { if (!cancelled) setTopAgenticAssets(LOAD_FAILED); });
         setTopEmployees(null);
         guardrailsApi.fetchTopEmployees(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setTopEmployees(resp); })
-            .catch(() => { if (!cancelled) setTopEmployees({}); });
+            .catch(() => { if (!cancelled) setTopEmployees(LOAD_FAILED); });
         return () => { cancelled = true; };
     }, [startTimestamp, endTimestamp]);
 

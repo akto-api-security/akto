@@ -5,6 +5,7 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import { initialsOf } from "@/apps/dashboard/components/shared/PeopleList";
 import func from "@/util/func";
 import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
+import { OverviewLoadError } from "./OverviewCard";
 import { formatCount, plural } from "./atlasOverviewUtils";
 
 function buildRows(employees, onOpenActivity) {
@@ -34,6 +35,7 @@ export default function TopEmployeesCard({ data, pageSize, onOpenActivity }) {
     return (
         <CardWithHeader title="Employees with most violations" hasData>
             {data === null ? <SpinnerCentered height="200px" />
+                : data?.failed ? <OverviewLoadError />
                 : <ItemListCard
                     items={rows}
                     limit={expanded ? undefined : pageSize}

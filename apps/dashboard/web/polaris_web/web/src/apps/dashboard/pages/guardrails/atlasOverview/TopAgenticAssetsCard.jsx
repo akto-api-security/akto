@@ -6,6 +6,7 @@ import AssetTagBadge from "@/apps/dashboard/components/shared/AssetTagBadge";
 import { CLIENT_TYPES } from "../../observe/agentic/mcpClientHelper";
 import { ACTIVITY_TAB, SKILL_URL_PREFIX } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import ItemListCard from "@/apps/dashboard/components/shared/ItemListCard";
+import { OverviewLoadError } from "./OverviewCard";
 import { formatCount, plural } from "./atlasOverviewUtils";
 
 const AGENTIC_ASSET_KINDS = {
@@ -51,6 +52,7 @@ export default function TopAgenticAssetsCard({ data, pageSize, onOpenActivity })
     return (
         <CardWithHeader title="Top agents, apps and servers involved" hasData>
             {data === null ? <SpinnerCentered height="200px" />
+                : data?.failed ? <OverviewLoadError />
                 : <ItemListCard
                     items={rows}
                     limit={expanded ? undefined : pageSize}
