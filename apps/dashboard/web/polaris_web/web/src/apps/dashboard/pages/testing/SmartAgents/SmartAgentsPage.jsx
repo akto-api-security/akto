@@ -13,6 +13,7 @@ import { usePermissions } from "@/util/permissions"
 import func from "@/util/func"
 import api from "../api"
 import { skillLabel } from "./smartAgentUtils"
+import { groupSkills } from "./skillFiles"
 
 const headers = [
     { title: "Smart agent", text: "Name", value: "nameComp" },
@@ -62,7 +63,7 @@ function SmartAgentsPage() {
     useEffect(() => { fetchData() }, [])
 
     const rows = profiles.map(profile => {
-        const skills = [...(profile.skills || []).map(skillLabel), ...(profile.customSkills || []).map(s => s.name)]
+        const skills = [...(profile.skills || []).map(skillLabel), ...groupSkills(profile.customSkills || []).map(s => s.name)]
         return {
             ...profile,
             id: profile.hexId,
