@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +38,7 @@ public class AtlasDiscoveryAction extends UserAction {
     private static final long DEVICE_CACHE_TTL_MS = 60_000;
     private static final int DEVICE_CACHE_MAX_ENTRIES = 1000;
     private static final String TOOL_NOT_FOUND = "Tool not found";
+    private static final List<Integer> DEMO_ACCOUNT_IDS = Arrays.asList(1669322524);
     private static final TtlCache<Integer, Map<String, Map<String, String>>> DEVICE_CACHE = new TtlCache<>(DEVICE_CACHE_TTL_MS, DEVICE_CACHE_MAX_ENTRIES);
 
     private final AtlasPeopleSource peopleSource = new AtlasPeopleSource();
@@ -152,7 +154,7 @@ public class AtlasDiscoveryAction extends UserAction {
         Map<String, AtlasAssetStatus> decisions = new HashMap<>(statusService.loadDecisions());
         decisions.putAll(statusService.loadSkillDecisions(allRows));
         return new AtlasDiscoveryService(rows, decisions, account.getAllowlistNamesLower(),
-                AtlasPeople.of(devices, account.getTeamByUser()), now);
+                AtlasPeople.of(devices, account.getTeamByUser()), now, DEMO_ACCOUNT_IDS.contains(Context.accountId.get()));
     }
 
     // Every endpoint-shield module is read, so share one read per account across the requests of a page load.

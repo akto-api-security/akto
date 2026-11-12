@@ -243,7 +243,7 @@ export function shapeRow(row) {
   if (row.hasPersonalAccount && !isFanout) tags.push("Contains personal account");
   if (row.hasLocalMcpServer && !isFanout) tags.push("Local MCP Server");
   if (row.hasMisconfiguredConfig && !isFanout) tags.push("Misconfigured");
-  if (row.isMalicious) tags.push("Malicious Skill");
+  if (row.isMalicious) tags.push(row.rowType === "service" ? "Malicious MCP Server" : "Malicious Skill");
 
   return {
     ...row,

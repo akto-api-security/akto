@@ -18,6 +18,7 @@ import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.InsightUtil.GovernanceBucket;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
+import com.akto.util.McpClientRegistry;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -524,6 +525,8 @@ public class AtlasPeopleService {
                 String email = browserEmailOf(c);
                 if (device == null && email != null) device = browserRowByEmail.get(identityKey(localPart(email)));
                 if (device == null) device = browserRowById.get(identity);
+                // A browser tool on a managed device carries that device's id in its host, as in the Overview.
+                if (device == null) device = devicesByLowerName.get(hostDevice.toLowerCase(Locale.ROOT));
                 if (device == null) {
                     unmatchedBrowserIdentities.add(identity);
                     continue;
@@ -1046,6 +1049,7 @@ public class AtlasPeopleService {
         if (notEmpty(query.categories)) {
             for (String category : query.categories) {
                 if (device.toolsByCategory.getOrDefault(category, 0) > 0) return true;
+                if (CAT_AGENTS.equals(category) && usesAgentClient(device)) return true;
             }
             return false;
         }
@@ -1137,6 +1141,15 @@ public class AtlasPeopleService {
     private static boolean anyToolContains(DeviceRow device, String value) {
         for (ToolRow tool : device.tools) {
             if (contains(tool.name, value) || contains(tool.client, value)) return true;
+        }
+        return false;
+    }
+
+    // The Overview counts a device as using an agent when a non-IDE agent client (e.g. claudecli) runs any tool on it, even an MCP server.
+    private static boolean usesAgentClient(DeviceRow device) {
+        for (ToolRow tool : device.tools) {
+            if (!CAT_AGENTS.equals(tool.category) && !CAT_MCP.equals(tool.category)) continue;
+            if (AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(McpClientRegistry.getAgentTypeFromValue(tool.client)) && !McpClientRegistry.isIdeAssistant(tool.client)) return true;
         }
         return false;
     }

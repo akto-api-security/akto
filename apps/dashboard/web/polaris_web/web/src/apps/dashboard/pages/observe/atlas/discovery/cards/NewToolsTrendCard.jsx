@@ -5,7 +5,7 @@ import StackedBarChart from "@/apps/dashboard/components/charts/StackedBarChart"
 import DiscoveryCard from "../shared/DiscoveryCard";
 import StatusLegend from "./StatusLegend";
 import { openInventoryByStatus } from "../shared/openInventory";
-import { STATUS_META, SUBTITLES, TREND_STATUSES, WEEK_SECONDS } from "../constants";
+import { DEFAULT_TREND_WEEKS, STATUS_META, SUBTITLES, TREND_STATUSES, WEEK_SECONDS } from "../constants";
 
 const CHART_HEIGHT = 230;
 
@@ -27,6 +27,7 @@ export default function NewToolsTrendCard({ periods, status }) {
         openInventoryByStatus(navigate, statusLabel, start ? { start, end: start + WEEK_SECONDS } : undefined);
     }, [navigate, periods]);
     const [selected, setSelected] = useState(null);
+    const weeks = periods?.length || DEFAULT_TREND_WEEKS;
     const hasData = (periods || []).some((period) => TREND_STATUSES.some((key) => period[key] > 0));
     const categories = useMemo(() => (periods || []).map((period) => formatWeek(period.periodStart)), [periods]);
     // Listed bottom to top: approved at the base, unapproved on top.
@@ -37,14 +38,15 @@ export default function NewToolsTrendCard({ periods, status }) {
     })), [periods, selected]);
     return (
         <DiscoveryCard
+            center
             title="New AI tools discovered"
-            subtitle={SUBTITLES.trend}
+            subtitle={SUBTITLES.trend(weeks)}
             legend={<StatusLegend statuses={TREND_STATUSES} selected={selected} onSelect={setSelected} />}
             status={status}
             empty={!hasData}
             emptyIcon={AnalyticsMajor}
             emptyTone="subdued"
-            emptyText="No new AI tools were discovered in the last 12 weeks."
+            emptyText={`No new AI tools were discovered in the last ${weeks} weeks.`}
         >
             <StackedBarChart categories={categories} series={series} height={CHART_HEIGHT} tooltipFormatter={tooltipOf} onPointClick={openWeek} />
         </DiscoveryCard>
