@@ -1144,7 +1144,7 @@ public class AtlasPeopleService {
         if (notEmpty(query.categories)) {
             for (String category : query.categories) {
                 if (device.toolsByCategory.getOrDefault(category, 0) > 0) return true;
-                if (CAT_AGENTS.equals(category) && usesAgentClient(device)) return true;
+                if (usesAgentClient(device, category)) return true;
             }
             return false;
         }
@@ -1240,11 +1240,14 @@ public class AtlasPeopleService {
         return false;
     }
 
-    // The Overview counts a device as using an agent when a non-IDE agent client (e.g. claudecli) runs any tool on it, even an MCP server.
-    private static boolean usesAgentClient(DeviceRow device) {
+    // Same rule as the Overview (AtlasCategory.of): a device uses an agent or IDE assistant when that client runs any agent or MCP tool on it, even through an MCP server.
+    private static boolean usesAgentClient(DeviceRow device, String category) {
+        if (!CAT_AGENTS.equals(category) && !CAT_IDE.equals(category)) return false;
         for (ToolRow tool : device.tools) {
-            if (!CAT_AGENTS.equals(tool.category) && !CAT_MCP.equals(tool.category)) continue;
-            if (AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(McpClientRegistry.getAgentTypeFromValue(tool.client)) && !McpClientRegistry.isIdeAssistant(tool.client)) return true;
+            if (!CAT_AGENTS.equals(tool.category) && !CAT_IDE.equals(tool.category) && !CAT_MCP.equals(tool.category)) continue;
+            String client = Constants.AKTO_AI_AGENT_TAG.equals(tool.client) ? tool.agent : tool.client;
+            if (client == null || !AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(McpClientRegistry.getAgentTypeFromValue(client))) continue;
+            if (category.equals(McpClientRegistry.isIdeAssistant(client) ? CAT_IDE : CAT_AGENTS)) return true;
         }
         return false;
     }
