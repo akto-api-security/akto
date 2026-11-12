@@ -12,6 +12,7 @@ import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import io.swagger.v3.oas.models.media.*;
 
@@ -108,7 +109,11 @@ public class SingleTypeInfo {
                         return;
                     }
                     refreshed.incrementAndGet();
-                    fetchDataTypesAndAuthTypes(t.getId());
+                    if (accountsToRefresh == null) {
+                        fetchDataTypesAndAuthTypes(t.getId());
+                    } else {
+                        refreshDataTypesAndAuthTypes(t.getId());
+                    }
                 }, "populate-data-types-info");
                 logger.info(Constants.CRON_STATS_LOG_TAG + " populate-data-types-info run finished: " + (accountsToRefresh == null ? "all accounts" : "active accounts only")
                     + ", accounts refreshed: " + refreshed.get() + ", skipped: " + skipped.get() + ", total: " + (System.currentTimeMillis() - startMs) + " ms");
@@ -136,7 +141,62 @@ public class SingleTypeInfo {
     }
 
     public static void fetchCustomDataTypes(int accountId) {
-        List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+        loadCustomDataTypes(accountId, CustomDataTypeDao.instance.findAll(new BasicDBObject()));
+    }
+
+    /**
+     * Refreshes an account that is already loaded: the custom data types are read in full only when they are new or
+     * changed since the last load (a type that is switched on or off, edited or deleted), the rest is kept.
+     * An account that is not loaded yet is loaded in full.
+     */
+    public static void refreshDataTypesAndAuthTypes(int accountId) {
+        if (!accountToDataTypesInfo.containsKey(accountId)) {
+            fetchDataTypesAndAuthTypes(accountId);
+            return;
+        }
+        loadCustomDataTypes(accountId, fetchCustomDataTypesChangedSinceLoad(accountId));
+        fetchCustomAuthTypes(accountId);
+    }
+
+    /**
+     * Reads only the name, timestamp and active flag of every custom data type, which is much smaller than the types,
+     * and reads in full the ones that are not loaded or whose timestamp or active flag differs from the loaded one.
+     * A type that was deleted is not in the result. The result is in the order of the collection, as a full read is.
+     */
+    private static List<CustomDataType> fetchCustomDataTypesChangedSinceLoad(int accountId) {
+        Map<String, CustomDataType> loaded = getCustomDataTypeMap(accountId);
+        List<CustomDataType> current = CustomDataTypeDao.instance.findAll(new BasicDBObject(),
+            Projections.include(CustomDataType.NAME, CustomDataType.TIMESTAMP, CustomDataType.ACTIVE));
+
+        List<String> changedNames = new ArrayList<>();
+        for (CustomDataType dataType : current) {
+            CustomDataType loadedDataType = loaded.get(dataType.getName());
+            if (loadedDataType == null || loadedDataType.getTimestamp() != dataType.getTimestamp()
+                    || loadedDataType.isActive() != dataType.isActive()) {
+                changedNames.add(dataType.getName());
+            }
+        }
+
+        Map<String, CustomDataType> changed = new HashMap<>();
+        if (!changedNames.isEmpty()) {
+            logger.info(Constants.CRON_STATS_LOG_TAG + " account " + accountId + ": custom data types read in full because new or changed: "
+                + changedNames.size() + " of " + current.size());
+            for (CustomDataType dataType : CustomDataTypeDao.instance.findAll(Filters.in(CustomDataType.NAME, changedNames))) {
+                changed.put(dataType.getName(), dataType);
+            }
+        }
+
+        List<CustomDataType> customDataTypes = new ArrayList<>();
+        for (CustomDataType dataType : current) {
+            CustomDataType full = changed.containsKey(dataType.getName()) ? changed.get(dataType.getName()) : loaded.get(dataType.getName());
+            if (full != null) {
+                customDataTypes.add(full);
+            }
+        }
+        return customDataTypes;
+    }
+
+    private static void loadCustomDataTypes(int accountId, List<CustomDataType> customDataTypes) {
         Map<String, CustomDataType> newMap = new HashMap<>();
         List<CustomDataType> sensitiveCustomDataType = new ArrayList<>();
         List<CustomDataType> nonSensitiveCustomDataType = new ArrayList<>();
