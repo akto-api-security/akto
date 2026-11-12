@@ -5,6 +5,7 @@ import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto.Status;
+import com.akto.service.atlas.AtlasAssetStatus;
 import com.akto.service.atlas.AtlasAssetStatusService;
 import com.akto.service.atlas.AtlasToolRow;
 import com.akto.service.insights.InsightDataBundle;
@@ -48,6 +49,8 @@ public class AtlasGuardrailUtils {
     static final List<String> AGENTIC_ASSET_TYPES = Arrays.asList(AgenticObserveUtil.CLIENT_TYPE_AI_AGENT,
             AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT, AgenticObserveUtil.CLIENT_TYPE_LLM, AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER);
     private static final List<String> EMPLOYEE_TAG_KEYS = Arrays.asList("team", "group", "role");
+    private static final List<String> ASSET_STATUS_PRIORITY = Arrays.asList(AtlasAssetStatus.UNAPPROVED.name(),
+            AtlasAssetStatus.UNDER_REVIEW.name(), AtlasAssetStatus.BLOCKED.name(), AtlasAssetStatus.APPROVED.name());
 
     static List<DashboardMaliciousEvent> collapseConfigFindings(List<DashboardMaliciousEvent> events) {
         Map<String, DashboardMaliciousEvent> latestConfigFinding = new LinkedHashMap<>();
@@ -232,5 +235,10 @@ public class AtlasGuardrailUtils {
             if (tag != null && StringUtils.isNotBlank(tag.getValue())) values.add(tag.getValue().trim());
         }
         return new ArrayList<>(values);
+    }
+
+    static int assetStatusPriority(String status) {
+        int index = ASSET_STATUS_PRIORITY.indexOf(status);
+        return index < 0 ? ASSET_STATUS_PRIORITY.size() : index;
     }
 }

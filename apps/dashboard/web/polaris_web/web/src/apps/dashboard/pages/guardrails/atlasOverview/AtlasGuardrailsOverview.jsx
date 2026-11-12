@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
-import { Button, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Button, Card, HorizontalGrid, HorizontalStack, Link, Text, VerticalStack } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
@@ -55,7 +55,6 @@ const AGENTIC_ASSET_STATUS_TAGS = {
     UNDER_REVIEW: "Under review",
     UNAPPROVED: "Unapproved",
 };
-const AGENTIC_ASSET_STATUS_RANK = ["BLOCKED", "UNDER_REVIEW", "UNAPPROVED", "APPROVED"];
 const TOP_EMPLOYEES = 5;
 
 function formatCount(n) {
@@ -158,38 +157,19 @@ function buildViolationsSourcesRows(assetTypes) {
         .sort((a, b) => b.count - a.count);
 }
 
-function buildTopAgenticAssetRows(collections, skills) {
-    const groups = new Map();
-    (collections || []).forEach((c) => {
-        const name = formatAssetDisplayName(c.host) || c.host;
-        const group = groups.get(name) || { name, type: c.type, count: 0, devices: new Set(), status: c.status, personal: false };
-        group.count += c.count;
-        if (c.device) group.devices.add(c.device);
-        if (c.personal) group.personal = true;
-        if (AGENTIC_ASSET_STATUS_RANK.indexOf(c.status) < AGENTIC_ASSET_STATUS_RANK.indexOf(group.status)) group.status = c.status;
-        groups.set(name, group);
-    });
-    (skills || []).forEach((s) => {
-        groups.set(`skill:${s.name}`, { name: s.name, type: CLIENT_TYPES.SKILL, count: s.count, devices: new Set(), status: s.status });
-    });
-    return [...groups.values()]
-        .sort((a, b) => b.count - a.count)
-        .slice(0, TOP_AGENTIC_ASSETS)
-        .map((g) => {
-            const detail = g.type === CLIENT_TYPES.MCP_SERVER ? plural(g.devices.size, "device", "devices") : "";
-            return {
-                id: g.name,
-                title: g.name,
-                description: [AGENTIC_ASSET_KINDS[g.type] || g.type, detail].filter(Boolean).join(" · "),
-                tag: (
-                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                        {g.personal && <AssetTagBadge tag="Personal" />}
-                        <AssetTagBadge tag={AGENTIC_ASSET_STATUS_TAGS[g.status]} />
-                        <Text variant="bodyMd" fontWeight="semibold">{formatCount(g.count)}</Text>
-                    </HorizontalStack>
-                ),
-            };
-        });
+function buildTopAgenticAssetRows(assets, openActivity) {
+    return (assets || []).map((a) => ({
+        id: a.key,
+        title: <Link monochrome removeUnderline onClick={openActivity}>{a.name}</Link>,
+        description: [AGENTIC_ASSET_KINDS[a.type] || a.type, plural(a.people, "person", "people"), plural(a.devices, "device", "devices")].join(" · "),
+        tag: (
+            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                {a.personal && <AssetTagBadge tag="Personal" />}
+                <AssetTagBadge tag={AGENTIC_ASSET_STATUS_TAGS[a.status]} />
+                <Text variant="bodyMd" fontWeight="semibold">{formatCount(a.count)}</Text>
+            </HorizontalStack>
+        ),
+    }));
 }
 
 function buildTopEmployeeRows(employees) {
@@ -223,7 +203,6 @@ function AtlasGuardrailsOverview() {
     const [topAgenticAssets, setTopAgenticAssets] = useState(null);
     const [topEmployees, setTopEmployees] = useState(null);
     const policyRows = useMemo(() => buildPolicyRows(policies?.rules), [policies]);
-    const topAssetRows = useMemo(() => buildTopAgenticAssetRows(topAgenticAssets?.collections, topAgenticAssets?.skills), [topAgenticAssets]);
     const topEmployeeRows = useMemo(() => buildTopEmployeeRows(topEmployees?.employees), [topEmployees]);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
@@ -264,6 +243,7 @@ function AtlasGuardrailsOverview() {
 
     const data = guardrailOverviewMock;
     const openActivity = () => openViolationInGuardrailViolations();
+    const topAssetRows = buildTopAgenticAssetRows(topAgenticAssets?.assets, openActivity);
     const openPolicies = () => navigate(POLICIES_PATH);
 
     const components = [
@@ -282,7 +262,7 @@ function AtlasGuardrailsOverview() {
             <ViolationsSourcesCard rows={buildViolationsSourcesRows(violationsSources?.assetTypes)} periodDays={violationsSources?.periodDays} loading={violationsSources === null} onRowClick={openActivity} />
             <TopEmployeesCard employees={topEmployeeRows} pageSize={TOP_EMPLOYEES} loading={topEmployees === null} />
             <DiscoveryCard title="Top agents, apps and servers involved" status={topAgenticAssets === null ? LOAD_STATE.LOADING : LOAD_STATE.READY}>
-                <ItemListCard items={topAssetRows} emptyText="No agents, apps or servers involved in this period." />
+                <ItemListCard items={topAssetRows} limit={TOP_AGENTIC_ASSETS} emptyText="No agents, apps or servers involved in this period." />
             </DiscoveryCard>
         </HorizontalGrid>,
     ];
