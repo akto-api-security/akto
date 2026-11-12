@@ -6,6 +6,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.akto.dao.context.Context;
+import com.akto.util.Constants;
+import com.akto.util.MongoReadStats;
 import com.akto.dao.jobs.JobsDao;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.JobExecutorType;
@@ -103,8 +105,15 @@ public class JobsCron {
                 if(params.getJobType() == JobType.DATADOG_TRAFFIC_COLLECTOR || params.getJobType() == JobType.JIRA_AUTO_CREATE_TICKETS || params.getJobType() == JobType.WIZ_SYNC || params.getJobType() == JobType.WIZ_API_ENDPOINTS_IMPORT || params.getJobType() == JobType.IMPERVA_API_ENDPOINTS_IMPORT || params.getJobType() == JobType.SKILL_REVALIDATION) {
                     executorService.submit(
                         () -> {
-                            Context.accountId.set(finalJob.getAccountId());
-                            JobExecutorFactory.getExecutor(finalJob.getJobParams().getJobType()).execute(finalJob);
+                            long startMs = System.currentTimeMillis();
+                            MongoReadStats.startTask("job:" + params.getJobType());
+                            try {
+                                Context.accountId.set(finalJob.getAccountId());
+                                JobExecutorFactory.getExecutor(finalJob.getJobParams().getJobType()).execute(finalJob);
+                            } finally {
+                                logger.info(String.format("%s task=job:%s account=%d took=%dms%s", Constants.CRON_STATS_LOG_TAG,
+                                        params.getJobType(), finalJob.getAccountId(), System.currentTimeMillis() - startMs, MongoReadStats.endTask()));
+                            }
                         }
                     );
                 }

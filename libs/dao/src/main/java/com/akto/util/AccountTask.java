@@ -201,78 +201,52 @@ public class AccountTask {
 
 
 
+    private static final Bson ACTIVE_FILTER = Filters.or(
+            Filters.exists(Account.INACTIVE_STR, false),
+            Filters.eq(Account.INACTIVE_STR, false)
+    );
+
     public void executeTask(Consumer<Account> consumeAccount, String taskName) {
-
-        Bson activeFilter = Filters.or(
-                Filters.exists(Account.INACTIVE_STR, false),
-                Filters.eq(Account.INACTIVE_STR, false)
-        );
-
-        List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter);
-        for(Account account: activeAccounts) {
-            if (inactiveAccountsSet.contains(account.getId())) {
-                continue;
-            }
-            try {
-                Context.accountId.set(account.getId());
-                consumeAccount.accept(account);
-            } catch (Exception e) {
-                String msgString = String.format("Error in executing task %s for account %d", taskName, account.getId());
-                logger.error(msgString, e);
-            }
-        }
-
+        runForAccounts(ACTIVE_FILTER, true, consumeAccount, taskName);
     }
 
     public void executeTaskHybridAccounts(Consumer<Account> consumeAccount, String taskName) {
-
-        Bson activeFilter = Filters.or(
-                Filters.exists(Account.INACTIVE_STR, false),
-                Filters.eq(Account.INACTIVE_STR, false)
-        );
-
-        Bson accountFilter = Filters.eq(Account.HYBRID_SAAS_ACCOUNT, true);
-
-        Bson combinedFilter = Filters.and(activeFilter, accountFilter);
-
-        List<Account> activeAccounts = AccountsDao.instance.findAll(combinedFilter);
-        logger.info("executeTaskHybridAccounts: accounts length" + activeAccounts.size());
-        for(Account account: activeAccounts) {
-            try {
-                Context.accountId.set(account.getId());
-                consumeAccount.accept(account);
-            } catch (Exception e) {
-                String msgString = String.format("Error in executing task %s for account %d", taskName, account.getId());
-                logger.error(msgString, e);
-            }
-        }
-
+        runForAccounts(Filters.and(ACTIVE_FILTER, Filters.eq(Account.HYBRID_SAAS_ACCOUNT, true)), false, consumeAccount, taskName);
     }
 
     public void executeTaskForNonHybridAccounts(Consumer<Account> consumeAccount, String taskName) {
-
-        Bson activeFilter = Filters.or(
-                Filters.exists(Account.INACTIVE_STR, false),
-                Filters.eq(Account.INACTIVE_STR, false)
-        );
-
         Bson nonHybridAccountsFilter = Filters.or(
             Filters.exists(Account.HYBRID_TESTING_ENABLED, false),
             Filters.eq(Account.HYBRID_TESTING_ENABLED, false)
         );
+        runForAccounts(Filters.and(ACTIVE_FILTER, nonHybridAccountsFilter), true, consumeAccount, taskName);
+    }
 
-        List<Account> activeAccounts = AccountsDao.instance.findAll(Filters.and(activeFilter, nonHybridAccountsFilter));
-        for(Account account: activeAccounts) {
-            if (inactiveAccountsSet.contains(account.getId())) {
-                continue;
+    /** Runs the task for each account the filter finds, and logs one line for the run: accounts, errors, time and what it read. */
+    private void runForAccounts(Bson accountFilter, boolean skipInactiveAccountsSet, Consumer<Account> consumeAccount, String taskName) {
+        long startMs = System.currentTimeMillis();
+        int accountsRun = 0;
+        int errors = 0;
+        MongoReadStats.startTask(taskName);
+        try {
+            List<Account> activeAccounts = AccountsDao.instance.findAll(accountFilter);
+            for (Account account : activeAccounts) {
+                if (skipInactiveAccountsSet && inactiveAccountsSet.contains(account.getId())) {
+                    continue;
+                }
+                accountsRun++;
+                try {
+                    Context.accountId.set(account.getId());
+                    consumeAccount.accept(account);
+                } catch (Exception e) {
+                    errors++;
+                    String msgString = String.format("Error in executing task %s for account %d", taskName, account.getId());
+                    logger.error(msgString, e);
+                }
             }
-            try {
-                Context.accountId.set(account.getId());
-                consumeAccount.accept(account);
-            } catch (Exception e) {
-                String msgString = String.format("Error in executing task %s for account %d", taskName, account.getId());
-                logger.error(msgString, e);
-            }
+        } finally {
+            logger.info("{} task={} accounts={} errors={} took={}ms{}", Constants.CRON_STATS_LOG_TAG, taskName, accountsRun,
+                    errors, System.currentTimeMillis() - startMs, MongoReadStats.endTask());
         }
     }
 }

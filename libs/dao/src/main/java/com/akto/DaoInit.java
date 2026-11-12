@@ -93,6 +93,7 @@ import com.akto.util.DbMode;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EnumCodec;
 import com.akto.util.LastCronRunInfo;
+import com.akto.util.MongoReadStats;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.MethodCondition;
@@ -471,14 +472,14 @@ public class DaoInit {
 
         CodecRegistry codecRegistry = createCodecRegistry();
 
-        MongoClientSettings clientSettings = MongoClientSettings.builder()
+        MongoClientSettings.Builder clientSettings = MongoClientSettings.builder()
                 .readPreference(readPreference)
                 .writeConcern(writeConcern)
                 .applyConnectionString(connectionString)
-                .codecRegistry(codecRegistry)
-                .build();
+                .codecRegistry(codecRegistry);
+        MongoReadStats.addTo(clientSettings);
 
-        clients[0] = MongoClients.create(clientSettings);
+        clients[0] = MongoClients.create(clientSettings.build());
     }
     public static void init(ConnectionString connectionString) {
         init(connectionString, ReadPreference.secondary(), WriteConcern.ACKNOWLEDGED);
