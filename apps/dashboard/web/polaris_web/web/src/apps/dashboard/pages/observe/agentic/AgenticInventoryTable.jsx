@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Card, HorizontalStack, Icon, Tabs, Text, TextField } from "@shopify/polaris";
-import { SearchMinor } from "@shopify/polaris-icons";
+import { Card, Tabs } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import useGridColumnFilter from "@/apps/dashboard/components/tables/useGridColumnFilter";
 import FilterToggleButtons from "@/apps/dashboard/components/shared/FilterToggleButtons";
@@ -208,15 +207,6 @@ const ROW_SELECTION = {
   hideDisabledCheckboxes: true,
 };
 const SELECTION_COLUMN_DEF = { pinned: "left" };
-// AI inventory design: faint purple selected row, purple checkboxes, slightly larger text.
-const THEME_PARAMS = {
-  fontSize: 13,
-  selectedRowBackgroundColor: "#F8F5FF",
-  rowHoverColor: "#FAFAFB",
-  checkboxCheckedBackgroundColor: "#6200EA",
-  checkboxCheckedBorderColor: "#6200EA",
-};
-
 // ─── Row shaping ──────────────────────────────────────────────────────────────
 
 // Second line under the name, only where we have it: "Local" for local MCP servers, and a
@@ -390,34 +380,11 @@ export default function AgenticInventoryTable({
     category.apply(!id || id === "all" ? [] : [id]);
   }, [tabs, category]);
 
-  // Bordered search with the status filters beside it (replaces AgGridTable's full-width search bar).
-  const renderSearch = useCallback(({ value, onChange, placeholder }) => (
-    <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">
-      <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-        <Box width="100%">
-          <TextField
-            label="Filter inventory"
-            labelHidden
-            autoComplete="off"
-            prefix={<Icon source={SearchMinor} color="subdued" />}
-            placeholder={placeholder}
-            value={value}
-            onChange={onChange}
-            clearButton
-            onClearButtonClick={() => onChange("")}
-          />
-        </Box>
-        <FilterToggleButtons options={APPROVAL_STATUSES} selected={status.values} onChange={status.apply} single />
-      </HorizontalStack>
-    </Box>
-  ), [status.values, status.apply]);
+  const filterRow = <FilterToggleButtons options={APPROVAL_STATUSES} selected={status.values} onChange={status.apply} single />;
 
   return (
     <>
       <Card padding="0">
-        <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="4">
-          <Text as="h2" variant="headingMd">Inventory</Text>
-        </Box>
         <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabSelect} />
         <AgGridTable
           key={`agentic-assets-grid-${startTimestamp}-${endTimestamp}-${refreshKey}`}
@@ -427,11 +394,10 @@ export default function AgenticInventoryTable({
           noOuterBorder
           height={560}
           domLayout="normal"
-          rowHeight={56}
+          rowHeight={48}
           headerHeight={40}
           searchPlaceholder="Filter by name or tool"
-          renderSearch={renderSearch}
-          themeParams={THEME_PARAMS}
+          searchBelow={filterRow}
           onRowClicked={handleRowClick}
           getRowStyle={getRowStyle}
           rowSelection={ROW_SELECTION}

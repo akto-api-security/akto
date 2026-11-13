@@ -138,15 +138,32 @@ export function ApprovalStatusCellRenderer({ value }) {
 
 // Discovered tool names (an agent's built-in tools, an MCP server's tools); the full list on hover.
 const MAX_TOOLTIP_TOOLS = 20;
+const MAX_TOOL_BADGES = 2;
 
 export function ToolsCellRenderer({ value }) {
     const tools = value || [];
     if (!tools.length) return <Text variant="bodyMd" color="subdued">-</Text>;
-    const toolList = tools.slice(0, MAX_TOOLTIP_TOOLS).join(", ") + (tools.length > MAX_TOOLTIP_TOOLS ? `, and ${tools.length - MAX_TOOLTIP_TOOLS} more` : "");
+    const rest = tools.slice(MAX_TOOL_BADGES);
+    const shown = rest.slice(0, MAX_TOOLTIP_TOOLS);
+    const moreBadge = (
+        <Badge size="small">{`+${rest.length}`}</Badge>
+    );
     return (
-        <Tooltip content={toolList}>
-            <Text variant="bodyMd" truncate>{tools.join(", ")}</Text>
-        </Tooltip>
+        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+            {tools.slice(0, MAX_TOOL_BADGES).map((tool) => <Badge key={tool} size="small">{tool}</Badge>)}
+            {rest.length > 0 && (
+                <Tooltip width="wide" content={
+                    <Box maxWidth="350px">
+                        <ul style={{ margin: 0, paddingLeft: 16, listStyle: "disc" }}>
+                            {shown.map((tool) => <li key={tool} style={{ wordBreak: "break-word" }}>{tool}</li>)}
+                            {rest.length > shown.length && <li>{`and ${rest.length - shown.length} more`}</li>}
+                        </ul>
+                    </Box>
+                }>
+                    {moreBadge}
+                </Tooltip>
+            )}
+        </HorizontalStack>
     );
 }
 

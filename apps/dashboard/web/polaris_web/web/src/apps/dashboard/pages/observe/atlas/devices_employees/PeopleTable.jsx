@@ -206,12 +206,12 @@ function FilterRow({ tab, filters, onFiltersChange, dataOptions, openFilter, set
             ))}
             {chips.map((chip) => (
                 <FilterChip key={chip.key} label={chip.label} active={isChipActive(chip.key, filters)}
-                    onClick={() => toggleChip(chip.key, filters, onFiltersChange)} />
+                    onClick={() => { setOpenFilter(null); toggleChip(chip.key, filters, onFiltersChange); }} />
             ))}
             {tags.map((tag) => (
-                <Button key={tag.key} icon={CancelSmallMinor} accessibilityLabel={`Remove ${tag.label}`} onClick={() => onFiltersChange(tag.clear)}>{tag.label}</Button>
+                <Button key={tag.key} icon={CancelSmallMinor} accessibilityLabel={`Remove ${tag.label}`} onClick={() => { setOpenFilter(null); onFiltersChange(tag.clear); }}>{tag.label}</Button>
             ))}
-            {tags.length > 0 && <Button plain onClick={() => onFiltersChange(EMPTY_PEOPLE_FILTERS)}>Clear filters</Button>}
+            {tags.length > 0 && <Button plain onClick={() => { setOpenFilter(null); onFiltersChange(EMPTY_PEOPLE_FILTERS); }}>Clear filters</Button>}
         </HorizontalStack>
     );
 }
@@ -299,6 +299,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 onFilterChanged={onColumnFilterChanged}
                 defaultColDef={DEFAULT_COL_DEF}
                 onServerFetch={onServerFetch}
+                serverSideRowModel
                 filterStateUrl={`/dashboard/observe/devices-employees/${tab}`}
                 searchValue={search}
                 onSearchChange={onSearchChange}
