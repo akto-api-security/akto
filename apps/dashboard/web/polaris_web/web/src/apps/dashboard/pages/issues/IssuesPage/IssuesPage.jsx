@@ -220,6 +220,9 @@ function IssuesPage() {
     const [linearModalActive, setLinearModalActive] = useState(false)
     const [linearTeams, setLinearTeams] = useState([])
     const [linearTeamId, setLinearTeamId] = useState('')
+    const [portModalActive, setPortModalActive] = useState(false)
+    const [portTeams, setPortTeams] = useState([])
+    const [portTeamId, setPortTeamId] = useState('')
 
     // Compulsory description modal states
     const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
@@ -506,6 +509,21 @@ function IssuesPage() {
         })
     }
 
+    const handleSaveBulkPortTicketsAction = () => {
+        setToast(true, false, "Please wait while we create your Linear tickets through Port.")
+        setPortModalActive(false)
+        api.createPortIOTickets(selectedIssuesItems, portTeamId, window.location.origin).then((res) => {
+            if (res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} Linear ticket${selectedIssuesItems.length === 1 ? "" : "s"} created through Port.`)
+            }
+            resetResourcesSelected()
+        }).catch((err) => {
+            setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating Linear tickets through Port")
+        })
+    }
+
     // Use keys directly for reasons and compulsorySettings
     const requiresDescription = (reasonKey) => {
         return compulsorySettings[reasonKey] || false;
@@ -685,6 +703,18 @@ function IssuesPage() {
             })
         }
 
+        function createPortTicketBulk() {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchPortIOIntegration().then((portIntegration) => {
+                const teamsArray = Object.entries(portIntegration?.teamsMap || {}).map(([id, name]) => ({ id, name }))
+                if (teamsArray.length > 0) {
+                    setPortTeams(teamsArray)
+                    setPortTeamId(teamsArray[0].id)
+                }
+                setPortModalActive(true)
+            })
+        }
+
         async function createWizFindings() {
             await api.createWizFindings(items).then((res) => {
                 setToast(true, false, `${items.length} Wiz finding${items.length === 1 ? "" : "s"} creation initiated.`)
@@ -777,6 +807,11 @@ function IssuesPage() {
                 onAction: () => { createLinearTicketBulk() },
                 disabled: (window.LINEAR_INTEGRATED === 'false'),
                 requires: ['api/fetchLinearIntegration', 'api/createLinearTickets']
+            },
+            {
+                content: 'Create Linear ticket via Port',
+                onAction: () => { createPortTicketBulk() },
+                requires: ['api/fetchPortIOIntegration', 'api/createPortIOTickets']
             },
             {
                 content: 'Create Wiz finding(s)',
@@ -1389,6 +1424,15 @@ function IssuesPage() {
                 teams={linearTeams}
                 teamId={linearTeamId}
                 setTeamId={setLinearTeamId}
+            />
+
+            <LinearTicketCreationModal
+                modalActive={portModalActive}
+                setModalActive={setPortModalActive}
+                handleSaveAction={handleSaveBulkPortTicketsAction}
+                teams={portTeams}
+                teamId={portTeamId}
+                setTeamId={setPortTeamId}
             />
 
             <CompulsoryDescriptionModal

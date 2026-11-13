@@ -424,6 +424,34 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchPortIOIntegration: async function(){
+      let portInteg = {}
+      await settingRequests.fetchPortIOIntegration().then((resp)=>{
+        portInteg = resp.portIOIntegration
+      })
+      return portInteg
+    },
+    addPortIOIntegration: async function(clientId, clientSecret, workflowId) {
+      let trafficData = {}
+      await settingRequests.addPortIOIntegration(clientId, clientSecret, workflowId).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    savePortIOTeams: async function(teamMappings) {
+      let trafficData = {}
+      await settingRequests.savePortIOTeams(teamMappings).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    removePortIOIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removePortIOIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     getSetupOptions: function(){
       return setupOptions;
     },
