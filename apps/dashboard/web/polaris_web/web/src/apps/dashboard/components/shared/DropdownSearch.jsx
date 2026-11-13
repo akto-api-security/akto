@@ -7,12 +7,14 @@ import func from "@/util/func";
 // Must match wildcardAllServers in guardrails-service/pkg/validator/service.go exactly — this is the value sent over the wire.
 // Not "*" — updateSelection below does option.value.match(selectedItem), and a bare "*" is an invalid regex (crashes).
 export const ALL_VALUES_SENTINEL = '__all__';
+// UI-only Listbox value for "Add <typed query>" — never persisted as a selected server id.
+const CREATE_CUSTOM_SENTINEL = '__create_custom__';
 
 function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, showSelectedItemLabels=false, searchDisable=false, textfieldRequiredIndicator=false, showSelectAllMinOptions=5, headerContent, negated=false, onToggleNegated} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, showSelectedItemLabels=false, searchDisable=false, textfieldRequiredIndicator=false, showSelectAllMinOptions=5, headerContent, negated=false, onToggleNegated, allowCreateCustom=false, validateCreate} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -264,6 +266,31 @@ function DropdownSearch(props) {
             : [{ title: '', options: options.slice(0, displayCap) }];
         const noResults = !loading && sections.every(s => (s.options || []).length === 0);
 
+        // Only while the field still shows the live search string (not "N selected" after a pick).
+        const typedQuery = (allowCreateCustom && inputValue !== undefined && inputValue === searchRef.current)
+            ? String(inputValue || '').trim()
+            : '';
+        const createCandidate = (() => {
+            if (!typedQuery) return null;
+            if (validateCreate?.(typedQuery)) return null;
+            const lower = typedQuery.toLowerCase();
+            if (selectedOptions.some(v => String(v).toLowerCase() === lower)) return null;
+            if ((deselectedOptions || []).some(o =>
+                String(o.value).toLowerCase() === lower || String(o.label || '').toLowerCase() === lower
+            )) return null;
+            return typedQuery;
+        })();
+
+        const commitCreateCustom = () => {
+            if (!createCandidate) return;
+            const next = [
+                ...selectedOptions.filter(v => v !== ALL_VALUES_SENTINEL && String(v).toLowerCase() !== createCandidate.toLowerCase()),
+                createCandidate,
+            ];
+            updateSelection(next);
+            updateText('');
+        };
+
         const popoverTextField = (
             <TextField
                 id={id}
@@ -286,6 +313,19 @@ function DropdownSearch(props) {
                 autoComplete="off"
                 requiredIndicator={textfieldRequiredIndicator}
                 onFocus={() => { setPopoverActive(true); if (!searchDisable) handleFocusEvent(); }}
+                {...(allowCreateCustom ? {
+                    // Scope custom-create only: open list + focus search on one click (do not change other headerContent callers).
+                    onClick: () => {
+                        setPopoverActive(true);
+                        if (!searchDisable) handleFocusEvent();
+                        requestAnimationFrame(() => document.getElementById(id)?.focus());
+                    },
+                    onKeyDown: (e) => {
+                        if (e.key !== 'Enter' || !createCandidate) return;
+                        e.preventDefault();
+                        commitCreateCustom();
+                    },
+                } : {})}
             />
         );
 
@@ -298,6 +338,10 @@ function DropdownSearch(props) {
                     onClose={() => setPopoverActive(false)}
                     preferredPosition="below"
                     fullWidth
+                    {...(allowCreateCustom ? {
+                        // Scope custom-create only: keep focus in the search field on open.
+                        autofocusTarget: 'none',
+                    } : {})}
                     // Measure the whole TextField, not just the inner <input> (default), so fullWidth matches the field exactly
                     preferInputActivator={false}
                 >
@@ -314,6 +358,10 @@ function DropdownSearch(props) {
                         <Listbox
                             accessibilityLabel={placeholder}
                             onSelect={(val) => {
+                                if (val === CREATE_CUSTOM_SENTINEL) {
+                                    commitCreateCustom();
+                                    return;
+                                }
                                 if (allowMultiple) {
                                     const isWildcardAll = onToggleNegated && !negated && selectedOptions.length === 1 && selectedOptions[0] === ALL_VALUES_SENTINEL;
                                     if (isWildcardAll) {
@@ -332,6 +380,13 @@ function DropdownSearch(props) {
                                 }
                             }}
                         >
+                            {createCandidate && (
+                                <Listbox.Option value={CREATE_CUSTOM_SENTINEL}>
+                                    <div style={{ padding: '8px 12px' }}>
+                                        <Link removeUnderline>Add &quot;{createCandidate}&quot;</Link>
+                                    </div>
+                                </Listbox.Option>
+                            )}
                             {sections.map((section, si) => (
                                 <Listbox.Section key={si} title={<Listbox.Header>{section.title || ''}</Listbox.Header>}>
                                     {(section.options || []).map(opt => {
@@ -362,7 +417,7 @@ function DropdownSearch(props) {
                                     })}
                                 </Listbox.Section>
                             ))}
-                            {noResults && (
+                            {noResults && !createCandidate && (
                                 <Box padding="4">
                                     {emptyState}
                                 </Box>
