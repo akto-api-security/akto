@@ -51,7 +51,7 @@ public class TestRbacGuards extends MongoBasedTest {
             "auth/login", "dashboard/accessToken", "api/me", "api/saveSubscription", "validate", "api/createNewTeam",
             "signup-email", "signup-google", "signup-github", "authorization-code/callback", "okta-initiate-login",
             "signup-azure-saml", "trigger-saml-sso", "callback-google-saml", "callback-jumpcloud-saml", "middleware/config",
-            "api/deleteApisBasedOnHeader", "api/logout", "auth0-logout", "api/fetchAccountConfig", "tools/publicApi",
+            "api/logout", "auth0-logout", "api/fetchAccountConfig", "tools/publicApi",
             "tools/fetchAllSubCategories", "api/fetchVulnerableRequests", "tools/fetchVulnerableRequests", "tools/fetchSampleData",
             "api/fetchParamsStatus", "api/fetchRemediationInfo", "api/fetchActiveTestRunsStatus", "copilot/oauth/callback",
             "api/fetchRuntimeInstances", "api/fetchRuntimeMetrics", "tools/runTestForGivenTemplate",
