@@ -720,7 +720,7 @@ public class ThreatActorService {
         if (!matchConditions.isEmpty()) {
             dedupedEventsPipeline.add(new Document("$match", matchConditions));
         }
-        dedupedEventsPipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
+        dedupedEventsPipeline.addAll(ThreatUtils.configScanDedupeStages(dedupedEventsPipeline, contextSource));
 
         List<Document> totalAnalysedPipeline = new ArrayList<>(dedupedEventsPipeline);
         totalAnalysedPipeline.add(new Document("$count", "total"));
@@ -989,7 +989,7 @@ public class ThreatActorService {
 
       List<Document> pipeline = new ArrayList<>();
       pipeline.add(new Document("$match", match));
-      pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
+      pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
       pipeline.addAll(Arrays.asList(
 
         // Stage 2: Project required fields and normalize timestamp to daily granularity
@@ -1502,7 +1502,7 @@ public class ThreatActorService {
     hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", ""))));
     // Misconfigured Settings lists each misconfiguration once, so count it once here too.
     if ("only".equalsIgnoreCase(configEvalMode)) {
-      hostPipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
+      hostPipeline.addAll(ThreatUtils.configScanDedupeStages(hostPipeline, contextSource));
     }
 
     hostPipeline.add(new Document("$group",
