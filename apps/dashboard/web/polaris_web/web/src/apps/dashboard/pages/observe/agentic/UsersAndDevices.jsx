@@ -196,8 +196,9 @@ function UsersAndDevices() {
                 tagsDisplay: buildTagsDisplay(row.tags),
                 sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || [], false),
                 sensitiveSubTypesVal: (row.sensitiveInRespTypes || []).join(" ") || "-",
-                riskScoreComp: row.riskScore != null ? (
-                    <Badge status={getRiskScoreStatus(row.riskScore)} size="small">{row.riskScore}</Badge>
+                riskScoreComp: row.riskScore != null ? transform.wrapRiskScoreTooltip(
+                    <Badge status={getRiskScoreStatus(row.riskScore)} size="small">{row.riskScore}</Badge>,
+                    row.riskScore, null, null, row.riskScoreFactors
                 ) : "-",
                 detectedTimestamp: row.lastSeenEpoch,
                 lastTraffic: func.prettifyEpoch(row.lastSeenEpoch),

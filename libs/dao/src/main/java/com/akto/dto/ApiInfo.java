@@ -50,6 +50,9 @@ public class ApiInfo {
     public static final String RISK_SCORE = "riskScore";
     private float riskScore;
 
+    public static final String RISK_SCORE_FACTORS = "riskScoreFactors";
+    private List<RiskScoreFactor> riskScoreFactors;
+
     public static final String LAST_CALCULATED_TIME = "lastCalculatedTime";
     private int lastCalculatedTime;
 
@@ -105,6 +108,45 @@ public class ApiInfo {
 
         private String key;
         private String value;
+    }
+
+    public static class RiskScoreFactor {
+        private float points;
+        private String label;
+        private String detail;
+
+        public RiskScoreFactor() {
+        }
+
+        public RiskScoreFactor(float points, String label, String detail) {
+            this.points = points;
+            this.label = label;
+            this.detail = detail;
+        }
+
+        public float getPoints() {
+            return points;
+        }
+
+        public void setPoints(float points) {
+            this.points = points;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public String getDetail() {
+            return detail;
+        }
+
+        public void setDetail(String detail) {
+            this.detail = detail;
+        }
     }
 
     public static class MessageFieldEntry {
@@ -398,13 +440,15 @@ public class ApiInfo {
         }
         this.isSensitive = that.isSensitive || this.isSensitive;
         this.severityScore = this.severityScore + that.severityScore;
-        this.riskScore = Math.max(this.riskScore, that.riskScore);
+        if (that.riskScore > this.riskScore) {
+            this.riskScore = that.riskScore;
+            this.riskScoreFactors = that.riskScoreFactors;
+        }
         this.threatScore = Math.max(this.threatScore, that.threatScore);
 
         if (that.lastCalculatedTime > this.lastCalculatedTime) {
             this.lastCalculatedTime = that.lastCalculatedTime;
         }
-        
 
         for (String k: that.violations.keySet()) {
             if (this.violations.get(k) == null || that.violations.get(k) > this.violations.get(k)) {
@@ -678,6 +722,14 @@ public class ApiInfo {
 
     public void setRiskScore(float riskScore) {
         this.riskScore = riskScore;
+    }
+
+    public List<RiskScoreFactor> getRiskScoreFactors() {
+        return riskScoreFactors;
+    }
+
+    public void setRiskScoreFactors(List<RiskScoreFactor> riskScoreFactors) {
+        this.riskScoreFactors = riskScoreFactors;
     }
 
     public int getLastCalculatedTime() {

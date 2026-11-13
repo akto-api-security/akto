@@ -1,6 +1,7 @@
 import func from "@/util/func";
-import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
+import RiskScoreTooltipContent from "./RiskScoreTooltipContent";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import CopyEndpoint from "./api_collections/component/CopyEndpoint"
@@ -422,10 +423,22 @@ const transform = {
         }
     },
 
-    // Suppressed when either score is 0/falsy — a "0" risk-score badge showing a non-zero base
-    // score (or vice versa) in its tooltip reads as contradictory, so both have to be meaningfully
-    // non-zero before the extra context is worth surfacing.
-    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason){
+    // Prefer riskScoreFactors saved with the score when present. Fall back to the older
+    // baseRiskScoreReason string used on inventory / collection pages.
+    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason, riskScoreFactors){
+        if (riskScore && Array.isArray(riskScoreFactors) && riskScoreFactors.length > 0) {
+            return (
+                <Tooltip dismissOnMouseOut content={
+                    <RiskScoreTooltipContent
+                        riskScore={Number(riskScore)}
+                        status={transform.getStatus(Number(riskScore))}
+                        factors={riskScoreFactors}
+                    />
+                }>
+                    {badge}
+                </Tooltip>
+            );
+        }
         if(!baseRiskScoreReason || !riskScore || !baseRiskScore) return badge;
         return (
             <Tooltip dismissOnMouseOut content={

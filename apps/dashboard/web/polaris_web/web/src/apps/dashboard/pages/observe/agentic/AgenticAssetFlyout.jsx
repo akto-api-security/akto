@@ -253,7 +253,7 @@ export default function AgenticAssetFlyout({
 
     const header = topNav ? (
         <FlyoutBreadcrumb
-            items={[{ label: asset.name, badge: asset.riskScore, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]}
+            items={[{ label: asset.name, badge: asset.riskScore, badgeFactors: asset.riskScoreFactors, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]}
             onClose={onClose}
         >
             {topNavPicker && (
@@ -268,7 +268,12 @@ export default function AgenticAssetFlyout({
             <DetailPanelHeader
                 icon={<AssetIcon type={asset.type} assetTagValue={asset.assetTagValue} size={36} />}
                 title={asset.name}
-                badge={asset.approvalStatus ? <ApprovalStatusBadge status={asset.approvalStatus} /> : null}
+                badge={(
+                    <HorizontalStack gap="2" blockAlign="center">
+                        {asset.approvalStatus ? <ApprovalStatusBadge status={asset.approvalStatus} /> : null}
+                        {asset.riskScore != null ? <RiskScoreCellRenderer value={asset.riskScore} data={asset} /> : null}
+                    </HorizontalStack>
+                )}
                 subtitle={[typeLabelOf(asset) || asset.type, asset.subtitle]}
                 actions={headerActions}
                 onClose={onClose}
