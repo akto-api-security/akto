@@ -177,6 +177,26 @@ public class ThreatUtils {
     }
 
     public static final Pattern CONFIG_ENDPOINT_PATTERN = Pattern.compile("/config/");
+    public static final String EVAL_TYPE_INDEX = "idx_context_evalType_detectedAt";
+    public static final String CONFIG_DEDUPE_KEY_INDEX = "idx_dedupeKey_unique";
+
+    public static String evalType(String contextSource, String latestApiEndpoint) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource) || latestApiEndpoint == null) {
+            return null;
+        }
+        if (SKILLS_ENDPOINT_PATTERN.matcher(latestApiEndpoint).find()) {
+            return MaliciousEventDto.EVAL_TYPE_SKILL;
+        }
+        if (CONFIG_ENDPOINT_PATTERN.matcher(latestApiEndpoint).find()) {
+            return MaliciousEventDto.EVAL_TYPE_CONFIG;
+        }
+        return null;
+    }
+
+    public static String configDedupeKey(String host, String actor, String category, String latestApiEndpoint) {
+        return String.join("|", Objects.toString(host, ""), Objects.toString(actor, ""),
+            Objects.toString(category, ""), Objects.toString(latestApiEndpoint, ""));
+    }
 
     // Skills Evaluations / Misconfigured Settings partitions — Atlas (ENDPOINT) only. An event
     // belongs to Skills Evaluations iff latestApiEndpoint starts with "/skills/"; it belongs to
@@ -580,6 +600,18 @@ public class ThreatUtils {
         if (groupsActivities(accountId) && !existingIndexes.contains(ACTIVITY_GROUP_INDEX)) {
             collection.createIndex(ACTIVITY_GROUP_INDEX_KEYS, new IndexOptions().name(ACTIVITY_GROUP_INDEX)
                 .partialFilterExpression(new Document("groupKey", new Document("$type", "string"))));
+        }
+
+        if (!existingIndexes.contains(EVAL_TYPE_INDEX)) {
+            collection.createIndex(Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending(MaliciousEventDto.EVAL_TYPE), Indexes.descending("detectedAt")),
+                new IndexOptions().name(EVAL_TYPE_INDEX)
+                    .partialFilterExpression(new Document(MaliciousEventDto.EVAL_TYPE, new Document("$exists", true))));
+        }
+
+        if (!existingIndexes.contains(CONFIG_DEDUPE_KEY_INDEX)) {
+            collection.createIndex(Indexes.ascending(MaliciousEventDto.DEDUPE_KEY),
+                new IndexOptions().name(CONFIG_DEDUPE_KEY_INDEX).unique(true)
+                    .partialFilterExpression(new Document(MaliciousEventDto.DEDUPE_KEY, new Document("$type", "string"))));
         }
     }
 

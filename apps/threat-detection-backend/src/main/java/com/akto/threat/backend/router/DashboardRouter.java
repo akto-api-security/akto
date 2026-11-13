@@ -197,6 +197,14 @@ public class DashboardRouter implements ARouter {
             });
 
         router
+            .post("/backfill_eval_types")
+            .blockingHandler(ctx -> {
+                Map<String, Long> result = dsService.backfillEvalTypes(ctx.get("accountId"));
+                ctx.response().setStatusCode(200).end(String.format("{\"skills\": %d, \"configs\": %d, \"keyed\": %d}",
+                    result.get("skills"), result.get("configs"), result.get("keyed")));
+            });
+
+        router
             .post("/list_malicious_requests")
             .blockingHandler(ctx -> {
                 String contextSource = getContextSourceHeader(ctx);
