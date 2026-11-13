@@ -140,6 +140,8 @@ public class DaoInit {
         ClassModel<ApiInfo> apiInfoClassModel = ClassModel.builder(ApiInfo.class).enableDiscriminator(true).build();
         ClassModel<ApiInfo.ApiInfoKey> apiInfoKeyClassModel = ClassModel.builder(ApiInfo.ApiInfoKey.class)
                 .enableDiscriminator(true).build();
+        ClassModel<ApiInfo.RiskScoreFactor> riskScoreFactorClassModel = ClassModel.builder(ApiInfo.RiskScoreFactor.class)
+                .enableDiscriminator(true).build();
         ClassModel<CustomFilter> customFilterClassModel = ClassModel.builder(CustomFilter.class)
                 .enableDiscriminator(true).build();
         ClassModel<FieldExistsFilter> fieldExistsFilterClassModel = ClassModel.builder(FieldExistsFilter.class)
@@ -323,7 +325,7 @@ public class DaoInit {
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
                 thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel, apiInfoClassModel,
-                apiInfoKeyClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,
+                apiInfoKeyClassModel, riskScoreFactorClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,
                 predicateClassModel, conditionsClassModel, regexPredicateClassModel, startsWithPredicateClassModel,
                 endsWithPredicateClassModel,
                 fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel,
