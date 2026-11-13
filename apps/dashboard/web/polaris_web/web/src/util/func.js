@@ -19,6 +19,7 @@ import { Box } from '@shopify/polaris';
 import TooltipText from '../apps/dashboard/components/shared/TooltipText';
 import { getMethod } from "../apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import observeFunc from '../apps/dashboard/pages/observe/transform';
+import values from './values';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -2607,9 +2608,17 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     const since = new Date(new Date(new Date().setDate(until.getDate() - 30)).setHours(0, 0, 0, 0));
     return { title: "Last 30 days", alias: "last30days", period: { since, until } };
   },
+  // Selected accounts default to "All time" in Atlas and Argus; undefined for everyone else.
+  getAllTimeRangeForAccounts(){
+    const allTimeAccs = [1669322524, 1784850613];
+    if (!(isAgenticSecurityCategory() || isEndpointSecurityCategory()) || !allTimeAccs.includes(Number(window.ACTIVE_ACCOUNT))) return undefined;
+    return values.ranges.find((r) => r.alias === "allTime");
+  },
   // Atlas (Endpoint Security) and Argus (Agentic Security) default to 30 days; every other product keeps `fallback`.
   // Heavy accounts keep `fallback` too (their data volume makes a 30-day default slow).
   getDefaultDateRange(fallback){
+    const allTime = this.getAllTimeRangeForAccounts();
+    if (allTime) return allTime;
     const accs = [1745303931, 1768175789, 1758787662];
     if (accs.includes(Number(window.ACTIVE_ACCOUNT))) return fallback;
     return (isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? this.getLast30DaysRange() : fallback;

@@ -8,6 +8,8 @@ import { devtoolsOptions } from "./devtoolsConfig";
 // Custom Storage with Gzip Compression for localStorage
 const gzipLocalStorage = createGzipStorage(localStorage);
 
+const NEW_LAYOUT_DEFAULT_ACCOUNT = 1784850613;
+
 const initialState = {
     subCategoryMap: {},
     categoryMap: {},
@@ -102,7 +104,12 @@ localStore = devtools(localStore, devtoolsOptions("LocalStore", (state) => ({
 })))
 localStore = persist(localStore, {
     name: 'Akto-tests-store',
-    storage: gzipLocalStorage
+    storage: gzipLocalStorage,
+    merge: (persisted, current) => ({
+        ...current,
+        ...persisted,
+        ...(Number(window.ACTIVE_ACCOUNT) === NEW_LAYOUT_DEFAULT_ACCOUNT && { agenticNewLayout: true, guardrailViolationsNewLayout: true }),
+    }),
 })
 
 const LocalStore = create(localStore);
