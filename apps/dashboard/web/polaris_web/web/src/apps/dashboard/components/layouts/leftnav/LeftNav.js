@@ -26,7 +26,7 @@ import IssuesStore from "../../../pages/issues/issuesStore";
 import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_ENDPOINT_SECURITY, CATEGORY_DAST, mapLabel, isAgenticSecurityCategory } from "../../../../main/labelHelper";
 
 // The Overview tiles link to these nav pages (and Back returns to Overview); the highlight follows them.
-const LINKED_NAV_IDS = new Set(["dashboard_observe_agentic_discovery", "dashboard_observe_agentic_assets", "dashboard_observe_endpoints"]);
+const LINKED_NAV_IDS = new Set(["dashboard_observe_agentic_discovery", "dashboard_observe_agentic_assets", "dashboard_observe_endpoints", "dashboard_observe_agent_discovery"]);
 
 // a nav item's "requires" is the action its page loads first; items the role can't open are left out,
 // a section with nothing left is hidden, and a section opens its first item the role can open
@@ -269,6 +269,16 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
                     ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [
+                    ...(dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
+                        label: "Overview",
+                        requires: pageRequires("/dashboard/observe/agent-discovery"),
+                        onClick: () => {
+                            navigate("/dashboard/observe/agent-discovery");
+                            handleSelect("dashboard_observe_agent_discovery");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_agent_discovery",
+                    }] : []),
                     // { label: "Agentic assets (legacy)", onClick: () => { navigate("/dashboard/observe/agentic-assets"); handleSelect("dashboard_observe_agentic_assets"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_agentic_assets" },
                     {
                         label: "Overview",

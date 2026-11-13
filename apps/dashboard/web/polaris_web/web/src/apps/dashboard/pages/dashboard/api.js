@@ -218,6 +218,15 @@ const api = {
         })
     },
 
+    // Same window as the changes call, so the backend loads its shared data once for both.
+    fetchArgusDiscoveryOverview: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusDiscoveryOverview',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+    },
+
     // The 5 Argus posture insight cards — fast, Java-only data, no LLM call.
     fetchArgusPostureInsights: async (startTimestamp, endTimestamp) => {
         return await request({

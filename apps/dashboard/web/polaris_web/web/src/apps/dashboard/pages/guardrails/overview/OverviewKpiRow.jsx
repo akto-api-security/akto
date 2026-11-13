@@ -1,7 +1,7 @@
 import { Box, Card, HorizontalGrid, Text, VerticalStack } from '@shopify/polaris'
 import { formatDuration } from './overviewApi'
 
-function KpiCard({ title, value, note, noteColor = 'subdued', onClick }) {
+export function KpiCard({ title, value, note, noteColor = 'subdued', onClick }) {
     const body = (
         <VerticalStack gap="1">
             <Text variant="bodyMd" color="subdued">{title}</Text>

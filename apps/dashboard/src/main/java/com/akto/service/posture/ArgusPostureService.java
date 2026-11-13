@@ -976,7 +976,7 @@ public class ArgusPostureService {
         return kpi;
     }
 
-    private static Bson privilegedToolFilter() {
+    static Bson privilegedToolFilter() {
         return Filters.and(
                 Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY),
                 Filters.ne(ApiInfo.TOOL_INFO_CAPABILITY, ToolCapabilityClassifier.SAFE));

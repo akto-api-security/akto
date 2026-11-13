@@ -19,6 +19,7 @@ import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
 import com.akto.service.posture.AgentDetailResult;
 import com.akto.service.posture.ArgusAgentPostureDrillService;
+import com.akto.service.posture.ArgusDiscoveryService;
 import com.akto.service.posture.ArgusPostureChangesService;
 import com.akto.service.posture.ArgusPostureService;
 import com.akto.service.posture.ArgusPostureUtils;
@@ -77,6 +78,7 @@ public class ArgusPostureAction extends UserAction {
     private final ArgusPostureService argusPostureService = new ArgusPostureService();
     private final ArgusAgentPostureDrillService agentPostureDrillService = new ArgusAgentPostureDrillService();
     private final ArgusPostureChangesService changesService = new ArgusPostureChangesService();
+    private final ArgusDiscoveryService discoveryService = new ArgusDiscoveryService();
     private final InsightService insightService = new InsightService();
 
     @Getter @Setter private int startTimestamp;
@@ -378,6 +380,18 @@ public class ArgusPostureAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error building Argus posture changes: " + e.getMessage());
             addActionError("Failed to build Argus posture changes");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // A point-in-time inventory. The page sends the same window as its changes call, so both share one bundle load.
+    public String fetchArgusDiscoveryOverview() {
+        try {
+            this.response = discoveryService.build(insightService.getOrLoadBundle(buildCtx()), Context.now());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building Argus discovery overview: " + e.getMessage());
+            addActionError("Failed to build Argus discovery overview");
             return ERROR.toUpperCase();
         }
     }

@@ -143,6 +143,7 @@ import AgenticAssetDevicesPage from "../dashboard/pages/observe/agentic/AgenticA
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
 import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
 import AgenticDiscoveryOverview from "../dashboard/pages/observe/atlas/discovery/AgenticDiscoveryOverview.jsx";
+import AgentDiscovery from "../dashboard/pages/observe/agent_discovery/AgentDiscovery.jsx";
 import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
@@ -278,6 +279,10 @@ const router = createBrowserRouter([
                             {
                                 path: "agentic-discovery",
                                 element: <AgenticDiscoveryOverview/>
+                            },
+                            {
+                                path: "agent-discovery",
+                                element: <AgentDiscovery/>
                             },
                             {
                                 path: "users-and-devices",
