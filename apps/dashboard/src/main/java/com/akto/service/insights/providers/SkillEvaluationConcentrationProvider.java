@@ -281,7 +281,7 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
 
     /** Everything after "/skills/" — deliberately the whole remainder, matching ThreatActorService's
      *  own $substrCP extraction, not just the first path segment. */
-    private static String extractSkillName(String url) {
+    public static String extractSkillName(String url) {
         if (url == null || !url.startsWith(SKILLS_PREFIX)) {
             return null;
         }

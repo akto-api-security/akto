@@ -27,7 +27,7 @@ import NeedsAttentionCard from './NeedsAttentionCard'
 const EXPORT_LIMIT = 2000
 
 // The Policies page opens the policy named in ?policy=, or just lists the policies when it no longer exists.
-const policyLink = (name) => `/dashboard/guardrails/policies${name ? `?policy=${encodeURIComponent(name)}` : ''}`
+export const policyLink = (name) => `/dashboard/guardrails/policies${name ? `?policy=${encodeURIComponent(name)}` : ''}`
 
 // "Last 1 year". Found by alias, so reordering the picker's ranges cannot change the default.
 const DEFAULT_DATE_RANGE = values.ranges.find((range) => range.alias === 'lastYear')

@@ -12,6 +12,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.OwaspCategory;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsRequest;
@@ -527,7 +528,7 @@ public class MaliciousEventService {
     boolean minimalFields = request.hasMinimalFields() && request.getMinimalFields();
     List<String> excludedFields = new ArrayList<>();
     if (minimalFields) {
-      excludedFields.addAll(Arrays.asList("metadata","latestApiOrig","payload","remediation", "evidenceLine", "humanResponse", "owaspCategories"));
+      excludedFields.addAll(Arrays.asList("latestApiOrig","payload","remediation", "evidenceLine", "humanResponse", "owaspCategories"));
     }
 
     Document query = buildListFilterQuery(accountId, filter, contextSource);
@@ -675,7 +676,9 @@ public class MaliciousEventService {
 
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       for (MaliciousEventDto evt : pageEvents) {
-        String metadata = minimalFields ? "" : ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
+        Metadata parsedMetadata = ThreatUtils.parseMetadata(evt.getMetadata());
+        String metadata = minimalFields ? "" : ThreatUtils.metadataJson(parsedMetadata);
+        String behaviour = parsedMetadata != null ? parsedMetadata.getBehaviour() : "";
         String resolvedSessionId = (!minimalFields && evt.getSessionId() != null && validSessionIds.contains(evt.getSessionId()))
             ? evt.getSessionId() : "";
 
@@ -704,7 +707,10 @@ public class MaliciousEventService {
                 .setHost(evt.getHost() != null ? evt.getHost() : "")
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
-                .setSessionId(resolvedSessionId);
+                .setSessionId(resolvedSessionId)
+                .setCaseOwner(evt.getCaseOwner() != null ? evt.getCaseOwner() : "")
+                .setBehaviour(behaviour)
+                .setFirstTriagedAt(evt.getFirstTriagedAt() != null ? evt.getFirstTriagedAt() : 0L);
         if (evt.getGroupKey() != null && evt.getGroupCount() != null) {
           builder.setGroupCount(evt.getGroupCount())
               .setGroupFirstDetectedAt(evt.getGroupFirstDetectedAt() != null ? evt.getGroupFirstDetectedAt() : evt.getDetectedAt());
@@ -719,7 +725,6 @@ public class MaliciousEventService {
           builder.setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
               .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "")
               .setHumanResponse(evt.getHumanResponse() != null ? evt.getHumanResponse() : "")
-              .setCaseOwner(evt.getCaseOwner() != null ? evt.getCaseOwner() : "")
               .setCaseNotes(evt.getCaseNotes() != null ? evt.getCaseNotes() : "")
               .addAllCaseTimeline(ThreatUtils.caseActivities(evt))
               .addAllOwaspCategories(evt.getOwaspCategories() != null
@@ -1193,6 +1198,7 @@ public class MaliciousEventService {
       }
       if (jiraTicketUrl != null && !jiraTicketUrl.isEmpty()) {
         updateOps.add(Updates.set("jiraTicketUrl", jiraTicketUrl));
+        updateOps.add(Updates.min(MaliciousEventDto.FIRST_TRIAGED_AT, com.akto.dao.context.Context.now()));
       }
       if (humanResponse != null && !humanResponse.isEmpty()) {
         MaliciousEventDto.HumanResponse parsed = MaliciousEventDto.HumanResponse.valueOf(humanResponse.toUpperCase());
@@ -1261,18 +1267,23 @@ public class MaliciousEventService {
     String by = updatedBy == null ? "" : updatedBy.trim();   // who the entries are recorded under
     Document set = new Document();
     List<Object> changes = new ArrayList<>();
+    List<Object> triaged = new ArrayList<>();
 
     if (status != null && !status.isEmpty()) {
       String newStatus = MaliciousEventDto.Status.valueOf(status.toUpperCase()).toString();
       set.append("status", literal(newStatus));
       Document changed = new Document("$ne", Arrays.asList(new Document("$ifNull", Arrays.asList("$status", ThreatDetectionConstants.ACTIVE)), literal(newStatus)));
       changes.add(timelineEntryIf(changed, now, by, MaliciousEventDto.CaseActivity.ACTIVITY_TYPE_STATUS, newStatus, "", ""));
+      triaged.add(changed);
     }
     if (caseOwner != null) {
       String newOwner = caseOwner.trim();
       set.append(MaliciousEventDto.CASE_OWNER, literal(newOwner));
       Document changed = new Document("$ne", Arrays.asList(new Document("$ifNull", Arrays.asList("$" + MaliciousEventDto.CASE_OWNER, "")), literal(newOwner)));
       changes.add(timelineEntryIf(changed, now, by, MaliciousEventDto.CaseActivity.ACTIVITY_TYPE_OWNER, "", newOwner, ""));
+      if (!newOwner.isEmpty()) {
+        triaged.add(changed);
+      }
     }
     if (caseNotes != null) {
       String newNotes = caseNotes.length() > CASE_NOTES_MAX_LENGTH ? caseNotes.substring(0, CASE_NOTES_MAX_LENGTH) : caseNotes;
@@ -1282,6 +1293,7 @@ public class MaliciousEventService {
     }
     if (jiraTicketUrl != null && !jiraTicketUrl.isEmpty()) {
       set.append("jiraTicketUrl", literal(jiraTicketUrl));
+      triaged.add(literal(true));
     }
     if (humanResponse != null && !humanResponse.isEmpty()) {
       set.append(MaliciousEventDto.HUMAN_RESPONSE, literal(MaliciousEventDto.HumanResponse.valueOf(humanResponse.toUpperCase()).name()));
@@ -1296,8 +1308,16 @@ public class MaliciousEventService {
         new Document("$slice", Arrays.asList(
             new Document("$concatArrays", Arrays.asList(new Document("$ifNull", Arrays.asList("$" + MaliciousEventDto.CASE_TIMELINE, Collections.emptyList())), newEntries)),
             -CASE_TIMELINE_MAX_ENTRIES))));
+    Document readOldValues = new Document(MaliciousEventDto.CASE_TIMELINE, timeline);
+    if (!triaged.isEmpty()) {
+      String firstTriagedAt = "$" + MaliciousEventDto.FIRST_TRIAGED_AT;
+      readOldValues.append(MaliciousEventDto.FIRST_TRIAGED_AT, new Document("$cond", Arrays.asList(
+          new Document("$or", triaged),
+          new Document("$ifNull", Arrays.asList(firstTriagedAt, now)),
+          firstTriagedAt)));
+    }
     List<Document> pipeline = Arrays.asList(
-        new Document("$set", new Document(MaliciousEventDto.CASE_TIMELINE, timeline)),
+        new Document("$set", readOldValues),
         new Document("$set", set));
 
     logger.info(String.format("Updating events %s to status: %s caseOwner: %s caseNotes: %s by: %s",

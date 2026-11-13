@@ -132,6 +132,7 @@ import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies
 import GuardrailViolations from "../dashboard/pages/guardrails/violations/ViolationsPage";
 import GuardrailOverview from "../dashboard/pages/guardrails/overview/GuardrailOverview";
 import Misconfigurations from "../dashboard/pages/guardrails/Misconfigurations";
+import AtlasGuardrailsOverview from "../dashboard/pages/guardrails/atlasOverview/AtlasGuardrailsOverview";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 import ThreatProtectedLayout from "../dashboard/pages/threat_detection/ThreatProtectedLayout";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
@@ -428,6 +429,10 @@ const router = createBrowserRouter([
                             {
                                 path: "overview",
                                 element: <GuardrailOverview/>
+                            },
+                            {
+                                path: "atlas-overview",
+                                element: <AtlasGuardrailsOverview/>
                             },
                             {
                                 path: "activity",

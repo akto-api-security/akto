@@ -179,6 +179,69 @@ export default {
         return resp
     },
 
+    async fetchSummary(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchSummary',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
+    async fetchTriageStatus(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchTriageStatus',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
+    async fetchDecisionsTrend(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchDecisionsTrend',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
+    async fetchViolationsByPolicy(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchViolationsByPolicy',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
+    async fetchViolationsSources(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchViolationsSources',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
+    async fetchTopAgenticAssets(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchTopAgenticAssets',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
+    async fetchTopEmployees(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchTopEmployees',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
     async suggestGuardrailCompliance(inputType, payload) {
         const resp = await request({
             url: '/api/ask_ai',
