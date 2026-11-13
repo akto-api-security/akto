@@ -55,19 +55,38 @@ public final class McpApiRiskScoreUtils {
         public final Map<String, ComponentRiskAnalysis> componentRiskByTypeAndResource;
         /** ApiCollection.baseRiskScore (0-2, AI agent risk) by collection id - independent of MCP tagging. */
         public final Map<Integer, Double> agentBaseRiskScoreByCollectionId;
+        /** ApiCollection.baseRiskScoreReason by collection id - explanation text only, not used in scoring. */
+        public final Map<Integer, String> agentBaseRiskScoreReasonByCollectionId;
 
         McpRiskScoreContext(Set<Integer> mcpServerCollectionIds,
                 Set<Integer> maliciousMcpServerCollectionIds,
                 Map<String, ComponentRiskAnalysis> componentRiskByTypeAndResource,
-                Map<Integer, Double> agentBaseRiskScoreByCollectionId) {
+                Map<Integer, Double> agentBaseRiskScoreByCollectionId,
+                Map<Integer, String> agentBaseRiskScoreReasonByCollectionId) {
             this.mcpServerCollectionIds = mcpServerCollectionIds;
             this.maliciousMcpServerCollectionIds = maliciousMcpServerCollectionIds;
             this.componentRiskByTypeAndResource = componentRiskByTypeAndResource;
             this.agentBaseRiskScoreByCollectionId = agentBaseRiskScoreByCollectionId;
+            this.agentBaseRiskScoreReasonByCollectionId = agentBaseRiskScoreReasonByCollectionId;
         }
 
         public boolean isEmpty() {
             return mcpServerCollectionIds.isEmpty() && agentBaseRiskScoreByCollectionId.isEmpty();
+        }
+    }
+
+    /** MCP audit flags for one API - same lookup used by scoring and by the explainer. */
+    public static final class McpAuditFlags {
+        public final boolean malicious;
+        public final boolean privileged;
+        public final boolean maliciousServerTag;
+        public final int nameCandidateCount;
+
+        McpAuditFlags(boolean malicious, boolean privileged, boolean maliciousServerTag, int nameCandidateCount) {
+            this.malicious = malicious;
+            this.privileged = privileged;
+            this.maliciousServerTag = maliciousServerTag;
+            this.nameCandidateCount = nameCandidateCount;
         }
     }
 
@@ -136,14 +155,19 @@ public final class McpApiRiskScoreUtils {
 
         // Agent base risk score - independent of MCP tagging, any collection can carry one.
         Map<Integer, Double> agentBaseRiskScoreByCollectionId = new HashMap<>();
+        Map<Integer, String> agentBaseRiskScoreReasonByCollectionId = new HashMap<>();
         try {
             Bson hasBaseRiskScore = Filters.exists(ApiCollection.BASE_RISK_SCORE, true);
             List<ApiCollection> agentScoredCols = ApiCollectionsDao.instance.findAll(hasBaseRiskScore,
-                    Projections.include(ApiCollection.ID, ApiCollection.BASE_RISK_SCORE));
+                    Projections.include(ApiCollection.ID, ApiCollection.BASE_RISK_SCORE,
+                            ApiCollection.BASE_RISK_SCORE_REASON));
             if (agentScoredCols != null) {
                 for (ApiCollection c : agentScoredCols) {
                     if (c.getBaseRiskScore() != null) {
                         agentBaseRiskScoreByCollectionId.put(c.getId(), c.getBaseRiskScore());
+                    }
+                    if (c.getBaseRiskScoreReason() != null && !c.getBaseRiskScoreReason().isEmpty()) {
+                        agentBaseRiskScoreReasonByCollectionId.put(c.getId(), c.getBaseRiskScoreReason());
                     }
                 }
             }
@@ -161,16 +185,19 @@ public final class McpApiRiskScoreUtils {
                         + " auditRowsWithoutComponentRisk=" + auditRowsSkippedNoCra
                         + " agentBaseRiskScoreCollections=" + agentBaseRiskScoreByCollectionId.size(),
                 LogDb.DASHBOARD);
-        return new McpRiskScoreContext(mcpIds, maliciousIds, map, agentBaseRiskScoreByCollectionId);
+        return new McpRiskScoreContext(mcpIds, maliciousIds, map, agentBaseRiskScoreByCollectionId,
+                agentBaseRiskScoreReasonByCollectionId);
     }
 
-    public static float getRiskScoreWithMcpAdjustments(ApiInfo apiInfo, float baseScore, McpRiskScoreContext ctx) {
-        float score = baseScore;
-        if (ctx == null || ctx.isEmpty() || apiInfo == null) {
-            return score;
+    /**
+     * Same MCP audit flag lookup used by {@link #getRiskScoreWithMcpAdjustments} and by RiskScoreExplainer.
+     * Moving the loop here does not change score math.
+     */
+    public static McpAuditFlags resolveMcpAuditFlags(ApiInfo apiInfo, McpRiskScoreContext ctx) {
+        if (ctx == null || apiInfo == null || apiInfo.getId() == null) {
+            return new McpAuditFlags(false, false, false, 0);
         }
         int cid = apiInfo.getId().getApiCollectionId();
-
         boolean malicious = false;
         boolean privileged = false;
         boolean maliciousServerTag = false;
@@ -192,13 +219,24 @@ public final class McpApiRiskScoreUtils {
                     privileged |= cra.getHasPrivilegedAccess();
                 }
             }
-            if (malicious) {
-                score += MCP_COMPONENT_MALICIOUS_SCORE_DELTA;
-            }
-            if (privileged) {
-                score += MCP_COMPONENT_PRIVILEGE_SCORE_DELTA;
-            }
             maliciousServerTag = ctx.maliciousMcpServerCollectionIds.contains(cid);
+        }
+        return new McpAuditFlags(malicious, privileged, maliciousServerTag, nameCandidateCount);
+    }
+
+    public static float getRiskScoreWithMcpAdjustments(ApiInfo apiInfo, float baseScore, McpRiskScoreContext ctx) {
+        float score = baseScore;
+        if (ctx == null || ctx.isEmpty() || apiInfo == null) {
+            return score;
+        }
+        int cid = apiInfo.getId().getApiCollectionId();
+        McpAuditFlags flags = resolveMcpAuditFlags(apiInfo, ctx);
+
+        if (flags.malicious) {
+            score += MCP_COMPONENT_MALICIOUS_SCORE_DELTA;
+        }
+        if (flags.privileged) {
+            score += MCP_COMPONENT_PRIVILEGE_SCORE_DELTA;
         }
 
         // Agent base risk score (0-2, -1 means "couldn't assess" and contributes nothing) - applies
@@ -209,7 +247,7 @@ public final class McpApiRiskScoreUtils {
         }
 
         score = Math.min(MCP_RISK_SCORE_CAP, score);
-        if (maliciousServerTag) {
+        if (flags.maliciousServerTag) {
             score = Math.max(MCP_MALICIOUS_SERVER_COLLECTION_RISK_FLOOR, score);
         }
         if (Math.abs(score - baseScore) > 1e-4f) {
@@ -217,12 +255,28 @@ public final class McpApiRiskScoreUtils {
                     "MCP risk adjusted accountId=" + Context.accountId.get() + " apiCollectionId="
                             + cid + " method=" + apiInfo.getId().getMethod() + " url="
                             + truncateForLog(apiInfo.getId().getUrl(), 160) + " baseScore=" + baseScore + " finalScore="
-                            + score + " auditMalicious=" + malicious + " auditPrivileged=" + privileged
-                            + " maliciousServerTag=" + maliciousServerTag + " agentBaseRiskScore=" + agentBaseRiskScore
-                            + " nameCandidates=" + nameCandidateCount,
+                            + score + " auditMalicious=" + flags.malicious + " auditPrivileged=" + flags.privileged
+                            + " maliciousServerTag=" + flags.maliciousServerTag + " agentBaseRiskScore="
+                            + agentBaseRiskScore + " nameCandidates=" + flags.nameCandidateCount,
                     LogDb.DASHBOARD);
         }
         return score;
+    }
+
+    public static float getMcpComponentMaliciousDelta() {
+        return MCP_COMPONENT_MALICIOUS_SCORE_DELTA;
+    }
+
+    public static float getMcpComponentPrivilegeDelta() {
+        return MCP_COMPONENT_PRIVILEGE_SCORE_DELTA;
+    }
+
+    public static float getMcpRiskScoreCap() {
+        return MCP_RISK_SCORE_CAP;
+    }
+
+    public static float getMcpMaliciousServerFloor() {
+        return MCP_MALICIOUS_SERVER_COLLECTION_RISK_FLOOR;
     }
 
     private static String truncateForLog(String s, int maxLen) {

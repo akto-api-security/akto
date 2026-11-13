@@ -112,6 +112,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
 
         ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
         assertEquals(true, apiInfo.getIsSensitive());
+        assertRiskScoreFactorsMatch(apiInfo);
 
         Bson filter2 = Filters.and(
             Filters.eq("_id.url", "http://sampl-aktol-1exannwybqov-67928726.ap-south-1.elb.amazonaws.com/api/college/prof/upload-marks"),
@@ -128,6 +129,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
 
         ApiInfo apiInfo3 = ApiInfoDao.instance.findOne(filter3);
         assertEquals(true, apiInfo3.getIsSensitive());
+        assertRiskScoreFactorsMatch(apiInfo3);
 
         AktoDataType dataType = AktoDataTypeDao.instance.findOne("name", "JWT");
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
@@ -207,12 +209,15 @@ public class TestUpdatesInCollections extends MongoBasedTest {
 
         ApiInfo apiInfo1 = ApiInfoDao.instance.findOne(filter1);
         assertEquals((double) 101, apiInfo1.getSeverityScore(), 0);
+        assertRiskScoreFactorsMatch(apiInfo1);
 
         ApiInfo apiInfo2 = ApiInfoDao.instance.findOne(filter2);
         assertEquals((double) 11, apiInfo2.getSeverityScore(), 0);
+        assertRiskScoreFactorsMatch(apiInfo2);
 
         ApiInfo apiInfo3 = ApiInfoDao.instance.findOne(filter3);
         assertEquals((double) 20, apiInfo3.getSeverityScore(), 0);
+        assertRiskScoreFactorsMatch(apiInfo3);
 
         Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.FIXED),
             Updates.set(TestingRunIssues.LAST_SEEN, Context.now())
@@ -253,7 +258,20 @@ public class TestUpdatesInCollections extends MongoBasedTest {
 
         ApiInfo apiInfo7 = ApiInfoDao.instance.findOne(filter2);
         assertEquals((double) 20 , apiInfo7.getSeverityScore(), 0);
+        assertRiskScoreFactorsMatch(apiInfo7);
 
 
+    }
+
+    private void assertRiskScoreFactorsMatch(ApiInfo apiInfo) {
+        assertNotNull("riskScoreFactors should be saved", apiInfo.getRiskScoreFactors());
+        assertFalse("riskScoreFactors should not be empty for scored APIs with open issues",
+                apiInfo.getRiskScoreFactors().isEmpty());
+        assertTrue("saved factors must be acceptable for the stored riskScore",
+                RiskScoreExplainer.isAcceptable(apiInfo.getRiskScoreFactors(), apiInfo.getRiskScore(), null, apiInfo));
+        for (ApiInfo.RiskScoreFactor factor : apiInfo.getRiskScoreFactors()) {
+            String label = factor.getLabel() == null ? "" : factor.getLabel().toLowerCase();
+            assertFalse(label.contains("cap") || label.contains("capped"));
+        }
     }
 }
