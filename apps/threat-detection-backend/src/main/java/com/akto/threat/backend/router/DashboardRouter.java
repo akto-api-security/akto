@@ -282,7 +282,7 @@ public class DashboardRouter implements ARouter {
                         contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
-            });
+            }, false);
 
         router
             .post("/list_threat_apis")
@@ -332,7 +332,7 @@ public class DashboardRouter implements ARouter {
                         contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
-            });
+            }, false);
 
         router
             .get("/get_threat_configuration")
@@ -399,7 +399,7 @@ public class DashboardRouter implements ARouter {
                         ThreatActorFilterRequest.newBuilder().build()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
-            });
+            }, false);
 
         router
         .post("/get_subcategory_wise_count")
@@ -581,7 +581,7 @@ public class DashboardRouter implements ARouter {
                         req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
-            });
+            }, false);
         
         router
             .post("/get_threat_activity_timeline")
@@ -611,7 +611,7 @@ public class DashboardRouter implements ARouter {
                         req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
-            });
+            }, false);
 
         router
             .post("/update_malicious_event_status")

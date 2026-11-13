@@ -178,7 +178,7 @@ public class ThreatApiService {
     ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
 
     // 3. Collapse misconfiguration re-detections.
-    pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
+    pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
 
     // 4. Group by category and subCategory
     pipeline.add(new Document("$group",
@@ -254,7 +254,7 @@ public class ThreatApiService {
       ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
       // The dedupe only collapses /config/ events; with those excluded it is a sort+group over every event for nothing.
       if (!"exclude".equalsIgnoreCase(configEvalMode)) {
-          pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
+          pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
       }
       pipeline.add(new Document("$group", new Document("_id", "$severity")
           .append("count", new Document("$sum", 1))));
