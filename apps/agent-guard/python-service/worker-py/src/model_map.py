@@ -111,12 +111,13 @@ def _fire_store(store_fn: Any | None, completed: list[dict[str, Any]], scanner_n
 
 
 class ModelMapScanner:
-    def __init__(self, scanner_name, scanner_type, text, config, store_fn=None, schedule_fn=None):
+    def __init__(self, scanner_name, scanner_type, text, config, store_fn=None, schedule_fn=None, agent_host=""):
         self.scanner_name = scanner_name
         self.scanner_type = scanner_type
         self.text = text
         self.config = config
         self.store_fn = store_fn
+        self.agent_host = agent_host  # the scan request's agent_host, when the gateway sends one
         # The runtime's fire-and-forget hook (waitUntil on Cloudflare, a task on the container).
         self.schedule = schedule_fn or _spawn
         self.completed_all: list[dict[str, Any]] = []
@@ -339,6 +340,7 @@ class ModelMapScanner:
         return {
             "time": datetime.now(UTC).isoformat(timespec="milliseconds"),
             "scanner": self.scanner_name,
+            "agent_host": self.agent_host,
             "tripwire": {
                 "is_attack": not result.get("is_valid", True),
                 "attack_score": tripwire.get("attack_score"),
