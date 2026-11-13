@@ -31,6 +31,10 @@ public enum InsightId {
     LIKELY_FALSE_POSITIVES("Likely false positives", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
     ALERT_MODE_REAL_HITS("Alert-mode policies catching real hits", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
     POLICY_HYGIENE("Policy hygiene", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    VIOLATIONS_PILING_UP("Open violations piling up on one agent", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    MALICIOUS_SKILLS_IN_USE("Malicious skills in use", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    RISKY_CONFIG_SETTINGS("Risky agent config settings", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    VIOLATION_SPIKE("Sudden rise in violations", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
 
     // — API posture insights (Ask Akto overlay) —
     UNAUTHENTICATED_SENSITIVE_APIS("Unauthenticated APIs exposed", InsightId.Category.ACTIONABLE, InsightId.Group.API_POSTURE),

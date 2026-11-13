@@ -8,7 +8,6 @@ import { ACTIVITY_TAB, THREAT_ACTIVITY_PATH, clearSavedActivityFilters, openThre
 import func from "@/util/func";
 import KpiStrip from "./KpiStrip";
 import AttentionCard from "./AttentionCard";
-import guardrailOverviewMock from "./guardrailOverviewMock";
 import TriageStatusCard from "./TriageStatusCard";
 import DecisionsTrendCard from "./DecisionsTrendCard";
 import PolicyViolationsCard from "./PolicyViolationsCard";
@@ -34,6 +33,7 @@ function AtlasGuardrailsOverview() {
     const [violationsSources, setViolationsSources] = useState(null);
     const [topAgenticAssets, setTopAgenticAssets] = useState(null);
     const [topEmployees, setTopEmployees] = useState(null);
+    const [attention, setAttention] = useState(null);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
@@ -68,6 +68,10 @@ function AtlasGuardrailsOverview() {
         guardrailsApi.fetchTopEmployees(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setTopEmployees(resp); })
             .catch(() => { if (!cancelled) setTopEmployees(LOAD_FAILED); });
+        setAttention(null);
+        guardrailsApi.fetchAttention(startTimestamp, endTimestamp)
+            .then((resp) => { if (!cancelled) setAttention(resp); })
+            .catch(() => { if (!cancelled) setAttention(LOAD_FAILED); });
         return () => { cancelled = true; };
     }, [startTimestamp, endTimestamp]);
 
@@ -84,7 +88,7 @@ function AtlasGuardrailsOverview() {
     const components = [
         <KpiStrip key="kpis" kpis={kpis} onOpenActivity={openActivity} />,
         <HorizontalGrid key="attention" columns={{ xs: 1, md: ["twoThirds", "oneThird"] }} gap="4">
-            <AttentionCard rows={guardrailOverviewMock.attention} onReview={() => openActivity()} onViewAll={() => openActivity()} />
+            <AttentionCard data={attention} onOpenActivity={openActivity} onOpenPolicy={(name) => navigate(policyLink(name))} onViewAll={() => openActivity()} />
             <TriageStatusCard triage={triage} onOpenActivity={openActivity} />
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">

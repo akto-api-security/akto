@@ -10,14 +10,21 @@ import com.akto.service.atlas.AtlasAssetStatusService;
 import com.akto.service.atlas.AtlasAssetStatus;
 import com.akto.service.insights.HostCollectionResolver;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightProvider;
+import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightUtil;
+import com.akto.service.insights.providers.MaliciousSkillsInUseProvider;
+import com.akto.service.insights.providers.RiskyConfigSettingsProvider;
 import com.akto.service.insights.providers.SkillEvaluationConcentrationProvider;
+import com.akto.service.insights.providers.ViolationSpikeProvider;
+import com.akto.service.insights.providers.ViolationsPilingUpProvider;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,6 +37,9 @@ import java.util.stream.Collectors;
 public class AtlasGuardrailsOverviewService {
 
     private static final int TOP_ROWS_LIMIT = 10;
+    private static final int ATTENTION_ROWS_LIMIT = 5;
+    private static final List<InsightProvider> ATTENTION_PROVIDERS = Arrays.asList(new ViolationsPilingUpProvider(),
+            new MaliciousSkillsInUseProvider(), new RiskyConfigSettingsProvider(), new ViolationSpikeProvider());
 
     public BasicDBObject buildTriage(InsightDataBundle bundle) {
         BasicDBObject triage = new BasicDBObject();
@@ -214,8 +224,7 @@ public class AtlasGuardrailsOverviewService {
             String type = AgenticObserveUtil.getTypeFromCollection(c);
             if (!AtlasGuardrailUtils.AGENTIC_ASSET_TYPES.contains(type)) continue;
             AtlasToolRow asset = AtlasGuardrailUtils.collectionAsset(c, type);
-            String key = asset == null ? AtlasAssetStatusService.toolKey(type, c.getHostName())
-                    : AtlasAssetStatusService.toolKey(asset.getRowType(), asset.getGroupKey());
+            String key = AtlasGuardrailUtils.assetKey(c, type, asset);
             TopAgenticAssetRow row = byAsset.computeIfAbsent(key, k -> new TopAgenticAssetRow(k, asset == null ? c.getHostName() : asset.getName(), type, asset == null ? c.getHostName() : null));
             row.addCount(entry.getValue().getOrDefault(AtlasGuardrailUtils.PERIOD_CURRENT, 0));
             if (InsightUtil.isPersonalAccount(c)) row.markPersonal();
@@ -255,6 +264,21 @@ public class AtlasGuardrailsOverviewService {
                 .sorted(Comparator.comparingLong((TopEmployeeRow row) -> row.critical).thenComparingLong(row -> row.count).reversed())
                 .limit(TOP_ROWS_LIMIT)
                 .map(TopEmployeeRow::toResponse)
+                .collect(Collectors.toList()));
+        return response;
+    }
+
+    public BasicDBObject buildAttention(InsightDataBundle bundle) {
+        List<InsightResult> results = new ArrayList<>();
+        for (InsightProvider provider : ATTENTION_PROVIDERS) {
+            results.add(provider.compute(bundle, bundle.ctx, InsightProvider.Scope.LIST));
+        }
+        BasicDBObject response = new BasicDBObject();
+        response.put("rows", results.stream()
+                .filter(r -> InsightResult.Status.READY.name().equals(r.getStatus()) && r.getSeverity() != null)
+                .sorted(Comparator.comparingInt(r -> InsightUtil.severityRank(r.getSeverity())))
+                .limit(ATTENTION_ROWS_LIMIT)
+                .map(AtlasGuardrailsOverviewService::attentionRow)
                 .collect(Collectors.toList()));
         return response;
     }
@@ -322,6 +346,24 @@ public class AtlasGuardrailsOverviewService {
         Long median = AtlasGuardrailUtils.medianOf(waits);
         if (median != null) kpi.put("seconds", median);
         return kpi;
+    }
+
+    private static long metricValue(InsightResult r, String key) {
+        for (InsightResult.Metric m : r.getMetrics()) {
+            if (key.equals(m.getKey()) && m.getValue() != null) return m.getValue().longValue();
+        }
+        return 0;
+    }
+
+    private static BasicDBObject attentionRow(InsightResult r) {
+        List<BasicDBObject> ctas = new ArrayList<>();
+        for (InsightResult.Cta cta : r.getCtas()) {
+            ctas.add(new BasicDBObject("id", cta.getId()).append("label", cta.getLabel()).append("route", cta.getRoute())
+                    .append("params", cta.getParams()).append("primary", cta.isPrimary()));
+        }
+        return new BasicDBObject("id", r.getInsightId()).append("severity", r.getSeverity()).append("title", r.getTitle())
+                .append("meta", r.getHeadline()).append("count", metricValue(r, AtlasGuardrailUtils.METRIC_VIOLATIONS))
+                .append("ctas", ctas);
     }
 
     private static class TopAgenticAssetRow {

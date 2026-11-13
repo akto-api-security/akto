@@ -118,4 +118,16 @@ public class AtlasGuardrailsOverviewAction extends UserAction {
             return ERROR.toUpperCase();
         }
     }
+
+    public String fetchAttention() {
+        try {
+            InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx());
+            this.response = overviewService.buildAttention(bundle);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building Atlas guardrails overview attention: " + e.getMessage());
+            addActionError("Failed to build Atlas guardrails overview attention");
+            return ERROR.toUpperCase();
+        }
+    }
 }
