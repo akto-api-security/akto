@@ -4,7 +4,7 @@ import { PREDEFINED_CUSTOM_PROMPTS } from "../predefinedCustomPrompts";
 
 export const RogueAgentsConfig = {
     number: 14,
-    title: "Rogue agents",
+    title: "Rogue Agents",
 
     validate: () => ({ isValid: true, errorMessage: null }),
 
