@@ -27,6 +27,8 @@ import {
     CodeDetectionConfig,
     CustomGuardrailsStep,
     CustomGuardrailsConfig,
+    RogueAgentsStep,
+    RogueAgentsConfig,
     UsageGuardrailsStep,
     UsageGuardrailsConfig,
     AnomalyDetectionStep,
@@ -257,6 +259,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: CustomGuardrailsConfig.title,
                 summary: CustomGuardrailsConfig.getSummary(storedStateData),
                 ...CustomGuardrailsConfig.validate(storedStateData)
+            },
+            {
+                number: RogueAgentsConfig.number,
+                title: RogueAgentsConfig.title,
+                summary: RogueAgentsConfig.getSummary(storedStateData),
+                ...RogueAgentsConfig.validate(storedStateData)
             },
             {
                 number: UsageGuardrailsConfig.number,
@@ -927,10 +935,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setEnableLlmPrompt={setEnableLlmPrompt}
                         llmRule={llmPrompt}
                         setLlmRule={setLlmPrompt}
-                        selectedTemplateIds={selectedTemplateIds}
-                        onToggleTemplate={togglePredefinedTemplate}
-                        presetPrompts={presetPrompts}
-                        onChangePresetPrompt={changePresetPrompt}
                         llmConfidenceScore={llmConfidenceScore}
                         setLlmConfidenceScore={setLlmConfidenceScore}
                         enableExternalModel={enableExternalModel}
@@ -939,6 +943,15 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setUrl={setUrl}
                         confidenceScore={confidenceScore}
                         setConfidenceScore={setConfidenceScore}
+                    />
+                );
+            case 14:
+                return (
+                    <RogueAgentsStep
+                        selectedTemplateIds={selectedTemplateIds}
+                        onToggleTemplate={togglePredefinedTemplate}
+                        presetPrompts={presetPrompts}
+                        onChangePresetPrompt={changePresetPrompt}
                     />
                 );
             case 7:
