@@ -3,7 +3,7 @@ export const LIMITS = {
     name: 80,
     description: 500,
     instructions: 2000,
-    customSkill: 5000,
+    skillFiles: 100, // custom skill files per agent, references included (MAX_SKILL_FILES)
     files: 10,
     fileChars: 50000,
     links: 20,
@@ -67,7 +67,8 @@ export function toForm(profile) {
         name: profile.name || "",
         description: profile.description || "",
         skills: profile.skills || [],
-        customSkills: (profile.customSkills || []).map(s => ({ name: s.name, content: s.content || "" })),
+        // skill files, like knowledge files: a saved one comes back as {name, sha256, size}, content stays in blob
+        customSkills: (profile.customSkills || []).map(f => fileOf(f)),
         allowCreateIdentities: !!profile.allowCreateIdentities,
         instructions: profile.instructions || "",
         // a saved file comes back as its id (sha256) and size; its content stays in blob storage
@@ -83,7 +84,7 @@ export function fromForm(form) {
         name: form.name.trim(),
         description: form.description.trim(),
         skills: form.skills,
-        customSkills: form.customSkills.map(s => ({ name: s.name.trim(), content: s.content.trim() })).filter(s => s.name && s.content),
+        customSkills: form.customSkills,
         allowCreateIdentities: form.allowCreateIdentities,
         instructions: form.instructions.trim(),
         knowledgeFiles: form.knowledgeFiles,
@@ -95,8 +96,7 @@ export function fromForm(form) {
 export function validate(form) {
     if (!form.name.trim()) return "Give the smart agent a name"
     if (form.name.trim().length > LIMITS.name) return `The name can be at most ${LIMITS.name} characters`
-    const unnamedSkill = form.customSkills.find(s => !s.name.trim() || !s.content.trim())
-    if (unnamedSkill) return "Give each custom skill a name and what it should do"
+    if (form.customSkills.length > LIMITS.skillFiles) return `Add at most ${LIMITS.skillFiles} skill files`
     const links = linesOf(form.knowledgeLinksText)
     if (links.length > LIMITS.links) return `Add at most ${LIMITS.links} links`
     const badLink = links.find(link => !isWebUrl(link))

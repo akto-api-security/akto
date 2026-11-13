@@ -9,6 +9,7 @@ export { default as UsageGuardrailsStep, UsageGuardrailsConfig } from './UsageGu
 export { default as AnomalyDetectionStep, AnomalyDetectionConfig } from './AnomalyDetectionStep';
 export { default as ToolsGuardrailsStep, ToolsGuardrailsConfig } from './ToolsGuardrailsStep';
 export { default as BlockedHostsStep, BlockedHostsConfig } from './BlockedHostsStep';
+export { default as RogueAgentsStep, RogueAgentsConfig } from './RogueAgentsStep';
 export { default as ServerSettingsStep, ServerSettingsConfig } from './ServerSettingsStep';
 export { default as EnterpriseLicenseComplianceStep, EnterpriseLicenseComplianceConfig } from './EnterpriseLicenseComplianceStep';
 export { default as ExceptionsStep, ExceptionsConfig } from './ExceptionsStep';

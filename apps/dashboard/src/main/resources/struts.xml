@@ -8197,6 +8197,66 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
+        <action name="api/fetchSmartTestingLive" class="com.akto.action.testing.SmartTestingLiveAction" method="fetchSmartTestingLive">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AUTOMATED_AGENTIC_TEST_RUN</param>
+            </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">START_TEST_RUN</param>
+                <param name="accessType">READ</param>
+                <param name="actionDescription">User watched smart testing live</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^smartTestingRuns.*,^smartTestingEvents.*,^smartTestingMessages.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+        <action name="api/sendSmartTestingRunMessage" class="com.akto.action.testing.SmartTestingLiveAction" method="sendSmartTestingRunMessage">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AUTOMATED_AGENTIC_TEST_RUN</param>
+            </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">START_TEST_RUN</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User sent a message to smart testing</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
         <action name="api/fetchTestRoles" class="com.akto.action.testing.TestRolesAction" method="fetchAllRolesAndLogicalGroups">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

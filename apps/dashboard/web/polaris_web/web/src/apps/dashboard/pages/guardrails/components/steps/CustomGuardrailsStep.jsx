@@ -299,6 +299,7 @@ const CustomGuardrailsStep = ({
                                     value={llmRule}
                                     onChange={setLlmRule}
                                     multiline={4}
+                                    maxHeight={400}
                                     placeholder="Enter your LLM evaluation prompt here..."
                                     helpText="This prompt will be used to evaluate whether content should be blocked. Be specific about what you want to detect."
                                 />

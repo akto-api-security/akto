@@ -18,6 +18,9 @@ import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
+import com.akto.dao.testing.SmartTestingEventDao;
+import com.akto.dao.testing.SmartTestingMessageDao;
+import com.akto.dao.testing.SmartTestingRunDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.config.TestScriptsDao;
@@ -603,5 +606,8 @@ public class DaoInit {
         ComplianceClauseCoverageDao.instance.createIndicesIfAbsent();
         McpOAuthClientsDao.instance.createIndicesIfAbsent();
         McpOAuthGrantsDao.instance.createIndicesIfAbsent();
+        SmartTestingRunDao.instance.createIndicesIfAbsent();
+        SmartTestingEventDao.instance.createIndicesIfAbsent();
+        SmartTestingMessageDao.instance.createIndicesIfAbsent();
     }
 }

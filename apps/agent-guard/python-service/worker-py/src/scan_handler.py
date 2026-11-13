@@ -161,7 +161,9 @@ async def scan_payload(
             )
         scan_diag.log_backpressure_proceeding(scanner_name)
         try:
-            result = await scan_with_model_map(scanner_name, scanner_type, text, config, store_fn=store_fn)
+            result = await scan_with_model_map(
+                scanner_name, scanner_type, text, config, store_fn=store_fn, schedule_fn=schedule_fn
+            )
             elapsed = result.get("execution_time_ms")
             if isinstance(elapsed, (int, float)) and elapsed > 0:
                 cascade_backpressure.record_cascade_latency(float(elapsed))

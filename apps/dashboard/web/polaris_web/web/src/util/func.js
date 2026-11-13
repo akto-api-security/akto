@@ -2619,7 +2619,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   getDefaultDateRange(fallback){
     const allTime = this.getAllTimeRangeForAccounts();
     if (allTime) return allTime;
-    const accs = [1745303931, 1768175789];
+    const accs = [1745303931, 1768175789, 1758787662];
     if (accs.includes(Number(window.ACTIVE_ACCOUNT))) return fallback;
     return (isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? this.getLast30DaysRange() : fallback;
   },
