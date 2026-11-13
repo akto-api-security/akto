@@ -12,7 +12,7 @@ import { SCRIPT_TYPES } from '../../testing/scripts/scriptTypes';
 // value of the dropdown's default option (not empty: the dropdown matches values as patterns)
 const DEFAULT_SMART_TESTING = "DEFAULT_SMART_TESTING"
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration, scriptsState}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, linearTeamsMap, generateLabelForJiraIntegration, scriptsState}) => {
     console.log("isAgenticCategory in config", isAgenticCategory)
     // smart agents for the Smart agent dropdown, loaded once smart testing is switched on
     const [smartAgentOptions, setSmartAgentOptions] = useState([{ label: "Default smart testing", value: DEFAULT_SMART_TESTING }])
@@ -60,16 +60,46 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
         }))
         : [];
 
-    const severitiesArr = func.getAktoSeverities()
-    const allSeverity = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
+    const linearTeams = Object.entries(linearTeamsMap || {}).map(([id, name]) => ({ label: name, value: id }))
 
-    function toggleCreateTicketCheckbox() {
+    const ticketToolOptions = [
+        ...(jiraProjectMap ? [{ label: 'Jira', value: 'JIRA' }] : []),
+        ...(linearTeamsMap ? [{ label: 'Linear', value: 'LINEAR' }] : [])
+    ]
+
+    const ticketSource = testRun?.autoTicketingDetails?.ticketSource || 'JIRA'
+    const isLinearTicketing = ticketSource === 'LINEAR'
+
+    function firstProjectAndIssueTypeFor(source) {
+        if (source === 'LINEAR') {
+            return { projectId: linearTeams[0]?.value || "", issueType: "" }
+        }
         const firstProject = allProjects[0]?.value || "";
         const firstIssueType =
             Array.isArray(jiraProjectMap?.[firstProject]) &&
             jiraProjectMap[firstProject]?.[0]?.issueType
                 ? jiraProjectMap[firstProject][0].issueType
                 : "";
+        return { projectId: firstProject, issueType: firstIssueType }
+    }
+
+    const severitiesArr = func.getAktoSeverities()
+    const allSeverity = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
+
+    function changeTicketTool(source) {
+        setTestRun((prev) => ({
+            ...prev,
+            autoTicketingDetails: {
+                ...prev.autoTicketingDetails,
+                ticketSource: source,
+                ...firstProjectAndIssueTypeFor(source),
+            },
+        }));
+    }
+
+    function toggleCreateTicketCheckbox() {
+        const defaultSource = jiraProjectMap ? 'JIRA' : 'LINEAR';
+        const { projectId, issueType } = firstProjectAndIssueTypeFor(defaultSource);
 
         const checkPrevToggle = !testRun?.autoTicketingDetails?.shouldCreateTickets;
 
@@ -79,9 +109,10 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 autoTicketingDetails: {
                     ...prev.autoTicketingDetails,
                     shouldCreateTickets: true,
-                    projectId: firstProject,
+                    ticketSource: defaultSource,
+                    projectId,
                     severities: ["CRITICAL", "HIGH"],
-                    issueType: firstIssueType,
+                    issueType,
                 },
             }));
         } else {
@@ -302,29 +333,53 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             />
             <HorizontalStack gap={4}>
             <Checkbox
-                    disabled={!jiraProjectMap}
+                    disabled={!jiraProjectMap && !linearTeamsMap}
                     label={generateLabelForJiraIntegration()}
                     checked={testRun.autoTicketingDetails.shouldCreateTickets}
                     onChange={() => { toggleCreateTicketCheckbox()}}
                 />
                 {testRun.autoTicketingDetails.shouldCreateTickets &&
                     <>
-                        <Dropdown
-                            menuItems={allProjects}
-                            selected={(val) => {
-                                setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
-                            }}
-                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
-                            placeHolder={"Select Project"}
-                            initial={testRun.autoTicketingDetails.projectId}
-                        />
-                        <Dropdown
-                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
-                            menuItems={allIssuesType}
-                            selected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
-                            placeHolder={"Select Issue Type"}
-                            initial={testRun.autoTicketingDetails.issueType}
-                        />
+                        {ticketToolOptions.length > 1 &&
+                            <Dropdown
+                                menuItems={ticketToolOptions}
+                                selected={changeTicketTool}
+                                placeHolder={"Select Ticket Tool"}
+                                initial={ticketSource}
+                            />
+                        }
+                        {isLinearTicketing ?
+                            <Dropdown
+                                key="linear-team"
+                                menuItems={linearTeams}
+                                selected={(val) => {
+                                    setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
+                                }}
+                                placeHolder={"Select Team"}
+                                initial={testRun.autoTicketingDetails.projectId}
+                            />
+                            :
+                            <>
+                                <Dropdown
+                                    key="jira-project"
+                                    menuItems={allProjects}
+                                    selected={(val) => {
+                                        setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
+                                    }}
+                                    disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                                    placeHolder={"Select Project"}
+                                    initial={testRun.autoTicketingDetails.projectId}
+                                />
+                                <Dropdown
+                                    key="jira-issue-type"
+                                    disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                                    menuItems={allIssuesType}
+                                    selected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
+                                    placeHolder={"Select Issue Type"}
+                                    initial={testRun.autoTicketingDetails.issueType}
+                                />
+                            </>
+                        }
                         <DropdownSearch
                             optionsList={allSeverity}
                             placeholder={"Select Severity"}

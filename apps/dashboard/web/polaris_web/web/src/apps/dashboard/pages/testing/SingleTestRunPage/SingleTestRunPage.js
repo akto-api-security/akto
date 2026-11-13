@@ -523,8 +523,8 @@ function SingleTestRunPage() {
         limit,
         filters,
         queryValue
-      ).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults }) => {
-        testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults)
+      ).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults, linearIssuesMapForResults }) => {
+        testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults, linearIssuesMapForResults)
         if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
           errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
           setErrorsObject(errorEnums)
@@ -971,7 +971,7 @@ function SingleTestRunPage() {
         if (!Array.isArray(res?.testingRunResults)) {
           throw new Error("Could not fetch all test results for the export")
         }
-        transform.prepareTestRunResults(hexId, res.testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, res.issuesDescriptionMap, res.jiraIssuesMapForResults, res.devrevIssuesMapForResults)
+        transform.prepareTestRunResults(hexId, res.testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, res.issuesDescriptionMap, res.jiraIssuesMapForResults, res.devrevIssuesMapForResults, res.linearIssuesMapForResults)
           .forEach((result) => {
             if (!seen.has(result.id)) {
               seen.add(result.id)

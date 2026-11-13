@@ -59,6 +59,10 @@ public class TestingRunIssues {
     @Getter @Setter
     private String wizFindingUrl;
 
+    public static final String LINEAR_ISSUE_URL = "linearIssueUrl";
+    @Getter @Setter
+    private String linearIssueUrl;
+
     public static final String WIZ_FINDING_CREATION_STATUS = "wizFindingCreationStatus";
     @Getter @Setter
     private String wizFindingCreationStatus;
