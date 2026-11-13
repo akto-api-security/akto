@@ -23,11 +23,14 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable, Coroutine
+from datetime import UTC, datetime
 from typing import Any
 
+import alerts
 import metrics_push
 from constants import observes
 from providers import FallbackProvider, build_provider_from_config, tripwire_provider
+from settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -108,12 +111,13 @@ def _fire_store(store_fn: Any | None, completed: list[dict[str, Any]], scanner_n
 
 
 class ModelMapScanner:
-    def __init__(self, scanner_name, scanner_type, text, config, store_fn=None, schedule_fn=None):
+    def __init__(self, scanner_name, scanner_type, text, config, store_fn=None, schedule_fn=None, agent_host=""):
         self.scanner_name = scanner_name
         self.scanner_type = scanner_type
         self.text = text
         self.config = config
         self.store_fn = store_fn
+        self.agent_host = agent_host  # the scan request's agent_host, when the gateway sends one
         # The runtime's fire-and-forget hook (waitUntil on Cloudflare, a task on the container).
         self.schedule = schedule_fn or _spawn
         self.completed_all: list[dict[str, Any]] = []
@@ -319,6 +323,8 @@ class ModelMapScanner:
             if result is None:
                 continue
             self.completed_all.append(result)
+            if settings.TRIPWIRE_RESULTS_BLOB_URL:
+                self.schedule(alerts.store_tripwire_result(self._tripwire_record(result, winner)))
             if (winner.get("details") or {}).get("error"):
                 continue  # the cascade failed open, so it has no verdict to disagree with
             if result.get("is_valid", True) != winner.get("is_valid", True):
@@ -327,6 +333,28 @@ class ModelMapScanner:
                     f"cascade={'SAFE' if winner.get('is_valid', True) else 'UNSAFE'} "
                     f"{entry.get('provider') or 'unknown'}={float(result.get('risk_score', 0.0)):.2f}"
                 )
+
+    def _tripwire_record(self, result: dict[str, Any], verdict: dict[str, Any]) -> dict[str, Any]:
+        """What's stored for one Tripwire answer: its verdict next to the scan's. Never the prompt text."""
+        tripwire, scan = result.get("details") or {}, verdict.get("details") or {}
+        return {
+            "time": datetime.now(UTC).isoformat(timespec="milliseconds"),
+            "scanner": self.scanner_name,
+            "agent_host": self.agent_host,
+            "tripwire": {
+                "is_attack": not result.get("is_valid", True),
+                "attack_score": tripwire.get("attack_score"),
+                "verdict": tripwire.get("verdict"),
+                "windows_skipped": tripwire.get("windows_skipped", 0),
+                "latency_ms": result.get("execution_time_ms"),
+            },
+            "scan": {
+                "blocked": not verdict.get("is_valid", True),
+                "risk_score": verdict.get("risk_score"),
+                "decided_by": scan.get("llm_provider", ""),
+                "failed_open": bool(scan.get("error")),
+            },
+        }
 
     async def _observe_late(self, late: TaskMap, verdict: dict[str, Any]) -> None:
         """Record observers that answered after the verdict went out, then store the scan's results together."""
