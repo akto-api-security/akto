@@ -811,6 +811,7 @@ function IssuesPage() {
             {
                 content: 'Create Linear ticket via Port',
                 onAction: () => { createPortTicketBulk() },
+                disabled: (window.PORT_IO_INTEGRATED === 'false'),
                 requires: ['api/fetchPortIOIntegration', 'api/createPortIOTickets']
             },
             {

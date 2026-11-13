@@ -52,6 +52,7 @@ const PortIO = () => {
         setIsSavingCredentials(true)
         try {
             await settingFunctions.addPortIOIntegration(clientId.trim(), clientSecret.trim(), workflowId.trim())
+            window.PORT_IO_INTEGRATED = 'true'
             setClientSecret('')
             func.setToast(true, false, isIntegrated ? 'Successfully updated Port credentials' : 'Successfully saved Port credentials')
             await loadIntegration()
@@ -66,6 +67,7 @@ const PortIO = () => {
         setIsSavingCredentials(true)
         try {
             await settingFunctions.removePortIOIntegration()
+            window.PORT_IO_INTEGRATED = 'false'
             setIsIntegrated(false)
             setTeams([])
             setClientId('')

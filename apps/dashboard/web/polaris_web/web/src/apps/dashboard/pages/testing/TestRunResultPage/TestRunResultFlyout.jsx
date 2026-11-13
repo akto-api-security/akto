@@ -44,7 +44,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, createLinearTicket, linearIssueUrl, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, createLinearTicket, createPortIOTicket, linearIssueUrl, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
     const [remediationText, setRemediationText] = useState("")
     const { canCall, canCallAll } = usePermissions()
     const [fullDescription, setFullDescription] = useState(false)
@@ -73,6 +73,9 @@ function TestRunResultFlyout(props) {
     const [linearModalActive, setLinearModalActive] = useState(false)
     const [linearTeams, setLinearTeams] = useState([])
     const [linearTeamId, setLinearTeamId] = useState('')
+    const [portModalActive, setPortModalActive] = useState(false)
+    const [portTeams, setPortTeams] = useState([])
+    const [portTeamId, setPortTeamId] = useState('')
     const [ticketMenuActive, setTicketMenuActive] = useState(false)
 
     const [description, setDescription] = useState("")
@@ -413,6 +416,27 @@ function TestRunResultFlyout(props) {
         }
     }
 
+    const handlePortClick = async () => {
+        if (!portModalActive) {
+            const portIntegration = await settingFunctions.fetchPortIOIntegration()
+            const teamsArray = Object.entries(portIntegration?.teamsMap || {}).map(([id, name]) => ({ id, name }))
+            if (teamsArray.length > 0) {
+                setPortTeams(teamsArray)
+                setPortTeamId(teamsArray[0].id)
+            }
+        }
+        setPortModalActive(!portModalActive)
+    }
+
+    const handlePortTicketCreation = async () => {
+        if (portTeamId && portTeamId.length > 0) {
+            await createPortIOTicket(issueDetails.id, portTeamId)
+            setPortModalActive(false)
+        } else {
+            func.setToast(true, true, "Invalid Linear team")
+        }
+    }
+
     const handleDevRevTicketCreation = async (issueId, labels) => {
         if (devrevPartId && devrevPartId.length > 0) {
             await createDevRevTicket(issueDetails.id, devrevPartId, devrevWorkItemType)
@@ -459,6 +483,13 @@ function TestRunResultFlyout(props) {
             allowed: canCallAll('api/fetchLinearIntegration', 'api/createLinearTickets'),
             ticketUrl: linearIssueUrl, ticketKey: hasTicket(linearIssueUrl) ? getLinearKey(linearIssueUrl) : '',
             onCreate: handleLinearClick
+        },
+        {
+            id: 'port', label: 'Linear via Port', logo: '/public/linear.svg',
+            integrated: window.PORT_IO_INTEGRATED === 'true',
+            allowed: canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets'),
+            ticketUrl: linearIssueUrl, ticketKey: hasTicket(linearIssueUrl) ? getLinearKey(linearIssueUrl) : '',
+            onCreate: handlePortClick
         }
     ]
 
@@ -776,6 +807,16 @@ function TestRunResultFlyout(props) {
                                 teams={linearTeams}
                                 teamId={linearTeamId}
                                 setTeamId={setLinearTeamId}
+                                issueId={issueDetails.id}
+                            />
+                            <LinearTicketCreationModal
+                                activator={showTicketMenu ? undefined : window.PORT_IO_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets')}><Button id={"create-port-ticket-button"} primary onClick={handlePortClick} disabled={!!linearIssueUrl}>Create Linear Ticket via Port</Button></AllowedAction> : <></>}
+                                modalActive={portModalActive}
+                                setModalActive={setPortModalActive}
+                                handleSaveAction={handlePortTicketCreation}
+                                teams={portTeams}
+                                teamId={portTeamId}
+                                setTeamId={setPortTeamId}
                                 issueId={issueDetails.id}
                             />
                            
