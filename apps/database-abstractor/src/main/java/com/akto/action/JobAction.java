@@ -5,6 +5,7 @@ import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobType;
+import com.akto.dto.jobs.LinearAutoTicketParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -49,6 +50,9 @@ public class JobAction extends ActionSupport {
         switch (jobType) {
             case JIRA_AUTO_CREATE_TICKETS:
                 jobParams = mapper.convertValue(jobParamsMap, AutoTicketParams.class);
+                break;
+            case LINEAR_AUTO_CREATE_TICKETS:
+                jobParams = mapper.convertValue(jobParamsMap, LinearAutoTicketParams.class);
                 break;
             default:
                 throw new IllegalArgumentException("Unhandled JobType: " + jobType);
