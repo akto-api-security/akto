@@ -213,6 +213,14 @@ public class MaliciousEventService {
         builder.setContextSource(contextSource);
     }
 
+    String evalType = ThreatUtils.evalType(contextSource, evt.getLatestApiEndpoint());
+    if (evalType != null) {
+        builder.setEvalType(evalType);
+    }
+    if (MaliciousEventDto.EVAL_TYPE_CONFIG.equals(evalType)) {
+        builder.setDedupeKey(ThreatUtils.configDedupeKey(evt.getHost(), actor, evt.getCategory(), evt.getLatestApiEndpoint()));
+    }
+
     if (ThreatUtils.groupsActivities(accountId)) {
         builder.setGroupKey(ThreatUtils.activityGroupKey(evt.getLatestApiPayload()));
     }
@@ -592,7 +600,8 @@ public class MaliciousEventService {
     // "agentic component + rule violated" — keeping only the latest occurrence. A different actor
     // (username) on the same host/setting still gets its own row.
     boolean dedupeLatestPerHostActorEndpoint = "only".equalsIgnoreCase(configEvalMode)
-        && "ENDPOINT".equalsIgnoreCase(contextSource);
+        && "ENDPOINT".equalsIgnoreCase(contextSource)
+        && !ThreatUtils.USE_EVAL_TYPE_READS;
 
     // Repeated Bedrock activities (same caller and prompt within the gap) are listed as one row.
     boolean groupActivities = ThreatUtils.groupsActivities(accountId) && "AGENTIC".equalsIgnoreCase(contextSource)

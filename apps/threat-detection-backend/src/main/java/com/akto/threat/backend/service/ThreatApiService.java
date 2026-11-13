@@ -9,6 +9,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.threat.backend.cache.DashboardFilterCache;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.ThreatUtils;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
 import com.mongodb.MongoExecutionTimeoutException;
 import com.mongodb.client.MongoCursor;
@@ -16,6 +17,7 @@ import com.mongodb.client.MongoCursor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -172,10 +174,21 @@ public class ThreatApiService {
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
+    boolean byEvalType = ThreatUtils.readsByEvalType(contextSource, null, ThreatUtils.USE_EVAL_TYPE_READS);
+    Document hostScopeMatch = req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null;
+    Document subCategoryGroupId = new Document("category", "$category").append("subCategory", "$subCategory");
+
+    if (byEvalType) {
+      Map<Object, Integer> counts = countExcludingEvalTypes(accountId, match, hostScopeMatch, subCategoryGroupId, null, 0);
+      return ThreatCategoryWiseCountResponse.newBuilder()
+          .addAllCategoryWiseCounts(subCategoryCounts(counts))
+          .build();
+    }
+
     match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
     pipeline.add(new Document("$match", match));
-    ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
+    ThreatUtils.addHostScope(pipeline, hostScopeMatch);
 
     // 3. Collapse misconfiguration re-detections.
     pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
@@ -243,28 +256,35 @@ public class ThreatApiService {
       if (!contextFilter.isEmpty()) {
           match.putAll(contextFilter);
       }
-      match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
-      List<Document> evaluationModeConditions = ThreatUtils.evaluationModeConditions(contextSource, skillEvalMode, configEvalMode);
+      boolean byEvalType = ThreatUtils.readsByEvalType(contextSource, skillEvalMode, ThreatUtils.USE_EVAL_TYPE_READS);
+      List<Document> evaluationModeConditions = byEvalType
+          ? Collections.emptyList()
+          : ThreatUtils.evaluationModeConditions(contextSource, skillEvalMode, configEvalMode);
+      if (!byEvalType) {
+          match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
+      }
       if (!evaluationModeConditions.isEmpty()) {
           match.append("$and", evaluationModeConditions);
       }
 
-      List<Document> pipeline = new ArrayList<>();
-      pipeline.add(new Document("$match", match));
-      ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
-      // The dedupe only collapses /config/ events; with those excluded it is a sort+group over every event for nothing.
-      if (!"exclude".equalsIgnoreCase(configEvalMode)) {
-          pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
-      }
-      pipeline.add(new Document("$group", new Document("_id", "$severity")
-          .append("count", new Document("$sum", 1))));
-
     Map<String, Integer> severityToCount = new HashMap<>();
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline)
-        .maxTime(evaluationModeConditions.isEmpty() ? 0 : ThreatUtils.REGEX_MAX_TIME_MS, java.util.concurrent.TimeUnit.MILLISECONDS).cursor()) {
-      while (cursor.hasNext()) {
-        Document doc = cursor.next();
-        severityToCount.put(doc.getString("_id"), doc.getInteger("count", 0));
+    long severityMaxTimeMs = evaluationModeConditions.isEmpty() && !byEvalType ? 0 : ThreatUtils.REGEX_MAX_TIME_MS;
+    Document hostScopeMatch = req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null;
+    try {
+      if (byEvalType) {
+        countExcludingEvalTypes(accountId, match, hostScopeMatch, "$severity", configEvalMode, severityMaxTimeMs)
+            .forEach((severity, count) -> severityToCount.put((String) severity, count));
+      } else {
+        List<Document> pipeline = new ArrayList<>();
+        pipeline.add(new Document("$match", match));
+        ThreatUtils.addHostScope(pipeline, hostScopeMatch);
+        // The dedupe only collapses /config/ events; with those excluded it is a sort+group over every event for nothing.
+        if (!"exclude".equalsIgnoreCase(configEvalMode)) {
+            pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
+        }
+        pipeline.add(new Document("$group", new Document("_id", "$severity")
+            .append("count", new Document("$sum", 1))));
+        severityToCount.putAll(runGroupedCounts(accountId, pipeline, severityMaxTimeMs, String.class));
       }
     } catch (MongoExecutionTimeoutException e) {
       new LoggerMaker(ThreatApiService.class, LoggerMaker.LogDb.THREAT_DETECTION).errorAndAddToDb("Severity counts exceeded " + ThreatUtils.REGEX_MAX_TIME_MS + "ms, returning none: " + e.getMessage(), LoggerMaker.LogDb.THREAT_DETECTION);
@@ -284,6 +304,59 @@ public class ThreatApiService {
     return ThreatSeverityWiseCountResponse.newBuilder()
         .addAllCategoryWiseCounts(categoryWiseCounts)
         .build();
+  }
+
+
+  private Map<Object, Integer> countExcludingEvalTypes(
+    String accountId, Document match, Document hostScopeMatch, Object groupId, String configEvalMode, long maxTimeMs) {
+
+    if ("only".equalsIgnoreCase(configEvalMode)) {
+      return runGroupedCounts(accountId, groupedPipeline(
+          new Document(match).append(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_CONFIG), hostScopeMatch, groupId),
+          maxTimeMs, Object.class);
+    }
+
+    Map<Object, Integer> counts = runGroupedCounts(accountId, groupedPipeline(match, hostScopeMatch, groupId), maxTimeMs, Object.class);
+    Document excluded = new Document(match).append(MaliciousEventDto.EVAL_TYPE,
+        new Document("$in", ThreatUtils.evalTypesExcludedFromCounts(configEvalMode)));
+    runGroupedCounts(accountId, groupedPipeline(excluded, hostScopeMatch, groupId), maxTimeMs, Object.class)
+        .forEach((key, count) -> counts.merge(key, -count, Integer::sum));
+    return counts;
+  }
+
+  private List<Document> groupedPipeline(Document match, Document hostScopeMatch, Object groupId) {
+    List<Document> pipeline = new ArrayList<>();
+    pipeline.add(new Document("$match", match));
+    ThreatUtils.addHostScope(pipeline, hostScopeMatch);
+    pipeline.add(new Document("$group", new Document("_id", groupId).append("count", new Document("$sum", 1))));
+    return pipeline;
+  }
+
+  private <K> Map<K, Integer> runGroupedCounts(String accountId, List<Document> pipeline, long maxTimeMs, Class<K> keyType) {
+    Map<K, Integer> counts = new HashMap<>();
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline)
+        .maxTime(maxTimeMs, java.util.concurrent.TimeUnit.MILLISECONDS).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        counts.put(keyType.cast(doc.get("_id")), doc.getInteger("count", 0));
+      }
+    }
+    return counts;
+  }
+
+  private List<ThreatCategoryWiseCountResponse.SubCategoryCount> subCategoryCounts(Map<Object, Integer> counts) {
+    return counts.entrySet().stream()
+        .filter(entry -> entry.getValue() > 0)
+        .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
+        .map(entry -> {
+          Document id = (Document) entry.getKey();
+          return ThreatCategoryWiseCountResponse.SubCategoryCount.newBuilder()
+              .setCategory(id.getString("category"))
+              .setSubCategory(id.getString("subCategory"))
+              .setCount(entry.getValue())
+              .build();
+        })
+        .collect(java.util.stream.Collectors.toList());
   }
 
 }

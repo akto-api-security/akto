@@ -177,6 +177,38 @@ public class ThreatUtils {
     }
 
     public static final Pattern CONFIG_ENDPOINT_PATTERN = Pattern.compile("/config/");
+    public static final boolean USE_EVAL_TYPE_READS = Boolean.parseBoolean(
+        System.getenv().getOrDefault("USE_EVAL_TYPE_READS", "false"));
+    public static final String EVAL_TYPE_INDEX = "idx_context_evalType_detectedAt";
+    public static final String CONFIG_DEDUPE_KEY_INDEX = "idx_dedupeKey_unique";
+
+    public static String evalType(String contextSource, String latestApiEndpoint) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource) || latestApiEndpoint == null) {
+            return null;
+        }
+        if (SKILLS_ENDPOINT_PATTERN.matcher(latestApiEndpoint).find()) {
+            return MaliciousEventDto.EVAL_TYPE_SKILL;
+        }
+        if (CONFIG_ENDPOINT_PATTERN.matcher(latestApiEndpoint).find()) {
+            return MaliciousEventDto.EVAL_TYPE_CONFIG;
+        }
+        return null;
+    }
+
+    public static boolean readsByEvalType(String contextSource, String skillEvalMode, boolean enabled) {
+        return enabled && "ENDPOINT".equalsIgnoreCase(contextSource) && !"only".equalsIgnoreCase(skillEvalMode);
+    }
+
+    public static List<String> evalTypesExcludedFromCounts(String configEvalMode) {
+        return "exclude".equalsIgnoreCase(configEvalMode)
+            ? Arrays.asList(MaliciousEventDto.EVAL_TYPE_SKILL, MaliciousEventDto.EVAL_TYPE_CONFIG)
+            : Collections.singletonList(MaliciousEventDto.EVAL_TYPE_SKILL);
+    }
+
+    public static String configDedupeKey(String host, String actor, String category, String latestApiEndpoint) {
+        return String.join("|", Objects.toString(host, ""), Objects.toString(actor, ""),
+            Objects.toString(category, ""), Objects.toString(latestApiEndpoint, ""));
+    }
 
     // Skills Evaluations / Misconfigured Settings partitions — Atlas (ENDPOINT) only. An event
     // belongs to Skills Evaluations iff latestApiEndpoint starts with "/skills/"; it belongs to
@@ -192,12 +224,16 @@ public class ThreatUtils {
             return conditions;
         }
         if ("only".equalsIgnoreCase(skillEvalMode)) {
-            conditions.add(new Document("latestApiEndpoint", SKILLS_ENDPOINT_PATTERN));
+            conditions.add(USE_EVAL_TYPE_READS
+                ? new Document(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_SKILL)
+                : new Document("latestApiEndpoint", SKILLS_ENDPOINT_PATTERN));
         } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
             conditions.add(new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN)));
         }
         if ("only".equalsIgnoreCase(configEvalMode)) {
-            conditions.add(new Document("latestApiEndpoint", CONFIG_ENDPOINT_PATTERN));
+            conditions.add(USE_EVAL_TYPE_READS
+                ? new Document(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_CONFIG)
+                : new Document("latestApiEndpoint", CONFIG_ENDPOINT_PATTERN));
         } else if ("exclude".equalsIgnoreCase(configEvalMode)) {
             conditions.add(new Document("latestApiEndpoint", new Document("$not", CONFIG_ENDPOINT_PATTERN)));
         }
@@ -224,7 +260,7 @@ public class ThreatUtils {
     // same shape and the deduped config events are unioned back in, so no group is built per event.
     // precedingStages are the caller's stages so far, replayed for the config branch.
     public static List<Document> configScanDedupeStages(List<Document> precedingStages, String contextSource) {
-        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+        if (USE_EVAL_TYPE_READS || !"ENDPOINT".equalsIgnoreCase(contextSource)) {
             return Collections.emptyList();
         }
 
@@ -580,6 +616,18 @@ public class ThreatUtils {
         if (groupsActivities(accountId) && !existingIndexes.contains(ACTIVITY_GROUP_INDEX)) {
             collection.createIndex(ACTIVITY_GROUP_INDEX_KEYS, new IndexOptions().name(ACTIVITY_GROUP_INDEX)
                 .partialFilterExpression(new Document("groupKey", new Document("$type", "string"))));
+        }
+
+        if (!existingIndexes.contains(EVAL_TYPE_INDEX)) {
+            collection.createIndex(Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending(MaliciousEventDto.EVAL_TYPE), Indexes.descending("detectedAt")),
+                new IndexOptions().name(EVAL_TYPE_INDEX)
+                    .partialFilterExpression(new Document(MaliciousEventDto.EVAL_TYPE, new Document("$exists", true))));
+        }
+
+        if (!existingIndexes.contains(CONFIG_DEDUPE_KEY_INDEX)) {
+            collection.createIndex(Indexes.ascending(MaliciousEventDto.DEDUPE_KEY),
+                new IndexOptions().name(CONFIG_DEDUPE_KEY_INDEX).unique(true)
+                    .partialFilterExpression(new Document(MaliciousEventDto.DEDUPE_KEY, new Document("$type", "string"))));
         }
     }
 
