@@ -60,19 +60,8 @@ export default function LeftNav() {
     const resetAll = PersistStore(state => state.resetAll);
     const resetStore = LocalStore(state => state.resetStore);
     const agenticNewLayout = LocalStore(state => state.agenticNewLayout);
-    const setAgenticNewLayout = LocalStore(state => state.setAgenticNewLayout);
     const resetSession = SessionStore(state => state.resetStore);
     const resetFields = IssuesStore(state => state.resetStore);
-
-    useEffect(() => {
-        if (Number(activeAccount) !== 1784850613) return;
-        const marker = "agenticNewLayoutDefaulted";
-        try {
-            if (localStorage.getItem(marker)) return;
-            localStorage.setItem(marker, "1");
-        } catch (e) { return; }
-        setAgenticNewLayout(true);
-    }, [activeAccount]);
 
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
