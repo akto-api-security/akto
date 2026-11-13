@@ -48,6 +48,7 @@ import com.akto.dto.gpt.AktoGptConfigState;
 import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobParams;
+import com.akto.dto.jobs.S3ExportJobParams;
 import com.akto.dto.jobs.TicketSyncJobParams;
 import com.akto.dto.jobs.WizApiEndpointsImportJobParams;
 import com.akto.dto.jobs.ImpervaApiEndpointsImportJobParams;
@@ -96,6 +97,7 @@ import com.akto.dto.upload.FileUploadLog;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
+import com.akto.dto.s3_export.S3ExportIntegration;
 import com.akto.dto.usage.UsageSync;
 import com.akto.dto.wiz_integration.WizEndpointAsset;
 import com.akto.dto.wiz_integration.WizIntegration;
@@ -374,6 +376,8 @@ public class DaoInit {
         ClassModel<OpenTelemetryIntegration> openTelemetryIntegrationClassModel = ClassModel.builder(OpenTelemetryIntegration.class).enableDiscriminator(true).build();
         ClassModel<ModelConfig> modelConfigClassModel = ClassModel.builder(ModelConfig.class).enableDiscriminator(true).build();
         ClassModel<CopilotStudioIntegration> copilotStudioIntegrationClassModel = ClassModel.builder(CopilotStudioIntegration.class).enableDiscriminator(true).build();
+        ClassModel<S3ExportIntegration> s3ExportIntegrationClassModel = ClassModel.builder(S3ExportIntegration.class).enableDiscriminator(true).build();
+        ClassModel<S3ExportJobParams> s3ExportJobParamsClassModel = ClassModel.builder(S3ExportJobParams.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -420,7 +424,8 @@ public class DaoInit {
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
                 wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel, wizApiEndpointsImportJobParamsClassModel, impervaApiEndpointsImportJobParamsClassModel, skillRevalidationJobParamsClassModel,
                 mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel,
-                openTelemetryIntegrationClassModel, copilotStudioIntegrationClassModel, insightNarrativeCacheClassModel, insightClassificationCacheClassModel)
+                openTelemetryIntegrationClassModel, copilotStudioIntegrationClassModel, insightNarrativeCacheClassModel, insightClassificationCacheClassModel,
+                s3ExportIntegrationClassModel, s3ExportJobParamsClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(

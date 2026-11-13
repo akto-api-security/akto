@@ -206,6 +206,12 @@ function Integrations() {
       source: '/public/opentelemetry-logo.svg'
     }
 
+    let s3ExportObj = {
+      id: 's3_export',
+      name: 'Amazon S3 export',
+      source: '/public/aws.svg'
+    }
+
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
@@ -280,7 +286,7 @@ function Integrations() {
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, wizObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
-    const siemItems = [splunkObj, datadogObj];
+    const siemItems = [splunkObj, datadogObj, ...(func.checkForFeatureSaas('S3_EXPORT') ? [s3ExportObj] : [])];
     const monitoringItems = [newRelicObj, openTelemetryObj]
     switch (tabId) {
       case 'traffic':

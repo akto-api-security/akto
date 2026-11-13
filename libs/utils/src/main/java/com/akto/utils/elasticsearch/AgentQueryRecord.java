@@ -33,6 +33,11 @@ public class AgentQueryRecord {
     public static final String F_GUARDRAIL_VIOLATED    = "guardrailViolated";
     public static final String F_GUARDRAIL_POLICY      = "guardrailPolicy";
     public static final String F_GUARDRAIL_POLICY_KW   = "guardrailPolicy.keyword";
+    public static final String F_GUARDRAIL_ACTION      = "guardrailAction";
+    public static final String F_GUARDRAIL_RULE        = "guardrailRule";
+    public static final String F_GUARDRAIL_REASON      = "guardrailReason";
+    public static final String F_GUARDRAIL_SEVERITY    = "guardrailSeverity";
+    public static final String F_SPAN_ID               = "spanId";
 
     private final String docId;
     private final int accountId;

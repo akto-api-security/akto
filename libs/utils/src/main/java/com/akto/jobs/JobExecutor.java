@@ -108,7 +108,7 @@ public abstract class JobExecutor<T extends JobParams> {
                 Filters.eq(Job.JOB_STATUS, JobStatus.RUNNING.name())
             ),
             Updates.combine(
-                Updates.set(Job.FINISHED_AT, now + 300),
+                Updates.set(Job.SCHEDULED_AT, now + 300),
                 Updates.set(Job.LAST_UPDATED_AT, now),
                 Updates.set(Job.JOB_STATUS, JobStatus.SCHEDULED.name())
             ),

@@ -2,6 +2,7 @@ package com.akto.utils.threat_detection;
 
 import com.akto.ProtoMessageUtils;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ExportMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -12,6 +13,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import java.io.IOException;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,6 +35,8 @@ public final class ThreatDetectionBackendClient {
     private static final String RECORD_MALICIOUS_EVENT_PATH = "/api/threat_detection/record_malicious_event";
     private static final String LIST_MALICIOUS_REQUESTS_PATH = "/api/dashboard/list_malicious_requests";
     private static final String LIST_GUARDRAIL_VIOLATION_PAYLOADS_PATH = "/api/dashboard/list_guardrail_violation_payloads";
+    private static final String EXPORT_MALICIOUS_EVENTS_PATH = "/api/dashboard/export_malicious_events";
+    private static final int ERROR_BODY_MAX_CHARS = 500;
 
     private ThreatDetectionBackendClient() {
     }
@@ -246,5 +250,61 @@ public final class ThreatDetectionBackendClient {
                 ListGuardrailViolationPayloadsResponse.class, responseBody
             ).orElse(null);
         }
+    }
+
+    /**
+     * One page of the bulk, keyset-paginated export of {@code malicious_events} in
+     * {@code [startTs, endTs)} (epoch seconds, end exclusive), oldest first. Pass the previous
+     * page's {@code next_cursor} as {@code cursor} until it comes back empty. Unlike the list
+     * methods above this never returns null: a non-2xx response or an unparseable body throws, so
+     * a caller can tell "no data" (empty events) from "error".
+     *
+     * @param limit page size request; the server defaults it when {@code <= 0} and caps it at 1000
+     * @param includePayload true to fill each event's {@code payload} with the decoded sample
+     */
+    public static ExportMaliciousEventsResponse exportMaliciousEvents(
+            int accountId,
+            long startTs,
+            long endTs,
+            String cursor,
+            int limit,
+            boolean includePayload,
+            String contextSourceValue) throws Exception {
+        String url = backendUrl() + EXPORT_MALICIOUS_EVENTS_PATH;
+
+        Map<String, Object> timeRange = new HashMap<>();
+        timeRange.put("start", startTs);
+        timeRange.put("end", endTs);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("detectedAtTimeRange", timeRange);
+        body.put("limit", limit);
+        body.put("includePayload", includePayload);
+        if (cursor != null && !cursor.isEmpty()) {
+            body.put("cursor", cursor);
+        }
+
+        RequestBody requestBody = RequestBody.create(objectMapper.valueToTree(body).toString(), JSON);
+        Request request = new Request.Builder()
+            .url(url)
+            .post(requestBody)
+            .addHeader("Authorization", "Bearer " + apiToken(accountId))
+            .addHeader("Content-Type", "application/json")
+            .addHeader("x-context-source", contextSourceValue == null ? "" : contextSourceValue)
+            .build();
+
+        try (Response resp = httpClient.newCall(request).execute()) {
+            String responseBody = resp.body() != null ? resp.body().string() : "";
+            if (!resp.isSuccessful()) {
+                throw new IOException("export_malicious_events failed with status " + resp.code() + ": " + truncate(responseBody));
+            }
+            return ProtoMessageUtils.<ExportMaliciousEventsResponse>toProtoMessage(
+                ExportMaliciousEventsResponse.class, responseBody
+            ).orElseThrow(() -> new IOException("export_malicious_events returned an unparseable body: " + truncate(responseBody)));
+        }
+    }
+
+    private static String truncate(String text) {
+        return text.length() <= ERROR_BODY_MAX_CHARS ? text : text.substring(0, ERROR_BODY_MAX_CHARS) + "...";
     }
 }

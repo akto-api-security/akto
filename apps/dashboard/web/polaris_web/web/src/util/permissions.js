@@ -143,6 +143,7 @@ const PAGE_REQUIRES = {
     '/dashboard/settings/integrations/cloudflare_waf': 'api/fetchCloudflareWafIntegration',
     '/dashboard/settings/integrations/postman': 'api/getPostmanCredential',
     '/dashboard/settings/integrations/webhooks': 'api/fetchCustomWebhooks',
+    '/dashboard/settings/integrations/s3_export': 'api/fetchS3ExportIntegration',
 }
 
 /** The action a page (by its path) needs, or undefined when it has none to check. */

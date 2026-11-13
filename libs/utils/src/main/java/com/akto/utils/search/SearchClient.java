@@ -134,6 +134,16 @@ public abstract class SearchClient {
     /** Used by UserAnalysisCron to write classified topic/subTopic back to the backend. */
     public abstract void bulkUpdateTopics(List<TopicUpdate> updates);
 
+    /**
+     * Used by the S3 export job: streams every Atlas (isAtlasTraffic) row of the account in the
+     * half-open window [startMs, endMs) to the consumer, in a deterministic order, so a retried
+     * window produces the same rows. Unlike the read paths above it throws on any backend error
+     * instead of returning partial or empty data. queryPayload/responsePayload are only set when
+     * includePayloads is true.
+     */
+    public abstract void exportAtlasTraces(int accountId, long startMs, long endMs, boolean includePayloads,
+        Consumer<Map<String, Object>> consumer) throws Exception;
+
     // ── Shared, backend-agnostic helpers ───────────────────────────────────────
 
     /**

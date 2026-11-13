@@ -705,6 +705,12 @@ public class AzureDataExplorerClient extends SearchClient {
         return new LinkedHashMap<>();
     }
 
+    @Override
+    public void exportAtlasTraces(int accountId, long startMs, long endMs, boolean includePayloads,
+                                  Consumer<Map<String, Object>> consumer) {
+        throw new UnsupportedOperationException("S3 export not supported on ADX backend");
+    }
+
     private long[] queryDataRange(String where, long fallbackMs) {
         String kql = ADX_TABLE + " | where " + where
             + " | summarize minTs=min(" + AgentQueryRecord.F_TIMESTAMP + "), maxTs=max(" + AgentQueryRecord.F_TIMESTAMP + ")"

@@ -165,6 +165,17 @@
             <version>2.40.9</version>
             <optional>true</optional>
         </dependency>
+        <!-- S3 export (S3ExportWriter): assume the customer's role and write to their bucket -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.40.9</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sts</artifactId>
+            <version>2.40.9</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>

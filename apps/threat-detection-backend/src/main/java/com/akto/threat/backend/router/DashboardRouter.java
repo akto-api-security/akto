@@ -4,6 +4,7 @@ import com.akto.threat.backend.utils.ThreatUtils;
 
 import com.akto.ProtoMessageUtils;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ExportMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
@@ -246,6 +247,33 @@ public class DashboardRouter implements ARouter {
                 ProtoMessageUtils.toString(
                     dsService.listGuardrailViolationPayloads(ctx.get("accountId"), req, contextSource)
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/export_malicious_events")
+            .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
+                RequestBody reqBody = ctx.body();
+                ExportMaliciousEventsRequest req = ProtoMessageUtils.<
+                    ExportMaliciousEventsRequest
+                >toProtoMessage(
+                    ExportMaliciousEventsRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                try {
+                    ProtoMessageUtils.toString(
+                        dsService.exportMaliciousEvents(ctx.get("accountId"), req, contextSource)
+                    ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+                } catch (IllegalArgumentException e) {
+                    ctx.response().setStatusCode(400).end("Invalid cursor");
+                }
             });
 
         router

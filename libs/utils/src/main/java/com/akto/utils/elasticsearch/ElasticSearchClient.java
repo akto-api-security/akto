@@ -18,6 +18,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -87,6 +89,15 @@ public class ElasticSearchClient extends SearchClient {
     private static final String AGG_USER_ANALYSIS_DEVICE   = "userAnalysisByDevice";
     private static final int    USER_ANALYSIS_SERVICE_SIZE = 200;
     private static final int    USER_ANALYSIS_DEVICE_SIZE  = 2000;
+
+    // S3 export: point-in-time + search_after paging, ordered by (timestamp, _shard_doc)
+    private static final int    EXPORT_PAGE_SIZE        = 2000;
+    private static final String PIT_KEEP_ALIVE          = "2m";
+    private static final String SHARD_DOC_FIELD         = "_shard_doc";
+    private static final String EXPORT_DOC_ID           = "docId";
+    private static final String EXPORT_TIMESTAMP_ISO    = "timestampIso";
+    private static final String EXPORT_APPLICATION      = "application";
+    private static final String EXPORT_SESSION_ID       = "sessionId";
 
     private static final ElasticSearchClient INSTANCE = new ElasticSearchClient();
     public static ElasticSearchClient instance() { return INSTANCE; }
@@ -1334,6 +1345,104 @@ public class ElasticSearchClient extends SearchClient {
         }
     }
 
+    // ── Export (PIT + search_after, used by the S3 export job) ────────────────
+
+    @Override
+    public void exportAtlasTraces(int accountId, long startMs, long endMs, boolean includePayloads,
+                                  Consumer<Map<String, Object>> consumer) throws Exception {
+        if (!isConfigured()) throw new IllegalStateException("Elasticsearch is not configured");
+        String pitId = openPit();
+        try {
+            JSONObject query = buildQuery(accountId, startMs, endMs, null, null, Boolean.TRUE);
+            JSONArray searchAfter = null;
+            while (true) {
+                JSONObject body = new JSONObject()
+                    .put("size", EXPORT_PAGE_SIZE)
+                    .put("query", query)
+                    .put("track_total_hits", false)
+                    .put("pit", new JSONObject().put("id", pitId).put("keep_alive", PIT_KEEP_ALIVE))
+                    .put("sort", new JSONArray()
+                        .put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, "asc"))
+                        .put(new JSONObject().put(SHARD_DOC_FIELD, "asc")));
+                if (!includePayloads) {
+                    body.put("_source", new JSONObject().put("excludes", new JSONArray().put(AgentQueryRecord.F_QUERY_PAYLOAD)));
+                }
+                if (searchAfter != null) body.put("search_after", searchAfter);
+
+                JSONObject response = httpPostStrict(trimTrailingSlash(ES_HOST) + "/_search", body.toString());
+                pitId = response.optString("pit_id", pitId);
+                JSONArray hits = extractHits(response);
+                if (hits == null || hits.length() == 0) return;
+
+                for (int i = 0; i < hits.length(); i++) {
+                    consumer.accept(toExportRow(hits.getJSONObject(i), includePayloads));
+                }
+                searchAfter = hits.getJSONObject(hits.length() - 1).optJSONArray("sort");
+                if (searchAfter == null) throw new IllegalStateException("Elasticsearch hit has no sort values");
+            }
+        } finally {
+            closePit(pitId);
+        }
+    }
+
+    private Map<String, Object> toExportRow(JSONObject hit, boolean includePayloads) {
+        JSONObject src = hit.optJSONObject("_source");
+        if (src == null) src = new JSONObject();
+        long ts = src.optLong(AgentQueryRecord.F_TIMESTAMP, 0L);
+        long inputTokens = src.optLong(AgentQueryRecord.F_INPUT_TOKENS, 0L);
+        long outputTokens = src.optLong(AgentQueryRecord.F_OUTPUT_TOKENS, 0L);
+        String responsePayload = src.optString(AgentQueryRecord.F_RESPONSE_PAYLOAD, "");
+
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put(EXPORT_DOC_ID, hit.optString("_id", ""));
+        row.put(AgentQueryRecord.F_ACCOUNT_ID, src.optInt(AgentQueryRecord.F_ACCOUNT_ID, 0));
+        row.put(AgentQueryRecord.F_TIMESTAMP, ts);
+        row.put(EXPORT_TIMESTAMP_ISO, Instant.ofEpochMilli(ts).toString());
+        row.put(AgentQueryRecord.F_USER_NAME, src.optString(AgentQueryRecord.F_USER_NAME, ""));
+        row.put(AgentQueryRecord.F_DEVICE_ID, src.optString(AgentQueryRecord.F_DEVICE_ID, ""));
+        row.put(EXPORT_APPLICATION, src.optString(AgentQueryRecord.F_SERVICE_ID, ""));
+        row.put(EXPORT_SESSION_ID, src.optString(AgentQueryRecord.F_SESSION_IDENTIFIER, ""));
+        row.put(AgentQueryRecord.F_TRACE_ID, src.optString(AgentQueryRecord.F_TRACE_ID, ""));
+        row.put(AgentQueryRecord.F_SPAN_ID, src.optString(AgentQueryRecord.F_SPAN_ID, ""));
+        row.put(KEY_MODEL, extractModel(responsePayload));
+        row.put(AgentQueryRecord.F_INPUT_TOKENS, inputTokens);
+        row.put(AgentQueryRecord.F_OUTPUT_TOKENS, outputTokens);
+        row.put(KEY_TOTAL_TOKENS, inputTokens + outputTokens);
+        row.put(AgentQueryRecord.F_IS_ATLAS_TRAFFIC, src.optBoolean(AgentQueryRecord.F_IS_ATLAS_TRAFFIC, false));
+        row.put(AgentQueryRecord.F_TOPIC, src.optString(AgentQueryRecord.F_TOPIC, ""));
+        row.put(AgentQueryRecord.F_SUB_TOPIC, src.optString(AgentQueryRecord.F_SUB_TOPIC, ""));
+        row.put(AgentQueryRecord.F_GUARDRAIL_VIOLATED, src.optBoolean(AgentQueryRecord.F_GUARDRAIL_VIOLATED, false));
+        row.put(AgentQueryRecord.F_GUARDRAIL_POLICY, src.optString(AgentQueryRecord.F_GUARDRAIL_POLICY, ""));
+        row.put(AgentQueryRecord.F_GUARDRAIL_RULE, src.optString(AgentQueryRecord.F_GUARDRAIL_RULE, ""));
+        row.put(AgentQueryRecord.F_GUARDRAIL_ACTION, src.optString(AgentQueryRecord.F_GUARDRAIL_ACTION, ""));
+        row.put(AgentQueryRecord.F_GUARDRAIL_SEVERITY, src.optString(AgentQueryRecord.F_GUARDRAIL_SEVERITY, ""));
+        row.put(AgentQueryRecord.F_GUARDRAIL_REASON, src.optString(AgentQueryRecord.F_GUARDRAIL_REASON, ""));
+        if (includePayloads) {
+            row.put(AgentQueryRecord.F_QUERY_PAYLOAD, src.optString(AgentQueryRecord.F_QUERY_PAYLOAD, ""));
+            row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD, responsePayload);
+        }
+        return row;
+    }
+
+    private String openPit() throws IOException, JSONException {
+        String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_pit?keep_alive=" + PIT_KEEP_ALIVE;
+        return httpPostStrict(url, "").getString("id");
+    }
+
+    // best-effort: an unclosed PIT expires on its own after the keep-alive
+    private void closePit(String pitId) {
+        try {
+            Request.Builder rb = new Request.Builder()
+                .url(trimTrailingSlash(ES_HOST) + "/_pit")
+                .method("DELETE", RequestBody.create(new JSONObject().put("id", pitId).toString(), JSON_MEDIA))
+                .addHeader("Content-Type", "application/json");
+            addAuthHeader(rb);
+            try (Response resp = http.newCall(rb.build()).execute()) { /* best-effort */ }
+        } catch (Exception e) {
+            logger.error("closePit error: " + e.getMessage());
+        }
+    }
+
     // ── Generic aggregation ─────────────────────────────────────────────────────
 
     private JSONObject aggregate(JSONObject query, JSONObject aggs) {
@@ -1702,6 +1811,21 @@ public class ElasticSearchClient extends SearchClient {
         } catch (Exception e) {
             logger.error("ES request error for " + url + ": " + e.getMessage());
             return null;
+        }
+    }
+
+    /** Like httpPost, but throws on any non-2xx response or transport error instead of returning null. */
+    private JSONObject httpPostStrict(String url, String body) throws IOException, JSONException {
+        Request.Builder rb = new Request.Builder()
+            .url(url)
+            .method("POST", RequestBody.create(body, JSON_MEDIA))
+            .addHeader("Content-Type", "application/json");
+        addAuthHeader(rb);
+        try (Response resp = http.newCall(rb.build()).execute()) {
+            if (!resp.isSuccessful()) throw new IOException("Elasticsearch request failed with HTTP " + resp.code());
+            ResponseBody rbody = resp.body();
+            if (rbody == null) throw new IOException("Elasticsearch returned an empty response");
+            return new JSONObject(rbody.string());
         }
     }
 

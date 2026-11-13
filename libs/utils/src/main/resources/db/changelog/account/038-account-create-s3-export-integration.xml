@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collection for S3ExportIntegrationDao (customer S3 bucket, assumable role, datasets and
+        schedule for the recurring S3 export). Singleton-per-account document, read/written via
+        findOne/updateOne/deleteAll with an empty filter (S3ExportIntegrationAction), so only the
+        default _id index is needed — no secondary indexes.
+    -->
+
+    <changeSet id="038-account-create-s3-export-integration" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="s3_export_integration"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="s3_export_integration"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="s3_export_integration"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

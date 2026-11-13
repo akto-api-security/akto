@@ -376,6 +376,9 @@ public class TestRbacGuards extends MongoBasedTest {
         expected.put("api/addDatadogIntegration", integrationWriters);
         expected.put("api/addSplunkIntegration", integrationWriters);
         expected.put("api/addAwsWafIntegration", integrationWriters);
+        expected.put("api/testS3ExportIntegration", integrationWriters);
+        expected.put("api/saveS3ExportIntegration", integrationWriters);
+        expected.put("api/removeS3ExportIntegration", integrationWriters);
 
         for (Map.Entry<String, Set<Role>> entry : expected.entrySet()) {
             Map<String, String> params = actions.get(entry.getKey());

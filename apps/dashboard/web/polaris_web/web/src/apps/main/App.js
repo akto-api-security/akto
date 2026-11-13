@@ -116,6 +116,7 @@ import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDat
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
 import Wiz from "@/apps/dashboard/pages/settings/integrations/Wiz.jsx";
+import S3Export from "@/apps/dashboard/pages/settings/integrations/S3Export.jsx";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
@@ -581,6 +582,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/wiz",
                         element: <Wiz/>,
+                    },
+                    {
+                        path: "integrations/s3_export",
+                        element: <S3Export/>,
                     },
                     {
                         path: "integrations/akto_apis",

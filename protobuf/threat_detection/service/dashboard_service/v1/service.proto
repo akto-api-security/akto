@@ -148,6 +148,18 @@ message ListGuardrailViolationPayloadsResponse {
   repeated ViolationPayload payloads = 1;
 }
 
+message ExportMaliciousEventsRequest {
+  optional TimeRangeFilter detected_at_time_range = 1; // epoch seconds; start inclusive, end EXCLUSIVE
+  optional string cursor = 2;                          // previous page's next_cursor ("<detectedAt>|<_id>"); empty = first page
+  uint32 limit = 3;                                    // 0/unset -> 500; capped at 1000
+  optional bool include_payload = 4;                   // true -> fill MaliciousEvent.payload with the decoded sample
+}
+
+message ExportMaliciousEventsResponse {
+  repeated ListMaliciousRequestsResponse.MaliciousEvent events = 1;
+  string next_cursor = 2;                              // empty when this was the last page
+}
+
 message FetchAlertFiltersRequest {
   optional TimeRangeFilter detected_at_time_range = 1;
 }

@@ -1322,6 +1322,34 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchS3ExportIntegration() {
+        return request({
+            url: '/api/fetchS3ExportIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    testS3ExportIntegration(connection) {
+        return request({
+            url: '/api/testS3ExportIntegration',
+            method: 'post',
+            data: connection
+        })
+    },
+    saveS3ExportIntegration(config) {
+        return request({
+            url: '/api/saveS3ExportIntegration',
+            method: 'post',
+            data: config
+        })
+    },
+    removeS3ExportIntegration() {
+        return request({
+            url: '/api/removeS3ExportIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     addMatchingPatternForProxy(proxyPattern, switchProxyMode) {
         return request({
             url: '/api/addMatchingPatternForProxy',

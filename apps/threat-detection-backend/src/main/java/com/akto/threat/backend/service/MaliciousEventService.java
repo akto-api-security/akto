@@ -12,6 +12,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.OwaspCategory;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ExportMaliciousEventsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ExportMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsRequest;
@@ -41,6 +43,7 @@ import com.mongodb.client.model.WriteModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.DistinctIterable;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Sorts;
@@ -675,65 +678,9 @@ public class MaliciousEventService {
 
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       for (MaliciousEventDto evt : pageEvents) {
-        String metadata = minimalFields ? "" : ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
         String resolvedSessionId = (!minimalFields && evt.getSessionId() != null && validSessionIds.contains(evt.getSessionId()))
             ? evt.getSessionId() : "";
-
-        ListMaliciousRequestsResponse.MaliciousEvent.Builder builder =
-            ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()
-                .setActor(evt.getActor())
-                .setFilterId(evt.getFilterId())
-                .setId(evt.getId())
-                .setIp(evt.getLatestApiIp())
-                .setCountry(evt.getCountry())
-                .setDestCountry(evt.getDestCountry() != null ? evt.getDestCountry() : "")
-                .setPayload("")
-                .setEndpoint(evt.getLatestApiEndpoint())
-                .setMethod(evt.getLatestApiMethod().name())
-                .setDetectedAt(evt.getDetectedAt())
-                .setCategory(evt.getCategory())
-                .setSubCategory(evt.getSubCategory())
-                .setApiCollectionId(evt.getLatestApiCollectionId())
-                .setType(evt.getType())
-                .setRefId(evt.getRefId())
-                .setEventTypeVal(evt.getEventType().toString())
-                .setMetadata(metadata)
-                .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : ThreatDetectionConstants.ACTIVE)
-                .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
-                .setLabel(convertModelLabelToString(evt.getLabel()))
-                .setHost(evt.getHost() != null ? evt.getHost() : "")
-                .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
-                .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
-                .setSessionId(resolvedSessionId);
-        if (evt.getGroupKey() != null && evt.getGroupCount() != null) {
-          builder.setGroupCount(evt.getGroupCount())
-              .setGroupFirstDetectedAt(evt.getGroupFirstDetectedAt() != null ? evt.getGroupFirstDetectedAt() : evt.getDetectedAt());
-          if (evt.getGroupEventIds() != null) {
-            builder.addAllGroupEventIds(evt.getGroupEventIds());
-          }
-          if (evt.getGroupFilterIds() != null) {
-            builder.addAllGroupFilterIds(evt.getGroupFilterIds());
-          }
-        }
-        if (!minimalFields) {
-          builder.setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
-              .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "")
-              .setHumanResponse(evt.getHumanResponse() != null ? evt.getHumanResponse() : "")
-              .setCaseOwner(evt.getCaseOwner() != null ? evt.getCaseOwner() : "")
-              .setCaseNotes(evt.getCaseNotes() != null ? evt.getCaseNotes() : "")
-              .addAllCaseTimeline(ThreatUtils.caseActivities(evt))
-              .addAllOwaspCategories(evt.getOwaspCategories() != null
-                  ? evt.getOwaspCategories().stream()
-                      .map(o -> OwaspCategory.newBuilder()
-                          .setId(o.getId() != null ? o.getId() : "")
-                          .setName(o.getName() != null ? o.getName() : "")
-                          .setSeverity(o.getSeverity() != null ? o.getSeverity() : "")
-                          .setConfidence(o.getConfidence() != null ? o.getConfidence() : "")
-                          .build())
-                      .collect(Collectors.toList())
-                  : Collections.emptyList());
-        }
-        maliciousEvents.add(builder.build());
+        maliciousEvents.add(toMaliciousEvent(evt, minimalFields, resolvedSessionId).build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
           .setTotal(total)
@@ -744,6 +691,67 @@ public class MaliciousEventService {
         cursor.close();
       }
     }
+  }
+
+  // Shared row mapping for list_malicious_requests and export_malicious_events; payload stays empty here.
+  private static ListMaliciousRequestsResponse.MaliciousEvent.Builder toMaliciousEvent(
+      MaliciousEventDto evt, boolean minimalFields, String resolvedSessionId) {
+    String metadata = minimalFields ? "" : ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
+    ListMaliciousRequestsResponse.MaliciousEvent.Builder builder =
+        ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()
+            .setActor(evt.getActor())
+            .setFilterId(evt.getFilterId())
+            .setId(evt.getId())
+            .setIp(evt.getLatestApiIp())
+            .setCountry(evt.getCountry())
+            .setDestCountry(evt.getDestCountry() != null ? evt.getDestCountry() : "")
+            .setPayload("")
+            .setEndpoint(evt.getLatestApiEndpoint())
+            .setMethod(evt.getLatestApiMethod().name())
+            .setDetectedAt(evt.getDetectedAt())
+            .setCategory(evt.getCategory())
+            .setSubCategory(evt.getSubCategory())
+            .setApiCollectionId(evt.getLatestApiCollectionId())
+            .setType(evt.getType())
+            .setRefId(evt.getRefId())
+            .setEventTypeVal(evt.getEventType().toString())
+            .setMetadata(metadata)
+            .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : ThreatDetectionConstants.ACTIVE)
+            .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
+            .setLabel(convertModelLabelToString(evt.getLabel()))
+            .setHost(evt.getHost() != null ? evt.getHost() : "")
+            .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
+            .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
+            .setSessionId(resolvedSessionId);
+    if (evt.getGroupKey() != null && evt.getGroupCount() != null) {
+      builder.setGroupCount(evt.getGroupCount())
+          .setGroupFirstDetectedAt(evt.getGroupFirstDetectedAt() != null ? evt.getGroupFirstDetectedAt() : evt.getDetectedAt());
+      if (evt.getGroupEventIds() != null) {
+        builder.addAllGroupEventIds(evt.getGroupEventIds());
+      }
+      if (evt.getGroupFilterIds() != null) {
+        builder.addAllGroupFilterIds(evt.getGroupFilterIds());
+      }
+    }
+    if (!minimalFields) {
+      builder.setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
+          .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "")
+          .setHumanResponse(evt.getHumanResponse() != null ? evt.getHumanResponse() : "")
+          .setCaseOwner(evt.getCaseOwner() != null ? evt.getCaseOwner() : "")
+          .setCaseNotes(evt.getCaseNotes() != null ? evt.getCaseNotes() : "")
+          .addAllCaseTimeline(ThreatUtils.caseActivities(evt))
+          .addAllOwaspCategories(evt.getOwaspCategories() != null
+              ? evt.getOwaspCategories().stream()
+                  .map(o -> OwaspCategory.newBuilder()
+                      .setId(o.getId() != null ? o.getId() : "")
+                      .setName(o.getName() != null ? o.getName() : "")
+                      .setSeverity(o.getSeverity() != null ? o.getSeverity() : "")
+                      .setConfidence(o.getConfidence() != null ? o.getConfidence() : "")
+                      .build())
+                  .collect(Collectors.toList())
+              : Collections.emptyList());
+    }
+    return builder;
   }
 
   /** Fallback when the caller sends no limit (0/unset). */
@@ -870,6 +878,96 @@ public class MaliciousEventService {
     return ListGuardrailViolationPayloadsResponse.newBuilder()
         .addAllPayloads(payloads)
         .build();
+  }
+
+  private static final int EXPORT_MALICIOUS_EVENTS_DEFAULT_LIMIT = 500;
+  private static final int EXPORT_MALICIOUS_EVENTS_MAX_LIMIT = 1000;
+  private static final String FIELD_ID = "_id";
+  private static final String FIELD_DETECTED_AT = "detectedAt";
+  private static final String FIELD_LATEST_API_ORIG = "latestApiOrig";
+
+  // Bulk keyset-paginated export for the S3 export job: no grouping, status filter or count, and raw sessionId.
+  // The cursor is "<detectedAt>|<_id>" (_id is a UUID string, see listGuardrailViolationPayloads); end is exclusive
+  // so adjacent windows never share a boundary event. Throws IllegalArgumentException on a malformed cursor.
+  public ExportMaliciousEventsResponse exportMaliciousEvents(
+      String accountId, ExportMaliciousEventsRequest request, String contextSource) {
+
+    if (!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
+      createIndexIfAbsent(accountId);
+    }
+
+    int requestedLimit = request.getLimit() > 0 ? request.getLimit() : EXPORT_MALICIOUS_EVENTS_DEFAULT_LIMIT;
+    int limit = Math.min(requestedLimit, EXPORT_MALICIOUS_EVENTS_MAX_LIMIT);
+    boolean includePayload = request.hasIncludePayload() && request.getIncludePayload();
+
+    Bson filter = buildExportFilter(accountId, request, contextSource);
+
+    FindIterable<MaliciousEventDto> find = maliciousEventDao.getCollection(accountId)
+        .find(filter)
+        .sort(Sorts.orderBy(Sorts.ascending(FIELD_DETECTED_AT), Sorts.ascending(FIELD_ID)))
+        .limit(limit)
+        .maxTime(ThreatUtils.REGEX_MAX_TIME_MS, TimeUnit.MILLISECONDS);
+    if (!includePayload) {
+      find = find.projection(Projections.exclude(FIELD_LATEST_API_ORIG));
+    }
+
+    List<ListMaliciousRequestsResponse.MaliciousEvent> events = new ArrayList<>();
+    MaliciousEventDto last = null;
+    try (MongoCursor<MaliciousEventDto> cursor = find.cursor()) {
+      while (cursor.hasNext()) {
+        MaliciousEventDto evt = cursor.next();
+        ListMaliciousRequestsResponse.MaliciousEvent.Builder builder = toMaliciousEvent(evt, false, evt.getSessionId() != null ? evt.getSessionId() : "");
+        if (includePayload) {
+          String payload = HttpResponseParams.getSampleStringFromProtoString(evt.getLatestApiOrig());
+          builder.setPayload(payload != null ? payload : "");
+        }
+        events.add(builder.build());
+        last = evt;
+      }
+    }
+
+    String nextCursor = events.size() == limit && last != null
+        ? last.getDetectedAt() + GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR + last.getId()
+        : "";
+    return ExportMaliciousEventsResponse.newBuilder()
+        .addAllEvents(events)
+        .setNextCursor(nextCursor)
+        .build();
+  }
+
+  // $and so the cursor/time conditions never clash with the legacy-account $or in the context filter.
+  Bson buildExportFilter(String accountId, ExportMaliciousEventsRequest request, String contextSource) {
+    List<Bson> conditions = new ArrayList<>();
+    conditions.add(ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId));
+    if (request.hasDetectedAtTimeRange()) {
+      TimeRangeFilter timeRange = request.getDetectedAtTimeRange();
+      if (timeRange.hasStart()) {
+        conditions.add(Filters.gte(FIELD_DETECTED_AT, timeRange.getStart()));
+      }
+      if (timeRange.hasEnd()) {
+        conditions.add(Filters.lt(FIELD_DETECTED_AT, timeRange.getEnd()));
+      }
+    }
+
+    String cursorParam = request.hasCursor() ? request.getCursor() : null;
+    if (cursorParam != null && !cursorParam.isEmpty()) {
+      int sep = cursorParam.indexOf(GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR);
+      if (sep < 0) {
+        throw new IllegalArgumentException("Malformed cursor: " + cursorParam);
+      }
+      long cursorDetectedAt;
+      try {
+        cursorDetectedAt = Long.parseLong(cursorParam.substring(0, sep));
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("Malformed cursor: " + cursorParam, e);
+      }
+      String cursorId = cursorParam.substring(sep + 1);
+      conditions.add(Filters.or(
+          Filters.gt(FIELD_DETECTED_AT, cursorDetectedAt),
+          Filters.and(Filters.eq(FIELD_DETECTED_AT, cursorDetectedAt), Filters.gt(FIELD_ID, cursorId))
+      ));
+    }
+    return Filters.and(conditions);
   }
 
   // metadata is stored as proto-text (`risk_score: "0.95"`) or JSON (`"riskScore": "0.95"`).
