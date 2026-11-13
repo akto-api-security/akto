@@ -48,6 +48,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -61,7 +62,8 @@ public class MaliciousEventService {
   private final MaliciousEventDao maliciousEventDao;
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
-  private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
+  // Read and written by concurrent (unordered) dashboard requests.
+  private static final Map<String, Boolean> shouldNotCreateIndexes = new ConcurrentHashMap<>();
   private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("SQLInjection", "SSRF");
 
   private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
