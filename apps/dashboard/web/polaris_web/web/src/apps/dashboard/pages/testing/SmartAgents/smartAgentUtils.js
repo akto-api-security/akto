@@ -3,7 +3,7 @@ export const LIMITS = {
     name: 80,
     description: 500,
     instructions: 2000,
-    customSkills: 20, // skill files per agent (MAX_LIST_ITEMS)
+    skillFiles: 100, // custom skill files per agent, references included (MAX_SKILL_FILES)
     files: 10,
     fileChars: 50000,
     links: 20,
@@ -24,7 +24,6 @@ export const BUILT_IN_SKILLS = [
 export const skillLabel = (id) => BUILT_IN_SKILLS.find(s => s.id === id)?.label || id
 
 export const KNOWLEDGE_FILE_TYPES = ".txt,.md,.markdown,.json,.yaml,.yml,.csv,.xml,.html,.har"
-export const SKILL_FILE_TYPES = ".md,.markdown,.txt,.yaml,.yml"
 
 // a knowledge base file: a new one carries its content; a saved one only its id (sha256) and size
 function fileOf(f) {
@@ -97,7 +96,7 @@ export function fromForm(form) {
 export function validate(form) {
     if (!form.name.trim()) return "Give the smart agent a name"
     if (form.name.trim().length > LIMITS.name) return `The name can be at most ${LIMITS.name} characters`
-    if (form.customSkills.length > LIMITS.customSkills) return `Add at most ${LIMITS.customSkills} skill files`
+    if (form.customSkills.length > LIMITS.skillFiles) return `Add at most ${LIMITS.skillFiles} skill files`
     const links = linesOf(form.knowledgeLinksText)
     if (links.length > LIMITS.links) return `Add at most ${LIMITS.links} links`
     const badLink = links.find(link => !isWebUrl(link))

@@ -179,7 +179,7 @@ public class SmartAgentProfileAction extends UserAction {
     /** Custom skills: skill files stored in blob storage exactly like knowledge files — only {name, sha256,
      * size} is kept in Mongo and only smart testing reads the content. The problem to show the user, or null. */
     private static String storeCustomSkills(List<Map<String, Object>> items, List<SmartAgentKnowledgeFile> out) {
-        return storeBlobFiles(items, out, SmartAgentConfig.MAX_CUSTOM_SKILL_CHARS, SmartAgentConfig.MAX_LIST_ITEMS, "skills");
+        return storeBlobFiles(items, out, SmartAgentConfig.MAX_CUSTOM_SKILL_CHARS, SmartAgentConfig.MAX_SKILL_FILES, "skill files");
     }
 
     /** Where knowledge base files go: Azure blob storage, as for file inspection content. Tests replace it. */
@@ -210,7 +210,7 @@ public class SmartAgentProfileAction extends UserAction {
         boolean blobsAvailable = true;
         for (Map<String, Object> item : orEmpty(items)) {
             if (item == null) continue;
-            String fileName = StringUtils.left(StringUtils.trimToEmpty(String.valueOf(item.getOrDefault("name", ""))), MAX_NAME_CHARS);
+            String fileName = StringUtils.left(StringUtils.trimToEmpty(String.valueOf(item.getOrDefault("name", ""))), SmartAgentConfig.MAX_FILE_NAME_CHARS);
             if (fileName.isEmpty()) continue;
             Object rawContent = item.get("content");
             String content = rawContent != null ? rawContent.toString() : null;

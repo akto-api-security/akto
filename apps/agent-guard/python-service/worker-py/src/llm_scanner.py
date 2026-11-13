@@ -11,8 +11,9 @@ import logging
 import time
 from typing import Any
 
+from constants import observes
 from prompts import build_scan_prompt, resolve_response_format
-from providers import LLMProvider, Qwen3GuardOutput, parse_qwen3guard_result
+from providers import LLMProvider, Qwen3GuardOutput, TripwireProvider, parse_qwen3guard_result, parse_tripwire_result
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +188,10 @@ class LLMScanner:
             raw, logprobs = await self.provider.complete_with_logprobs(text)
             logger.debug(f"[LLMScanner] {scanner_name} qwen3guard raw response: {raw!r}")
             result = parse_qwen3guard_result(scanner_name, raw, logprobs)
+        elif isinstance(self.provider, TripwireProvider):
+            if not observes(scanner_name, scanner_type):
+                raise ValueError(f"Tripwire observes PromptInjection input only, not {scanner_name} {scanner_type}")
+            result = parse_tripwire_result(await self.provider.detect(text))
         else:
             prompt = build_scan_prompt(
                 scanner_name,
@@ -221,7 +226,8 @@ async def scan_with_model_map(
     text: str,
     config: dict[str, Any],
     store_fn: Any | None = None,
+    schedule_fn: Any | None = None,
 ) -> dict[str, Any]:
     from model_map import ModelMapScanner
 
-    return await ModelMapScanner(scanner_name, scanner_type, text, config, store_fn).run()
+    return await ModelMapScanner(scanner_name, scanner_type, text, config, store_fn, schedule_fn).run()

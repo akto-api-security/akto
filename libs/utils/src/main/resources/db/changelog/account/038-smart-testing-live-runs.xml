@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Smart testing live runs: mirrors SmartTestingRunDao / SmartTestingEventDao / SmartTestingMessageDao
+        .createIndicesIfAbsent. Index names match MCollection.generateIndexName, so these are no-ops where the
+        DAOs already built them.
+    -->
+
+    <changeSet id="038-account-smart-testing-runs-run-key-index" author="akto">
+        <mongodb:createIndex collectionName="smart_testing_runs">
+            <mongodb:keys>{ "runKey": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "runKey_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="smart_testing_runs">
+                <mongodb:keys>{ "runKey": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="038-account-smart-testing-runs-summary-started-index" author="akto">
+        <mongodb:createIndex collectionName="smart_testing_runs">
+            <mongodb:keys>{ "testingRunResultSummaryId": -1, "startedTs": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "testingRunResu-startedTs_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="smart_testing_runs">
+                <mongodb:keys>{ "testingRunResultSummaryId": -1, "startedTs": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="038-account-smart-testing-events-run-key-seq-index" author="akto">
+        <mongodb:createIndex collectionName="smart_testing_events">
+            <mongodb:keys>{ "runKey": 1, "seq": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "runKey-seq_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="smart_testing_events">
+                <mongodb:keys>{ "runKey": 1, "seq": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="038-account-smart-testing-events-run-key-timestamp-seq-index" author="akto">
+        <mongodb:createIndex collectionName="smart_testing_events">
+            <mongodb:keys>{ "runKey": 1, "timestamp": 1, "seq": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "runKey-timestamp-seq_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="smart_testing_events">
+                <mongodb:keys>{ "runKey": 1, "timestamp": 1, "seq": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="038-account-smart-testing-messages-run-key-timestamp-index" author="akto">
+        <mongodb:createIndex collectionName="smart_testing_messages">
+            <mongodb:keys>{ "runKey": 1, "timestamp": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "runKey-timestamp_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="smart_testing_messages">
+                <mongodb:keys>{ "runKey": 1, "timestamp": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
