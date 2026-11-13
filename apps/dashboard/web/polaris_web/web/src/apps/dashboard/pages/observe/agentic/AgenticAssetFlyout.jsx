@@ -253,7 +253,7 @@ export default function AgenticAssetFlyout({
 
     const header = topNav ? (
         <FlyoutBreadcrumb
-            items={[{ label: asset.name, badge: asset.riskScore, badgeFactors: asset.riskScoreFactors, badgeNote: asset.riskScoreNote, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]}
+            items={[{ label: asset.name, badge: asset.riskScore, badgeFactors: asset.riskScoreFactors, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]}
             onClose={onClose}
         >
             {topNavPicker && (

@@ -198,7 +198,7 @@ function UsersAndDevices() {
                 sensitiveSubTypesVal: (row.sensitiveInRespTypes || []).join(" ") || "-",
                 riskScoreComp: row.riskScore != null ? transform.wrapRiskScoreTooltip(
                     <Badge status={getRiskScoreStatus(row.riskScore)} size="small">{row.riskScore}</Badge>,
-                    row.riskScore, null, null, row.riskScoreFactors, row.riskScoreNote
+                    row.riskScore, null, null, row.riskScoreFactors
                 ) : "-",
                 detectedTimestamp: row.lastSeenEpoch,
                 lastTraffic: func.prettifyEpoch(row.lastSeenEpoch),

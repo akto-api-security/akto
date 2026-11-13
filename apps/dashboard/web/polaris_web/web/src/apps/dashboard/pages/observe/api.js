@@ -370,7 +370,6 @@ export default {
             ...(resp?.assetRiskScore != null ? {
                 riskScore: resp.assetRiskScore,
                 riskScoreFactors: resp?.assetRiskScoreFactors || [],
-                riskScoreNote: resp?.assetRiskScoreNote || null,
             } : {}),
         }
     },

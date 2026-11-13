@@ -96,7 +96,7 @@ function getRiskScoreStatus(riskScore) {
 // fields — those are deliberately not computed for skill rows, matching prettifyGroupData's
 // original client-side behavior. isMalicious for skill rows IS computed server-side already
 // (AgenticObserveAction's own account-wide maliciousSkillKeys cache — no client round-trip needed).
-function shapeRow(row, { skillScoreMap = {}, skillScoreFactorsMap = {}, skillScoreNotesMap = {} } = {}) {
+function shapeRow(row, { skillScoreMap = {}, skillScoreFactorsMap = {} } = {}) {
     const isSkill = row.rowType === ROW_TYPES.SKILL;
     const isPlugin = row.rowType === ROW_TYPES.PLUGIN;
     // Fan-out rows borrow their parent agent collection's flags, so suppress them on both.
@@ -110,9 +110,6 @@ function shapeRow(row, { skillScoreMap = {}, skillScoreFactorsMap = {}, skillSco
     const riskScoreFactors = isSkill
         ? (skillScoreFactorsMap[row.name] || [])
         : (row.riskScoreFactors || []);
-    const riskScoreNote = isSkill
-        ? (skillScoreNotesMap[row.name] || null)
-        : (row.riskScoreNote || null);
 
     const showPersonal = row.hasPersonalAccount && !isFanout;
     const showLocalMcp = row.hasLocalMcpServer && !isFanout;
@@ -150,7 +147,6 @@ function shapeRow(row, { skillScoreMap = {}, skillScoreFactorsMap = {}, skillSco
                 row.baseRiskScore,
                 row.baseRiskScoreReason,
                 riskScoreFactors,
-                riskScoreNote,
             )
             : "-",
         sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || [], false),
@@ -210,7 +206,7 @@ function Endpoints() {
     // async: skill risk/malicious/misconfigured data), read (not reacted to) by fetchTableData.
     const enrichRef = useRef({
         trafficMap: {}, riskScoreMap: {}, sensitiveMap: {},
-        skillScoreMap: {}, skillScoreFactorsMap: {}, skillScoreNotesMap: {},
+        skillScoreMap: {}, skillScoreFactorsMap: {},
     });
     // Progressively populated from each page's distinctUsernames (server-computed, current page
     // only) — same pattern as AgenticAssetDevicesPage.jsx's filterChoices/updateFilterChoicesIfChanged.
@@ -310,13 +306,12 @@ function Endpoints() {
             // maliciousSkillKeys here — "Malicious" (row.isMalicious) is computed server-side in
             // fetchAgenticAssetsSummary (AgenticObserveAction.getOrBuildSkillData's own account-wide
             // cache) instead of requiring the whole set re-POSTed on every paginated request.
-            fetchAndCacheSkillApiData([], { api, PersistStore }).then(({ skillScoreMap, skillScoreFactorsMap, skillScoreNotesMap }) => {
+            fetchAndCacheSkillApiData([], { api, PersistStore }).then(({ skillScoreMap, skillScoreFactorsMap }) => {
                 if (!isMountedRef.current) return;
                 enrichRef.current = {
                     ...enrichRef.current,
                     skillScoreMap: skillScoreMap || {},
                     skillScoreFactorsMap: skillScoreFactorsMap || {},
-                    skillScoreNotesMap: skillScoreNotesMap || {},
                 };
                 setRefreshKey((k) => k + 1);
             }).catch(() => {});
@@ -334,7 +329,7 @@ function Endpoints() {
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
         setTableLoading(true);
         try {
-            const { trafficMap, riskScoreMap, sensitiveMap, skillScoreMap, skillScoreFactorsMap, skillScoreNotesMap } = enrichRef.current;
+            const { trafficMap, riskScoreMap, sensitiveMap, skillScoreMap, skillScoreFactorsMap } = enrichRef.current;
             // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
             // NhiGovernanceIdentitiesAction's own onServerFetch convention).
             const mongoSortOrder = sortOrder === -1 ? 1 : -1;
@@ -363,7 +358,7 @@ function Endpoints() {
             }
             // Misconfigured is an Agent/MCP-server-only concept — Skill rows never show it (see
             // shapeRow's own comment), so no misconfiguredSkills lookup is threaded through here.
-            const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap, skillScoreFactorsMap, skillScoreNotesMap }));
+            const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap, skillScoreFactorsMap }));
             return { value: rows, total: res.total || 0 };
         } finally {
             setTableLoading(false);

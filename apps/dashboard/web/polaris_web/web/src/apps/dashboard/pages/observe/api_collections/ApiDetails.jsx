@@ -94,6 +94,7 @@ function ApiDetails(props) {
     const [selectedTabId, setSelectedTabId] = useState('values');
     const [showForbidden, setShowForbidden] = useState(false);
     const [detectedBasePrompt, setDetectedBasePrompt] = useState(null);
+    const [endpointRiskScoreFactors, setEndpointRiskScoreFactors] = useState([]);
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -296,9 +297,15 @@ function ApiDetails(props) {
                 } else {
                     setDetectedBasePrompt(null);
                 }
+                const factors = apiInfoResp?.riskScoreFactors
+                    || apiInfoResp?.data?.riskScoreFactors
+                    || apiInfoResp?.apiInfo?.riskScoreFactors
+                    || [];
+                setEndpointRiskScoreFactors(Array.isArray(factors) ? factors : []);
             } catch (error) {
                 console.error("Error fetching ApiInfo:", error);
                 setDetectedBasePrompt(null);
+                setEndpointRiskScoreFactors([]);
             }
             
             try {
@@ -647,43 +654,15 @@ function ApiDetails(props) {
     const skillSample = isSkillEndpoint && sampleData.length > 0 ? parseSkillSample(sampleData[0].message) : null
     const skillMarkdown = skillSample?.markdown || null
 
-    // Base risk score/remarks live on the owning collection, not the per-endpoint ApiInfo — same
-    // fields AgentEndpointTreeTable.jsx/AgenticAssetDevicesPage.jsx surface via wrapRiskScoreTooltip.
-    const agentRiskAnalysis = (() => {
-        if (!isEndpointSecurityCategory()) return null;
-        if (!apiDetail?.apiCollectionId || !allCollections) return null;
-        const collection = allCollections.find(c => c.id === apiDetail.apiCollectionId);
-        if (!collection?.baseRiskScoreReason || !collection?.baseRiskScore) return null;
-        return { score: collection.baseRiskScore, reason: collection.baseRiskScoreReason };
-    })();
-
-    // Justifies apiDetail.riskScore itself: base (LLM score) + threat (guardrail violations) +
-    // remaining (everything else the real ApiInfoDao.getRiskScore formula folds in — sensitive
-    // data, open-issue severity, public access — that baseRiskScore was never actually summed
-    // with in the backend). "remaining" is computed as a balancing figure, not itemized, so the
-    // three lines always add up to the displayed total instead of drifting from it.
+    // Saved with riskScore by the cron — never invent Other-factors balancing lines here.
     const riskScoreFactors = (() => {
-        if (!apiDetail || !agentRiskAnalysis) return [];
-        const factors = [];
-        const isThreat = !!apiDetail.isThreatEnabled;
-        // Real threatScore when present; falls back to 1 for the skill-tag-only threat path
-        // (malicious-skill-tag), which flags isThreatEnabled without ever setting a threatScore.
-        const threatWeight = isThreat ? (apiDetail.threatScore || 1) : 0;
-        if (threatWeight > 0) factors.push({ weight: threatWeight, text: 'Guardrail violations detected' });
-
-        const baseWeight = agentRiskAnalysis?.score || 0;
-        const remaining = (apiDetail.riskScore || 0) - baseWeight - threatWeight;
-        if (remaining > 0) {
-            const sensitiveTags = [...new Set([...(apiDetail.sensitiveTags || []), ...(apiDetail.sensitiveInReq || []), ...(apiDetail.sensitiveInResp || [])])];
-            const remainingReasons = [];
-            if (sensitiveTags.length > 0) remainingReasons.push(`sensitive data detected: ${sensitiveTags.join(', ')}`);
-            if (apiDetail.access_type === 'Public') remainingReasons.push('publicly accessible');
-            factors.push({
-                weight: remaining,
-                text: remainingReasons.length > 0 ? `Other factors — ${remainingReasons.join(', ')}` : 'Other factors',
-            });
+        if (Array.isArray(endpointRiskScoreFactors) && endpointRiskScoreFactors.length > 0) {
+            return endpointRiskScoreFactors;
         }
-        return factors;
+        if (Array.isArray(apiDetail?.riskScoreFactors) && apiDetail.riskScoreFactors.length > 0) {
+            return apiDetail.riskScoreFactors;
+        }
+        return [];
     })();
 
     const ValuesTab = {
@@ -693,19 +672,18 @@ function ApiDetails(props) {
             ? <Box paddingBlockStart={"4"}><SkillMarkdownViewer markdown={skillMarkdown} evidence={skillSample.evidence} /></Box>
             : sampleData.length > 0 && <Box paddingBlockStart={"4"}>
                 <VerticalStack gap="4">
-                    {agentRiskAnalysis && (
+                    {riskScoreFactors.length > 0 && (
                         <VerticalStack gap="3">
                             <HorizontalStack gap="2" blockAlign="center">
-                                <Text variant='headingMd'>Agent's Risk Score Breakdown</Text>
+                                <Text variant='headingMd'>Risk Score Breakdown</Text>
                                 <Badge status={transform.getStatus(apiDetail?.riskScore)} size="small">{apiDetail?.riskScore}</Badge>
                             </HorizontalStack>
                             <List type="bullet">
-                                <List.Item>
-                                    <Text variant="bodyMd" color="subdued" as="span">{agentRiskAnalysis.score} -&gt; {agentRiskAnalysis.reason}</Text>
-                                </List.Item>
                                 {riskScoreFactors.map((factor, index) => (
                                     <List.Item key={index}>
-                                        <Text variant="bodyMd" color="subdued" as="span">{factor.weight} -&gt; {factor.text}</Text>
+                                        <Text variant="bodyMd" color="subdued" as="span">
+                                            {factor.points} -&gt; {factor.label}{factor.detail ? ` — ${factor.detail}` : ""}
+                                        </Text>
                                     </List.Item>
                                 ))}
                             </List>

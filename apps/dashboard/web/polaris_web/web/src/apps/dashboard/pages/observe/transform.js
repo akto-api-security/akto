@@ -423,18 +423,16 @@ const transform = {
         }
     },
 
-    // Prefer riskScoreFactors (saved with the score, or rebuilt live) when present. Fall back to
-    // the older baseRiskScoreReason string used on inventory / collection pages. riskScoreNote is
-    // an honest shortfall message when no saved list exists yet — never invents points.
-    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason, riskScoreFactors, riskScoreNote){
-        if (riskScore && ((Array.isArray(riskScoreFactors) && riskScoreFactors.length > 0) || riskScoreNote)) {
+    // Prefer riskScoreFactors saved with the score when present. Fall back to the older
+    // baseRiskScoreReason string used on inventory / collection pages.
+    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason, riskScoreFactors){
+        if (riskScore && Array.isArray(riskScoreFactors) && riskScoreFactors.length > 0) {
             return (
                 <Tooltip dismissOnMouseOut content={
                     <RiskScoreTooltipContent
                         riskScore={Number(riskScore)}
                         status={transform.getStatus(Number(riskScore))}
                         factors={riskScoreFactors}
-                        note={riskScoreNote}
                     />
                 }>
                     {badge}

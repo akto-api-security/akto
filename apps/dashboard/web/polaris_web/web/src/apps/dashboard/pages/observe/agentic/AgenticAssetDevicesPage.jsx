@@ -219,7 +219,7 @@ function ChildrenTable({ parentRowId, children, rowType, misconfiguredChildId, o
                     return transform.wrapRiskScoreTooltip(
                         <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
                         childRiskScore, child.baseRiskScore, child.baseRiskScoreReason,
-                        child.riskScoreFactors, child.riskScoreNote
+                        child.riskScoreFactors
                     );
                 case "sensitiveSubTypes":
                     return transform.prettifySubtypes(child.sensitiveInRespTypes || []);
@@ -362,7 +362,7 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
         riskScoreComp: transform.wrapRiskScoreTooltip(
             <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
             riskScore, row.baseRiskScore, row.baseRiskScoreReason,
-            row.riskScoreFactors, row.riskScoreNote
+            row.riskScoreFactors
         ),
         sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || []),
         lastTraffic: func.prettifyEpoch(row.lastSeenEpoch || 0),
@@ -394,14 +394,14 @@ export default function AgenticAssetDevicesPage() {
     // two places this exact asset's device breakdown is shown, so the header should read the same
     // regardless of which one a click landed on.
     const [description, setDescription] = useState("");
-    const [assetRisk, setAssetRisk] = useState({ score: null, factors: [], note: null });
+    const [assetRisk, setAssetRisk] = useState({ score: null, factors: [] });
 
     const pageTitle = useMemo(() => {
         const titleLabel = assetType ? `${assetType} - ${assetName}` : assetName;
         const riskBadge = assetRisk.score
             ? transform.wrapRiskScoreTooltip(
                 <Badge status={transform.getStatus(assetRisk.score)} size="small">{assetRisk.score}</Badge>,
-                assetRisk.score, null, null, assetRisk.factors, assetRisk.note
+                assetRisk.score, null, null, assetRisk.factors
             )
             : null;
         return (
@@ -479,7 +479,6 @@ export default function AgenticAssetDevicesPage() {
                 setAssetRisk({
                     score: detail?.riskScore ?? null,
                     factors: detail?.riskScoreFactors || [],
-                    note: detail?.riskScoreNote || null,
                 });
                 setPluginBundle(rowType === "plugin" ? {
                     mcpServers: detail?.pluginMcpServers || [],

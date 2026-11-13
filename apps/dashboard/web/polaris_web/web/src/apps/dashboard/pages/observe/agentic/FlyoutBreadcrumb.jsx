@@ -43,7 +43,7 @@ export default function FlyoutBreadcrumb({ items = [], onClose, children, subtit
                                         )}
                                         {item.badge != null && observeFunc.wrapRiskScoreTooltip(
                                             <RiskPill score={item.badge} />,
-                                            item.badge, null, null, item.badgeFactors, item.badgeNote,
+                                            item.badge, null, null, item.badgeFactors,
                                         )}
                                     </React.Fragment>
                                 );

@@ -117,15 +117,14 @@ export function PluginAgentCellRenderer({ value }) {
 
 export function RiskScoreCellRenderer({ value, data }) {
     if (value == null) return null;
-    // Prefer riskScoreFactors (saved with the score, or rebuilt live). baseRiskScoreReason stays
-    // as a fallback for collections that still carry the older LLM/base reason fields.
+    // Prefer riskScoreFactors saved with the score. baseRiskScoreReason stays as a fallback for
+    // collections that still carry the older LLM/base reason fields.
     return observeFunc.wrapRiskScoreTooltip(
         <RiskPill score={value} />,
         value,
         data?.baseRiskScore,
         data?.baseRiskScoreReason,
         data?.riskScoreFactors,
-        data?.riskScoreNote,
     );
 }
 

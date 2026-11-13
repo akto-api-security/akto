@@ -50,7 +50,6 @@ public class ApiInfo {
     public static final String RISK_SCORE = "riskScore";
     private float riskScore;
 
-    // Written with riskScore by RiskScoreOfCollections — labeled point lines for the tooltip.
     public static final String RISK_SCORE_FACTORS = "riskScoreFactors";
     private List<RiskScoreFactor> riskScoreFactors;
 
@@ -111,14 +110,43 @@ public class ApiInfo {
         private String value;
     }
 
-    @Getter
-    @Setter
-    @AllArgsConstructor
-    @NoArgsConstructor
     public static class RiskScoreFactor {
         private float points;
         private String label;
         private String detail;
+
+        public RiskScoreFactor() {
+        }
+
+        public RiskScoreFactor(float points, String label, String detail) {
+            this.points = points;
+            this.label = label;
+            this.detail = detail;
+        }
+
+        public float getPoints() {
+            return points;
+        }
+
+        public void setPoints(float points) {
+            this.points = points;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public String getDetail() {
+            return detail;
+        }
+
+        public void setDetail(String detail) {
+            this.detail = detail;
+        }
     }
 
     public static class MessageFieldEntry {
@@ -412,12 +440,14 @@ public class ApiInfo {
         }
         this.isSensitive = that.isSensitive || this.isSensitive;
         this.severityScore = this.severityScore + that.severityScore;
-        this.riskScore = Math.max(this.riskScore, that.riskScore);
+        if (that.riskScore > this.riskScore) {
+            this.riskScore = that.riskScore;
+            this.riskScoreFactors = that.riskScoreFactors;
+        }
         this.threatScore = Math.max(this.threatScore, that.threatScore);
 
         if (that.lastCalculatedTime > this.lastCalculatedTime) {
             this.lastCalculatedTime = that.lastCalculatedTime;
-            this.riskScoreFactors = that.riskScoreFactors;
         }
 
         for (String k: that.violations.keySet()) {

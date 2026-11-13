@@ -66,7 +66,7 @@ function FactorRow({ points, label, detail }) {
     );
 }
 
-export default function RiskScoreTooltipContent({ riskScore, status, factors, note }) {
+export default function RiskScoreTooltipContent({ riskScore, status, factors }) {
     const applied = [...(factors || [])].sort((a, b) => (b.points || 0) - (a.points || 0));
 
     return (
@@ -93,8 +93,6 @@ export default function RiskScoreTooltipContent({ riskScore, status, factors, no
                         </VerticalStack>
                     </Box>
                 ) : null}
-
-                {note ? <Text variant="bodySm" color="subdued">{note}</Text> : null}
             </VerticalStack>
         </Box>
     );
