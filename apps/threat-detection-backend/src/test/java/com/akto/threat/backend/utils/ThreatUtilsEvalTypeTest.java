@@ -2,9 +2,14 @@ package com.akto.threat.backend.utils;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.Collections;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ThreatUtilsEvalTypeTest {
 
@@ -46,5 +51,21 @@ public class ThreatUtilsEvalTypeTest {
   @Test
   void dedupeKeyTreatsNullPartsAsEmpty() {
     assertEquals("|||", ThreatUtils.configDedupeKey(null, null, null, null));
+  }
+
+  @Test
+  void evalTypeReadsNeedTheFlagEndpointContextAndNoSkillOnlyMode() {
+    assertTrue(ThreatUtils.readsByEvalType("ENDPOINT", null, true));
+    assertFalse(ThreatUtils.readsByEvalType("ENDPOINT", null, false));
+    assertFalse(ThreatUtils.readsByEvalType("AGENTIC", null, true));
+    assertFalse(ThreatUtils.readsByEvalType("ENDPOINT", "only", true));
+    assertTrue(ThreatUtils.readsByEvalType("ENDPOINT", "exclude", true));
+  }
+
+  @Test
+  void skillsAreAlwaysSubtractedAndConfigOnlyWhenExcluded() {
+    assertEquals(Collections.singletonList("SKILL"), ThreatUtils.evalTypesExcludedFromCounts(null));
+    assertEquals(Collections.singletonList("SKILL"), ThreatUtils.evalTypesExcludedFromCounts("only"));
+    assertEquals(Arrays.asList("SKILL", "CONFIG"), ThreatUtils.evalTypesExcludedFromCounts("exclude"));
   }
 }

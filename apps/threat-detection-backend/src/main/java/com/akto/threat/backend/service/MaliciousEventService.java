@@ -34,8 +34,6 @@ import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ParallelQueryExecutor;
 import com.akto.util.ThreatDetectionConstants;
 import com.mongodb.MongoExecutionTimeoutException;
-import com.mongodb.ErrorCategory;
-import com.mongodb.MongoWriteException;
 import com.mongodb.client.model.CountOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -602,7 +600,8 @@ public class MaliciousEventService {
     // "agentic component + rule violated" — keeping only the latest occurrence. A different actor
     // (username) on the same host/setting still gets its own row.
     boolean dedupeLatestPerHostActorEndpoint = "only".equalsIgnoreCase(configEvalMode)
-        && "ENDPOINT".equalsIgnoreCase(contextSource);
+        && "ENDPOINT".equalsIgnoreCase(contextSource)
+        && !ThreatUtils.USE_EVAL_TYPE_READS;
 
     // Repeated Bedrock activities (same caller and prompt within the gap) are listed as one row.
     boolean groupActivities = ThreatUtils.groupsActivities(accountId) && "AGENTIC".equalsIgnoreCase(contextSource)
@@ -1196,66 +1195,6 @@ public class MaliciousEventService {
     }
     logger.info("backfillActivityGroupKeys accountId=" + accountId + " updated=" + updated);
     return updated;
-  }
-
-  public Map<String, Long> backfillEvalTypes(String accountId) {
-    createIndexIfAbsent(accountId);
-    MongoCollection<Document> events = maliciousEventDao.getDocumentCollection(accountId);
-    long skills = tagEvalType(events, ThreatUtils.SKILLS_ENDPOINT_PATTERN, MaliciousEventDto.EVAL_TYPE_SKILL);
-    long configs = tagEvalType(events, ThreatUtils.CONFIG_ENDPOINT_PATTERN, MaliciousEventDto.EVAL_TYPE_CONFIG);
-    long keyed = keyLatestConfigEvents(events);
-    logger.info("backfillEvalTypes accountId=" + accountId + " skills=" + skills + " configs=" + configs + " keyed=" + keyed);
-    Map<String, Long> result = new LinkedHashMap<>();
-    result.put("skills", skills);
-    result.put("configs", configs);
-    result.put("keyed", keyed);
-    return result;
-  }
-
-  private long tagEvalType(MongoCollection<Document> events, Pattern endpointPattern, String evalType) {
-    Bson untagged = Filters.and(
-        Filters.eq("contextSource", "ENDPOINT"),
-        Filters.exists(MaliciousEventDto.EVAL_TYPE, false),
-        Filters.regex("latestApiEndpoint", endpointPattern));
-    return events.updateMany(untagged, Updates.set(MaliciousEventDto.EVAL_TYPE, evalType)).getModifiedCount();
-  }
-
-  private long keyLatestConfigEvents(MongoCollection<Document> events) {
-    Document groupId = new Document("host", "$host").append("actor", "$actor")
-        .append("category", "$category").append("latestApiEndpoint", "$latestApiEndpoint");
-    List<Document> pipeline = Arrays.asList(
-        new Document("$match", new Document("contextSource", "ENDPOINT")
-            .append(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_CONFIG)
-            .append(MaliciousEventDto.DEDUPE_KEY, new Document("$exists", false))),
-        new Document("$project", new Document("host", 1).append("actor", 1).append("category", 1)
-            .append("latestApiEndpoint", 1).append("detectedAt", 1)),
-        new Document("$sort", new Document("detectedAt", -1)),
-        new Document("$group", new Document("_id", groupId)
-            .append("latestId", new Document("$first", "$_id"))
-            .append("firstDetectedAt", new Document("$min", "$detectedAt"))
-            .append("count", new Document("$sum", 1))));
-    long keyed = 0;
-    try (MongoCursor<Document> cursor = events.aggregate(pipeline).allowDiskUse(true).cursor()) {
-      while (cursor.hasNext()) {
-        Document group = cursor.next();
-        Document id = group.get("_id", Document.class);
-        String key = ThreatUtils.configDedupeKey(id.getString("host"), id.getString("actor"),
-            id.getString("category"), id.getString("latestApiEndpoint"));
-        Bson update = Updates.combine(
-            Updates.set(MaliciousEventDto.DEDUPE_KEY, key),
-            Updates.set(MaliciousEventDto.FIRST_DETECTED_AT, group.get("firstDetectedAt")),
-            Updates.set(MaliciousEventDto.OCCURRENCE_COUNT, group.get("count")));
-        try {
-          keyed += events.updateOne(Filters.and(Filters.eq("_id", group.get("latestId")),
-              Filters.exists(MaliciousEventDto.DEDUPE_KEY, false)), update).getModifiedCount();
-        } catch (MongoWriteException e) {
-          if (e.getError().getCategory() != ErrorCategory.DUPLICATE_KEY) {
-            throw e;
-          }
-        }
-      }
-    }
-    return keyed;
   }
 
   public void createIndexIfAbsent(String accountId) {
