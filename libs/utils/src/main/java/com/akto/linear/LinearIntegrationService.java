@@ -135,7 +135,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         return updated;
     }
 
-    private static Map<String, String> sanitizeSeverityMapping(LinearTeamMapping requested) throws Exception {
+    static Map<String, String> sanitizeSeverityMapping(LinearTeamMapping requested) throws Exception {
         Map<String, String> sanitized = new LinkedHashMap<>();
         for (String severity : MAPPED_SEVERITIES) {
             String value = requested != null && requested.getSeverityToPriority() != null
@@ -209,10 +209,8 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         return teamsMap;
     }
 
-    private static int resolvePriority(LinearIntegration integration, String teamId, Severity severity) {
-        LinearTeamMapping mapping = integration.getTeamMappings() == null
-            ? null
-            : integration.getTeamMappings().get(teamId);
+    static int resolvePriority(Map<String, LinearTeamMapping> teamMappings, String teamId, Severity severity) {
+        LinearTeamMapping mapping = teamMappings == null ? null : teamMappings.get(teamId);
         String value = mapping != null && mapping.getSeverityToPriority() != null
             ? mapping.getSeverityToPriority().get(severity.name())
             : null;
@@ -289,7 +287,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
                 endpointDetails, aktoIssueUrl);
 
             LinearIssue issue = LinearApiClient.createIssue(authToken, teamId, title, description,
-                resolvePriority(integration, teamId, severity));
+                resolvePriority(integration.getTeamMappings(), teamId, severity));
 
             linkAktoIssue(authToken, issue, aktoIssueUrl, testInfo, severity);
 
@@ -316,7 +314,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         }
     }
 
-    private String buildDescription(Info testInfo, TestingRunResult testingRunResult, Severity severity,
+    static String buildDescription(Info testInfo, TestingRunResult testingRunResult, Severity severity,
         String method, Pair<String, String> endpointDetails, String aktoIssueUrl) {
         StringBuilder body = new StringBuilder();
 
@@ -346,7 +344,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         return body.toString();
     }
 
-    private String buildRequestResponseData(TestingRunResult testingRunResult) {
+    private static String buildRequestResponseData(TestingRunResult testingRunResult) {
         try {
             if (testingRunResult.getTestResults() == null || testingRunResult.getTestResults().isEmpty()) {
                 return "";

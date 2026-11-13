@@ -103,6 +103,11 @@ function Integrations() {
       name:'Linear',
       source: '/public/linear.svg'
     }
+    let portIOObj={
+      id: 'port',
+      name:'Port',
+      source: '/public/Globe_icon.svg'
+    }
     let jenkinsObj={
       id: `jenkins`,
       name: "Jenkins",
@@ -283,7 +288,7 @@ function Integrations() {
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [/* aktoGptObj, */ agentConfigObj, mcpRegistryObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
-    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, linearObj, wizObj];
+    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, linearObj, portIOObj, wizObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj, datadogObj];
     const monitoringItems = [newRelicObj, openTelemetryObj]

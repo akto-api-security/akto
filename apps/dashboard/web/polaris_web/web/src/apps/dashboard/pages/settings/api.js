@@ -917,6 +917,38 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchPortIOIntegration() {
+        return request({
+            url: '/api/fetchPortIOIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addPortIOIntegration(clientId, clientSecret, workflowId) {
+        return request({
+            url: '/api/addPortIOIntegration',
+            method: 'post',
+            data: { clientId, clientSecret, workflowId }
+        })
+    },
+
+    savePortIOTeams(teamMappings) {
+        return request({
+            url: '/api/savePortIOTeams',
+            method: 'post',
+            data: { teamMappings }
+        })
+    },
+
+    removePortIOIntegration() {
+        return request({
+            url: '/api/removePortIOIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     removeInvitation(email) {
         return request({
             url: '/api/removeInvitation',
