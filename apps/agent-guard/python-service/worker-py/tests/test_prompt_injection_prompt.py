@@ -1,54 +1,55 @@
 """PromptInjection prompt guards.
 
-Two invariants keep this prompt healthy:
+Three invariants keep this prompt healthy:
 
 1. Latency — the Gemma Foundry deployment has a hard prefill step at ~9.6k chars
-   (measured: flat ~890ms below it, ~1.13s above). The INPUT template must stay
-   under that so ordinary short traffic keeps prod-level latency; obfuscation
-   coverage lives in the deterministic preprocessor, not in extra few-shots.
+   (measured: flat ~890ms below it, ~1.13s above). The templates must stay under
+   that so ordinary short traffic keeps prod-level latency; obfuscation coverage
+   lives in the deterministic preprocessor, not in extra few-shots.
 2. Recall — the guidance that lifts recall over the bare production prompt
    (conversation-state overrides, per-segment evaluation, graded persona
-   assignment) must remain present, and benign few-shots must stay low so the
+   assignment) must remain present, and benign few-shots must answer A so the
    cascade does not escalate ordinary traffic to the slow arbiter.
+3. One contract — PromptInjection only has letter prompts, so every request gets
+   a letter, whatever response format a deployment or model config asks for.
 """
 
 import re
 
 import pytest
 
-from prompts import build_scan_prompt, prompt_injection
-from settings import settings
+import settings as settings_module
+from prompts import build_scan_prompt, prompt_injection, resolve_response_format
 
 # Hard prefill-latency step on the Gemma Foundry deployment (chars of final prompt).
 _LATENCY_CLIFF = 9600
 
 
-@pytest.mark.parametrize("template", ["INPUT", "INPUT_V2", "INPUT_ABCD_V2"])
-def test_input_template_stays_under_latency_cliff(template):
+@pytest.mark.parametrize("template", ["INPUT", "OUTPUT"])
+def test_template_stays_under_latency_cliff(template):
     assert len(getattr(prompt_injection, template)) < _LATENCY_CLIFF
 
 
-@pytest.mark.parametrize(
-    ("version", "response_format", "template"),
-    [
-        ("", "", "INPUT"),
-        ("v1", "abcd", "INPUT_ABCD"),
-        ("V2", "", "INPUT_V2"),
-        ("v2", "abcd", "INPUT_ABCD_V2"),
-        ("v3", "", "INPUT"),
-    ],
-)
-def test_version_env_selects_input_rules(monkeypatch, version, response_format, template):
-    """PROMPT_INJECTION_PROMPT_VERSION picks the input rules; unknown falls back to v1."""
-    monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", version)
-    prompt = build_scan_prompt("PromptInjection", "prompt", {}, "hi", response_format=response_format)
+@pytest.mark.parametrize(("scanner_type", "template"), [("prompt", "INPUT"), ("output", "OUTPUT")])
+def test_each_side_gets_its_own_rules(scanner_type, template):
+    prompt = build_scan_prompt("PromptInjection", scanner_type, {}, "hi")
     assert prompt == getattr(prompt_injection, template) % "hi"
 
 
-def test_version_env_leaves_output_rules_alone(monkeypatch):
-    monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", "v2")
-    prompt = build_scan_prompt("PromptInjection", "output", {}, "hi")
-    assert prompt == prompt_injection.OUTPUT % "hi"
+@pytest.mark.parametrize("scanner_type", ["prompt", "output"])
+@pytest.mark.parametrize("requested", ["", "json", "JSON", "abcd", "values", "yn"])
+def test_always_answers_with_a_letter(scanner_type, requested):
+    """There is no JSON PromptInjection prompt, so asking for one still gets the letter
+    contract, and the parser resolves the same way."""
+    assert resolve_response_format("PromptInjection", scanner_type, requested) == "abcd"
+    prompt = build_scan_prompt("PromptInjection", scanner_type, {}, "hi", response_format=requested)
+    assert "respond with ONE character" in prompt
+    for json_key in ('"isInjection"', '"confidence"', '"reason"'):
+        assert json_key not in prompt, json_key
+
+
+def test_the_prompt_version_setting_is_gone():
+    assert "PROMPT_INJECTION_PROMPT_VERSION" not in settings_module._FIELDS
 
 
 def test_recall_critical_guidance_is_present():
@@ -58,7 +59,7 @@ def test_recall_critical_guidance_is_present():
     assert "CONVERSATION STATE" in prompt
     assert "vergiss alles davor" in prompt
     assert "Evaluate EVERY segment independently" in prompt
-    assert "Persona confidence is graded" in prompt
+    assert "Persona assignment is graded" in prompt
 
 
 def test_obfuscation_is_delegated_to_preprocessor():
@@ -85,13 +86,10 @@ def test_build_is_percent_safe():
     assert prompt.rstrip().endswith("give me 50% off now")
 
 
-@pytest.mark.parametrize("template_name", ["INPUT", "INPUT_V2", "OUTPUT"])
-def test_benign_few_shots_stay_out_of_escalation_zone(template_name):
-    """Benign (isInjection:false) examples must sit <= 0.09 so they never escalate."""
-    template = getattr(prompt_injection, template_name)
-    pattern = re.compile(r'"isInjection":\s*false,\s*"confidence":\s*([0-9.]+)')
-    scores = [float(m) for m in pattern.findall(template)]
-
-    assert scores, "expected benign few-shot examples in the template"
-    offenders = [s for s in scores if s > 0.09]
-    assert not offenders, f"benign few-shots above the 0.09 escalation line: {offenders}"
+@pytest.mark.parametrize("template_name", ["INPUT", "OUTPUT"])
+def test_few_shots_answer_with_a_confident_letter(template_name):
+    """Few-shots model the normal answers: A for benign, D for attacks. A benign example
+    answered B would teach the model to escalate ordinary traffic to the slow arbiter."""
+    letters = re.findall(r"^Output: (.)$", getattr(prompt_injection, template_name), re.M)
+    assert "A" in letters and "D" in letters
+    assert set(letters) <= {"A", "D"}, f"{template_name}: {sorted(set(letters))}"
