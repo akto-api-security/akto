@@ -3,14 +3,18 @@
 Async sinks, all no-ops when their target isn't configured:
   - post_slack(...)         → Slack incoming webhook (SLACK_WEBHOOK_URL)
   - store_results(...)      → DB abstractor /api/storeGuardrailModelResults
+  - store_tripwire_result() → one JSON blob per Tripwire answer (TRIPWIRE_RESULTS_BLOB_URL)
 
 All are scheduled via the runtime's fire-and-forget hook (waitUntil on
 Cloudflare, asyncio.create_task on the container) so they never block the scan
 response. None ever raises into the caller.
 """
 
+import json
 import logging
 import time
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -121,6 +125,34 @@ async def store_results(completed: list[dict[str, Any]], scanner_name: str) -> N
     except Exception as exc:
         metrics_push.COUNTS["alert_errors"].increment(f"store_results:{type(exc).__name__}")
         logger.warning(f"[Store] failed for scanner={scanner_name}: {exc}")
+
+
+async def store_tripwire_result(record: dict[str, Any]) -> None:
+    """Upload one Tripwire record as its own JSON blob (Azure Put Blob, authorised by the SAS token in
+    TRIPWIRE_RESULTS_BLOB_URL). Blobs are named <yyyy>/<mm>/<dd>/<hh>/<time>-<id>.json, so an hour or a day
+    lists together. The URL is never logged: it carries the SAS token."""
+    container = (settings.TRIPWIRE_RESULTS_BLOB_URL or "").strip()
+    if not container:
+        return
+    now = datetime.now(UTC)
+    name = f"{now:%Y/%m/%d/%H}/{now:%Y%m%dT%H%M%S%f}Z-{uuid.uuid4().hex[:12]}.json"
+    base, _, sas = container.partition("?")
+    url = f"{base.rstrip('/')}/{name}" + (f"?{sas}" if sas else "")
+    started = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=_STORE_TIMEOUT_S) as client:
+            resp = await client.put(
+                url,
+                headers={"x-ms-blob-type": "BlockBlob", "Content-Type": "application/json"},
+                content=json.dumps(record),
+            )
+        metrics_push.SAMPLES["alert"].record("tripwire_blob", (time.perf_counter() - started) * 1000.0)
+        if resp.status_code >= 400:
+            metrics_push.COUNTS["alert_errors"].increment(f"tripwire_blob:status_{resp.status_code}")
+            logger.warning(f"[TripwireBlob] upload of {name} returned {resp.status_code}")
+    except Exception as exc:
+        metrics_push.COUNTS["alert_errors"].increment(f"tripwire_blob:{type(exc).__name__}")
+        logger.warning(f"[TripwireBlob] upload of {name} failed: {type(exc).__name__}")  # not exc: it may hold the URL
 
 
 # ── Model-fallback alerts (FALLBACK_SLACK_WEBHOOK_URL) ────────────────────────
