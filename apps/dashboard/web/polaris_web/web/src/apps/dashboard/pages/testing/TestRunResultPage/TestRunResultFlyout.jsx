@@ -5,8 +5,8 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, Tooltip, VerticalStack, Link, ActionList } from '@shopify/polaris'
-import { EditMinor, FileMinor } from '@shopify/polaris-icons'
+import { ActionList, Avatar, Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, Tooltip, VerticalStack, Link } from '@shopify/polaris'
+import { EditMinor, ExternalMinor, FileMinor } from '@shopify/polaris-icons'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -21,6 +21,8 @@ import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
+import LinearTicketCreationModal from '../../../components/shared/LinearTicketCreationModal.jsx'
+import { getLinearKey } from '../../../components/shared/LinearTicketDisplay'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
@@ -42,7 +44,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, createLinearTicket, linearIssueUrl, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
     const [remediationText, setRemediationText] = useState("")
     const { canCall, canCallAll } = usePermissions()
     const [fullDescription, setFullDescription] = useState(false)
@@ -67,6 +69,11 @@ function TestRunResultFlyout(props) {
     const [devrevParts, setDevRevParts] = useState([])
     const [devrevPartId, setDevRevPartId] = useState('')
     const [devrevWorkItemType, setDevRevWorkItemType] = useState('issue')
+
+    const [linearModalActive, setLinearModalActive] = useState(false)
+    const [linearTeams, setLinearTeams] = useState([])
+    const [linearTeamId, setLinearTeamId] = useState('')
+    const [ticketMenuActive, setTicketMenuActive] = useState(false)
 
     const [description, setDescription] = useState("")
     const [editDescription, setEditDescription] = useState("")
@@ -126,7 +133,7 @@ function TestRunResultFlyout(props) {
                 })
             })
 
-            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl, issueDetails.wizFindingUrl))
+            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl, issueDetails.wizFindingUrl, issueDetails.linearIssueUrl))
         }
     }, [issueDetails])
 
@@ -385,12 +392,94 @@ function TestRunResultFlyout(props) {
         setDevRevModalActive(!devrevModalActive)
     }
 
+    const handleLinearClick = async () => {
+        if (!linearModalActive) {
+            const linearIntegration = await settingFunctions.fetchLinearIntegration()
+            const teamsArray = Object.entries(linearIntegration?.teamsMap || {}).map(([id, name]) => ({ id, name }))
+            if (teamsArray.length > 0) {
+                setLinearTeams(teamsArray)
+                setLinearTeamId(teamsArray[0].id)
+            }
+        }
+        setLinearModalActive(!linearModalActive)
+    }
+
+    const handleLinearTicketCreation = async () => {
+        if (linearTeamId && linearTeamId.length > 0) {
+            await createLinearTicket(issueDetails.id, linearTeamId)
+            setLinearModalActive(false)
+        } else {
+            func.setToast(true, true, "Invalid Linear team")
+        }
+    }
+
     const handleDevRevTicketCreation = async (issueId, labels) => {
         if (devrevPartId && devrevPartId.length > 0) {
             await createDevRevTicket(issueDetails.id, devrevPartId, devrevWorkItemType)
             setDevRevModalActive(false)
         } else {
             func.setToast(true, true, "Invalid DevRev part")
+        }
+    }
+
+    const hasTicket = (url) => typeof url === 'string' && url.length > 0
+
+    const ticketTools = [
+        {
+            id: 'jira', label: 'Jira', logo: '/public/logo_jira.svg',
+            integrated: window.JIRA_INTEGRATED === 'true',
+            allowed: canCallAll('api/fetchIntegration', 'api/createJiraIssue'),
+            ticketUrl: jiraIssueUrl, ticketKey: hasTicket(jiraIssueUrl) ? jiraIssueUrl.split('/').pop() : '',
+            onCreate: handleJiraClick
+        },
+        {
+            id: 'azure', label: 'Azure Boards', logo: '/public/azure-boards.svg',
+            integrated: window.AZURE_BOARDS_INTEGRATED === 'true',
+            allowed: canCallAll('api/fetchAzureBoardsIntegration', 'api/createAzureBoardsWorkItem'),
+            ticketUrl: azureBoardsWorkItemUrl, ticketKey: hasTicket(azureBoardsWorkItemUrl) ? azureBoardsWorkItemUrl.split('/').pop() : '',
+            onCreate: handleAzureBoardClick
+        },
+        {
+            id: 'servicenow', label: 'ServiceNow', logo: '/public/servicenow.svg',
+            integrated: window.SERVICENOW_INTEGRATED === 'true',
+            allowed: canCallAll('api/fetchServiceNowIntegration', 'api/createServiceNowTicket'),
+            ticketUrl: serviceNowTicketUrl, ticketKey: issueDetails?.ticketId || 'View ticket',
+            onCreate: handleServiceNowClick
+        },
+        {
+            id: 'devrev', label: 'DevRev', logo: '/public/devrev-ai.svg',
+            integrated: window.DEVREV_INTEGRATED === 'true',
+            allowed: canCallAll('api/fetchDevRevIntegration', 'api/createDevRevTickets'),
+            ticketUrl: devrevWorkUrl, ticketKey: hasTicket(devrevWorkUrl) ? devrevWorkUrl.split('/').pop() : '',
+            onCreate: handleDevRevClick
+        },
+        {
+            id: 'linear', label: 'Linear', logo: '/public/linear.svg',
+            integrated: window.LINEAR_INTEGRATED === 'true',
+            allowed: canCallAll('api/fetchLinearIntegration', 'api/createLinearTickets'),
+            ticketUrl: linearIssueUrl, ticketKey: hasTicket(linearIssueUrl) ? getLinearKey(linearIssueUrl) : '',
+            onCreate: handleLinearClick
+        }
+    ]
+
+    const connectedTicketTools = ticketTools.filter(tool => tool.integrated)
+    const showTicketMenu = connectedTicketTools.length > 1
+
+    const ticketMenuItem = (tool) => {
+        const created = hasTicket(tool.ticketUrl)
+        return {
+            content: tool.label,
+            prefix: <Avatar size="extraSmall" shape="round" source={tool.logo} />,
+            suffix: created
+                ? <HorizontalStack gap="1" blockAlign="center">
+                    <Text as="span" variant="bodySm" color="subdued">{tool.ticketKey}</Text>
+                    <Icon source={ExternalMinor} color="subdued" />
+                </HorizontalStack>
+                : <Text as="span" variant="bodySm" color="subdued">Create</Text>,
+            disabled: !tool.allowed,
+            ...(created
+                ? { url: tool.ticketUrl, external: true }
+                : { onAction: () => { setTicketMenuActive(false); tool.onCreate() } })
         }
     }
 
@@ -614,8 +703,20 @@ function TestRunResultFlyout(props) {
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable &&
                         <HorizontalStack gap={2} wrap={false}>
+                            {showTicketMenu && (
+                                <Popover
+                                    active={ticketMenuActive}
+                                    activator={<Button id={"create-ticket-menu-button"} primary disclosure onClick={() => setTicketMenuActive(prev => !prev)}>Create ticket</Button>}
+                                    onClose={() => setTicketMenuActive(false)}
+                                    autofocusTarget="first-node"
+                                    preferredPosition="below"
+                                    preferredAlignment="right"
+                                >
+                                    <ActionList actionRole="menuitem" items={connectedTicketTools.map(ticketMenuItem)} />
+                                </Popover>
+                            )}
                             <JiraTicketCreationModal
-                                activator={window.JIRA_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchIntegration', 'api/createJiraIssue')}><Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button></AllowedAction> : <></>}
+                                activator={showTicketMenu ? undefined : window.JIRA_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchIntegration', 'api/createJiraIssue')}><Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button></AllowedAction> : <></>}
                                 modalActive={modalActive}
                                 setModalActive={setModalActive}
                                 handleSaveAction={handleSaveAction}
@@ -629,7 +730,7 @@ function TestRunResultFlyout(props) {
                                 setLabelsText={setLabelsText}
                             />
                             <JiraTicketCreationModal
-                                activator={window.AZURE_BOARDS_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchAzureBoardsIntegration', 'api/createAzureBoardsWorkItem')}><Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button></AllowedAction> : <></>}
+                                activator={showTicketMenu ? undefined : window.AZURE_BOARDS_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchAzureBoardsIntegration', 'api/createAzureBoardsWorkItem')}><Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button></AllowedAction> : <></>}
                                 modalActive={boardsModalActive}
                                 setModalActive={setBoardsModalActive}
                                 handleSaveAction={handleAzureBoardWorkitemCreation}
@@ -642,7 +743,7 @@ function TestRunResultFlyout(props) {
                                 isAzureModal={true}
                             />
                             <JiraTicketCreationModal
-                                activator={window.SERVICENOW_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchServiceNowIntegration', 'api/createServiceNowTicket')}><Button id={"create-servicenow-ticket-button"} primary onClick={handleServiceNowClick} disabled={serviceNowTicketUrl !== "" || window.SERVICENOW_INTEGRATED !== "true"}>Create ServiceNow Ticket</Button></AllowedAction> : <></>}
+                                activator={showTicketMenu ? undefined : window.SERVICENOW_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchServiceNowIntegration', 'api/createServiceNowTicket')}><Button id={"create-servicenow-ticket-button"} primary onClick={handleServiceNowClick} disabled={serviceNowTicketUrl !== "" || window.SERVICENOW_INTEGRATED !== "true"}>Create ServiceNow Ticket</Button></AllowedAction> : <></>}
                                 modalActive={serviceNowModalActive}
                                 setModalActive={setServiceNowModalActive}
                                 handleSaveAction={handleServiceNowTicketCreation}
@@ -655,7 +756,7 @@ function TestRunResultFlyout(props) {
                                 isServiceNowModal={true}
                             />
                             <JiraTicketCreationModal
-                                activator={window.DEVREV_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchDevRevIntegration', 'api/createDevRevTickets')}><Button id={"create-devrev-ticket-button"} primary onClick={handleDevRevClick} disabled={devrevWorkUrl !== "" || window.DEVREV_INTEGRATED !== "true"}>Create DevRev Ticket</Button></AllowedAction> : <></>}
+                                activator={showTicketMenu ? undefined : window.DEVREV_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchDevRevIntegration', 'api/createDevRevTickets')}><Button id={"create-devrev-ticket-button"} primary onClick={handleDevRevClick} disabled={devrevWorkUrl !== "" || window.DEVREV_INTEGRATED !== "true"}>Create DevRev Ticket</Button></AllowedAction> : <></>}
                                 modalActive={devrevModalActive}
                                 setModalActive={setDevRevModalActive}
                                 handleSaveAction={handleDevRevTicketCreation}
@@ -666,6 +767,16 @@ function TestRunResultFlyout(props) {
                                 issueType={devrevWorkItemType}
                                 issueId={issueDetails.id}
                                 isDevRevModal={true}
+                            />
+                            <LinearTicketCreationModal
+                                activator={showTicketMenu ? undefined : window.LINEAR_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchLinearIntegration', 'api/createLinearTickets')}><Button id={"create-linear-ticket-button"} primary onClick={handleLinearClick} disabled={!!linearIssueUrl}>Create Linear Ticket</Button></AllowedAction> : <></>}
+                                modalActive={linearModalActive}
+                                setModalActive={setLinearModalActive}
+                                handleSaveAction={handleLinearTicketCreation}
+                                teams={linearTeams}
+                                teamId={linearTeamId}
+                                setTeamId={setLinearTeamId}
+                                issueId={issueDetails.id}
                             />
                            
                             { window?.WIZ_INTEGRATED === 'true' ? 

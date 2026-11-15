@@ -24,6 +24,7 @@ import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import LocalStore from "../../../main/LocalStorageStore";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import JiraTicketDisplay from "../../components/shared/JiraTicketDisplay";
+import LinearTicketDisplay from "../../components/shared/LinearTicketDisplay";
 import { getMethod } from "../observe/GetPrettifyEndpoint";
 import { getDashboardCategory, mapLabel, CATEGORY_API_SECURITY, CATEGORY_DAST, isEndpointSecurityCategory } from "../../../main/labelHelper";
 import TooltipWithLink from "../../components/shared/TooltipWithLink";
@@ -424,7 +425,7 @@ const transform = {
     })
     return testRuns;
   },
-  prepareTestRunResult: (hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults) => {
+  prepareTestRunResult: (hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults, linearIssuesMapForResults) => {
     let obj = {};
     obj['id'] = data.hexId;
     obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
@@ -473,12 +474,18 @@ const transform = {
       }
     }
 
+    if (linearIssuesMapForResults && Object.keys(linearIssuesMapForResults).length > 0) {
+      if (linearIssuesMapForResults[testingRunResultHexId]) {
+        obj['linearIssueUrl'] = linearIssuesMapForResults[testingRunResultHexId];
+      }
+    }
+
     return obj;
   },
-  prepareTestRunResults: (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults) => {
+  prepareTestRunResults: (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults, linearIssuesMapForResults) => {
     let testRunResults = []
     testingRunResults.forEach((data) => {
-      let obj = transform.prepareTestRunResult(hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults);
+      let obj = transform.prepareTestRunResult(hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults, linearIssuesMapForResults);
       if (obj['name'] && obj['testCategory']) {
         testRunResults.push(obj);
       }
@@ -506,6 +513,7 @@ const transform = {
         'Errors': res.errors,
         'Jira issue': res.jiraIssueUrl,
         'DevRev work item': res.devrevWorkUrl,
+        'Linear issue': res.linearIssueUrl,
         'Result ID': res.id,
       }
     })
@@ -1084,6 +1092,7 @@ const transform = {
                         </HorizontalStack>
                       </Tag>
                     )}
+                    <LinearTicketDisplay linearIssueUrl={ele.linearIssueUrl} />
                     <Box maxWidth="250px" paddingInlineStart="3">
                       <TooltipText
                         text={ele.issueDescription}
@@ -1168,7 +1177,7 @@ const transform = {
       if (testRunResultsObj.hasOwnProperty(key)) {
         let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
         let urls = testRunResultsObj[key].urls
-        urls.push({ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl, startTimestamp: test?.startTimestamp || 0, endTimestamp: test?.endTimestamp || 0 })
+        urls.push({ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl, linearIssueUrl: test.linearIssueUrl, startTimestamp: test?.startTimestamp || 0, endTimestamp: test?.endTimestamp || 0 })
         let obj = {
           ...test,
           urls: urls,
@@ -1180,7 +1189,7 @@ const transform = {
         delete obj["errorsList"]
         testRunResultsObj[key] = obj
       } else {
-        let urls = [{ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl, startTimestamp: test?.startTimestamp || 0, endTimestamp: test?.endTimestamp || 0 }]
+        let urls = [{ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl, linearIssueUrl: test.linearIssueUrl, startTimestamp: test?.startTimestamp || 0, endTimestamp: test?.endTimestamp || 0 }]
         let obj = {
           ...test,
           urls: urls,
@@ -1234,7 +1243,7 @@ const transform = {
     return finalMethod + " " + truncatedUrl
 
   },
-  getRowInfo(severity, apiInfo, jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl, wizFindingUrl) {
+  getRowInfo(severity, apiInfo, jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl, wizFindingUrl, linearIssueUrl) {
     if (apiInfo == null || apiInfo === undefined) {
       apiInfo = {
         allAuthTypesFound: [],
@@ -1327,6 +1336,12 @@ const transform = {
       </Box>
     ) : null
 
+    const linearComp = linearIssueUrl?.length > 0 ? (
+      <Box>
+        <LinearTicketDisplay linearIssueUrl={linearIssueUrl} />
+      </Box>
+    ) : null
+
     const wizComp = (wizFindingUrl?.length > 0 && wizFindingUrl !== "unavailable") ? (
       <Box>
         <Tag>
@@ -1411,6 +1426,14 @@ const transform = {
         title: "DevRev ticket",
         value: devrevComp,
         tooltipContent: "DevRev ticket attached to the testing run issue"
+      })
+    }
+
+    if (linearComp != null) {
+      rowItems.push({
+        title: "Linear ticket",
+        value: linearComp,
+        tooltipContent: "Linear ticket attached to the testing run issue"
       })
     }
 

@@ -869,6 +869,54 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchLinearIntegration() {
+        return request({
+            url: '/api/fetchLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchLinearTeams(apiToken) {
+        return request({
+            url: '/api/fetchLinearTeams',
+            method: 'post',
+            data: { apiToken }
+        })
+    },
+
+    createLinearTeam(apiToken, teamName, teamKey) {
+        return request({
+            url: '/api/createLinearTeam',
+            method: 'post',
+            data: { apiToken, teamName, teamKey }
+        })
+    },
+
+    addLinearIntegration(apiToken) {
+        return request({
+            url: '/api/addLinearIntegration',
+            method: 'post',
+            data: { apiToken }
+        })
+    },
+
+    saveLinearTeams(teamMappings) {
+        return request({
+            url: '/api/saveLinearTeams',
+            method: 'post',
+            data: { teamMappings }
+        })
+    },
+
+    removeLinearIntegration() {
+        return request({
+            url: '/api/removeLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     removeInvitation(email) {
         return request({
             url: '/api/removeInvitation',

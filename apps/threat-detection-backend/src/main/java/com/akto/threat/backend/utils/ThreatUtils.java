@@ -5,6 +5,7 @@ import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.HostScope;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
+import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.core.JsonParser;
@@ -215,22 +216,37 @@ public class ThreatUtils {
             new Document("uniqueId", "$_id")));
     }
 
-    public static List<Document> configScanDedupeStages(String contextSource) {
+    private static final List<String> CONFIG_SCAN_DEDUPE_FIELDS = Arrays.asList(
+        "host", "category", "subCategory", "status", "severity", "detectedAt", "successfulExploit");
+
+    // Collapses repeated config-scan findings to the latest one per {host, actor, category, setting}; every other
+    // event stays its own row. Only the (few) /config/ events are sorted and grouped: the rest are projected to the
+    // same shape and the deduped config events are unioned back in, so no group is built per event.
+    // precedingStages are the caller's stages so far, replayed for the config branch.
+    public static List<Document> configScanDedupeStages(List<Document> precedingStages, String contextSource) {
         if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
             return Collections.emptyList();
         }
 
+        Document passThrough = new Document("_id", new Document("uniqueId", "$_id"));
+        Document latestPerSetting = new Document("_id", new Document("host", "$host").append("actor", "$actor")
+            .append("category", "$category").append("latestApiEndpoint", "$latestApiEndpoint"));
+        for (String field : CONFIG_SCAN_DEDUPE_FIELDS) {
+            // $first gives null for a missing field, so the pass-through does too
+            passThrough.append(field, new Document("$ifNull", Arrays.asList("$" + field, null)));
+            latestPerSetting.append(field, new Document("$first", "$" + field));
+        }
+
+        List<Document> configBranch = new ArrayList<>(precedingStages);
+        configBranch.add(new Document("$match", new Document("latestApiEndpoint", CONFIG_ENDPOINT_PATTERN)));
+        configBranch.add(new Document("$sort", new Document("detectedAt", -1)));
+        configBranch.add(new Document("$group", latestPerSetting));
+
         return Arrays.asList(
-            new Document("$sort", new Document("detectedAt", -1)),
-            new Document("$group",
-                new Document("_id", configScanDedupeKey())
-                    .append("host", new Document("$first", "$host"))
-                    .append("category", new Document("$first", "$category"))
-                    .append("subCategory", new Document("$first", "$subCategory"))
-                    .append("status", new Document("$first", "$status"))
-                    .append("severity", new Document("$first", "$severity"))
-                    .append("detectedAt", new Document("$first", "$detectedAt"))
-                    .append("successfulExploit", new Document("$first", "$successfulExploit"))));
+            new Document("$match", new Document("latestApiEndpoint", new Document("$not", CONFIG_ENDPOINT_PATTERN))),
+            new Document("$project", passThrough),
+            new Document("$unionWith", new Document("coll", MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS)
+                .append("pipeline", configBranch)));
     }
 
     public static List<Document> configScanLatestDocStages(String contextSource) {
@@ -551,6 +567,8 @@ public class ThreatUtils {
         requiredIndexes.put("idx_context_detectedAt_host", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("host")));
         requiredIndexes.put("idx_context_detectedAt_latestApiEndpoint", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("latestApiEndpoint")));
         requiredIndexes.put("idx_context_detectedAt_category_subCategory", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("category"), Indexes.ascending("subCategory")));
+        // Lets the Active tab count and its skills/config exclusion count be answered from index keys alone.
+        requiredIndexes.put("idx_ctx_status_detected_endpoint", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending("status"), Indexes.descending("detectedAt"), Indexes.ascending("latestApiEndpoint")));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {

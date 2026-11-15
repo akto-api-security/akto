@@ -48,6 +48,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -61,7 +62,8 @@ public class MaliciousEventService {
   private final MaliciousEventDao maliciousEventDao;
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
-  private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
+  // Read and written by concurrent (unordered) dashboard requests.
+  private static final Map<String, Boolean> shouldNotCreateIndexes = new ConcurrentHashMap<>();
   private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("SQLInjection", "SSRF");
 
   private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
@@ -238,6 +240,31 @@ public class MaliciousEventService {
         KafkaUtils.generateMsg(
             maliciousEventModel, MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, accountId),
         KafkaTopic.ThreatDetection.INTERNAL_DB_MESSAGES);
+  }
+
+  // A negated regex can't be answered from index keys, so counting it fetches every doc in the range.
+  // Count the range once, then subtract the small excluded partitions, matched positively.
+  long countWithEvaluationModes(String accountId, Document scope, List<Document> evaluationModeConditions, long maxTimeMs) {
+    List<Document> included = new ArrayList<>();
+    List<Document> excluded = new ArrayList<>();
+    for (Document condition : evaluationModeConditions) {
+      Object endpoint = condition.get("latestApiEndpoint");
+      Object negated = endpoint instanceof Document ? ((Document) endpoint).get("$not") : null;
+      if (negated != null) {
+        excluded.add(new Document("latestApiEndpoint", negated));
+      } else {
+        included.add(condition);
+      }
+    }
+    Document rangeScope = new Document(scope);
+    included.forEach(condition -> andDocument(rangeScope, condition));
+    long total = maliciousEventDao.countDocuments(accountId, rangeScope, maxTimeMs);
+    if (excluded.isEmpty()) {
+      return total;
+    }
+    Document excludedScope = new Document(rangeScope);
+    andDocument(excludedScope, new Document("$or", excluded));
+    return total - maliciousEventDao.countDocuments(accountId, excludedScope, maxTimeMs);
   }
 
   public int updateRemediation(String accountId, String refId, String remediation) {
@@ -536,6 +563,7 @@ public class MaliciousEventService {
     // Skills Evaluations / Misconfigured Settings partitions (see ThreatUtils.evaluationModeConditions).
     // Done server-side so the total count and pagination stay correct.
     List<Document> evaluationModeConditions = ThreatUtils.evaluationModeConditions(contextSource, skillEvalMode, configEvalMode);
+    Document countScope = new Document(query);
     if (!evaluationModeConditions.isEmpty()) {
       List<Document> andConditions = new ArrayList<>();
       andConditions.add(new Document(query));
@@ -623,7 +651,7 @@ public class MaliciousEventService {
       total = activityRows.total;
       cursor = activityRows.cursor;
     } else if (sortBySeverity) {
-      total = maliciousEventDao.countDocuments(accountId, query, regexMaxTimeMs);
+      total = countWithEvaluationModes(accountId, countScope, evaluationModeConditions, regexMaxTimeMs);
       // Use aggregation pipeline for custom severity sorting
       List<Document> pipeline = new ArrayList<>(matchStages);
       pipeline.addAll(Arrays.asList(
@@ -634,7 +662,7 @@ public class MaliciousEventService {
           ));
       cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
     } else if (sortByRiskScore) {
-      total = maliciousEventDao.countDocuments(accountId, query, regexMaxTimeMs);
+      total = countWithEvaluationModes(accountId, countScope, evaluationModeConditions, regexMaxTimeMs);
       List<Document> pipeline = new ArrayList<>(matchStages);
       pipeline.addAll(Arrays.asList(
               new Document("$addFields", riskScoreSortAddFields()),
@@ -644,7 +672,7 @@ public class MaliciousEventService {
           ));
       cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
     } else {
-      total = maliciousEventDao.countDocuments(accountId, query, regexMaxTimeMs);
+      total = countWithEvaluationModes(accountId, countScope, evaluationModeConditions, regexMaxTimeMs);
       cursor = maliciousEventDao.getCollection(accountId)
           .find(query)
           .maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS)
