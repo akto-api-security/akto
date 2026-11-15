@@ -39,6 +39,7 @@ import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
+import com.akto.util.LoginRedirectUtils;
 import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.http_request.CustomHttpRequest;
@@ -278,6 +279,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         }
         String decodedState = new String(java.util.Base64.getDecoder().decode(state));
         parsedState = BasicDBObject.parse(decodedState);
+        returnPath = LoginRedirectUtils.safeReturnPath(parsedState.getString(LoginRedirectUtils.RETURN_PATH_STATE_KEY));
 
         if(parsedState.containsKey("signupInvitationCode")){
             // User clicked on signup link
@@ -1305,6 +1307,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     String companyName, teamName;
     List<String> allEmails;
     String shouldLogin="false";
+    // Page the user was heading to before login (from the Auth0 state)
+    private String returnPath;
 
 //    public String addSignupInfo() throws IOException {
 //        String email = ((BasicDBObject) servletRequest.getAttribute("signupInfo")).getString("email");
@@ -1426,8 +1430,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             // Onboarding flow disabled - land new users on the dashboard directly.
             // logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to /dashboard/onboarding");
             // servletResponse.sendRedirect("/dashboard/onboarding");
-            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to /dashboard/observe/inventory");
-            servletResponse.sendRedirect("/dashboard/observe/inventory");
+            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to post-login landing page");
+            servletResponse.sendRedirect(LoginRedirectUtils.landingPath(returnPath));
         } else {
             logger.infoAndAddToDb("[createUserAndRedirect] Path: " + (user == null ? "NEW USER" : "EXISTING USER") + " with shouldLogin=true or existing user");
             logger.info("[createUserAndRedirect] invitationToAccount: " + invitationToAccount);
@@ -1576,12 +1580,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     servletRequest.getSession().setAttribute("accountId", accountId);
                     logger.info("[createUserAndRedirect] Set session accountId to: " + accountId);
                 }
-                logger.info("[createUserAndRedirect] Logging in existing user and redirecting to /dashboard/observe/inventory");
+                logger.info("[createUserAndRedirect] Logging in existing user and redirecting to post-login landing page");
                 LoginAction.loginUser(user, servletResponse, true, servletRequest, signupInfo);
                 // If this left the user with no account (e.g. invite didn't match), UserDetailsFilter
                 // catches it on this redirect's request and sends them to /login?error=no_account.
-                servletResponse.sendRedirect("/dashboard/observe/inventory");
-                logger.infoAndAddToDb("[createUserAndRedirect] EXISTING USER LOGIN COMPLETED - redirected to inventory");
+                servletResponse.sendRedirect(LoginRedirectUtils.landingPath(returnPath));
+                logger.infoAndAddToDb("[createUserAndRedirect] EXISTING USER LOGIN COMPLETED - redirected to landing page");
                 return;
             }
 
@@ -1635,8 +1639,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             // Onboarding flow disabled - land new users on the dashboard directly.
             // logger.infoAndAddToDb("[createUserAndRedirect] Redirecting new user to /dashboard/onboarding");
             // servletResponse.sendRedirect("/dashboard/onboarding");
-            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting new user to /dashboard/observe/inventory");
-            servletResponse.sendRedirect("/dashboard/observe/inventory");
+            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting new user to post-login landing page");
+            servletResponse.sendRedirect(LoginRedirectUtils.landingPath(returnPath));
 
             String dashboardMode = DashboardMode.getActualDashboardMode().toString();
             String distinct_id = userEmail + "_" + dashboardMode;

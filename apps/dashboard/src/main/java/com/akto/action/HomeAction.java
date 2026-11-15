@@ -14,6 +14,7 @@ import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
+import com.akto.util.LoginRedirectUtils;
 import com.akto.utils.Auth0;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
@@ -103,7 +104,12 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
                     logger.debug("Access token expired, unable to set window vars", e);
                 }
             }
-            return redirectToAuth0(servletRequest, servletResponse, accessToken, new BasicDBObject());
+            BasicDBObject authState = new BasicDBObject();
+            String returnPath = LoginRedirectUtils.safeReturnPath(redirectUri);
+            if (returnPath != null) {
+                authState.put(LoginRedirectUtils.RETURN_PATH_STATE_KEY, returnPath);
+            }
+            return redirectToAuth0(servletRequest, servletResponse, accessToken, authState);
         }
 
         return "SUCCESS";
@@ -172,8 +178,12 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     private String signupInvitationCode;
     private String signupEmailId;
 
-    // to prevent redirect_uri not found warning
-    public void setRedirect_uri(String redirect_uri) {
+    // Return path set by UserDetailsFilter, carried through the Auth0 state
+    private String redirectUri;
+
+    // Name is fixed by the redirect_uri request parameter
+    public void setRedirect_uri(String redirectUri) {
+        this.redirectUri = redirectUri;
     }
 
     public String getAccessToken() {

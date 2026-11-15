@@ -1,5 +1,5 @@
 # Build stage - use native platform for building (avoids QEMU emulation issues)
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 
 # Build arguments for cross-compilation (automatically set by BuildKit)
 ARG TARGETOS
@@ -46,7 +46,8 @@ FROM alpine:3.22
 
 # CA certs for outbound TLS; nonroot user keeps distroless's UID/GID (65532) and
 # writable /home/nonroot (endpoint-shield writes ~/.akto-endpoint-shield)
-RUN apk add --no-cache ca-certificates bash \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache ca-certificates bash \
     && addgroup -S -g 65532 nonroot \
     && adduser -S -D -h /home/nonroot -u 65532 -G nonroot -s /bin/bash nonroot
 

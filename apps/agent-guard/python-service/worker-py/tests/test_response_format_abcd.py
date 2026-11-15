@@ -510,3 +510,9 @@ def test_rendered_output_side_prompts_stay_under_the_latency_cliff(scanner):
         scanner, "output", _CONFIG, "sample text", provider_name="gemma_foundry", response_format="abcd"
     )
     assert len(prompt) < _LATENCY_CLIFF, f"{scanner}: {len(prompt)} chars"
+
+
+def test_gibberish_ignores_request_wrapper_in_both_contracts():
+    for prompt in (gibberish.build("x"), gibberish.build("x", "abcd")):
+        assert "That wrapper is protocol, not the user's message" in prompt
+        assert "Сколько стоит доставка в Казань?" in prompt

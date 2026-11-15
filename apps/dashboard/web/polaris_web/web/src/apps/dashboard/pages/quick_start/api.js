@@ -195,11 +195,11 @@ const api = {
         })
     },
 
-    initiateMCPScan(serverUrl, authKey, authValue, dashboardUrl, testRoleHexId) {
+    initiateMCPScan(serverUrl, authKey, authValue, dashboardUrl, testRoleHexId, miniTestingName) {
         return request({
             url: '/api/initiateMCPScan',
             method: 'post',
-            data: {serverUrl, authKey, authValue, dashboardUrl, testRoleHexId}
+            data: {serverUrl, authKey, authValue, dashboardUrl, testRoleHexId, miniTestingName}
         })
     },
 
@@ -216,11 +216,11 @@ const api = {
         })
     },
 
-    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders) {
+    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName) {
         return request({
             url: '/api/importFromUrl',
             method: 'post',
-            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders}
+            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName}
         })
     },
 

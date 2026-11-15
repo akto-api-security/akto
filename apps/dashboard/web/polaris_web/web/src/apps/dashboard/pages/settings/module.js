@@ -382,6 +382,48 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchLinearIntegration: async function(){
+      let linearInteg = {}
+      await settingRequests.fetchLinearIntegration().then((resp)=>{
+        linearInteg = resp.linearIntegration
+      })
+      return linearInteg
+    },
+    fetchLinearTeams: async function(apiToken) {
+      let teamsMap = {}
+      await settingRequests.fetchLinearTeams(apiToken).then((resp)=>{
+        teamsMap = resp.teamsMap
+      })
+      return teamsMap
+    },
+    createLinearTeam: async function(apiToken, teamName, teamKey) {
+      let teamsMap = {}
+      await settingRequests.createLinearTeam(apiToken, teamName, teamKey).then((resp)=>{
+        teamsMap = resp.teamsMap
+      })
+      return teamsMap
+    },
+    addLinearIntegration: async function(apiToken) {
+      let trafficData = {}
+      await settingRequests.addLinearIntegration(apiToken).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    saveLinearTeams: async function(teamMappings) {
+      let trafficData = {}
+      await settingRequests.saveLinearTeams(teamMappings).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    removeLinearIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeLinearIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     getSetupOptions: function(){
       return setupOptions;
     },

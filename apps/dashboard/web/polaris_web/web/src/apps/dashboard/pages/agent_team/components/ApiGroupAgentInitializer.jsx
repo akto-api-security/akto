@@ -4,6 +4,7 @@ import agentApi from '../api'
 import func from "../../../../../util/func";
 import DropDownAgentInitializer from "./DropDownAgentInitializer";
 import { useAgentsStore } from "../agents.store";
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function ApiGroupAgentInitializer(props) {
 
@@ -40,7 +41,7 @@ function ApiGroupAgentInitializer(props) {
         data={selectedCollections}
         setData={setSelectedCollections}
         startAgent={startAgent}
-        agentText={"Hey! Let's select API collections to run the API grouping agent on."}
+        agentText={"Hey! Let's select " + mapLabel('API', getDashboardCategory()) + " collections to run the API grouping agent on."}
         agentProperty={"collection"}
     />
 }

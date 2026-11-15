@@ -447,7 +447,9 @@ public class InventoryAction extends UserAction {
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
                 Filters.and(
                         Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                        Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections)
+                        Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections),
+                        apiCollectionId == AllAPIsGroup.ALL_APIS_GROUP_ID
+                                ? AllAPIsGroup.visibleOwnerFilter(ApiInfo.ID_API_COLLECTION_ID) : Filters.empty()
                 ));
         for(ApiInfo apiInfo: apiInfos){
             apiInfo.calculateActualAuth();

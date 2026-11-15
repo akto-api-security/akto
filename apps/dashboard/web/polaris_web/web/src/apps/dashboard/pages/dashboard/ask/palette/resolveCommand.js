@@ -6,6 +6,14 @@
 // questions" is prompts matching ANY WORD of the query. No fuzzy scoring, no askFirst reordering
 // — the design is explicit that the ask option always leads.
 import { COMMANDS, INTENTS, categoryLabel, suggestedPrompts } from "./commandRegistry"
+import { mapLabel } from "@/apps/main/labelHelper"
+
+// Registry copy is written in API wording; only segments naming the API term follow the category
+// (e.g. "Endpoint" in a breadcrumb is a section name, not the entity)
+function localize(text, category) {
+    if (!text) return text
+    return text.split(" › ").map((part) => (/\bAPIs?\b/.test(part) ? mapLabel(part, category) : part)).join(" › ")
+}
 
 function normalize(s) {
     return String(s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").trim()
@@ -45,14 +53,16 @@ export function buildResults(query, category, { commands = COMMANDS, intents = I
             const m = q.match(intent.pattern)
             if (!m) return null
             const built = intent.build(m)
-            return { id: `intent_${intent.id}`, kind: "PAGE", ...built }
+            return { id: `intent_${intent.id}`, kind: "PAGE", ...built, label: localize(built.label, category), breadcrumb: localize(built.breadcrumb, category) }
         })
         .filter(Boolean)
 
     const pageHits = commands
         .filter(safeGate)
-        .filter((c) => normalize(c.label).includes(qn) || normalize(c.breadcrumb || "").includes(qn))
-        .map((c) => ({ id: c.id, kind: "PAGE", label: c.label, breadcrumb: c.breadcrumb, route: c.route, params: c.params }))
+        .map((c) => ({ c, label: localize(c.label, category), breadcrumb: localize(c.breadcrumb, category) }))
+        // match the registry wording too, so typing "api" still finds a page in other categories
+        .filter(({ c, label, breadcrumb }) => [c.label, c.breadcrumb, label, breadcrumb].some((t) => normalize(t || "").includes(qn)))
+        .map(({ c, label, breadcrumb }) => ({ id: c.id, kind: "PAGE", label, breadcrumb, route: c.route, params: c.params }))
 
     const pages = [...intentHits, ...pageHits]
     pages.forEach((p, i) => out.push({ ...p, header: i === 0 ? "Go to" : null }))

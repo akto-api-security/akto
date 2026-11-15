@@ -158,13 +158,14 @@ def note_fallback(primary: str, backup: str, reason: str) -> None:
     entry["reasons"][reason] = entry["reasons"].get(reason, 0) + 1
 
 
-def note_availability(target: str, available: bool) -> None:
-    """The health check changed a primary's state (called only on a change)."""
+def note_availability(target: str, available: bool, reasons: str = "") -> None:
+    """The health check changed a primary's state (called only on a change); `reasons` are the failed probes' causes."""
     if _fallback_webhook():
+        cause = f" ({reasons})" if reasons else ""
         _transitions.append(
             f"✅ primary `{target}` is AVAILABLE again"
             if available
-            else f"🔴 primary `{target}` is DOWN, requests go to its backup"
+            else f"🔴 primary `{target}` is DOWN{cause}, requests go to its backup"
         )
 
 

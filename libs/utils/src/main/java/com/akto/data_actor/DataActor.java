@@ -118,6 +118,8 @@ public abstract class DataActor {
     public abstract void ingestMetricData(List<MetricData> metricData);
 
     public abstract List<ApiSequences> fetchApiSequences();
+
+    public abstract List<ApiSequences> fetchSequenceRules();
     public abstract List<EndpointMcpConfig> fetchEndpointMcpConfigs(String tempCollectionName, int updatedDate);
 
     // Copilot Studio agent_users sync (CopilotStudioAgentUsersCron)

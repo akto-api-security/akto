@@ -58,7 +58,10 @@ public class TestRbacGuards extends MongoBasedTest {
             "api/fetchTestingRunPlaygroundStatus", "tools/createSampleDataJson", "callback", "tools/addLLmData",
             "tools/convertSamleDataToBurpRequest", "tools/convertSampleDataToCurl", "api/downloadReportPDF",
             "auth/sendPasswordResetLink", "auth/resetPassword", "api/findSvcToSvcGraphEdges", "api/findSvcToSvcGraphNodes",
-            "api/downloadSamplePdf", "api/wrapped"
+            "api/downloadSamplePdf", "api/wrapped",
+            // MCP OAuth: public protocol endpoints, and consent APIs that check the user's role per product inside the action
+            "oauth/register", "oauth/authorize", "oauth/token",
+            "api/mcpOAuth/fetchAuthorizeRequest", "api/mcpOAuth/approveAuthorizeRequest", "api/mcpOAuth/denyAuthorizeRequest"
     ));
 
     private static Map<String, String> roleCheckParams(Element action) {

@@ -31,6 +31,9 @@ import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
+import com.akto.dto.testing.config.TestScript;
+import com.akto.service.scripts.TestScriptException;
+import com.akto.service.scripts.TestScriptService;
 import com.akto.dto.testing.info.CurrentTestsStatus;
 import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
@@ -41,6 +44,7 @@ import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.DeleteTestRunUtils;
@@ -123,6 +127,13 @@ public class StartTestAction extends UserAction {
     private String testRoleId;
     private boolean cleanUpTestingResources;
 
+    // null = default-test-{type} script, "" = no script, otherwise a TestScript id. See ScriptSelection.
+    @Getter @Setter
+    private String preRequestScriptId;
+    @Getter @Setter
+    private String postRequestScriptId;
+    private final TestScriptService testScriptService = new TestScriptService();
+
     private AutoTicketingDetails autoTicketingDetails;
 
     private Map<String, String> issuesDescriptionMap;
@@ -175,6 +186,10 @@ public class StartTestAction extends UserAction {
     private boolean sendMsTeamsAlert = false;
     private boolean doNotMarkIssuesAsFixed = false;
     private boolean runAutomatedTests = false;
+    private String automatedTestsCustomPrompt;
+    private static final int MAX_AUTOMATED_TESTS_CUSTOM_PROMPT_CHARS = 2000;
+    // the smart agent chosen for smart testing (none: smart testing as before)
+    private String smartAgentProfileId;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
@@ -270,6 +285,7 @@ public class StartTestAction extends UserAction {
             }
             List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
             testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
+            applyScriptSelections(testingRunConfig);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -283,7 +299,28 @@ public class StartTestAction extends UserAction {
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
         testingRun.setMaxAgentTokens(this.maxAgentTokens);
         testingRun.setRunAutomatedTests(this.runAutomatedTests);
+        if (this.runAutomatedTests && StringUtils.isNotBlank(this.automatedTestsCustomPrompt)) {
+            testingRun.setAutomatedTestsCustomPrompt(StringUtils.left(this.automatedTestsCustomPrompt.trim(), MAX_AUTOMATED_TESTS_CUSTOM_PROMPT_CHARS));
+        }
+        if (!applySmartAgentProfile(testingRun)) {
+            addActionError("Smart agent not found");
+            throw new IllegalArgumentException("smart agent profile not found: " + this.smartAgentProfileId);
+        }
         return testingRun;
+    }
+
+    /** The smart agent chosen in the Run test modal: a copy goes on the run. False when it does not exist. */
+    boolean applySmartAgentProfile(TestingRun testingRun) {
+        if (StringUtils.isBlank(this.smartAgentProfileId)) {
+            return true;
+        }
+        SmartAgentProfile profile = SmartAgentProfileAction.findProfile(this.smartAgentProfileId);
+        if (profile == null) {
+            return false;
+        }
+        testingRun.setRunAutomatedTests(true);
+        testingRun.setSmartAgentConfig(profile.toRunConfig());
+        return true;
     }
 
     List<String> selectedMiniTestingServiceNames;
@@ -316,6 +353,22 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private boolean validateScriptSelections(String preId, String postId) {
+        try {
+            testScriptService.validateRunSelection(preId, TestScript.Type.PRE_REQUEST);
+            testScriptService.validateRunSelection(postId, TestScript.Type.POST_REQUEST);
+            return true;
+        } catch (TestScriptException e) {
+            addActionError(e.getMessage());
+            return false;
+        }
+    }
+
+    private void applyScriptSelections(TestingRunConfig testingRunConfig) {
+        testingRunConfig.setPreRequestScriptId(this.preRequestScriptId);
+        testingRunConfig.setPostRequestScriptId(this.postRequestScriptId);
+    }
+
     private static final Slack SLACK_INSTANCE = Slack.getInstance();
 
     public String startTest() {
@@ -326,6 +379,10 @@ public class StartTestAction extends UserAction {
         }
 
         if (!validateAutoTicketingDetails(this.autoTicketingDetails)) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        if (!validateScriptSelections(this.preRequestScriptId, this.postRequestScriptId)) {
             return Action.ERROR.toUpperCase();
         }
 
@@ -423,6 +480,7 @@ public class StartTestAction extends UserAction {
 
                 List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
                 testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
+                applyScriptSelections(testingRunConfig);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             }
@@ -994,6 +1052,9 @@ public class StartTestAction extends UserAction {
     @Getter
     private Map<String, String> devrevIssuesMapForResults;
 
+    @Getter
+    private Map<String, String> linearIssuesMapForResults;
+
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
@@ -1036,6 +1097,7 @@ public class StartTestAction extends UserAction {
                 this.issuesDescriptionMap = (Map<String, String>) issueMetaDataMap.get("descriptions");
                 this.jiraIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("jiraIssues");
                 this.devrevIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("devrevIssues");
+                this.linearIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("linearIssues");
             }
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
@@ -1050,6 +1112,7 @@ public class StartTestAction extends UserAction {
         response.put("issuesDescriptionMap", this.issuesDescriptionMap);
         response.put("jiraIssuesMapForResults", this.jiraIssuesMapForResults);
         response.put("devrevIssuesMapForResults", this.devrevIssuesMapForResults);
+        response.put("linearIssuesMapForResults", this.linearIssuesMapForResults);
 
         return SUCCESS.toUpperCase();
     }
@@ -1071,7 +1134,7 @@ public class StartTestAction extends UserAction {
                 Filters.and(
                     Filters.in(Constants.ID, idToResultMap.keySet())
                 ),
-                Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.DESCRIPTION, TestingRunIssues.JIRA_ISSUE_URL, TestingRunIssues.DEVREV_WORK_URL)
+                Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.DESCRIPTION, TestingRunIssues.JIRA_ISSUE_URL, TestingRunIssues.DEVREV_WORK_URL, TestingRunIssues.LINEAR_ISSUE_URL)
             );
 
             return buildIssueMetaDataMap(issues, idToResultMap, ignoreStatuses);
@@ -1539,7 +1602,21 @@ public class StartTestAction extends UserAction {
                     return Action.ERROR.toUpperCase();
                 }
 
+                // validated before any write so a bad script id never leaves a half-applied edit
+                if (!validateScriptSelections(editableTestingRunConfig.getPreRequestScriptId(), editableTestingRunConfig.getPostRequestScriptId())) {
+                    return Action.ERROR.toUpperCase();
+                }
+
                 List<Bson> updates = new ArrayList<>();
+
+                // absent (null) = unchanged; "" = no script; otherwise the validated script id
+                if (editableTestingRunConfig.getPreRequestScriptId() != null && !editableTestingRunConfig.getPreRequestScriptId().equals(existingTestingRunConfig.getPreRequestScriptId())) {
+                    updates.add(Updates.set(TestingRunConfig.PRE_REQUEST_SCRIPT_ID, editableTestingRunConfig.getPreRequestScriptId()));
+                }
+
+                if (editableTestingRunConfig.getPostRequestScriptId() != null && !editableTestingRunConfig.getPostRequestScriptId().equals(existingTestingRunConfig.getPostRequestScriptId())) {
+                    updates.add(Updates.set(TestingRunConfig.POST_REQUEST_SCRIPT_ID, editableTestingRunConfig.getPostRequestScriptId()));
+                }
 
                 if (editableTestingRunConfig.getConfigsAdvancedSettings() != null && !editableTestingRunConfig.getConfigsAdvancedSettings().equals(existingTestingRunConfig.getConfigsAdvancedSettings())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_CONFIGS_ADVANCED_SETTINGS, editableTestingRunConfig.getConfigsAdvancedSettings()));
@@ -1690,6 +1767,12 @@ public class StartTestAction extends UserAction {
                 "JIRA_INTEGRATION");
             if (!featureAccess.getIsGranted()) {
                 addActionError("Auto Create Tickets plan is not activated for this account.");
+                return false;
+            }
+
+            String ticketSource = autoTicketingDetails.getTicketSource();
+            if (!TicketSource.JIRA.name().equals(ticketSource) && !TicketSource.LINEAR.name().equals(ticketSource)) {
+                addActionError("Invalid parameter: ticketSource.");
                 return false;
             }
 
@@ -2199,6 +2282,18 @@ public class StartTestAction extends UserAction {
 
     public boolean getRunAutomatedTests() {
         return runAutomatedTests;
+    }
+
+    public void setSmartAgentProfileId(String smartAgentProfileId) {
+        this.smartAgentProfileId = smartAgentProfileId;
+    }
+
+    public void setAutomatedTestsCustomPrompt(String automatedTestsCustomPrompt) {
+        this.automatedTestsCustomPrompt = automatedTestsCustomPrompt;
+    }
+
+    public String getAutomatedTestsCustomPrompt() {
+        return automatedTestsCustomPrompt;
     }
 
     public void setRecurringWeekly(boolean recurringWeekly) {

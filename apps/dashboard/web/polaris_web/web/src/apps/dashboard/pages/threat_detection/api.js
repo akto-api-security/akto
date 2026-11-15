@@ -56,6 +56,7 @@ const threatDetectionRequests = {
                 ...(riskScoreFilterValue != null && riskScoreFilterValue !== "" ? { riskScoreFilterValue } : {}),
                 ...(humanResponseFilter ? { humanResponse: humanResponseFilter } : {}),
                 ...(ungroupActivities ? { ungroupActivities: true } : {}),
+                ...(extraFilters.atlasToolKey ? { atlasToolKey: extraFilters.atlasToolKey } : {}),
                 ...(extraFilters.agenticTypes?.length ? { agenticTypes: extraFilters.agenticTypes } : {}),
                 ...(extraFilters.behaviours?.length ? { behaviours: extraFilters.behaviours } : {}),
                 // Guardrail case management: owner logins (UNASSIGNED_OWNER = no owner) and whether the event has notes.
@@ -179,6 +180,43 @@ const threatDetectionRequests = {
             url: '/api/getDailyThreatActorsCount',
             method: 'post',
             data: {startTs, endTs, latestAttack: latestAttack || []}
+        })
+    },
+    // Guardrail overview: events per day split by action. `filters` takes the violations list's filter keys.
+    fetchGuardrailActionCounts(startTimestamp, endTimestamp, filters) {
+        return request({
+            url: '/api/fetchGuardrailActionCounts',
+            method: 'post',
+            data: {startTimestamp, endTimestamp, filters: filters || {}}
+        })
+    },
+    // The overview's list panels page on the backend: `skip` rows in, `limit` rows out, plus the total.
+    fetchGuardrailTopPolicies(startTimestamp, endTimestamp, filters, skip, limit) {
+        return request({
+            url: '/api/fetchGuardrailTopPolicies',
+            method: 'post',
+            data: {startTimestamp, endTimestamp, filters: filters || {}, skip, limit}
+        })
+    },
+    fetchGuardrailHeatmap(startTimestamp, endTimestamp, filters, skip, limit) {
+        return request({
+            url: '/api/fetchGuardrailHeatmap',
+            method: 'post',
+            data: {startTimestamp, endTimestamp, filters: filters || {}, skip, limit}
+        })
+    },
+    fetchGuardrailNeedsAttention(startTimestamp, endTimestamp, filters, skip, limit) {
+        return request({
+            url: '/api/fetchGuardrailNeedsAttention',
+            method: 'post',
+            data: {startTimestamp, endTimestamp, filters: filters || {}, skip, limit}
+        })
+    },
+    fetchGuardrailTriageTime(startTimestamp, endTimestamp, filters) {
+        return request({
+            url: '/api/fetchGuardrailTriageTime',
+            method: 'post',
+            data: {startTimestamp, endTimestamp, filters: filters || {}}
         })
     },
     fetchSensitiveParamsForEndpoints (urls) {

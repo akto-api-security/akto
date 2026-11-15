@@ -432,6 +432,23 @@ function EndpointShieldMetadata() {
                 },
                 requires: 'api/deleteModuleInfo',
             });
+
+            // Server side, no agent involved: the skills already stored are validated again and their tags replaced.
+            actions.push({
+                content: `Revalidate stored skills of ${agentCount} ${agentWord}`,
+                onAction: () => {
+                    const msg = `Validate every stored skill of ${agentCount} ${agentWord} again? Their evidence and tags are replaced with the new result. Only SKILL.md is stored, so the scripts the skills run are not checked.`;
+                    func.showConfirmationModal(msg, "Revalidate", async () => {
+                        try {
+                            await settingRequests.triggerSkillRevalidation(selectedAgents);
+                            func.setToast(true, false, `Skill revalidation started for ${agentCount} ${agentWord}.`);
+                        } catch (error) {
+                            console.error("Error starting skill revalidation:", error);
+                        }
+                    });
+                },
+                requires: 'api/triggerSkillRevalidation',
+            });
         }
         return actions;
     };

@@ -4,12 +4,14 @@ import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.mongodb.client.AggregateIterable;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.CountOptions;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
 
@@ -48,6 +50,10 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
 
     public long countDocuments(String accountId, Bson filter) {
         return getCollection(accountId).countDocuments(filter);
+    }
+
+    public long countDocuments(String accountId, Bson filter, long maxTimeMs) {
+        return getCollection(accountId).countDocuments(filter, new CountOptions().maxTime(maxTimeMs, TimeUnit.MILLISECONDS));
     }
 
     public void createIndexIfAbsent(String accountId) {

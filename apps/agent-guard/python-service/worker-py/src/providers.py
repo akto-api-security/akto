@@ -8,6 +8,7 @@ Differences from the container version:
 """
 
 import asyncio
+import functools
 import json
 import logging
 import math
@@ -26,6 +27,7 @@ import alerts
 import aws_auth
 import gcp_auth
 import http_client
+import reachback
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -254,7 +256,18 @@ class AnthropicProvider(LLMProvider):
             },
             self._log_tag,
         )
-        return body["content"][0]["text"]
+        return _anthropic_text(body)
+
+
+def _anthropic_text(body: dict) -> str:
+    """The first text block of a Messages API reply. Current Claude models think by default, so the
+    reply can open with a `thinking` block (no "text" key) before the answer; a refusal has no answer."""
+    if body.get("stop_reason") == "refusal":
+        raise ValueError(f"Anthropic declined the request (stop_reason=refusal): {body!r}"[:500])
+    for block in body.get("content") or []:
+        if "text" in block:
+            return block["text"]
+    raise ValueError(f"Anthropic response has no text content block: {body!r}"[:500])
 
 
 def _normalize_anthropic_foundry_base_url(base_url: str) -> str:
@@ -515,6 +528,36 @@ class Qwen3GuardFoundryProvider(Qwen3GuardOutput, AzureFoundryProvider):
     ) -> tuple[str, list | None]:
         body = await self._chat(_qwen3guard_params(text, top_logprobs, temperature))
         return _choice_content_and_logprobs(body)
+
+
+class ReachbackProvider(LLMProvider):
+    """Model behind a client's reach-back gateway (OpenAI chat completions).
+
+    Auth (Azure AD token + mTLS) and transport live in reachback.py, shared
+    with POST /reachback/test. Reasoning is off (`reasoning_effort: "none"`)
+    so the verdict is not spent on hidden reasoning tokens and greedy
+    `temperature` is accepted; models that cannot turn reasoning off
+    (gpt-6-astra, gpt-6.1-sol) reject this with a 400. Uses
+    `max_completion_tokens`, as GPT-5/6 models reject `max_tokens`."""
+
+    name = "reachback"
+
+    def __init__(self, model: str):
+        self.model = model
+        logger.info(f"[Reachback] model={self.model} base_url={settings.REACHBACK_BASE_URL}")
+
+    async def complete(self, prompt: str) -> str:
+        result = await reachback.chat(
+            {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_completion_tokens": _max_tokens(),
+                "temperature": _TEMPERATURE,
+                "reasoning_effort": "none",
+            }
+        )
+        content, _ = _choice_content_and_logprobs(result["response"])
+        return content
 
 
 # Converse stopReasons meaning Bedrock itself withheld the answer — surfaced as
@@ -965,6 +1008,78 @@ class GemmaFastArbiterProvider(OpenAIProvider):
         self.name = "gemma_fast_arbiter"
 
 
+class TripwireProvider(LLMProvider):
+    """Tripwire, a prompt-injection classifier (akto-api-security/Tripwire): POST {base_url}/v1/detect with the
+    raw text returns an attack_score in [0, 1]. Not an LLM, so LLMScanner sends it the text itself rather than a
+    scan prompt, and long text is windowed by the server, not chunked here. It only observes: see
+    tripwire_provider; it is never a modelConfigs entry."""
+
+    name = "tripwire"
+    # Its own connection pool: a hung Tripwire must not hold the shared pool's connections that Qwen/Gemma need.
+    _MAX_CONNECTIONS = 20
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip("/")
+        self._http: httpx.AsyncClient | None = None
+        logger.info(f"[Tripwire] base_url={self.base_url}")
+
+    def _client(self) -> httpx.AsyncClient:
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.AsyncClient(timeout=10.0, limits=httpx.Limits(max_connections=self._MAX_CONNECTIONS))
+        return self._http
+
+    async def detect(self, text: str) -> dict[str, Any]:
+        resp = await self._client().post(
+            f"{self.base_url}/v1/detect",
+            headers=dict(_IDENTITY, **{"Content-Type": "application/json"}),
+            json={"text": text},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def complete(self, prompt: str) -> str:
+        """Satisfies LLMProvider; the startup self-check pings Tripwire through it."""
+        return json.dumps(await self.detect(prompt))
+
+
+def parse_tripwire_result(body: dict[str, Any]) -> dict[str, Any]:
+    """A /v1/detect reply as a scanner result. is_attack applies the server's own THRESHOLD; risk_score is the
+    attack_score (1 - P(benign)), on the same scale as an LLM arbiter's risk_score."""
+    score = float(body["attack_score"])
+    verdict = body.get("verdict") or ""
+    is_attack = body.get("is_attack")
+    if is_attack is None:  # missing or null: fall back to the score
+        is_attack = score >= 0.5
+    details: dict[str, Any] = {"verdict": verdict, "attack_score": score}
+    if is_attack:
+        flagged = verdict.replace("_", " ") or "an attack"
+        details["reason"] = f"Tripwire flagged this as {flagged} (attack score {score:.2f})."
+    if body.get("windows_skipped"):  # a long input the server read only part of
+        details["windows_skipped"] = int(body["windows_skipped"])
+    return {
+        "is_valid": not is_attack,
+        "risk_score": score,
+        "decision_confidence": max(score, 1.0 - score),
+        "details": details,
+    }
+
+
+def tripwire_provider() -> TripwireProvider | None:
+    """The Tripwire observer when TRIPWIRE_ENABLED is on and TRIPWIRE_BASE_URL is set, else None."""
+    if settings.TRIPWIRE_ENABLED.strip().lower() not in ("1", "true", "yes", "on"):
+        return None
+    return _tripwire_for(settings.TRIPWIRE_BASE_URL.strip())
+
+
+@functools.cache
+def _tripwire_for(base_url: str) -> TripwireProvider | None:
+    """One provider, so one connection pool, per URL. A missing URL is warned about once, not on every scan."""
+    if not base_url:
+        logger.warning("[Tripwire] TRIPWIRE_ENABLED is on but TRIPWIRE_BASE_URL is unset; Tripwire is off")
+        return None
+    return TripwireProvider(base_url)
+
+
 _FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
 
 # Fast provider name → settings attr holding its default endpoint. An entry's
@@ -1051,6 +1166,18 @@ def _build_bedrock(model: str, base_url: str) -> LLMProvider | None:
     return None
 
 
+def _build_reachback(model: str) -> LLMProvider | None:
+    """Gateway URL and credentials come from REACHBACK_* env only; the entry picks the model."""
+    missing = reachback.missing_settings()
+    if missing:
+        logger.warning(f"[Providers] reachback: missing required vars {missing}; skipping")
+        return None
+    if not model:
+        logger.warning("[Providers] reachback: modelConfigs entry has no model; skipping")
+        return None
+    return ReachbackProvider(model)
+
+
 _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
     "openai": lambda model, _b, _d: _build_openai_compatible(model, base_url=""),
     "openai_compatible": lambda model, base_url, _d: _build_openai_compatible(model, base_url),
@@ -1082,6 +1209,7 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
         else None
     ),
     "bedrock": lambda model, base_url, _d: _build_bedrock(model, base_url),
+    "reachback": lambda model, _b, _d: _build_reachback(model),
 }
 
 
@@ -1106,26 +1234,51 @@ _HEALTH_PROBE_TIMEOUT_S = 3.0
 _HEALTH_FAILURES_TO_DOWN = int(os.getenv("AGW_ARBITER_HEALTH_FAILURES_TO_DOWN", "3"))
 _PRIMARY_AVAILABLE: dict[str, bool] = {}
 _HEALTH_FAILURES: dict[str, int] = {}
+_HEALTH_FAILURE_REASONS: dict[str, dict[str, int]] = {}
 _HEALTH_TASKS: dict[str, "asyncio.Task[None]"] = {}
+_HEALTH_CLIENT: httpx.AsyncClient | None = None
 
 
-def _set_availability(health_url: str, available: bool) -> None:
+def _health_client() -> httpx.AsyncClient:
+    # Probes get their own pool: in the shared one, multi-second scan calls fill every connection under load,
+    # httpx counts the wait for a free one against the probe timeout (PoolTimeout), and a healthy primary is
+    # marked DOWN.
+    global _HEALTH_CLIENT
+    if _HEALTH_CLIENT is None or _HEALTH_CLIENT.is_closed:
+        _HEALTH_CLIENT = httpx.AsyncClient(timeout=_HEALTH_PROBE_TIMEOUT_S, limits=httpx.Limits(max_connections=4))
+    return _HEALTH_CLIENT
+
+
+def _set_availability(health_url: str, available: bool, reasons: str = "") -> None:
     if _PRIMARY_AVAILABLE.get(health_url, True) != available:
         logger.warning(f"[FinalArbiter] primary {health_url} is now {'AVAILABLE' if available else 'DOWN'}")
-        alerts.note_availability(urlparse(health_url).netloc or health_url, available)
+        alerts.note_availability(urlparse(health_url).netloc or health_url, available, reasons)
     _PRIMARY_AVAILABLE[health_url] = available
 
 
 async def _health_loop(health_url: str) -> None:
     while True:
         try:
-            resp = await http_client.get_client().get(health_url, timeout=_HEALTH_PROBE_TIMEOUT_S)
+            resp = await _health_client().get(health_url)
             healthy = resp.status_code == 200
-        except Exception:
+            reason = why = f"HTTP {resp.status_code}"
+        except Exception as exc:
             healthy = False
+            reason, why = type(exc).__name__, repr(exc)
+        # Causes of the current failure streak, for the DOWN alert; a good probe ends the streak.
+        streak = _HEALTH_FAILURE_REASONS.setdefault(health_url, {})
+        if healthy:
+            streak.clear()
+        else:
+            streak[reason] = streak.get(reason, 0) + 1
         _HEALTH_FAILURES[health_url] = 0 if healthy else _HEALTH_FAILURES.get(health_url, 0) + 1
+        if not healthy:
+            logger.warning(
+                f"[FinalArbiter] health probe {health_url} failed ({why}), "
+                f"{_HEALTH_FAILURES[health_url]}/{_HEALTH_FAILURES_TO_DOWN} before DOWN"
+            )
         if healthy or _HEALTH_FAILURES[health_url] >= _HEALTH_FAILURES_TO_DOWN:
-            _set_availability(health_url, healthy)
+            _set_availability(health_url, healthy, ", ".join(f"{r} x{n}" for r, n in streak.items()))
         await asyncio.sleep(_HEALTH_INTERVAL_S)
 
 
@@ -1244,6 +1397,10 @@ async def _startup_check_entry(entry: dict[str, Any]) -> None:
         # extra to say here, and staying silent avoids false-alarming on
         # providers this deployment was never meant to use.
         return
+    await _startup_ping(label, provider)
+
+
+async def _startup_ping(label: str, provider: LLMProvider) -> None:
     logger.info(f"[StartupCheck] {label}: pinging real endpoint...")
     t0 = time.time()
     try:
@@ -1264,5 +1421,9 @@ async def startup_self_check() -> None:
 
     entries = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON).get("modelConfigs", [])
     logger.info(f"[StartupCheck] checking {len(entries)} configured cascade entries")
-    await asyncio.gather(*(_startup_check_entry(e) for e in entries), return_exceptions=True)
+    checks = [_startup_check_entry(e) for e in entries]
+    tripwire = tripwire_provider()
+    if tripwire is not None:
+        checks.append(_startup_ping("tripwire[observer]", tripwire))
+    await asyncio.gather(*checks, return_exceptions=True)
     logger.info("[StartupCheck] done")

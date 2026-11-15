@@ -1,4 +1,4 @@
-"""Chat completions against models behind Morgan Stanley's reach-back gateway.
+"""Chat completions against models behind a client's reach-back gateway.
 
 Two layers of auth on every call:
   1. Azure AD app token (azure_ad_auth) — sent as `Authorization: Bearer`.

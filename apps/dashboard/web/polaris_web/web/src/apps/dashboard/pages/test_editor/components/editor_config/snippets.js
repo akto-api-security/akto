@@ -1,3 +1,4 @@
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const successResponseCode = [
     "\tresponse_code:",
@@ -15,7 +16,7 @@ const executeBasic = [
 const snippets = [
     {
         label: "authorization-SAMPLE",
-        desc: "Makes sure that only authenticated APIs get considered for a test",
+        desc: "Makes sure that only authenticated " + mapLabel('APIs', getDashboardCategory()) + " get considered for a test",
         text: [
             "auth:",
             "\tauthenticated: true"
@@ -23,7 +24,7 @@ const snippets = [
     },
     {
         label: "filter-success-response-SAMPLE",
-        desc: "API filter for success response code",
+        desc: mapLabel('API', getDashboardCategory()) + " filter for success response code",
         text: [
             "api_selection_filters:",
             ...successResponseCode

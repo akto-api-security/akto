@@ -126,7 +126,7 @@ public class HttpProxyAction extends ActionSupport {
         }
     }
 
-    private String normalizeHostInRequestHeaders(String headers) {
+    static String normalizeHostInRequestHeaders(String headers) {
         if (headers == null || headers.isEmpty()) return headers;
         try {
             BasicDBObject headersObj = BasicDBObject.parse(headers);

@@ -869,6 +869,54 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchLinearIntegration() {
+        return request({
+            url: '/api/fetchLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchLinearTeams(apiToken) {
+        return request({
+            url: '/api/fetchLinearTeams',
+            method: 'post',
+            data: { apiToken }
+        })
+    },
+
+    createLinearTeam(apiToken, teamName, teamKey) {
+        return request({
+            url: '/api/createLinearTeam',
+            method: 'post',
+            data: { apiToken, teamName, teamKey }
+        })
+    },
+
+    addLinearIntegration(apiToken) {
+        return request({
+            url: '/api/addLinearIntegration',
+            method: 'post',
+            data: { apiToken }
+        })
+    },
+
+    saveLinearTeams(teamMappings) {
+        return request({
+            url: '/api/saveLinearTeams',
+            method: 'post',
+            data: { teamMappings }
+        })
+    },
+
+    removeLinearIntegration() {
+        return request({
+            url: '/api/removeLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     removeInvitation(email) {
         return request({
             url: '/api/removeInvitation',
@@ -903,6 +951,48 @@ const settingRequests = {
             url: '/api/fetchEndpointShieldAgents',
             method: 'post',
             data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, browserNames, agentVersions, statuses, providers, queryValue, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchEndpointShieldStats({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchEndpointShieldStats',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchAtlasOverview({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchAtlasOverview',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchAtlasTrend({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchAtlasTrend',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchAtlasEmployees(params = {}) {
+        return await request({
+            url: '/api/fetchAtlasEmployees',
+            method: 'post',
+            data: params
+        })
+    },
+    async fetchAtlasPersonDetail({ deviceScope = "all", atlasKind, atlasId }) {
+        return await request({
+            url: '/api/fetchAtlasPersonDetail',
+            method: 'post',
+            data: { deviceScope, atlasKind, atlasId }
+        })
+    },
+    async fetchAtlasDevices(params = {}) {
+        return await request({
+            url: '/api/fetchAtlasDevices',
+            method: 'post',
+            data: params
         })
     },
     async fetchEndpointShieldFilterOptions() {
@@ -1209,9 +1299,52 @@ const settingRequests = {
             data: {moduleIds, envData}
         })
     },
+    // Akto users only: validates the agents' stored skills again in a dashboard job
+    triggerSkillRevalidation(agentIds) {
+        return request({
+            url: '/api/triggerSkillRevalidation',
+            method: 'post',
+            data: {agentIds}
+        })
+    },
+    fetchSkillRevalidationJob() {
+        return request({
+            url: '/api/fetchSkillRevalidationJob',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchFilterYamlTemplate() {
         return request({
             url: '/api/fetchFilterYamlTemplate',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchImpervaIntegration() {
+        return request({
+            url: '/api/fetchImpervaIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addImpervaIntegration(apiId, apiKey) {
+        return request({
+            url: '/api/addImpervaIntegration',
+            method: 'post',
+            data: {apiId, apiKey}
+        })
+    },
+    triggerImpervaImport() {
+        return request({
+            url: '/api/triggerImpervaImport',
+            method: 'post',
+            data: {}
+        })
+    },
+    stopImpervaImport() {
+        return request({
+            url: '/api/stopImpervaImport',
             method: 'post',
             data: {}
         })
@@ -1262,18 +1395,28 @@ const settingRequests = {
     fetchFileInspectionRules() {
         return request({ url: '/api/fetchFileInspectionRules', method: 'post', data: {} })
     },
-    addFileInspectionRule(path, existenceOnly, maxDepth) {
+    addFileInspectionRule(path, existenceOnly, maxDepth, agent, os, role) {
         return request({
             url: '/api/addFileInspectionRule',
             method: 'post',
-            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0 }
+            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent, os, role }
         })
     },
-    deleteFileInspectionRule(path) {
+    updateFileInspectionRule(ruleId, path, existenceOnly, maxDepth, agent, os, role) {
+        return request({
+            url: '/api/updateFileInspectionRule',
+            method: 'post',
+            data: { ruleId, path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent, os, role }
+        })
+    },
+    restoreFileInspectionDefaults() {
+        return request({ url: '/api/restoreFileInspectionDefaults', method: 'post', data: {} })
+    },
+    deleteFileInspectionRule(ruleId) {
         return request({
             url: '/api/deleteFileInspectionRule',
             method: 'post',
-            data: { path }
+            data: { ruleId }
         })
     },
     fetchFileInspectionResults(ruleId) {
@@ -1390,6 +1533,27 @@ const settingRequests = {
             url: '/api/cancelEndpointRemoteCommand',
             method: 'post',
             data: { commandId }
+        })
+    },
+    updateMcpKnownClientsOnly(mcpKnownClientsOnly) {
+        return request({
+            url: '/api/updateMcpKnownClientsOnly',
+            method: 'post',
+            data: { mcpKnownClientsOnly }
+        })
+    },
+    addMcpAllowedRedirectUri(mcpRedirectUri) {
+        return request({
+            url: '/api/addMcpAllowedRedirectUri',
+            method: 'post',
+            data: { mcpRedirectUri }
+        })
+    },
+    deleteMcpAllowedRedirectUri(mcpRedirectUri) {
+        return request({
+            url: '/api/deleteMcpAllowedRedirectUri',
+            method: 'post',
+            data: { mcpRedirectUri }
         })
     }
 }

@@ -40,7 +40,7 @@ public class ArgusPostureUtils {
         return (c.isMcpCollection() || c.isGenAICollection()) && !c.isEndpointCollection();
     }
 
-    static String agentDisplayName(ApiCollection c) {
+    public static String agentDisplayName(ApiCollection c) {
         // Not extractServiceName(hostName): it mis-parses real DNS hosts ("mcp.kite.trade" -> "trade").
         String assetValue = AgenticObserveUtil.getAssetTagValue(c);
         if (assetValue != null && !assetValue.trim().isEmpty()) return AgenticObserveUtil.formatDisplayName(assetValue);

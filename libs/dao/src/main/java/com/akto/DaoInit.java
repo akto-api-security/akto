@@ -21,7 +21,12 @@ import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
+import com.akto.dao.testing.SmartTestingEventDao;
+import com.akto.dao.testing.SmartTestingMessageDao;
+import com.akto.dao.testing.SmartTestingRunDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.TestingRunConfigDao;
+import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.AgentConversationDao;
 import com.akto.dao.testing.AgentConversationResultDao;
@@ -49,8 +54,11 @@ import com.akto.dto.gpt.AktoGptConfigState;
 import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobParams;
+import com.akto.dto.jobs.LinearAutoTicketParams;
 import com.akto.dto.jobs.TicketSyncJobParams;
 import com.akto.dto.jobs.WizApiEndpointsImportJobParams;
+import com.akto.dto.jobs.ImpervaApiEndpointsImportJobParams;
+import com.akto.dto.jobs.SkillRevalidationJobParams;
 import com.akto.dto.jobs.WizSyncJobParams;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
@@ -336,6 +344,7 @@ public class DaoInit {
         ClassModel<TestingInstanceHeartBeat> testingInstanceHeartBeat = ClassModel.builder(TestingInstanceHeartBeat.class).enableDiscriminator(true).build();
         ClassModel<JobParams> jobParams = ClassModel.builder(JobParams.class).enableDiscriminator(true).build();
         ClassModel<AutoTicketParams> autoTicketParams = ClassModel.builder(AutoTicketParams.class).enableDiscriminator(true).build();
+        ClassModel<LinearAutoTicketParams> linearAutoTicketParams = ClassModel.builder(LinearAutoTicketParams.class).enableDiscriminator(true).build();
         ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
         ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
@@ -366,6 +375,8 @@ public class DaoInit {
         ClassModel<WizEndpointAsset> wizEndpointAssetClassModel = ClassModel.builder(WizEndpointAsset.class).enableDiscriminator(true).build();
         ClassModel<WizSyncJobParams> wizSyncJobParamsClassModel = ClassModel.builder(WizSyncJobParams.class).enableDiscriminator(true).build();
         ClassModel<WizApiEndpointsImportJobParams> wizApiEndpointsImportJobParamsClassModel = ClassModel.builder(WizApiEndpointsImportJobParams.class).enableDiscriminator(true).build();
+        ClassModel<ImpervaApiEndpointsImportJobParams> impervaApiEndpointsImportJobParamsClassModel = ClassModel.builder(ImpervaApiEndpointsImportJobParams.class).enableDiscriminator(true).build();
+        ClassModel<SkillRevalidationJobParams> skillRevalidationJobParamsClassModel = ClassModel.builder(SkillRevalidationJobParams.class).enableDiscriminator(true).build();
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
         ClassModel<OpenTelemetryIntegration> openTelemetryIntegrationClassModel = ClassModel.builder(OpenTelemetryIntegration.class).enableDiscriminator(true).build();
@@ -411,11 +422,11 @@ public class DaoInit {
                 eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel,
                 RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel,
                 configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
-                jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
+                jobParams, autoTicketParams, linearAutoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
-                wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel, wizApiEndpointsImportJobParamsClassModel,
+                wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel, wizApiEndpointsImportJobParamsClassModel, impervaApiEndpointsImportJobParamsClassModel, skillRevalidationJobParamsClassModel,
                 mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel,
                 openTelemetryIntegrationClassModel, copilotStudioIntegrationClassModel, insightNarrativeCacheClassModel, insightClassificationCacheClassModel)
             .automatic(true).build());
@@ -523,6 +534,8 @@ public class DaoInit {
         TrafficMetricsDao.instance.createIndicesIfAbsent();
         SensitiveDataCountDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
+        TestScriptsDao.instance.createIndicesIfAbsent();
+        TestingRunConfigDao.instance.createIndicesIfAbsent();
         UsersDao.instance.createIndicesIfAbsent();
         AccountsDao.instance.createIndexIfAbsent();
 
@@ -599,5 +612,10 @@ public class DaoInit {
         AgentGuardCorpusDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusQueueDao.instance.createIndicesIfAbsent();
         ComplianceClauseCoverageDao.instance.createIndicesIfAbsent();
+        McpOAuthClientsDao.instance.createIndicesIfAbsent();
+        McpOAuthGrantsDao.instance.createIndicesIfAbsent();
+        SmartTestingRunDao.instance.createIndicesIfAbsent();
+        SmartTestingEventDao.instance.createIndicesIfAbsent();
+        SmartTestingMessageDao.instance.createIndicesIfAbsent();
     }
 }

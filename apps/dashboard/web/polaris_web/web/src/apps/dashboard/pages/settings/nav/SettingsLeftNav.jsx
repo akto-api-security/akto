@@ -82,6 +82,14 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/audit-logs")
     }] : []
 
+    const mcpClientsArr = func.isUserAdmin() ? [{
+        label: 'MCP clients',
+        icon: LockFilledMajor,
+        selected: page === 'mcp-clients',
+        route: "/dashboard/settings/mcp-clients",
+        onClick: () => navigate("/dashboard/settings/mcp-clients")
+    }] : []
+
     const billingArr = (window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM') && !hideBillingAndSelfHosted ? [{
         label: 'Billing',
         icon: PlanMajor,
@@ -233,6 +241,7 @@ const SettingsLeftNav = () => {
                     ...billingArr,
                     ...selfHostedArr,
                     ...auditLogsArr,
+                    ...mcpClientsArr,
                     {
                         label: 'Help & Support',
                         icon: ChatMajor,

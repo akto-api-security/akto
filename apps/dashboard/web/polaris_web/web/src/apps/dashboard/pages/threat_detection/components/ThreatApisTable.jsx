@@ -6,8 +6,7 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import func from "../../../../../util/func";
 import PersistStore from "../../../../main/PersistStore";
 import SessionStore from "../../../../main/SessionStore";
-import { isMCPSecurityCategory } from "../../../../main/labelHelper";
-import { labelMap } from "../../../../main/labelHelperMap";
+import { isMCPSecurityCategory, mapLabel } from "../../../../main/labelHelper";
 
 const resourceName = {
   singular: "api",
@@ -16,9 +15,9 @@ const resourceName = {
 
 const headers = [
   {
-    text:  labelMap[PersistStore.getState().dashboardCategory]["Endpoint"],
+    text:  mapLabel("Endpoint", PersistStore.getState().dashboardCategory),
     value: "api",
-    title: labelMap[PersistStore.getState().dashboardCategory]["Endpoint"],
+    title: mapLabel("Endpoint", PersistStore.getState().dashboardCategory),
   },
   {
     text: "Host",
@@ -84,7 +83,7 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
     filters = [
       {
         key: 'latestAttack',
-        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
+        label: mapLabel("Latest attack sub-category", PersistStore.getState().dashboardCategory),
         type: 'select',
         choices: attackTypeChoices,
         multiple: true

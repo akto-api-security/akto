@@ -43,6 +43,9 @@ public class McpAuditInfo {
     // Values used in the `remarks` field for skill/MCP-server approval flows.
     public static final String REMARKS_REJECTED = "Rejected";
     public static final String REMARKS_APPROVED = "Approved";
+    // AI inventory "Mark under review": not a decision, so guardrails (which only fetches
+    // Approved / Conditionally Approved / Rejected rows) treats it like a pending record.
+    public static final String REMARKS_UNDER_REVIEW = "Under review";
 
     private ObjectId id;
 

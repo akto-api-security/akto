@@ -698,4 +698,14 @@ public class AccountSettings {
     public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
         this.compulsoryDescription = compulsoryDescription;
     }
+
+    public static final String MCP_KNOWN_CLIENTS_ONLY = "mcpKnownClientsOnly";
+    @Getter
+    @Setter
+    private boolean mcpKnownClientsOnly;
+
+    public static final String MCP_ALLOWED_REDIRECT_URIS = "mcpAllowedRedirectUris";
+    @Getter
+    @Setter
+    private List<String> mcpAllowedRedirectUris;
 }

@@ -3,7 +3,9 @@ package com.akto.threat.backend.utils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -13,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
@@ -67,6 +70,7 @@ public class ThreatUtilsHostScopeTest {
         AggregateIterable<Document> aggregateIterable = mock(AggregateIterable.class);
         MongoCursor<Document> cursor = mock(MongoCursor.class);
         when(maliciousEventDao.aggregateRaw(eq("1000"), anyList())).thenReturn(aggregateIterable);
+        when(aggregateIterable.maxTime(anyLong(), any(TimeUnit.class))).thenReturn(aggregateIterable);
         when(aggregateIterable.cursor()).thenReturn(cursor);
         ThreatApiService service = new ThreatApiService(maliciousEventDao);
 
