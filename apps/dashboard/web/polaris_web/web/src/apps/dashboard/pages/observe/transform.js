@@ -623,7 +623,7 @@ const transform = {
             const riskScoreBadge = <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>;
             const riskScoreComp = isUntrackedTab
                 ? <Text></Text>
-                : (isLoading ? loadingComp : this.wrapRiskScoreTooltip(riskScoreBadge, c.riskScore, c.baseRiskScore, c.baseRiskScoreReason));
+                : (isLoading ? loadingComp : this.wrapRiskScoreTooltip(riskScoreBadge, c.riskScore, c.baseRiskScore, c.baseRiskScoreReason, c.riskScoreFactors));
 
             // Create iconComp for collections if not already present
             const showIcon = isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || ((isApiSecurityCategory() || isDastCategory()) && c.hostName);
@@ -803,7 +803,13 @@ const transform = {
                 methodComp: <MethodBox method={url.method} url={url.endpoint} apiType={url.apiType} methodBoxWidth="48px" />,
                 endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} apiType={url.apiType} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} isMalicious={url.isMalicious || false} isMisconfigured={url.isMisconfigured || false} skillTags={url.skillTags || []} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
-                riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
+                riskScoreComp: this.wrapRiskScoreTooltip(
+                    <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
+                    url.riskScore,
+                    null,
+                    null,
+                    url.riskScoreFactors,
+                ),
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,

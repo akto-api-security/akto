@@ -6,6 +6,7 @@ import com.akto.dao.ApiInfoDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.EndpointShieldSettings;
 import com.akto.dto.GuardrailPolicies;
@@ -20,6 +21,7 @@ import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
 import com.akto.util.McpClientRegistry;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.RiskScoreExplainer;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import org.bson.Document;
@@ -220,6 +222,8 @@ public class AtlasPeopleService {
         public boolean misconfigured;
         public final List<Map<String, String>> tags = new ArrayList<>();
         public double riskScore;
+        /** Collection id of the tool that produced {@link #riskScore}; used to load riskScoreFactors. */
+        public int riskCollectionId;
 
         public DeviceRow() {
             for (String category : CATEGORIES) toolsByCategory.put(category, 0);
@@ -284,6 +288,8 @@ public class AtlasPeopleService {
         public int personalAccounts;
         public int lastActive;
         public double riskScore;
+        /** Collection id of the device that produced {@link #riskScore}; used to load riskScoreFactors. */
+        public int riskCollectionId;
         public boolean inferenceHooksOnly;
 
         public Map<String, Object> toMap() {
@@ -733,7 +739,10 @@ public class AtlasPeopleService {
         for (DeviceRow device : devices) {
             for (ToolRow tool : device.tools) {
                 tool.riskScore = AgenticObserveUtil.roundRiskScore(riskByCollection.getOrDefault(tool.collectionId, 0.0));
-                device.riskScore = Math.max(device.riskScore, tool.riskScore);
+                if (tool.riskScore > device.riskScore) {
+                    device.riskScore = tool.riskScore;
+                    device.riskCollectionId = tool.collectionId;
+                }
             }
         }
     }
@@ -800,7 +809,10 @@ public class AtlasPeopleService {
             employee.unapprovedTools += device.unapprovedTools;
             employee.personalAccounts += device.personalAccounts;
             employee.lastActive = Math.max(employee.lastActive, device.lastHeartbeat);
-            employee.riskScore = Math.max(employee.riskScore, device.riskScore);
+            if (device.riskScore > employee.riskScore) {
+                employee.riskScore = device.riskScore;
+                employee.riskCollectionId = device.riskCollectionId;
+            }
             for (String severity : SEVERITIES) {
                 employee.violationsBySeverity.merge(severity, device.violationsBySeverity.get(severity), Integer::sum);
             }
@@ -1071,8 +1083,14 @@ public class AtlasPeopleService {
         }
         matching.sort(deviceComparator(query).thenComparing(device -> device.key));
         totalOut[0] = matching.size();
+        List<DeviceRow> sliced = slice(matching, query);
         List<Map<String, Object>> page = new ArrayList<>();
-        for (DeviceRow device : slice(matching, query)) page.add(deviceRow(device, query));
+        List<Integer> riskCollectionIds = new ArrayList<>();
+        for (DeviceRow device : sliced) {
+            page.add(deviceRow(device, query));
+            riskCollectionIds.add(device.riskCollectionId);
+        }
+        attachRiskScoreFactors(page, riskCollectionIds);
         return page;
     }
 
@@ -1113,9 +1131,39 @@ public class AtlasPeopleService {
         }
         matching.sort(employeeComparator(query));
         totalOut[0] = matching.size();
+        List<EmployeeRow> sliced = slice(matching, query);
         List<Map<String, Object>> page = new ArrayList<>();
-        for (EmployeeRow employee : slice(matching, query)) page.add(employee.toMap());
+        List<Integer> riskCollectionIds = new ArrayList<>();
+        for (EmployeeRow employee : sliced) {
+            page.add(employee.toMap());
+            riskCollectionIds.add(employee.riskCollectionId);
+        }
+        attachRiskScoreFactors(page, riskCollectionIds);
         return page;
+    }
+
+    /**
+     * One aggregation for this page's winning collections; puts {@code riskScoreFactors} on each
+     * row whose winning ApiInfo has a non-empty saved breakdown.
+     */
+    private static void attachRiskScoreFactors(List<Map<String, Object>> rows, List<Integer> riskCollectionIds) {
+        if (rows == null || riskCollectionIds == null || rows.isEmpty()) return;
+        Set<Integer> ids = new HashSet<>();
+        for (Integer id : riskCollectionIds) {
+            if (id != null && id > 0) ids.add(id);
+        }
+        if (ids.isEmpty()) return;
+        Map<Integer, ApiInfo> byCollection = RiskScoreExplainer.loadHighestRiskApiInfoByCollection(ids);
+        for (int i = 0; i < rows.size() && i < riskCollectionIds.size(); i++) {
+            Integer collectionId = riskCollectionIds.get(i);
+            if (collectionId == null || collectionId <= 0) continue;
+            ApiInfo winning = byCollection.get(collectionId);
+            if (winning == null) continue;
+            RiskScoreExplainer.Explanation explanation = RiskScoreExplainer.explain(winning);
+            if (!explanation.factors.isEmpty()) {
+                rows.get(i).put("riskScoreFactors", explanation.factors);
+            }
+        }
     }
 
     private static List<DeviceRow> devicesOf(Snapshot snapshot, EmployeeRow employee) {

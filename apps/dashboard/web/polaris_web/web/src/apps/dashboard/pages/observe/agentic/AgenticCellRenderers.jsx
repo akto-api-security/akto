@@ -165,7 +165,7 @@ export function RiskLevelCellRenderer({ value, data }) {
             <Text variant="bodySm">{func.toSentenceCase(level)}</Text>
         </HorizontalStack>
     );
-    return observeFunc.wrapRiskScoreTooltip(label, value, data?.baseRiskScore, data?.baseRiskScoreReason);
+    return observeFunc.wrapRiskScoreTooltip(label, value, data?.baseRiskScore, data?.baseRiskScoreReason, data?.riskScoreFactors);
 }
 
 export function ViolationsCellRenderer({ value }) {

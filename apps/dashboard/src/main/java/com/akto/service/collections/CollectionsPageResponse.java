@@ -4,6 +4,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionStats;
 import com.akto.dto.ApiCollectionStatsMeta;
 import com.akto.dto.billing.UningestedApiOverage;
+import com.mongodb.BasicDBObject;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,6 +31,11 @@ public final class CollectionsPageResponse {
         private List<ApiCollection> apiCollections = new ArrayList<>();
         private long total;
         private Map<Integer, Double> riskScoreMap = Collections.emptyMap();
+        /**
+         * collection id -> riskScoreFactors of the highest-risk api_info, only when that api's
+         * rounded score equals the collection's riskScore (avoids a drifted stats score).
+         */
+        private Map<Integer, List<BasicDBObject>> riskScoreFactorsMap = Collections.emptyMap();
         private Map<Integer, Integer> lastSeenMap = Collections.emptyMap();
         private Map<Integer, List<String>> sensitiveInfoMap = Collections.emptyMap();
         /** collection id -> open issues by severity; empty with issuesUnavailable set when that query failed or ran out of time */
