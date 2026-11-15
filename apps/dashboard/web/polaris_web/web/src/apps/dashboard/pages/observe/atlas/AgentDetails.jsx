@@ -77,6 +77,12 @@ const DEVICE_INFO_SECTIONS = [
             { label: "Free Disk",      key: "availableDiskGB", format: (v) => (v != null && v !== DEFAULT_VALUE) ? `${v} GB` : null },
             { label: "CPU Cores",      key: "cpuCount",      format: (v) => (v != null && v !== DEFAULT_VALUE) ? String(v) : null },
             { label: "Virtual Machine",key: "isVM",          isVM: true },
+            { label: "VM of",          key: "hostDeviceLabel", format: (v, agent) => {
+                if (!v) return null;
+                const hyp = agent?.hypervisor ? ` (${agent.hypervisor})` : "";
+                return `${v}${hyp}`;
+            } },
+            { label: "Host Device ID", key: "hostDeviceId" },
         ],
     },
     {
