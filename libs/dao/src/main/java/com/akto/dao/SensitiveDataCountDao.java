@@ -149,8 +149,13 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
         for (SensitiveDataCount inc : increments) {
             if (!isValid(inc)) continue;
 
+            // The caller is part of the key, so two services sending the same type to the same
+            // callee in one hour keep their own buckets instead of collapsing into one. An
+            // increment from a runtime that predates the field carries UNKNOWN_COLLECTION_ID,
+            // which is simply one more sender and needs no special case.
             Bson filter = Filters.and(
                     Filters.eq(SensitiveDataCount.API_COLLECTION_ID, inc.getApiCollectionId()),
+                    Filters.eq(SensitiveDataCount.SENDER_COLLECTION_ID, inc.getSenderCollectionId()),
                     Filters.eq(SensitiveDataCount.SUB_TYPE, inc.getSubType()),
                     Filters.eq(SensitiveDataCount.HOUR, inc.getHour()));
 

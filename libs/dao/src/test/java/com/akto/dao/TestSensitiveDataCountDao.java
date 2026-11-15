@@ -146,11 +146,51 @@ public class TestSensitiveDataCountDao extends MongoBasedTest {
         assertTrue(SensitiveDataCountDao.instance.countsByCollectionAbove("PHONE", HOUR, 0).isEmpty());
     }
 
+    /** Two callers to one callee keep their own buckets instead of collapsing into one. */
+    @Test
+    public void testSenderIsPartOfTheKey() {
+        SensitiveDataCountDao.instance.bulkInc(Arrays.asList(
+                new SensitiveDataCount(1, 101, "PASSPORT", HOUR, 3),
+                new SensitiveDataCount(1, 102, "PASSPORT", HOUR, 5),
+                new SensitiveDataCount(1, 101, "PASSPORT", HOUR, 4)));
+
+        assertEquals(2, SensitiveDataCountDao.instance.count(new Document()));
+        assertEquals(7, storedFrom(1, 101, "PASSPORT", HOUR).getCount());
+        assertEquals(5, storedFrom(1, 102, "PASSPORT", HOUR).getCount());
+
+        // the callee still sees everything that reached it
+        assertEquals(Long.valueOf(12),
+                SensitiveDataCountDao.instance.countsByCollectionAbove("PASSPORT", HOUR, 0).get(1));
+    }
+
+    /**
+     * A runtime that predates the field sends no sender at all. Those increments must still add up
+     * together rather than each landing in a bucket of its own.
+     */
+    @Test
+    public void testIncrementsWithoutASenderStillShareOneBucket() {
+        SensitiveDataCountDao.instance.bulkInc(Arrays.asList(
+                new SensitiveDataCount(1, "PASSPORT", HOUR, 3),
+                new SensitiveDataCount(1, "PASSPORT", HOUR, 4)));
+
+        assertEquals(1, SensitiveDataCountDao.instance.count(new Document()));
+        assertEquals(7, storedFrom(1, SensitiveDataCount.UNKNOWN_COLLECTION_ID, "PASSPORT", HOUR).getCount());
+    }
+
+    private static SensitiveDataCount storedFrom(int apiCollectionId, int senderCollectionId, String subType, int hour) {
+        return SensitiveDataCountDao.instance.findOne(Filters.and(
+                Filters.eq(SensitiveDataCount.API_COLLECTION_ID, apiCollectionId),
+                Filters.eq(SensitiveDataCount.SENDER_COLLECTION_ID, senderCollectionId),
+                Filters.eq(SensitiveDataCount.SUB_TYPE, subType),
+                Filters.eq(SensitiveDataCount.HOUR, hour)));
+    }
+
     @Test
     public void testHourOf() {
         assertEquals(HOUR, SensitiveDataCount.hourOf(HOUR));
         assertEquals(HOUR, SensitiveDataCount.hourOf(HOUR + 3599));
         assertEquals(HOUR + 3600, SensitiveDataCount.hourOf(HOUR + 3600));
         assertNull(new SensitiveDataCount().getSubType());
+        assertEquals(SensitiveDataCount.UNKNOWN_COLLECTION_ID, new SensitiveDataCount().getSenderCollectionId());
     }
 }
