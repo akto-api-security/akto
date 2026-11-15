@@ -5,6 +5,8 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.AiSummaryEntry;
+import com.akto.dto.testing.SmartAgentConfig;
+import com.akto.dto.testing.SmartAgentKnowledgeFile;
 import com.akto.dto.testing.TestResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -51,13 +53,43 @@ public class AutomatedAgenticTestExecutor {
             .callTimeout(2, TimeUnit.MINUTES)
             .build();
 
+    private final String baseUrl;
+
+    public AutomatedAgenticTestExecutor() {
+        this(BASE_URL);
+    }
+
+    // The smart testing service's address; tests point it at a local server.
+    AutomatedAgenticTestExecutor(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
     public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType) {
+        return executeAgenticTest(testReq, testSubType, null);
+    }
+
+    /** userPrompt: the run's custom prompt for smart testing (values to use or to look up); null sends none. */
+    public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType, String userPrompt) {
+        return executeAgenticTest(testReq, testSubType, userPrompt, null);
+    }
+
+    /** smartAgent: the run's smart agent (skills, knowledge base, ...); null sends none. */
+    public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType, String userPrompt, SmartAgentConfig smartAgent) {
+        return executeAgenticTest(testReq, testSubType, userPrompt, smartAgent, null);
+    }
+
+    /**
+     * runContext: which test run this call belongs to (see {@link #runContext}), so the service can show it live;
+     * null or empty sends none.
+     */
+    public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType, String userPrompt, SmartAgentConfig smartAgent,
+                                                     Map<String, Object> runContext) {
         try {
-            String body = buildRequestBody(testReq, testSubType);
+            String body = buildRequestBody(testReq, testSubType, userPrompt, smartAgent, runContext);
             RequestBody requestBody = RequestBody.create(body, MediaType.parse("application/json"));
 
             Request.Builder requestBuilder = new Request.Builder()
-                    .url(BASE_URL + EXECUTE_ENDPOINT)
+                    .url(baseUrl + EXECUTE_ENDPOINT)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "application/json");
@@ -100,7 +132,8 @@ public class AutomatedAgenticTestExecutor {
                     result.setResultTypeAgentic(true);
                     results.add(result);
                 }
-                return new PentestExecutionResult(results, aiSummaryTraces);
+                String skipReason = root.path("skipped").asBoolean(false) && root.hasNonNull("skipReason") ? root.get("skipReason").asText() : null;
+                return new PentestExecutionResult(results, aiSummaryTraces, skipReason);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("AutomatedAgenticTestExecutor: error executing agentic test: " + e.getMessage());
@@ -113,15 +146,20 @@ public class AutomatedAgenticTestExecutor {
      * vulnerable. Empty results mean it couldn't judge it (skipped, error, timeout), so the template's verdict stands.
      */
     public PentestExecutionResult verifyFinding(RawApi original, RawApi finding, String testSubType) {
+        return verifyFinding(original, finding, testSubType, null);
+    }
+
+    public PentestExecutionResult verifyFinding(RawApi original, RawApi finding, String testSubType, SmartAgentConfig smartAgent) {
         try {
-            JsonNode payload = objectMapper.readTree(buildRequestBody(original, testSubType));
+            JsonNode payload = objectMapper.readTree(buildRequestBody(original, testSubType, null, smartAgent));
             JsonNode findingNode = objectMapper.readTree(buildRequestBody(finding, testSubType));
             ((ObjectNode) findingNode).remove("testSubType");
+            ((ObjectNode) findingNode).remove("digestAuth");
             ((ObjectNode) payload).set("finding", findingNode);
             RequestBody requestBody = RequestBody.create(objectMapper.writeValueAsString(payload), MediaType.parse("application/json"));
 
             Request.Builder requestBuilder = new Request.Builder()
-                    .url(BASE_URL + VERIFY_ENDPOINT)
+                    .url(baseUrl + VERIFY_ENDPOINT)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "application/json");
@@ -179,7 +217,32 @@ public class AutomatedAgenticTestExecutor {
         return entries.isEmpty() ? null : entries;
     }
 
+    /**
+     * The /pentest run context: the testing run result summary it belongs to and the API under test.
+     * Null when no summary id is known; null fields are left out.
+     */
+    public static Map<String, Object> runContext(String testingRunResultSummaryId, Integer apiCollectionId, String method, String url) {
+        if (testingRunResultSummaryId == null || testingRunResultSummaryId.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> out = new HashMap<>();
+        out.put("testingRunResultSummaryId", testingRunResultSummaryId);
+        if (apiCollectionId != null) out.put("apiCollectionId", apiCollectionId);
+        if (method != null) out.put("method", method);
+        if (url != null) out.put("url", url);
+        return out;
+    }
+
     private String buildRequestBody(RawApi testReq, String testSubType) throws Exception {
+        return buildRequestBody(testReq, testSubType, null, null);
+    }
+
+    private String buildRequestBody(RawApi testReq, String testSubType, String userPrompt, SmartAgentConfig smartAgent) throws Exception {
+        return buildRequestBody(testReq, testSubType, userPrompt, smartAgent, null);
+    }
+
+    private String buildRequestBody(RawApi testReq, String testSubType, String userPrompt, SmartAgentConfig smartAgent,
+                                    Map<String, Object> runContext) throws Exception {
         OriginalHttpRequest req = testReq.getRequest();
         OriginalHttpResponse resp = testReq.getResponse();
 
@@ -203,7 +266,53 @@ public class AutomatedAgenticTestExecutor {
         payload.put("request", requestMap);
         payload.put("response", responseMap);
 
+        // Digest credentials are kept outside the headers map (see DigestAuthParam): the Authorization
+        // header only exists after the server's 401 challenge, so the service runs that exchange itself.
+        if (req.getDigestAuthUsername() != null && req.getDigestAuthPassword() != null) {
+            Map<String, String> digestAuth = new HashMap<>();
+            digestAuth.put("username", req.getDigestAuthUsername());
+            digestAuth.put("password", req.getDigestAuthPassword());
+            payload.put("digestAuth", digestAuth);
+        }
+        if (userPrompt != null && !userPrompt.trim().isEmpty()) {
+            payload.put("userPrompt", userPrompt.trim());
+        }
+        if (smartAgent != null) {
+            payload.put("smartAgent", smartAgentOf(smartAgent));
+        }
+        if (runContext != null && !runContext.isEmpty()) {
+            payload.put("runContext", runContext);
+        }
+
         return objectMapper.writeValueAsString(payload);
+    }
+
+    private static Map<String, Object> smartAgentOf(SmartAgentConfig agent) {
+        Map<String, Object> out = new HashMap<>();
+        out.put("profileId", agent.getProfileId());
+        out.put("profileName", agent.getProfileName());
+        out.put("skills", agent.getSkills() != null ? agent.getSkills() : Collections.emptyList());
+        out.put("customSkills", named(agent.getCustomSkills()));
+        out.put("allowCreateIdentities", agent.getAllowCreateIdentities());
+        out.put("instructions", agent.getInstructions());
+        out.put("knowledgeFiles", named(agent.getKnowledgeFiles()));
+        out.put("knowledgeLinks", agent.getKnowledgeLinks() != null ? agent.getKnowledgeLinks() : Collections.emptyList());
+        return out;
+    }
+
+    // a file kept in blob storage goes as its sha256 (smart testing reads it through cyborg), never its content
+    private static List<Map<String, Object>> named(List<SmartAgentKnowledgeFile> items) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (SmartAgentKnowledgeFile item : items != null ? items : Collections.<SmartAgentKnowledgeFile>emptyList()) {
+            if (item == null || (item.getContent() == null && item.getSha256() == null)) continue;
+            Map<String, Object> one = new HashMap<>();
+            one.put("name", item.getName());
+            if (item.getContent() != null) one.put("content", item.getContent());
+            if (item.getSha256() != null) one.put("sha256", item.getSha256());
+            one.put("size", item.getSize());
+            out.add(one);
+        }
+        return out;
     }
 
 

@@ -10,6 +10,7 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.LinearAutoTicketParams;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
@@ -44,6 +45,8 @@ import com.akto.usage.OrgUtils;
 public class TestCompletion {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestCompletion.class, LogDb.TESTING);
+
+    private static final String LINEAR_TICKET_SOURCE = "LINEAR";
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final AgentClient agentClient = new AgentClient(Constants.AGENT_BASE_URL);
@@ -239,6 +242,14 @@ public class TestCompletion {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "JIRA_INTEGRATION");
             if (!featureAccess.getIsGranted()) {
                 loggerMaker.error("Auto Create Tickets plan is not activated for the account - {}", accountId);
+                return;
+            }
+
+            if (LINEAR_TICKET_SOURCE.equals(testRunConfig.getAutoTicketingDetails().getTicketSource())) {
+                LinearAutoTicketParams linearParams = new LinearAutoTicketParams(testingRun.getId(), summaryId,
+                    testRunConfig.getAutoTicketingDetails().getProjectId(),
+                    testRunConfig.getAutoTicketingDetails().getSeverities());
+                dataActor.scheduleAutoCreateTicketsJob(accountId, linearParams, JobExecutorType.DASHBOARD);
                 return;
             }
 

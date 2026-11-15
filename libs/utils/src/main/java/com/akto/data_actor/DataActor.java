@@ -333,7 +333,11 @@ public abstract class DataActor {
 
     public abstract long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state);
 
+    /** The default-test-{type} script, or null if there is none. Throws if the script could not be read. */
     public abstract TestScript fetchTestScript(TestScript.Type type);
+
+    /** The library script with this id, or null if there is none. Throws if the script could not be read. */
+    public abstract TestScript fetchTestScriptById(String id);
 
     public abstract List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod);
 
@@ -384,6 +388,8 @@ public abstract class DataActor {
     public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
 
     public abstract void writeApiSequences(List<ApiSequences> sequences);
+
+    public abstract void writeSequenceCounts(List<SequenceCount> sequenceCounts);
     public abstract void storeAgentQueryData(AgentQueryRecord agentQueryRecord);
     public abstract List<AgentQueryRecord> fetchAgentQueryRecords(String messageId);
 

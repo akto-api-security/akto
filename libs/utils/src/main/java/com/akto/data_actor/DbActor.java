@@ -704,6 +704,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchTestScript(type);
     }
 
+    public TestScript fetchTestScriptById(String id){
+        return DbLayer.fetchTestScriptById(id);
+    }
+
     public List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod){
         return DbLayer.findDependencyNodes(apiCollectionId, url, method, reqMethod);
     }
@@ -815,6 +819,10 @@ public class DbActor extends DataActor {
     @Override
     public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
         DbLayer.storeTestingRunWebhook(testingRunWebhook);
+    }
+
+    @Override
+    public void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
     }
 
     @Override

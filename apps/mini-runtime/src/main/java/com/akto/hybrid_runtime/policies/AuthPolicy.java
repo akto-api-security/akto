@@ -80,6 +80,9 @@ public class AuthPolicy {
     }
 
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
+        // Akto built this MCP call itself, so its headers say nothing about how the tool is really called
+        if (httpResponseParams.syntheticMcpCall) return false;
+
         Set<Set<String>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
 

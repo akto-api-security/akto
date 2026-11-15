@@ -28,6 +28,7 @@ public class UtilityServer {
 
     private static HttpServer server;
     private static ExecutorService executorService;
+    private static ExecutorService httpExecutor;
     private static ApiExecutionJobStore jobStore;
     private static DataActor dataActor;
     private static volatile boolean started = false;
@@ -94,21 +95,28 @@ public class UtilityServer {
                 server.stop(1);
                 logger.info("akto-utility-server stopped");
             }
-            if (executorService != null) {
-                executorService.shutdown();
-                if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
-                    executorService.shutdownNow();
-                }
-            }
+            shutdownExecutor(httpExecutor);
+            shutdownExecutor(executorService);
         } catch (Exception e) {
             logger.error("Error stopping akto-utility-server: " + e.getMessage(), e);
         } finally {
             ApiExecutionJobStoreRegistry.set(null);
             server = null;
             executorService = null;
+            httpExecutor = null;
             jobStore = null;
             dataActor = null;
             started = false;
+        }
+    }
+
+    private static void shutdownExecutor(ExecutorService executor) throws InterruptedException {
+        if (executor == null) {
+            return;
+        }
+        executor.shutdown();
+        if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+            executor.shutdownNow();
         }
     }
 

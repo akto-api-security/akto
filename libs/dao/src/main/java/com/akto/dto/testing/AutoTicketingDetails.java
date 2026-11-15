@@ -15,4 +15,5 @@ public class AutoTicketingDetails {
     private List<String> severities;
     private String projectId;
     private String issueType;
+    private String ticketSource = "JIRA";
 }

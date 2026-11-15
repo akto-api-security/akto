@@ -93,6 +93,11 @@ public class HttpCallParser {
 
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
 
+    // Accounts for which loopback hosts (127.0.0.1[:port], ::1) are normalized to localhost so that
+    // they form host-named collections instead of falling into the vxlan bucket. Gated per-account
+    // so the behaviour is opt-in and a no-op everywhere else.
+    private static final List<Integer> LOOPBACK_HOST_NORMALIZATION_ACCOUNTS = Arrays.asList(1760499072);
+
     /** HttpResponseParams.direction: "1" = inbound (callee side), "2" = outbound (caller side). */
     public static final String DIRECTION_OUTBOUND = "2";
 
@@ -135,8 +140,9 @@ public class HttpCallParser {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
+        // the constructor already builds from the DB; building again here only re-downloaded every STI and ApiInfo
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
-        apiCatalogSync.buildFromDB(false, fetchAllSTI);
+        // apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionsMap = new HashMap<>();
         apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
         serviceTagCollectionHostNamesCache = new HashMap<>();
@@ -360,11 +366,37 @@ public class HttpCallParser {
         return getHostnameForCollection(responseParam, parseTagsMap(responseParam.getTags()));
     }
 
+    // Loopback addresses: "127.0.0.1" (optionally with a port, e.g. "127.0.0.1:2424") and IPv6 "::1".
+    private static final Pattern LOOPBACK_HOST_PATTERN =
+        Pattern.compile("^(?:127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|\\[?::1\\]?)(:\\d+)?$");
+
+    /**
+     * Loopback IP hosts (e.g. "127.0.0.1:2424") are not valid hostnames per
+     * {@link RuntimeUtil#isValidHostname(String)} (they contain no letters), so they would never
+     * take the host-collection path in {@link #useHostCondition} and would instead be bucketed into
+     * the vxlan-based collection. Rewriting them to "localhost" (preserving any port) lets such
+     * traffic get its own host-named collection. Only the collection-naming path uses this; the
+     * in-process block list ({@link #IGNORE_HOST_NAMES}) is intentionally left untouched.
+     */
+    static String normalizeLoopbackHost(String hostName) {
+        if (hostName == null) return null;
+        Matcher m = LOOPBACK_HOST_PATTERN.matcher(hostName.trim());
+        if (!m.matches()) return hostName;
+        String port = m.group(1);
+        return port == null ? "localhost" : "localhost" + port;
+    }
+
     public static String getHostnameForCollection(HttpResponseParams responseParam, Map<String, String> tagsMap) {
         // Get base hostname from headers
         String baseHostname = getHeaderValue(responseParam.getRequestParams().getHeaders(), "host");
         if (baseHostname == null || baseHostname.isEmpty()) {
             return baseHostname;
+        }
+        // Loopback IPs (127.0.0.1[:port], ::1) are not valid hostnames, so without this they would
+        // fall into the vxlan collection instead of a host-named one. Map them to "localhost".
+        // Gated per-account (opt-in); a no-op for every other account.
+        if (LOOPBACK_HOST_NORMALIZATION_ACCOUNTS.contains(Context.getActualAccountId())) {
+            baseHostname = normalizeLoopbackHost(baseHostname);
         }
 
         if (tagsMap == null) {
@@ -534,7 +566,7 @@ public class HttpCallParser {
         return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.ERROR);
     }
 
-    public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
+    public List<HttpResponseParams> syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = responseParams;
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
@@ -558,7 +590,7 @@ public class HttpCallParser {
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         executeCatalogSync(syncImmediately, fetchAllSTI, isHarOrPcap, syncThresh);
-
+        return filteredResponseParams;
     }
 
     private void executeCatalogSync(boolean syncImmediately, boolean fetchAllSTI, boolean isHarOrPcap, int syncThresh) {

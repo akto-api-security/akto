@@ -34,6 +34,8 @@ public class HttpResponseParams {
     String traces;
     // Guardrail result recorded at ingestion (Gateway.recordGuardrailVerdict), as a JSON blob.
     String guardrailVerdict;
+    // An MCP call Akto built itself (e.g. a tools/call per tool in a tools/list), not one seen in traffic. In memory only.
+    public boolean syntheticMcpCall;
 
     public HttpResponseParams() {}
 

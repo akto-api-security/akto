@@ -248,6 +248,7 @@ public final class McpRequestResponseUtils {
 
                 cloned.setPayload("");
                 cloned.setHeaders(Collections.emptyMap());
+                cloned.syntheticMcpCall = true;
                 modifyOriginalHttpMessage(cloned, newReqString);
                 handleMcpMethodCall(new McpJsonRpcModel(
                         McpSchema.JSONRPC_VERSION,

@@ -231,15 +231,24 @@ public class Executor {
         boolean verifyFindings = TestingConfigurations.getInstance().isRunAutomatedTests();
         String verificationSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
         RawApi verificationBaseline = null;
+        String smartTestingSkipReason = null;
 
 
         if (runAutomatedPentest) {
             String testSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
             RawApi preparedForPentest = applyPreRequestScript(origRawApi, testingRunConfig);
+            // tells smart testing which run this call belongs to, so the dashboard can show it live
+            Map<String, Object> runContext = AutomatedAgenticTestExecutor.runContext(testingRunResultSummaryIdHex,
+                    apiInfoKey != null ? apiInfoKey.getApiCollectionId() : null,
+                    apiInfoKey != null && apiInfoKey.getMethod() != null ? apiInfoKey.getMethod().name() : null,
+                    apiInfoKey != null ? apiInfoKey.getUrl() : null);
             PentestExecutionResult pentestResult =
-                    automatedAgenticTestExecutor.executeAgenticTest(preparedForPentest, testSubType);
+                    automatedAgenticTestExecutor.executeAgenticTest(preparedForPentest, testSubType,
+                            TestingConfigurations.getInstance().getAutomatedTestsCustomPrompt(),
+                            TestingConfigurations.getInstance().getSmartAgentConfig(), runContext);
             List<TestResult> automatedAgenticResults = pentestResult.getTestResults();
             aiSummaryTraces = pentestResult.getAiSummaryTraces();
+            smartTestingSkipReason = pentestResult.getSkipReason();
             if (automatedAgenticResults != null && !automatedAgenticResults.isEmpty()) {
                 requestAttempted = true;
                 String originalMessage = origRawApi.getOriginalMessage();
@@ -328,7 +337,8 @@ public class Executor {
                             // sendRequest already ran the pre-request script on this request
                             RawApi vulnerableAttempt = new RawApi(testReq.getRequest(), testResponse, null);
                             PentestExecutionResult verification = automatedAgenticTestExecutor.verifyFinding(
-                                    verificationBaseline, vulnerableAttempt, verificationSubType);
+                                    verificationBaseline, vulnerableAttempt, verificationSubType,
+                                    TestingConfigurations.getInstance().getSmartAgentConfig());
                             List<TestResult> verdicts = verification.getTestResults();
                             if (verdicts != null && !verdicts.isEmpty()) {
                                 boolean confirmed = verdicts.get(verdicts.size() - 1).getVulnerable();
@@ -382,6 +392,8 @@ public class Executor {
             } else if (allRequestsSkippedDueToMatch) {
                 // All requests were skipped because test payload matches original
                 error_messages.add(TestError.NO_REQUEST_ATTEMPTED.getMessage());
+            } else if (smartTestingSkipReason != null && !smartTestingSkipReason.isEmpty()) {
+                error_messages.add("Smart testing skipped: " + smartTestingSkipReason);
             } else {
                 error_messages.add(TestError.NO_API_REQUEST.getMessage());
             }

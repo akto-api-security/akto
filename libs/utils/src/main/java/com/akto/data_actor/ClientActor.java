@@ -46,6 +46,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 import com.akto.util.SecretUtils;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -80,6 +81,7 @@ public class ClientActor extends DataActor {
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     public static final String ULTRON_URL = "https://ultron.akto.io";
     private static final String PARAM_TEST_SCRIPT_TYPE = "testScriptType";
+    private static final String PARAM_TEST_SCRIPT_ID = "testScriptId";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static ExecutorService sequenceThreadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
         
@@ -606,12 +608,58 @@ public class ClientActor extends DataActor {
         // }
     }
 
+    // see HostStiSync, DISABLE_INCREMENTAL_STI_FETCH=true always does the full fetch
+    private static final boolean INCREMENTAL_STI_FETCH_DISABLED = "true".equalsIgnoreCase(System.getenv("DISABLE_INCREMENTAL_STI_FETCH"));
+    private static final int HOST_STI_MAX_PAGES = 80;
+
+    private final Map<Integer, HostStiSync> hostStiSyncByAccountId = new HashMap<>();
+    private final HostStiSync.Source hostStiSource = new HostStiSync.Source() {
+        @Override
+        public HostStiSync.FullFetch fetchAll() {
+            return fetchAllStisFull(true);
+        }
+
+        @Override
+        public Map<String, String> fetchSeenSince(int lastSeenGte) {
+            return fetchRawHostStis(null, lastSeenGte);
+        }
+
+        @Override
+        public Map<String, String> fetchCreatedAfter(String lastStiId) {
+            return fetchRawHostStis(lastStiId, 0);
+        }
+
+        @Override
+        public long countStis() {
+            return fetchHostStiCount();
+        }
+
+        @Override
+        public List<SingleTypeInfo> parseStis(Collection<String> rawStis) {
+            return parseRawStis(rawStis);
+        }
+    };
+
     public List<SingleTypeInfo> fetchAllStis() {
+        if (INCREMENTAL_STI_FETCH_DISABLED) {
+            return fetchAllStisFull(false).stis;
+        }
+        Integer accountId = Context.accountId.get();
+        HostStiSync hostStiSync;
+        synchronized (hostStiSyncByAccountId) {
+            hostStiSync = hostStiSyncByAccountId.computeIfAbsent(accountId == null ? 0 : accountId, key -> new HostStiSync(hostStiSource, Context::now));
+        }
+        return hostStiSync.fetch();
+    }
+
+    private HostStiSync.FullFetch fetchAllStisFull(boolean keepRawStis) {
         Map<String, List<String>> headers = buildHeaders();
         List<SingleTypeInfo> allStis = new ArrayList<>();
+        Map<String, String> rawStis = new HashMap<>();
+        boolean complete = false;
         String lastStiId = null;
 
-        for (int i =0; i<80; i++) {
+        for (int i = 0; i < HOST_STI_MAX_PAGES; i++) {
             BasicDBObject obj = new BasicDBObject();
             obj.put("lastStiId", lastStiId);
             OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "POST",  obj.toString(), headers, "");
@@ -620,23 +668,26 @@ public class ClientActor extends DataActor {
                 String responsePayload = response.getBody();
                 if (response.getStatusCode() != 200 || responsePayload == null) {
                     loggerMaker.errorAndAddToDb("invalid response in fetchAllStis", LoggerMaker.LogDb.RUNTIME);
-                    return allStis;
+                    return new HostStiSync.FullFetch(allStis, rawStis, false);
                 }
                 BasicDBObject payloadObj;
                 try {
                     payloadObj =  BasicDBObject.parse(responsePayload);
                     BasicDBList stiList = (BasicDBList) payloadObj.get("stis");
-                    if (stiList.isEmpty()) break;
+                    if (stiList.isEmpty()) {
+                        complete = true;
+                        break;
+                    }
 
                     for (Object stiObj: stiList) {
-                        BasicDBObject obj2 = (BasicDBObject) stiObj;
-                        obj2.put("id", obj2.get("strId"));
-                        BasicDBObject subType = (BasicDBObject) obj2.get("subType");
-                        obj2.remove("subType");
-                        SingleTypeInfo s = objectMapper.readValue(obj2.toJson(), SingleTypeInfo.class);
-                        s.setSubType(SingleTypeInfo.subTypeMap.get(subType.get("name")));
-                        allStis.add(s);
-                        lastStiId = s.getId().toHexString();
+                        BasicDBObject stiDoc = (BasicDBObject) stiObj;
+                        String rawSti = keepRawStis ? stiDoc.toJson() : null;
+                        SingleTypeInfo sti = JSONUtils.parseSingleTypeInfo(stiDoc, objectMapper);
+                        allStis.add(sti);
+                        lastStiId = sti.getId().toHexString();
+                        if (keepRawStis) {
+                            rawStis.put(lastStiId, rawSti);
+                        }
                     }
                 } catch(Exception e) {
                     loggerMaker.errorAndAddToDb("error extracting response in fetchAllStis" + e, LoggerMaker.LogDb.RUNTIME);
@@ -646,8 +697,80 @@ public class ClientActor extends DataActor {
             }
         }
 
+        return new HostStiSync.FullFetch(allStis, rawStis, complete);
+    }
 
-        return allStis;
+    // raw JSON of the host-header STIs after the _id afterStiId (null = from the start), seen at or after lastSeenGte (0 = any time)
+    private Map<String, String> fetchRawHostStis(String afterStiId, int lastSeenGte) {
+        Map<String, List<String>> headers = buildHeaders();
+        Map<String, String> rawStis = new HashMap<>();
+        String lastStiId = afterStiId;
+
+        for (int i = 0; i < HOST_STI_MAX_PAGES; i++) {
+            BasicDBObject requestBody = new BasicDBObject();
+            requestBody.put("lastStiId", lastStiId);
+            if (lastSeenGte > 0) {
+                requestBody.put("lastSeenGte", lastSeenGte);
+            }
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "POST", requestBody.toString(), headers, "");
+            try {
+                OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+                String responsePayload = response.getBody();
+                if (response.getStatusCode() != 200 || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb("invalid response in fetchRawHostStis", LoggerMaker.LogDb.RUNTIME);
+                    return null;
+                }
+                BasicDBList stiList = (BasicDBList) BasicDBObject.parse(responsePayload).get("stis");
+                if (stiList.isEmpty()) {
+                    return rawStis;
+                }
+                for (Object stiObj: stiList) {
+                    BasicDBObject hostSti = (BasicDBObject) stiObj;
+                    lastStiId = hostSti.getString("strId");
+                    if (lastStiId == null) {
+                        return null;
+                    }
+                    rawStis.put(lastStiId, hostSti.toJson());
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in fetchRawHostStis " + e, LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+        }
+
+        // page limit reached, there may be more
+        return null;
+    }
+
+    // -1 if the count is not available, e.g. on a database-abstractor without this endpoint
+    private long fetchHostStiCount() {
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiCountBasedOnHostHeaders", "", "POST", new BasicDBObject().toString(), buildHeaders(), "");
+        try {
+            // no retries, a missing endpoint would only wait out the backoff
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                return -1;
+            }
+            Object stiCount = BasicDBObject.parse(responsePayload).get("count");
+            return stiCount instanceof Number ? ((Number) stiCount).longValue() : -1;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchHostStiCount " + e, LoggerMaker.LogDb.RUNTIME);
+            return -1;
+        }
+    }
+
+    List<SingleTypeInfo> parseRawStis(Collection<String> rawStis) {
+        List<SingleTypeInfo> parsedStis = new ArrayList<>(rawStis.size());
+        try {
+            for (String rawSti: rawStis) {
+                parsedStis.add(JSONUtils.parseSingleTypeInfo(BasicDBObject.parse(rawSti), objectMapper));
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error parsing host STIs " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+        return parsedStis;
     }
 
     public List<SingleTypeInfo> fetchStiInBatches(int batchCount, int lastStiFetchTs) {
@@ -4388,36 +4511,39 @@ public class ClientActor extends DataActor {
     }
 
     public TestScript fetchTestScript(TestScript.Type type){
-        TestScript testScript = null;
-
-        Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put(PARAM_TEST_SCRIPT_TYPE, type != null ? type.name() : null);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestScript", "", "POST", obj.toString(), headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("invalid response in fetchTestScript", LoggerMaker.LogDb.RUNTIME);
-                return testScript;
-            }
-            BasicDBObject payloadObj;
+        return requestTestScript("/fetchTestScript", obj);
+    }
 
-            try {
-                payloadObj = BasicDBObject.parse(responsePayload);
-                BasicDBObject testScriptObj = (BasicDBObject) payloadObj.get("testScript");
-                // No script configured for this type is a normal, common outcome (most accounts
-                // don't set one) — not an error. Avoid NPE-ing on toJson() and don't log it.
-                if (testScriptObj != null) {
-                    testScript = objectMapper.readValue(testScriptObj.toJson(), TestScript.class);
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchTestScript" + e, LoggerMaker.LogDb.RUNTIME);
-            }
+    public TestScript fetchTestScriptById(String id){
+        BasicDBObject obj = new BasicDBObject();
+        obj.put(PARAM_TEST_SCRIPT_ID, id);
+        return requestTestScript("/fetchTestScriptById", obj);
+    }
+
+    /**
+     * null when the database-abstractor has no such script (a normal outcome: most accounts have none);
+     * throws when the script could not be read, so callers never cache a failure as "no script".
+     */
+    private TestScript requestTestScript(String path, BasicDBObject body) {
+        OriginalHttpRequest request = new OriginalHttpRequest(url + path, "", "POST", body.toString(), buildHeaders(), "");
+        OriginalHttpResponse response;
+        try {
+            response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchTestScript" + e, LoggerMaker.LogDb.RUNTIME);
+            throw new IllegalStateException("error calling " + path, e);
         }
-        return testScript;
+        if (response == null || response.getStatusCode() != 200 || response.getBody() == null) {
+            throw new IllegalStateException("invalid response from " + path + ": " + (response == null ? "null" : response.getStatusCode()));
+        }
+        try {
+            BasicDBObject payloadObj = BasicDBObject.parse(response.getBody());
+            BasicDBObject testScriptObj = (BasicDBObject) payloadObj.get("testScript");
+            return testScriptObj == null ? null : objectMapper.readValue(testScriptObj.toJson(), TestScript.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("error parsing response from " + path, e);
+        }
     }
 
     public List<DependencyNode> findDependencyNodes(int apiCollectionId, String urlVar, String method, String reqMethod) {
@@ -5064,6 +5190,40 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb(e, "error in writeApiSequences: " + e, LoggerMaker.LogDb.RUNTIME);
         }
     }
+    int sequenceCountBatchLimit = 1000;
+    public void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
+        if (sequenceCounts == null || sequenceCounts.isEmpty()) return;
+        List<SequenceCount> batch = new ArrayList<>();
+        for (SequenceCount sequenceCount : sequenceCounts) {
+            batch.add(sequenceCount);
+            if (batch.size() == sequenceCountBatchLimit) {
+                List<SequenceCount> finalBatch = batch;
+                sequenceThreadPool.submit(() -> writeSequenceCountsBatch(finalBatch));
+                batch = new ArrayList<>();
+            }
+        }
+        if (!batch.isEmpty()) {
+            List<SequenceCount> finalBatch = batch;
+            sequenceThreadPool.submit(() -> writeSequenceCountsBatch(finalBatch));
+        }
+    }
+
+    private void writeSequenceCountsBatch(List<SequenceCount> sequenceCounts) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("sequenceCounts", sequenceCounts);
+        String objString = gson.toJson(obj);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/writeSequenceCounts", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb(null, "non 2xx response in writeSequenceCounts", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in writeSequenceCounts: " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public Map<String, String> fetchDeviceUserMap() {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDeviceUserMap", "", "POST", null, headers, "");
