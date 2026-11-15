@@ -6,6 +6,9 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.loaders.LoadersDao;
+import com.akto.dao.testing.SmartTestingEventDao;
+import com.akto.dao.testing.SmartTestingMessageDao;
+import com.akto.dao.testing.SmartTestingRunDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -500,12 +503,13 @@ public class DaoInit {
         AgentTrafficLogDao.instance.createIndicesIfAbsent();
         TestingRunWebhookDao.instance.createIndicesIfAbsent();
         ApiSequencesDao.instance.createIndicesIfAbsent();
-        SequenceCountDao.instance.createIndicesIfAbsent();
-        SequenceModelDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandExecutionDao.instance.createIndicesIfAbsent();
         EndpointShieldDiagnosticDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
+        SmartTestingRunDao.instance.createIndicesIfAbsent();
+        SmartTestingEventDao.instance.createIndicesIfAbsent();
+        SmartTestingMessageDao.instance.createIndicesIfAbsent();
     }
 
 }

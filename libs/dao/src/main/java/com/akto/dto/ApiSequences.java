@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import java.util.Date;
 import java.util.List;
 import com.akto.dao.context.Context;
 import lombok.AllArgsConstructor;
@@ -53,6 +54,40 @@ public class ApiSequences {
     // Show to user or not.
     boolean isActive;
     public static final String IS_ACTIVE = "isActive";
+
+    // Paths joined by "|", unique per row
+    String seqKey;
+    public static final String SEQ_KEY = "seqKey";
+
+    // Previous APIs joined by "|" ("" when order is 0) and the API that followed
+    String contextKey;
+    public static final String CONTEXT_KEY = "contextKey";
+
+    String next;
+    public static final String NEXT = "next";
+
+    // Number of previous APIs: 0, 1 or 2
+    int order;
+    public static final String ORDER = "order";
+
+    // Decayed count, halves every day; transitionCount is its rounded value
+    double weight;
+    public static final String WEIGHT = "weight";
+
+    // Lower bound of precedenceScore
+    double precedenceLow;
+    public static final String PRECEDENCE_LOW = "precedenceLow";
+
+    // weight * precedenceLow, used to rank sequences
+    double score;
+    public static final String SCORE = "score";
+
+    // Event time the weight was last decayed to
+    int lastTs;
+    public static final String LAST_TS = "lastTs";
+
+    Date lastSeen;
+    public static final String LAST_SEEN = "lastSeen";
 
     public ApiSequences(int apiCollectionId, List<String> paths, int transitionCount,
                        int prevStateCount, int lastStateCount, float precedenceScore, float probability) {

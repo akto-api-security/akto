@@ -141,6 +141,18 @@
             </result>
         </action>
 
+        <action name="api/fetchFileInspectionRulesV2" class="com.akto.action.FileInspectionAction" method="fetchFileInspectionRulesV2">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">rules</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/uploadFileInspectionResult" class="com.akto.action.FileInspectionAction" method="uploadFileInspectionResult">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -436,6 +448,32 @@
             </result>
         </action>
 
+        <action name="api/fetchWebSocketApiInfos" class="com.akto.action.DbAction" method="fetchWebSocketApiInfos">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">apiInfos</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchWebSocketApiInfosWithUrls" class="com.akto.action.DbAction" method="fetchWebSocketApiInfosWithUrls">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">webSocketInfoWithUrl</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/bulkWriteTestingRunIssues" class="com.akto.action.DbAction" method="bulkWriteTestingRunIssues">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -500,6 +538,17 @@
         </action>
 
         <action name="api/fetchApiSequences" class="com.akto.action.DbAction" method="fetchApiSequences">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchSequenceRules" class="com.akto.action.DbAction" method="fetchSequenceRules">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -2201,6 +2250,17 @@
             </result>
         </action>
 
+        <action name="api/fetchTestScriptById" class="com.akto.action.DbAction" method="fetchTestScriptById">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchEditorTest" class="com.akto.action.DbAction" method="fetchCurrentTestingRunDetailsFromEditor">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2675,6 +2735,20 @@
         </result>
       </action>
 
+      <!-- Called only by the dashboard's skill revalidation job -->
+      <action name="api/validateSkillV3" class="com.akto.action.skill_validation_v3.SkillValidationV3Action" method="validateSkillV3">
+        <interceptor-ref name="json"/>
+        <interceptor-ref name="defaultStack"/>
+        <result name="SUCCESS" type="json">
+          <param name="root">validationResult</param>
+        </result>
+        <result name="ERROR" type="json">
+          <param name="statusCode">422</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+      </action>
+
          <action name="api/getSlackWebhooks" class="com.akto.action.DbAction" method="fetchSlackWebhooks">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2892,6 +2966,19 @@
             </result>
         </action>
 
+        <action name="api/fetchOrgEmailDomains" class="com.akto.action.GuardrailPoliciesAction" method="fetchOrgEmailDomains">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^orgEmailDomains.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/storeConversationResults" class="com.akto.action.DbAction" method="storeConversationResults">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2945,6 +3032,58 @@
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/startSmartTestingRun" class="com.akto.action.DbAction" method="startSmartTestingRun">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/insertSmartTestingEvents" class="com.akto.action.DbAction" method="insertSmartTestingEvents">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/finishSmartTestingRun" class="com.akto.action.DbAction" method="finishSmartTestingRun">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchSmartTestingMessages" class="com.akto.action.DbAction" method="fetchSmartTestingMessages">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^smartTestingMessages.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -3339,7 +3478,20 @@
             </result>
         </action>
 
-         <action name="api/bulkInsertCorpusExamples" class="com.akto.action.GuardrailPoliciesAction" method="bulkSaveCorpusEntries">
+        <action name="api/fetchWsConnectionApiInfos" class="com.akto.action.DbAction" method="fetchWsConnectionApiInfos">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">apiInfos</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/bulkInsertCorpusExamples" class="com.akto.action.GuardrailPoliciesAction" method="bulkSaveCorpusEntries">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
@@ -3352,7 +3504,7 @@
             </result>
         </action>
 
-         <action name="api/loadCorpusForAgent" class="com.akto.action.GuardrailPoliciesAction" method="loadResultsForAgent">
+        <action name="api/loadCorpusForAgent" class="com.akto.action.GuardrailPoliciesAction" method="loadResultsForAgent">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">

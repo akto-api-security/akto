@@ -83,7 +83,7 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
-import com.akto.dao.testing.config.TestScriptsDao;
+import com.akto.testing.scripts.TestScriptProviders;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
@@ -276,7 +276,7 @@ public class DbLayer {
         updateList.add(Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()));
         updateList.add(Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
         updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
-        updateList.add(Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)));
+        updateList.add(expiresAtUpdate(moduleInfo.getModuleType()));
         // lastHeartbeatReceived is a primitive int, so a payload that omits it arrives as 0 —
         // skip the update in that case instead of wiping the stored timestamp.
         if (moduleInfo.getLastHeartbeatReceived() != 0) {
@@ -334,6 +334,13 @@ public class DbLayer {
     private static final String ORGANIZATION_TYPE_KEY = "organizationType";
     // Agents that predate organizationType report the same plan string as accountType.
     private static final String ACCOUNT_TYPE_KEY = "accountType";
+
+    private static Bson expiresAtUpdate(ModuleInfo.ModuleType moduleType) {
+        if (moduleType == ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD) {
+            return Updates.unset(ModuleInfo.EXPIRES_AT);
+        }
+        return Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS));
+    }
 
     private static void syncAgentUserFromModuleInfo(ModuleInfo moduleInfo) {
         if (moduleInfo == null) {
@@ -589,7 +596,7 @@ public class DbLayer {
                     Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                     Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
                     Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
-                    Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)),
+                    expiresAtUpdate(moduleInfo.getModuleType()),
                     Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                     Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
@@ -3624,8 +3631,16 @@ public class DbLayer {
         return TestingRunResultSummariesDao.instance.count(filter);
     }
 
+    /**
+     * The default-test-{type} script (legacy store until the account is migrated), or null. A request
+     * with no type comes from a pre-2026-03-15 mini-testing build and means the pre-request script.
+     */
     public static TestScript fetchTestScript(TestScript.Type type){
-        return TestScriptsDao.instance.fetchTestScript(type);
+        return TestScriptProviders.database().findDefault(TestScript.typeForUntypedRequest(type));
+    }
+
+    public static TestScript fetchTestScriptById(String id){
+        return TestScriptProviders.database().findById(id);
     }
 
     public static List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod) {
@@ -4140,6 +4155,23 @@ public class DbLayer {
             loggerMaker.errorAndAddToDb(e, "Error in fetchGuardrailPolicies: " + e.getMessage());
             return new ArrayList<>();
         }
+    }
+
+    // Distinct email domains of this account's users; throws on error so callers keep their old list.
+    public static List<String> fetchOrgEmailDomains() {
+        Set<String> domains = new HashSet<>();
+        List<User> users = UsersDao.instance.findAll(Filters.exists("accounts." + Context.accountId.get()), Projections.include(User.LOGIN));
+        for (User user : users) {
+            String login = user.getLogin();
+            if (login == null || !login.contains("@")) {
+                continue;
+            }
+            String domain = login.substring(login.lastIndexOf('@') + 1).trim().toLowerCase();
+            if (!domain.isEmpty()) {
+                domains.add(domain);
+            }
+        }
+        return new ArrayList<>(domains);
     }
 
     public static List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters,
@@ -4732,15 +4764,23 @@ public class DbLayer {
             updates.add(Updates.setOnInsert(NhiIdentity.LAST_ROTATED_AT, now));
         }
 
-        // Owner: inferred from deviceLabel. Set on insert; backfill for older records
-        // that were created before this field was populated (owner == null).
-        if (StringUtils.isNotBlank(identity.getDeviceLabel())) {
+        // Owner: the scanner sends the signed-in user of the agent that holds the credential
+        // (email). It is the current login, so it always wins. Without an email the owner is
+        // inferred from deviceLabel: set on insert; backfill for older records that were
+        // created before this field was populated (owner == null).
+        NhiIdentity.Owner sentOwner = identity.getOwner();
+        if (sentOwner != null && StringUtils.isNotBlank(sentOwner.getEmail())) {
+            NhiIdentity.Owner o = new NhiIdentity.Owner();
+            o.setEmail(sentOwner.getEmail());
+            o.setName(StringUtils.isNotBlank(sentOwner.getName()) ? sentOwner.getName() : identity.getDeviceLabel());
+            updates.add(Updates.set(NhiIdentity.OWNER, o));
+        } else if (StringUtils.isNotBlank(identity.getDeviceLabel())) {
             if (existing == null) {
-                com.akto.dto.nhi_governance.NhiIdentity.Owner o = new com.akto.dto.nhi_governance.NhiIdentity.Owner();
+                NhiIdentity.Owner o = new NhiIdentity.Owner();
                 o.setName(identity.getDeviceLabel());
                 updates.add(Updates.setOnInsert(NhiIdentity.OWNER, o));
             } else if (existing.getOwner() == null) {
-                com.akto.dto.nhi_governance.NhiIdentity.Owner o = new com.akto.dto.nhi_governance.NhiIdentity.Owner();
+                NhiIdentity.Owner o = new NhiIdentity.Owner();
                 o.setName(identity.getDeviceLabel());
                 updates.add(Updates.set(NhiIdentity.OWNER, o));
             }
@@ -4829,7 +4869,7 @@ public class DbLayer {
     }
 
     public static void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
-        SequenceModelDao.instance.writeSequenceCounts(sequenceCounts);
+        ApiSequencesDao.instance.incrementSequences(sequenceCounts);
     }
 
 }

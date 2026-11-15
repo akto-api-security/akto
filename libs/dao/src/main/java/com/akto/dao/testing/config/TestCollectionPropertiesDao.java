@@ -5,20 +5,20 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
-import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestRoles;
-import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.config.TestCollectionProperty;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.util.enums.GlobalEnums;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static com.akto.dto.CustomAuthType.API_COLLECTION_IDS;
 import static com.akto.dto.CustomAuthType.TYPE_OF_TOKENS;
@@ -151,6 +151,25 @@ public class TestCollectionPropertiesDao extends AccountsContextDao<TestCollecti
             }
         }
         return ret;
+    }
+
+    /**
+     * Reads a pre-library test script. Before the script library (test_scripts) existed, scripts were stored
+     * in this collection, at most one per type, next to TestCollectionProperty documents. Only
+     * LegacyTestScriptAdapter and the one-time migration should call this. Remove it with the adapter once
+     * every account is migrated.
+     * The filter matches the runtime's old one, so an account with duplicate legacy docs gets the same one.
+     */
+    public TestScript findLegacyTestScript(TestScript.Type type) {
+        if (type == null) {
+            throw new IllegalArgumentException("type is required");
+        }
+        return getMCollection().withDocumentClass(TestScript.class)
+            .find(Filters.eq(TestScript.TYPE, type.name()))
+            .projection(Projections.include(TestScript.ID, TestScript.JAVASCRIPT, TestScript.TYPE, TestScript.AUTHOR,
+                TestScript.LAST_CREATED_AT, TestScript.LAST_UPDATED_AT))
+            .maxTime(30, TimeUnit.SECONDS)
+            .first();
     }
 
     private TestCollectionPropertiesDao() {}

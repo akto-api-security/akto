@@ -68,6 +68,12 @@ public class TestingRun {
 
     public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
     private boolean runAutomatedTests = false;
+    // Free text for smart testing (values to use, or to look up), sent with each smart test as userPrompt.
+    public static final String AUTOMATED_TESTS_CUSTOM_PROMPT = "automatedTestsCustomPrompt";
+    private String automatedTestsCustomPrompt;
+    // The smart agent chosen for this run's smart testing (a copy); mini-testing sends it with every smart test.
+    // Null: smart testing exactly as before.
+    private SmartAgentConfig smartAgentConfig;
 
     public static final String DASHBOARD_CONTEXT = "dashboardContext";
     private CONTEXT_SOURCE dashboardContext;
@@ -282,6 +288,22 @@ public class TestingRun {
 
     public void setRunAutomatedTests(boolean runAutomatedTests) {
         this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public SmartAgentConfig getSmartAgentConfig() {
+        return smartAgentConfig;
+    }
+
+    public void setSmartAgentConfig(SmartAgentConfig smartAgentConfig) {
+        this.smartAgentConfig = smartAgentConfig;
+    }
+
+    public String getAutomatedTestsCustomPrompt() {
+        return automatedTestsCustomPrompt;
+    }
+
+    public void setAutomatedTestsCustomPrompt(String automatedTestsCustomPrompt) {
+        this.automatedTestsCustomPrompt = automatedTestsCustomPrompt;
     }
 
     public CONTEXT_SOURCE getDashboardContext() {
