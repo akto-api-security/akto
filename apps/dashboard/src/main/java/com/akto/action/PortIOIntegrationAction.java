@@ -10,6 +10,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.ticketing.ATicketIntegrationService.TicketCreationResult;
 import com.opensymphony.xwork2.Action;
 import java.util.List;
+import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,6 +24,7 @@ public class PortIOIntegrationAction extends UserAction {
     private String clientId;
     private String clientSecret;
     private String workflowId;
+    private Map<String, String> severityToPriority;
     private PortIOIntegration portIOIntegration;
     private List<TestingIssuesId> testingIssuesIdList;
     private String errorMessage;
@@ -35,6 +37,18 @@ public class PortIOIntegrationAction extends UserAction {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error adding Port integration: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    @Audit(description = "User saved Port severity mapping", resource = Resource.PORT_IO_INTEGRATION, operation = Operation.UPDATE)
+    public String savePortIOSeverityMapping() {
+        try {
+            portIOIntegration = new PortIOIntegrationService().saveSeverityMapping(severityToPriority);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error saving Port severity mapping: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             addActionError(e.getMessage());
             return Action.ERROR.toUpperCase();
         }

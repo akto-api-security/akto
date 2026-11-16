@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Divider, LegacyCard, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Button, Divider, HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from '@shopify/polaris'
 import settingFunctions from '../module'
 import IntegrationsLayout from './IntegrationsLayout'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
+import AllowedAction from '../../../components/shared/AllowedAction'
+import SeverityPriorityMapping, { DEFAULT_SEVERITY_TO_PRIORITY } from '../../../components/shared/SeverityPriorityMapping'
 import func from "@/util/func"
 import { usePermissions, whenAllowed } from "@/util/permissions"
 import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
@@ -20,6 +22,9 @@ const PortIO = () => {
     const [workflowId, setWorkflowId] = useState(DEFAULT_WORKFLOW_ID)
     const [isIntegrated, setIsIntegrated] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [severityToPriority, setSeverityToPriority] = useState(DEFAULT_SEVERITY_TO_PRIORITY)
+    const [editingMapping, setEditingMapping] = useState(false)
+    const [isSavingMapping, setIsSavingMapping] = useState(false)
 
     async function loadIntegration() {
         try {
@@ -30,6 +35,7 @@ const PortIO = () => {
             setIsIntegrated(true)
             setClientId(portInteg.clientId || '')
             setWorkflowId(portInteg.workflowId || DEFAULT_WORKFLOW_ID)
+            setSeverityToPriority({ ...DEFAULT_SEVERITY_TO_PRIORITY, ...portInteg.severityToPriority })
         } catch (error) {
             func.setToast(true, true, errorMessageOf(error, 'Error fetching Port integration'))
         }
@@ -54,6 +60,19 @@ const PortIO = () => {
         }
     }
 
+    async function saveMapping() {
+        setIsSavingMapping(true)
+        try {
+            await settingFunctions.savePortIOSeverityMapping(severityToPriority)
+            setEditingMapping(false)
+            func.setToast(true, false, 'Severity mapping saved')
+        } catch (error) {
+            func.setToast(true, true, errorMessageOf(error, 'Failed to save severity mapping'))
+        } finally {
+            setIsSavingMapping(false)
+        }
+    }
+
     async function removeIntegration() {
         setIsSaving(true)
         try {
@@ -63,6 +82,8 @@ const PortIO = () => {
             setClientId('')
             setClientSecret('')
             setWorkflowId(DEFAULT_WORKFLOW_ID)
+            setSeverityToPriority(DEFAULT_SEVERITY_TO_PRIORITY)
+            setEditingMapping(false)
             func.setToast(true, false, 'Successfully removed Port integration')
         } catch (error) {
             func.setToast(true, true, errorMessageOf(error, 'Failed to remove Port integration'))
@@ -127,6 +148,39 @@ const PortIO = () => {
         </LegacyCard>
     )
 
+    const MappingCard = (
+        <LegacyCard>
+            <LegacyCard.Section>
+                <HorizontalStack align="space-between" blockAlign="center">
+                    <VerticalStack gap="1">
+                        <Text variant="headingMd">Severity to Priority Mapping</Text>
+                        <Text variant="bodyMd" color="subdued">
+                            Akto sends the mapped priority to your Port workflow as the priority input
+                        </Text>
+                    </VerticalStack>
+                    <AllowedAction allowed={canCall('api/savePortIOSeverityMapping')}>
+                        <Button
+                            size="slim"
+                            disabled={!isIntegrated || isSavingMapping}
+                            loading={isSavingMapping}
+                            onClick={editingMapping ? saveMapping : () => setEditingMapping(true)}
+                        >
+                            {editingMapping ? 'Save' : 'Edit Mapping'}
+                        </Button>
+                    </AllowedAction>
+                </HorizontalStack>
+            </LegacyCard.Section>
+            <LegacyCard.Section>
+                <SeverityPriorityMapping
+                    rowId="port"
+                    severityToPriority={severityToPriority}
+                    editing={editingMapping}
+                    onChange={(severity, value) => setSeverityToPriority(prev => ({ ...prev, [severity]: value }))}
+                />
+            </LegacyCard.Section>
+        </LegacyCard>
+    )
+
     const cardContent = "Create Linear issues for " + mapLabel('API', getDashboardCategory()) + " vulnerability findings through your Port workflow. Akto only needs Port credentials; the Linear key and team stay in Port"
 
     return (
@@ -136,6 +190,7 @@ const PortIO = () => {
             component={
                 <VerticalStack gap="4">
                     {CredentialsCard}
+                    {MappingCard}
                 </VerticalStack>
             }
             readOnly={!canCall('api/addPortIOIntegration')}

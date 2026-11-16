@@ -934,6 +934,14 @@ const settingRequests = {
         })
     },
 
+    savePortIOSeverityMapping(severityToPriority) {
+        return request({
+            url: '/api/savePortIOSeverityMapping',
+            method: 'post',
+            data: { severityToPriority }
+        })
+    },
+
     removePortIOIntegration() {
         return request({
             url: '/api/removePortIOIntegration',

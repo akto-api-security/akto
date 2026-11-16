@@ -211,9 +211,11 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
 
     static int resolvePriority(Map<String, LinearTeamMapping> teamMappings, String teamId, Severity severity) {
         LinearTeamMapping mapping = teamMappings == null ? null : teamMappings.get(teamId);
-        String value = mapping != null && mapping.getSeverityToPriority() != null
-            ? mapping.getSeverityToPriority().get(severity.name())
-            : null;
+        return resolvePriority(mapping == null ? null : mapping.getSeverityToPriority(), severity);
+    }
+
+    static int resolvePriority(Map<String, String> severityToPriority, Severity severity) {
+        String value = severityToPriority == null ? null : severityToPriority.get(severity.name());
         if (value == null) {
             value = DEFAULT_SEVERITY_TO_PRIORITY.getOrDefault(severity.name(), PRIORITY_NONE);
         }

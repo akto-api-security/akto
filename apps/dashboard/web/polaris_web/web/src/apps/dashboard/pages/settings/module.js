@@ -438,6 +438,13 @@ const settingFunctions = {
       })
       return trafficData
     },
+    savePortIOSeverityMapping: async function(severityToPriority) {
+      let portInteg = {}
+      await settingRequests.savePortIOSeverityMapping(severityToPriority).then((resp)=>{
+        portInteg = resp.portIOIntegration
+      })
+      return portInteg
+    },
     removePortIOIntegration: async function() {
       let trafficData = {}
       await settingRequests.removePortIOIntegration().then((resp)=>{

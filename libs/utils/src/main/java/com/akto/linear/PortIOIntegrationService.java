@@ -2,6 +2,7 @@ package com.akto.linear;
 
 import com.akto.dao.PortIOIntegrationDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.linear_integration.LinearTeamMapping;
 import com.akto.dto.port_io_integration.PortIOIntegration;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -17,6 +18,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
@@ -46,6 +48,25 @@ public class PortIOIntegrationService extends ATicketIntegrationService<PortIOIn
             new BasicDBObject(),
             updates,
             new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
+        );
+        return redacted(saved);
+    }
+
+    public PortIOIntegration saveSeverityMapping(Map<String, String> severityToPriority) throws Exception {
+        if (fetchIntegration() == null) {
+            throw new Exception("Save Port credentials before setting the severity mapping.");
+        }
+
+        Map<String, String> sanitized = LinearIntegrationService.sanitizeSeverityMapping(
+            new LinearTeamMapping(null, severityToPriority));
+
+        PortIOIntegration saved = PortIOIntegrationDao.instance.getMCollection().findOneAndUpdate(
+            new BasicDBObject(),
+            Updates.combine(
+                Updates.set(PortIOIntegration.SEVERITY_TO_PRIORITY, sanitized),
+                Updates.set(PortIOIntegration.UPDATED_TS, Context.now())
+            ),
+            new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
         );
         return redacted(saved);
     }
@@ -136,7 +157,7 @@ public class PortIOIntegrationService extends ATicketIntegrationService<PortIOIn
                 method, endpointDetails, aktoIssueUrl);
 
             LinearIssue issue = PortApiClient.createIssue(authToken, integration.getWorkflowId(), title,
-                description, LinearIntegrationService.resolvePriority(null, null, severity));
+                description, LinearIntegrationService.resolvePriority(integration.getSeverityToPriority(), severity));
 
             return new TicketInfo(issue.getIdentifier(), issue.getUrl());
         } catch (Exception e) {

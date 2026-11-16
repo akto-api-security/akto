@@ -4,6 +4,8 @@ import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.LinearAutoTicketParams;
+import com.akto.dto.jobs.PortIOAutoTicketParams;
+import com.akto.dto.testing.AutoTicketingDetails;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.jobs.JobScheduler;
 import com.akto.billing.UsageMetricUtils;
@@ -122,6 +124,14 @@ public class TestCompletion {
                 JobScheduler.scheduleRunOnceJob(accountId,
                     new LinearAutoTicketParams(testingRun.getId(), summaryId,
                         testRunConfig.getAutoTicketingDetails().getProjectId(),
+                        testRunConfig.getAutoTicketingDetails().getSeverities()),
+                    JobExecutorType.DASHBOARD);
+                return;
+            }
+
+            if (AutoTicketingDetails.PORT_IO_TICKET_SOURCE.equals(testRunConfig.getAutoTicketingDetails().getTicketSource())) {
+                JobScheduler.scheduleRunOnceJob(accountId,
+                    new PortIOAutoTicketParams(testingRun.getId(), summaryId,
                         testRunConfig.getAutoTicketingDetails().getSeverities()),
                     JobExecutorType.DASHBOARD);
                 return;
