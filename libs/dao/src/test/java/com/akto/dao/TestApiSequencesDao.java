@@ -101,7 +101,7 @@ public class TestApiSequencesDao extends MongoBasedTest {
         boolean seqKeyUnique = false, score = false, ttl = false, paths = false;
         for (Document index : ApiSequencesDao.instance.getMCollection().listIndexes()) {
             Document key = index.get("key", Document.class);
-            if (key.containsKey(ApiSequences.SEQ_KEY)) seqKeyUnique = Boolean.TRUE.equals(index.getBoolean("unique"));
+            if (key.size() == 1 && key.containsKey(ApiSequences.SEQ_KEY)) seqKeyUnique = Boolean.TRUE.equals(index.getBoolean("unique"));
             if (key.containsKey(ApiSequences.SCORE)) score = true;
             if (key.containsKey(ApiSequences.LAST_SEEN)) ttl = ((Number) index.get("expireAfterSeconds")).longValue() == 7 * 24 * 3600L;
             if (key.containsKey(ApiSequences.PATHS)) paths = true;
