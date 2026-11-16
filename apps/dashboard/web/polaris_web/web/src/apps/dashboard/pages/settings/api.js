@@ -934,14 +934,6 @@ const settingRequests = {
         })
     },
 
-    savePortIOTeams(teamMappings) {
-        return request({
-            url: '/api/savePortIOTeams',
-            method: 'post',
-            data: { teamMappings }
-        })
-    },
-
     removePortIOIntegration() {
         return request({
             url: '/api/removePortIOIntegration',

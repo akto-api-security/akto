@@ -220,9 +220,6 @@ function IssuesPage() {
     const [linearModalActive, setLinearModalActive] = useState(false)
     const [linearTeams, setLinearTeams] = useState([])
     const [linearTeamId, setLinearTeamId] = useState('')
-    const [portModalActive, setPortModalActive] = useState(false)
-    const [portTeams, setPortTeams] = useState([])
-    const [portTeamId, setPortTeamId] = useState('')
 
     // Compulsory description modal states
     const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
@@ -509,10 +506,9 @@ function IssuesPage() {
         })
     }
 
-    const handleSaveBulkPortTicketsAction = () => {
+    const handleSaveBulkPortTicketsAction = (selectedIssuesItems) => {
         setToast(true, false, "Please wait while we create your Linear tickets through Port.")
-        setPortModalActive(false)
-        api.createPortIOTickets(selectedIssuesItems, portTeamId, window.location.origin).then((res) => {
+        api.createPortIOTickets(selectedIssuesItems, window.location.origin).then((res) => {
             if (res?.errorMessage) {
                 setToast(true, false, res?.errorMessage)
             } else {
@@ -703,18 +699,6 @@ function IssuesPage() {
             })
         }
 
-        function createPortTicketBulk() {
-            setSelectedIssuesItems(items)
-            settingFunctions.fetchPortIOIntegration().then((portIntegration) => {
-                const teamsArray = Object.entries(portIntegration?.teamsMap || {}).map(([id, name]) => ({ id, name }))
-                if (teamsArray.length > 0) {
-                    setPortTeams(teamsArray)
-                    setPortTeamId(teamsArray[0].id)
-                }
-                setPortModalActive(true)
-            })
-        }
-
         async function createWizFindings() {
             await api.createWizFindings(items).then((res) => {
                 setToast(true, false, `${items.length} Wiz finding${items.length === 1 ? "" : "s"} creation initiated.`)
@@ -810,7 +794,7 @@ function IssuesPage() {
             },
             {
                 content: 'Create Linear ticket via Port',
-                onAction: () => { createPortTicketBulk() },
+                onAction: () => { handleSaveBulkPortTicketsAction(items) },
                 disabled: (window.PORT_IO_INTEGRATED === 'false'),
                 requires: ['api/fetchPortIOIntegration', 'api/createPortIOTickets']
             },
@@ -1425,15 +1409,6 @@ function IssuesPage() {
                 teams={linearTeams}
                 teamId={linearTeamId}
                 setTeamId={setLinearTeamId}
-            />
-
-            <LinearTicketCreationModal
-                modalActive={portModalActive}
-                setModalActive={setPortModalActive}
-                handleSaveAction={handleSaveBulkPortTicketsAction}
-                teams={portTeams}
-                teamId={portTeamId}
-                setTeamId={setPortTeamId}
             />
 
             <CompulsoryDescriptionModal

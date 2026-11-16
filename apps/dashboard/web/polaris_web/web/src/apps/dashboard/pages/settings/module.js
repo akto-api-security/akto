@@ -438,13 +438,6 @@ const settingFunctions = {
       })
       return trafficData
     },
-    savePortIOTeams: async function(teamMappings) {
-      let trafficData = {}
-      await settingRequests.savePortIOTeams(teamMappings).then((resp)=>{
-        trafficData = resp
-      })
-      return trafficData
-    },
     removePortIOIntegration: async function() {
       let trafficData = {}
       await settingRequests.removePortIOIntegration().then((resp)=>{

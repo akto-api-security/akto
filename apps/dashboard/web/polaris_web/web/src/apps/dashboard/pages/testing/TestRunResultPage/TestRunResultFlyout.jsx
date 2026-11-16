@@ -73,9 +73,6 @@ function TestRunResultFlyout(props) {
     const [linearModalActive, setLinearModalActive] = useState(false)
     const [linearTeams, setLinearTeams] = useState([])
     const [linearTeamId, setLinearTeamId] = useState('')
-    const [portModalActive, setPortModalActive] = useState(false)
-    const [portTeams, setPortTeams] = useState([])
-    const [portTeamId, setPortTeamId] = useState('')
     const [ticketMenuActive, setTicketMenuActive] = useState(false)
 
     const [description, setDescription] = useState("")
@@ -417,24 +414,7 @@ function TestRunResultFlyout(props) {
     }
 
     const handlePortClick = async () => {
-        if (!portModalActive) {
-            const portIntegration = await settingFunctions.fetchPortIOIntegration()
-            const teamsArray = Object.entries(portIntegration?.teamsMap || {}).map(([id, name]) => ({ id, name }))
-            if (teamsArray.length > 0) {
-                setPortTeams(teamsArray)
-                setPortTeamId(teamsArray[0].id)
-            }
-        }
-        setPortModalActive(!portModalActive)
-    }
-
-    const handlePortTicketCreation = async () => {
-        if (portTeamId && portTeamId.length > 0) {
-            await createPortIOTicket(issueDetails.id, portTeamId)
-            setPortModalActive(false)
-        } else {
-            func.setToast(true, true, "Invalid Linear team")
-        }
+        await createPortIOTicket(issueDetails.id)
     }
 
     const handleDevRevTicketCreation = async (issueId, labels) => {
@@ -485,7 +465,7 @@ function TestRunResultFlyout(props) {
             onCreate: handleLinearClick
         },
         {
-            id: 'port', label: 'Linear via Port', logo: '/public/linear.svg',
+            id: 'port', label: 'Linear via Port', logo: '/public/portio.svg',
             integrated: window.PORT_IO_INTEGRATED === 'true',
             allowed: canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets'),
             ticketUrl: linearIssueUrl, ticketKey: hasTicket(linearIssueUrl) ? getLinearKey(linearIssueUrl) : '',
@@ -809,17 +789,9 @@ function TestRunResultFlyout(props) {
                                 setTeamId={setLinearTeamId}
                                 issueId={issueDetails.id}
                             />
-                            <LinearTicketCreationModal
-                                activator={showTicketMenu ? undefined : window.PORT_IO_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets')}><Button id={"create-port-ticket-button"} primary onClick={handlePortClick} disabled={!!linearIssueUrl}>Create Linear Ticket via Port</Button></AllowedAction> : <></>}
-                                modalActive={portModalActive}
-                                setModalActive={setPortModalActive}
-                                handleSaveAction={handlePortTicketCreation}
-                                teams={portTeams}
-                                teamId={portTeamId}
-                                setTeamId={setPortTeamId}
-                                issueId={issueDetails.id}
-                            />
                            
+                            {!showTicketMenu && window.PORT_IO_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets')}><Button id={"create-port-ticket-button"} primary onClick={handlePortClick} disabled={!!linearIssueUrl}>Create Linear Ticket via Port</Button></AllowedAction> : <></>}
+
                             { window?.WIZ_INTEGRATED === 'true' ? 
                                 <AllowedAction allowed={canCall('api/createWizFindings')}>
                                 <Button id={"create-wiz-finding-button"} primary onClick={handleWizFindingCreation} disabled={ wizFindingUrl?.length > 0 }>

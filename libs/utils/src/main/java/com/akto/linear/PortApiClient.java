@@ -51,11 +51,10 @@ public final class PortApiClient {
         return accessToken;
     }
 
-    public static LinearIssue createIssue(String accessToken, String workflowId, String teamId, String title,
-        String description, int priority) throws Exception {
+    public static LinearIssue createIssue(String accessToken, String workflowId, String title, String description,
+        int priority) throws Exception {
         BasicDBObject inputs = new BasicDBObject("title", title)
             .append("description", description)
-            .append("teamId", teamId)
             .append("priority", priority);
 
         BasicDBObject started = call(authorized(accessToken, "/workflows/" + workflowId.trim() + "/runs")

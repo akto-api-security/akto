@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Button, Card, Divider, HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from '@shopify/polaris'
+import React, { useEffect, useState } from 'react'
+import { Divider, LegacyCard, Text, TextField, VerticalStack } from '@shopify/polaris'
 import settingFunctions from '../module'
 import IntegrationsLayout from './IntegrationsLayout'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
@@ -14,17 +14,12 @@ const errorMessageOf = (error, fallback) => error?.response?.data?.actionErrors?
 const PortIO = () => {
 
     const { canCall } = usePermissions()
-    const nextRowId = useRef(0)
-
-    const newTeamRow = (teamId = '', teamName = '') => ({ rowId: nextRowId.current++, teamId, teamName })
 
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
     const [workflowId, setWorkflowId] = useState(DEFAULT_WORKFLOW_ID)
     const [isIntegrated, setIsIntegrated] = useState(false)
-    const [isSavingCredentials, setIsSavingCredentials] = useState(false)
-    const [teams, setTeams] = useState([])
-    const [isSavingTeams, setIsSavingTeams] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
 
     async function loadIntegration() {
         try {
@@ -35,10 +30,6 @@ const PortIO = () => {
             setIsIntegrated(true)
             setClientId(portInteg.clientId || '')
             setWorkflowId(portInteg.workflowId || DEFAULT_WORKFLOW_ID)
-            const savedTeams = Object.entries(portInteg.teamMappings || {}).map(([teamId, mapping]) =>
-                newTeamRow(teamId, mapping.teamName)
-            )
-            setTeams(savedTeams.length > 0 ? savedTeams : [newTeamRow()])
         } catch (error) {
             func.setToast(true, true, errorMessageOf(error, 'Error fetching Port integration'))
         }
@@ -49,7 +40,7 @@ const PortIO = () => {
     }, [])
 
     async function saveCredentials() {
-        setIsSavingCredentials(true)
+        setIsSaving(true)
         try {
             await settingFunctions.addPortIOIntegration(clientId.trim(), clientSecret.trim(), workflowId.trim())
             window.PORT_IO_INTEGRATED = 'true'
@@ -59,17 +50,16 @@ const PortIO = () => {
         } catch (error) {
             func.setToast(true, true, errorMessageOf(error, 'Failed to save Port credentials'))
         } finally {
-            setIsSavingCredentials(false)
+            setIsSaving(false)
         }
     }
 
     async function removeIntegration() {
-        setIsSavingCredentials(true)
+        setIsSaving(true)
         try {
             await settingFunctions.removePortIOIntegration()
             window.PORT_IO_INTEGRATED = 'false'
             setIsIntegrated(false)
-            setTeams([])
             setClientId('')
             setClientSecret('')
             setWorkflowId(DEFAULT_WORKFLOW_ID)
@@ -77,53 +67,25 @@ const PortIO = () => {
         } catch (error) {
             func.setToast(true, true, errorMessageOf(error, 'Failed to remove Port integration'))
         } finally {
-            setIsSavingCredentials(false)
+            setIsSaving(false)
         }
     }
 
-    async function saveTeams() {
-        const teamMappings = {}
-        teams.forEach(team => {
-            teamMappings[team.teamId.trim()] = { teamName: team.teamName.trim() }
-        })
-
-        setIsSavingTeams(true)
-        try {
-            await settingFunctions.savePortIOTeams(teamMappings)
-            func.setToast(true, false, 'Linear teams saved successfully')
-            await loadIntegration()
-        } catch (error) {
-            func.setToast(true, true, errorMessageOf(error, 'Failed to save Linear teams'))
-        } finally {
-            setIsSavingTeams(false)
-        }
-    }
-
-    function updateTeam(rowId, patch) {
-        setTeams(prev => prev.map(team => team.rowId === rowId ? { ...team, ...patch } : team))
-    }
-
-    function deleteTeam(rowId) {
-        setTeams(prev => prev.filter(team => team.rowId !== rowId))
-    }
-
-    const hasCompleteTeams = teams.length > 0 && teams.every(team => team.teamId.trim() && team.teamName.trim())
-    const hasDuplicateTeams = new Set(teams.map(team => team.teamId.trim())).size !== teams.length
-    const canSaveCredentials = clientId.trim() && workflowId.trim() && clientSecret.trim()
+    const canSave = clientId.trim() && workflowId.trim() && clientSecret.trim()
 
     const CredentialsCard = (
         <LegacyCard
             primaryFooterAction={{
-                content: isSavingCredentials ? 'Saving...' : (isIntegrated ? 'Update' : 'Save'),
+                content: isSaving ? 'Saving...' : (isIntegrated ? 'Update' : 'Save'),
                 onAction: saveCredentials,
-                disabled: isSavingCredentials || !canSaveCredentials,
-                loading: isSavingCredentials,
+                disabled: isSaving || !canSave,
+                loading: isSaving,
                 ...whenAllowed(canCall('api/addPortIOIntegration'))
             }}
             secondaryFooterActions={[{
                 content: 'Remove',
                 onAction: removeIntegration,
-                disabled: !isIntegrated || isSavingCredentials,
+                disabled: !isIntegrated || isSaving,
                 ...whenAllowed(canCall('api/removePortIOIntegration'))
             }]}
         >
@@ -143,7 +105,7 @@ const PortIO = () => {
                         label="Client secret"
                         helpText={isIntegrated
                             ? 'Your client secret is saved. Enter it again to update the credentials'
-                            : 'Port client secret. It is only used to call your Port workflow'}
+                            : 'Port client secret. It is only used to run your Port workflow'}
                         field={clientSecret}
                         onFunc={true}
                         setField={setClientSecret}
@@ -154,7 +116,7 @@ const PortIO = () => {
                         label="Workflow identifier"
                         value={workflowId}
                         onChange={setWorkflowId}
-                        helpText="Identifier of the Port workflow that creates the Linear issue"
+                        helpText="Identifier of the Port workflow that creates the Linear issue. The Linear team is set inside that workflow"
                         autoComplete="off"
                         requiredIndicator
                     />
@@ -165,62 +127,7 @@ const PortIO = () => {
         </LegacyCard>
     )
 
-    const TeamCards = teams.map((team, index) => (
-        <Card roundedAbove="sm" key={`team-${team.rowId}`}>
-            <VerticalStack gap="4">
-                <HorizontalStack align="space-between">
-                    <Text fontWeight="semibold" variant="headingSm">{`Team ${index + 1}`}</Text>
-                    <Button plain removeUnderline destructive size="slim" disabled={teams.length <= 1} onClick={() => deleteTeam(team.rowId)}>
-                        Delete Team
-                    </Button>
-                </HorizontalStack>
-                <TextField
-                    label="Linear team ID"
-                    value={team.teamId}
-                    onChange={(teamId) => updateTeam(team.rowId, { teamId })}
-                    helpText="UUID of the Linear team, not the team key"
-                    autoComplete="off"
-                    requiredIndicator
-                />
-                <TextField
-                    label="Team name"
-                    value={team.teamName}
-                    onChange={(teamName) => updateTeam(team.rowId, { teamName })}
-                    autoComplete="off"
-                    requiredIndicator
-                />
-            </VerticalStack>
-        </Card>
-    ))
-
-    const TeamsCard = (
-        <LegacyCard
-            primaryFooterAction={{
-                content: isSavingTeams ? 'Saving...' : 'Save',
-                onAction: saveTeams,
-                disabled: isSavingTeams || !hasCompleteTeams || hasDuplicateTeams,
-                loading: isSavingTeams,
-                ...whenAllowed(canCall('api/savePortIOTeams'))
-            }}
-        >
-            <LegacyCard.Section>
-                <Text variant="headingMd">Linear Teams</Text>
-            </LegacyCard.Section>
-            <LegacyCard.Section>
-                <VerticalStack gap="4">
-                    <HorizontalStack align="space-between">
-                        <Text fontWeight="semibold" variant="headingMd">Teams</Text>
-                        <Button plain monochrome onClick={() => setTeams(prev => [...prev, newTeamRow()])}>Add Team</Button>
-                    </HorizontalStack>
-                    {TeamCards}
-                </VerticalStack>
-            </LegacyCard.Section>
-            <Divider />
-            <br />
-        </LegacyCard>
-    )
-
-    const cardContent = "Create Linear issues for " + mapLabel('API', getDashboardCategory()) + " vulnerability findings through your Port workflow. Akto only needs Port credentials; the Linear key stays in Port"
+    const cardContent = "Create Linear issues for " + mapLabel('API', getDashboardCategory()) + " vulnerability findings through your Port workflow. Akto only needs Port credentials; the Linear key and team stay in Port"
 
     return (
         <IntegrationsLayout
@@ -229,7 +136,6 @@ const PortIO = () => {
             component={
                 <VerticalStack gap="4">
                     {CredentialsCard}
-                    {isIntegrated ? TeamsCard : null}
                 </VerticalStack>
             }
             readOnly={!canCall('api/addPortIOIntegration')}

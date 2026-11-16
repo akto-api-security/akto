@@ -478,10 +478,10 @@ function TestRunResultPage(props) {
     })
   }
 
-  async function createPortIOTicket(issueId, teamId) {
+  async function createPortIOTicket(issueId) {
     setToast(true, false, "Creating Linear Ticket through Port")
 
-    await issuesApi.createPortIOTickets([issueId], teamId, window.location.origin).then(async (res) => {
+    await issuesApi.createPortIOTickets([issueId], window.location.origin).then(async (res) => {
       await fetchData();
       if (res?.errorMessage) {
         setToast(true, false, res.errorMessage)
