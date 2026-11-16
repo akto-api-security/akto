@@ -161,22 +161,23 @@ public class SensitiveDataPartiesIT {
         assertEquals(Collections.singletonMap(expected + "->" + RECEIVER_COLLECTION, 1L), flushed());
     }
 
-    /** Inbound pod labels describe the callee, so there is no caller to attribute. */
+    /**
+     * Inbound pod labels describe the callee, so there is no caller to attribute - and a count with
+     * no caller can never appear in an alert that names both ends, so nothing is sent.
+     */
     @Test
-    public void inboundSendsNoSenderButStillCountsForTheCallee() throws Exception {
+    public void inboundIsNotSentBecauseThereIsNoCallerToName() throws Exception {
         send("1", callerLabels("customerapi"));
 
-        assertEquals(Collections.singletonMap(
-                SensitiveDataCount.UNKNOWN_COLLECTION_ID + "->" + RECEIVER_COLLECTION, 1L), flushed());
+        assertEquals(Collections.emptyMap(), flushed());
     }
 
-    /** Outbound traffic with no pod labels at all - the caller is simply unknown. */
+    /** Outbound traffic with no pod labels at all - the caller is unknown, so nothing is sent. */
     @Test
-    public void outboundWithoutLabelsSendsNoSender() throws Exception {
+    public void outboundWithoutLabelsIsNotSent() throws Exception {
         send(HttpCallParser.DIRECTION_OUTBOUND, null);
 
-        assertEquals(Collections.singletonMap(
-                SensitiveDataCount.UNKNOWN_COLLECTION_ID + "->" + RECEIVER_COLLECTION, 1L), flushed());
+        assertEquals(Collections.emptyMap(), flushed());
     }
 
     /** Several callers to one callee stay separate increments rather than collapsing into one. */
@@ -206,5 +207,19 @@ public class SensitiveDataPartiesIT {
         assertEquals(ApiCollection.generateServiceTagCollectionId("pma-smile"), c.getSenderCollectionId());
         assertEquals("BOOKING_REF", c.getSubType());
         assertEquals(HOUR, c.getHour());
+    }
+
+    /**
+     * Dropping is decided per message: an unattributable message alongside a named one removes only
+     * its own count, and does not suppress or merge into the caller that could be named.
+     */
+    @Test
+    public void droppingOneMessageLeavesANamedCallerIntact() throws Exception {
+        send(HttpCallParser.DIRECTION_OUTBOUND, callerLabels("pma-smile"));
+        send("1", callerLabels("customerapi"));
+        send(HttpCallParser.DIRECTION_OUTBOUND, null);
+
+        int expected = ApiCollection.generateServiceTagCollectionId("pma-smile");
+        assertEquals(Collections.singletonMap(expected + "->" + RECEIVER_COLLECTION, 1L), flushed());
     }
 }

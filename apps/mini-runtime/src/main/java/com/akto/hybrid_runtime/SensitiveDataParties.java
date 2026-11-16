@@ -17,8 +17,7 @@ import java.util.Map;
  * hash. Reusing both means one service is one collection whichever end of a call it is on.
  *
  * Only outbound captures can identify a caller. On inbound the pod labels describe the callee, so
- * there is nobody to attribute and the bucket is left without a sender; it still counts in full
- * towards the service that received it.
+ * there is nobody to attribute and the message is not counted at all.
  *
  * Deliberately NOT derived from {@code apc-source-service-name}. That header is stamped once by
  * whoever started the call chain and then propagates, so it names the ORIGINATOR rather than the
@@ -29,6 +28,16 @@ import java.util.Map;
 public class SensitiveDataParties {
 
     private SensitiveDataParties() {
+    }
+
+    /**
+     * Whether a count with this caller is worth storing.
+     *
+     * A count nobody can attribute cannot appear in an alert that names both ends of a call, so it
+     * is not recorded at all rather than stored under an unknown sender.
+     */
+    public static boolean shouldRecord(int senderCollectionId) {
+        return senderCollectionId != SensitiveDataCount.UNKNOWN_COLLECTION_ID;
     }
 
     /**

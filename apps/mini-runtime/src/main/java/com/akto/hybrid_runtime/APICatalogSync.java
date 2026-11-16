@@ -136,9 +136,13 @@ public class APICatalogSync {
                 // the message, not of the collection a value happened to be detected in. The key of
                 // each entry is already the receiving end.
                 int senderCollectionId = SensitiveDataParties.senderCollectionId(responseParams);
-                for (Map.Entry<Integer, Set<String>> seen : seenByCollection.entrySet()) {
-                    SensitiveDataCounter.instance.record(seen.getKey(), seen.getValue(), senderCollectionId,
-                            responseParams.getTimeOrNow());
+                // drain() has already run, so this thread's events are cleared whether or not they
+                // are recorded: a dropped count must not be left behind to attach to the next message.
+                if (SensitiveDataParties.shouldRecord(senderCollectionId)) {
+                    for (Map.Entry<Integer, Set<String>> seen : seenByCollection.entrySet()) {
+                        SensitiveDataCounter.instance.record(seen.getKey(), seen.getValue(), senderCollectionId,
+                                responseParams.getTimeOrNow());
+                    }
                 }
             }
         }
