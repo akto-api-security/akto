@@ -45,8 +45,9 @@ public class ApiSequencesDao extends AccountsContextDao<ApiSequences> {
     public static final double KNOWN_STEP_MIN_COUNT = 5;
     public static final double KNOWN_STEP_MIN_SHARE = 0.01;
     private static final String LAST_SEEN_TTL_INDEX = "lastSeen_ttl";
-    // Serves findKnownSteps: order-0 rows, and order-1 rows by weight or probability
-    private static final String KNOWN_STEPS_INDEX = "order_1_weight_-1_probability_-1";
+    // Serves findKnownStepsPage from the index alone: rows of one order, paged by seqKey, with the fields isKnownStep reads
+    private static final String KNOWN_STEPS_INDEX = "order_1_seqKey_1_weight_1_probability_1";
+    public static final int KNOWN_STEPS_PAGE_SIZE = 5000;
     private static final double DECAY_PER_SECOND = Math.log(2) / HALF_LIFE_SECONDS;
     private static final double Z = 1.645;
     private static final int DUPLICATE_KEY = 11000;
@@ -90,7 +91,7 @@ public class ApiSequencesDao extends AccountsContextDao<ApiSequences> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiSequences.CREATED_AT }, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiSequences.LAST_UPDATED_AT }, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                Indexes.compoundIndex(Indexes.ascending(ApiSequences.ORDER), Indexes.descending(ApiSequences.WEIGHT, ApiSequences.PROBABILITY)),
+                Indexes.ascending(ApiSequences.ORDER, ApiSequences.SEQ_KEY, ApiSequences.WEIGHT, ApiSequences.PROBABILITY),
                 new IndexOptions().name(KNOWN_STEPS_INDEX));
         return hasWriteIndexes();
     }
@@ -279,15 +280,32 @@ public class ApiSequencesDao extends AccountsContextDao<ApiSequences> {
         return rules;
     }
 
+    // One page of rows of the given order after afterSeqKey (null for the first page), in seqKey order.
+    // Read as documents: an index-only read returns missing weight/probability as null, which the POJO's primitives reject.
+    public List<ApiSequences> findKnownStepsPage(int order, String afterSeqKey) {
+        Bson filter = Filters.and(Filters.eq(ApiSequences.ORDER, order),
+                Filters.gt(ApiSequences.SEQ_KEY, afterSeqKey == null ? "" : afterSeqKey));
+        Bson fields = Projections.fields(Projections.include(ApiSequences.ORDER, ApiSequences.SEQ_KEY,
+                ApiSequences.WEIGHT, ApiSequences.PROBABILITY), Projections.excludeId());
+        List<ApiSequences> page = new ArrayList<>();
+        for (Document d : getMCollection().find(filter, Document.class).projection(fields)
+                .sort(Sorts.ascending(ApiSequences.SEQ_KEY)).limit(KNOWN_STEPS_PAGE_SIZE)) {
+            ApiSequences row = new ApiSequences();
+            row.setOrder(order);
+            row.setSeqKey(d.getString(ApiSequences.SEQ_KEY));
+            Object weight = d.get(ApiSequences.WEIGHT);
+            Object probability = d.get(ApiSequences.PROBABILITY);
+            row.setWeight(weight instanceof Number ? ((Number) weight).doubleValue() : 0);
+            row.setProbability(probability instanceof Number ? ((Number) probability).floatValue() : 0f);
+            page.add(row);
+        }
+        return page;
+    }
+
     // Every API's call count (order 0), and the steps users actually take (order 1): seen at least
     // KNOWN_STEP_MIN_COUNT times or at least KNOWN_STEP_MIN_SHARE of what follows that API. Rare steps are left out.
-    public List<ApiSequences> findKnownSteps() {
-        Bson known = Filters.or(
-                Filters.eq(ApiSequences.ORDER, 0),
-                Filters.and(Filters.eq(ApiSequences.ORDER, 1), Filters.or(
-                        Filters.gte(ApiSequences.WEIGHT, KNOWN_STEP_MIN_COUNT),
-                        Filters.gte(ApiSequences.PROBABILITY, KNOWN_STEP_MIN_SHARE))));
-        return findAll(known, Projections.include(ApiSequences.SEQ_KEY, ApiSequences.ORDER));
+    public static boolean isKnownStep(ApiSequences row) {
+        return row.getOrder() == 0 || row.getWeight() >= KNOWN_STEP_MIN_COUNT || row.getProbability() >= KNOWN_STEP_MIN_SHARE;
     }
 
     public List<ApiSequences> findByApiCollectionId(int apiCollectionId) {
