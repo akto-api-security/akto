@@ -1,4 +1,4 @@
-import { Box, Button, HorizontalGrid, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Box, HorizontalGrid, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import CardWithHeader from "@/apps/dashboard/pages/dashboard/new_components/CardWithHeader";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import SeverityPill from "@/apps/dashboard/components/shared/SeverityPill";
@@ -7,14 +7,13 @@ import { THREAT_ACTIVITY_PATH } from "@/apps/dashboard/pages/threat_detection/ut
 import { OverviewListRow, OverviewLoadError } from "./OverviewCard";
 import { formatCount } from "./atlasOverviewUtils";
 
-export default function AttentionCard({ data, onOpenActivity, onOpenPolicy, onViewAll }) {
+export default function AttentionCard({ data, onOpenActivity, onOpenPolicy }) {
     const rows = data?.rows || [];
     const openCta = (cta) => (cta.route === THREAT_ACTIVITY_PATH ? onOpenActivity(cta.params || {}) : onOpenPolicy(cta.params?.policy));
     return (
         <CardWithHeader
             title="Needs your attention"
             tooltipContent="Grouped by root cause"
-            headerAction={<Button plain onClick={onViewAll}>View all</Button>}
             hasData
         >
             {data === null ? <SpinnerCentered height="200px" />
@@ -36,7 +35,7 @@ export default function AttentionCard({ data, onOpenActivity, onOpenPolicy, onVi
                                             </VerticalStack>
                                             <HorizontalStack gap="2" wrap={false}>
                                                 {secondary && <CompactButton onClick={() => openCta(secondary)}>{secondary.label}</CompactButton>}
-                                                {review && <CompactButton onClick={() => openCta(review)}>{`Review ${formatCount(row.count)}`}</CompactButton>}
+                                                {review && <CompactButton onClick={() => openCta(review)}>{row.count == null ? "Review" : `Review ${formatCount(row.count)}`}</CompactButton>}
                                             </HorizontalStack>
                                         </HorizontalGrid>
                                     </Box>

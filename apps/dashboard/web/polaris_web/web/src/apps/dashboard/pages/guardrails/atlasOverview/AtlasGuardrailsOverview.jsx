@@ -88,7 +88,7 @@ function AtlasGuardrailsOverview() {
     const components = [
         <KpiStrip key="kpis" kpis={kpis} onOpenActivity={openActivity} />,
         <HorizontalGrid key="attention" columns={{ xs: 1, md: ["twoThirds", "oneThird"] }} gap="4">
-            <AttentionCard data={attention} onOpenActivity={openActivity} onOpenPolicy={(name) => navigate(policyLink(name))} onViewAll={() => openActivity()} />
+            <AttentionCard data={attention} onOpenActivity={openActivity} onOpenPolicy={(name) => navigate(policyLink(name))} />
             <TriageStatusCard triage={triage} onOpenActivity={openActivity} />
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">
