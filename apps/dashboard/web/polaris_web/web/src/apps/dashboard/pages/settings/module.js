@@ -417,6 +417,13 @@ const settingFunctions = {
       })
       return trafficData
     },
+    saveLinearBiDirectionalSync: async function(biDirectionalSyncEnabled) {
+      let trafficData = {}
+      await settingRequests.saveLinearBiDirectionalSync(biDirectionalSyncEnabled).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     removeLinearIntegration: async function() {
       let trafficData = {}
       await settingRequests.removeLinearIntegration().then((resp)=>{

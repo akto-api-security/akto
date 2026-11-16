@@ -910,6 +910,14 @@ const settingRequests = {
         })
     },
 
+    saveLinearBiDirectionalSync(biDirectionalSyncEnabled) {
+        return request({
+            url: '/api/saveLinearBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled }
+        })
+    },
+
     removeLinearIntegration() {
         return request({
             url: '/api/removeLinearIntegration',

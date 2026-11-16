@@ -2,9 +2,16 @@ package com.akto.linear;
 
 import com.akto.dao.LinearIntegrationDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.BidirectionalSyncSettingsDao;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.linear_integration.LinearIntegration;
+import com.akto.dto.jobs.Job;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.TicketSyncJobParams;
 import com.akto.dto.linear_integration.LinearTeamMapping;
+import com.akto.dto.testing.BidirectionalSyncSettings;
+import com.akto.jobs.JobScheduler;
+import com.akto.jobs.executors.LinearTicketSyncJobExecutor;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -20,6 +27,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.utils.CurlUtils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
@@ -31,6 +39,7 @@ import java.util.Map;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 @NoArgsConstructor
 public class LinearIntegrationService extends ATicketIntegrationService<LinearIntegration> {
@@ -56,6 +65,8 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         DEFAULT_SEVERITY_TO_PRIORITY.put(Severity.MEDIUM.name(), PRIORITY_MEDIUM);
         DEFAULT_SEVERITY_TO_PRIORITY.put(Severity.LOW.name(), PRIORITY_LOW);
     }
+
+    private static final int SYNC_INTERVAL_SECONDS = 3600;
 
     private String apiToken;
 
@@ -153,6 +164,102 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         return sanitized;
     }
 
+    public LinearIntegration saveBiDirectionalSync(boolean enabled) throws Exception {
+        LinearIntegration existing = LinearIntegrationDao.instance.findOne(new BasicDBObject());
+        if (existing == null || StringUtils.isBlank(existing.getApiToken())) {
+            throw new Exception("Please save your Linear API key first.");
+        }
+        if (enabled && (existing.getTeamMappings() == null || existing.getTeamMappings().isEmpty())) {
+            throw new Exception("Please add at least one team before enabling sync.");
+        }
+
+        if (enabled) {
+            startSyncJob();
+        } else {
+            stopSyncJob();
+        }
+
+        LinearIntegration updated = LinearIntegrationDao.instance.getMCollection().findOneAndUpdate(
+            new BasicDBObject(),
+            Updates.combine(
+                Updates.set(LinearIntegration.BI_DIRECTIONAL_SYNC_ENABLED, enabled),
+                Updates.set(LinearIntegration.UPDATED_TS, Context.now())
+            ),
+            new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+        );
+        if (updated != null) {
+            updated.setApiToken(null);
+        }
+        return updated;
+    }
+
+    private void startSyncJob() throws Exception {
+        BidirectionalSyncSettings settings = findSyncSettings();
+
+        if (settings == null) {
+            Job job = JobScheduler.scheduleRecurringJob(Context.accountId.get(),
+                new TicketSyncJobParams(GlobalEnums.TicketSource.LINEAR.name(),
+                    LinearTicketSyncJobExecutor.SYNC_KEY, Context.now()),
+                JobExecutorType.DASHBOARD, SYNC_INTERVAL_SECONDS);
+            if (job == null) {
+                throw new Exception("Failed to schedule the Linear sync job. Please try again.");
+            }
+
+            BidirectionalSyncSettings created = new BidirectionalSyncSettings();
+            created.setSource(GlobalEnums.TicketSource.LINEAR);
+            created.setProjectKey(LinearTicketSyncJobExecutor.SYNC_KEY);
+            created.setActive(true);
+            created.setLastSyncedAt(Context.now());
+            created.setJobId(job.getId());
+            BidirectionalSyncSettingsDao.instance.insertOne(created);
+            return;
+        }
+
+        ObjectId jobId = settings.getJobId();
+        if (!settings.isActive()) {
+            Job job = JobScheduler.restartJob(jobId);
+            if (job == null) {
+                throw new Exception("Failed to restart the Linear sync job. Please try again.");
+            }
+            jobId = job.getId();
+        }
+
+        BidirectionalSyncSettingsDao.instance.updateOne(
+            Filters.eq(BidirectionalSyncSettings.ID, settings.getId()),
+            Updates.combine(
+                Updates.set(BidirectionalSyncSettings.ACTIVE, true),
+                Updates.set(BidirectionalSyncSettings.LAST_SYNCED_AT, Context.now()),
+                Updates.set(BidirectionalSyncSettings.JOB_ID, jobId)
+            )
+        );
+    }
+
+    private void stopSyncJob() {
+        BidirectionalSyncSettings settings = findSyncSettings();
+        if (settings == null || !settings.isActive()) {
+            return;
+        }
+
+        BidirectionalSyncSettingsDao.instance.updateOne(
+            Filters.eq(BidirectionalSyncSettings.ID, settings.getId()),
+            Updates.combine(
+                Updates.set(BidirectionalSyncSettings.ACTIVE, false),
+                Updates.set(BidirectionalSyncSettings.LAST_SYNCED_AT, Context.now())
+            )
+        );
+
+        if (settings.getJobId() != null) {
+            JobScheduler.deleteJob(settings.getJobId());
+        }
+    }
+
+    private BidirectionalSyncSettings findSyncSettings() {
+        return BidirectionalSyncSettingsDao.instance.findOne(Filters.and(
+            Filters.eq(BidirectionalSyncSettings.SOURCE, GlobalEnums.TicketSource.LINEAR.name()),
+            Filters.eq(BidirectionalSyncSettings.PROJECT_KEY, LinearTicketSyncJobExecutor.SYNC_KEY)
+        ));
+    }
+
     public LinearIntegration fetchLinearIntegration() {
         LinearIntegration integration = LinearIntegrationDao.instance.findOne(new BasicDBObject());
         if (integration != null) {
@@ -180,6 +287,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
 
     public void removeIntegration() throws Exception {
         try {
+            stopSyncJob();
             LinearIntegrationDao.instance.getMCollection().deleteOne(new BasicDBObject());
             logger.infoAndAddToDb("Linear integration removed successfully", LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {
