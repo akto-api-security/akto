@@ -3915,7 +3915,7 @@
             </result>
         </action>
 
-        <action name="api/getApiSequences" class="com.akto.action.ApiSequencesAction" method="fetchApiSequences">
+        <action name="api/fetchSessionSteps" class="com.akto.action.ApiSequencesAction" method="fetchSessionSteps">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
