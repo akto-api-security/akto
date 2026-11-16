@@ -21,8 +21,9 @@ Placeholders, in the url, header values and body strings:
                   secrets (model keys) to the URL it names. An entry naming an unset variable is skipped.
 
 "text" says where the text is in a JSON reply: a "path" (a.b, [0] an index, [] every item of a list), "join" for a
-list (default newline) and "each", a nested spec applied to every item first. Without "text" the reply body is the
-text. A preset is just such an entry; it is data, not code.
+list (default newline) and "each", a nested spec applied to every item first. "noText" names the reply that means the
+image has no text (a model can't be relied on to answer with nothing), which then reads as empty text. Without "text"
+the reply body is the text. A preset is just such an entry; it is data, not code.
 """
 
 import asyncio
@@ -55,9 +56,13 @@ _IMAGE_KEYS = ("image_bytes", "image_b64", "image_mime")
 _PLACEHOLDER = re.compile(r"\$\{([A-Za-z0-9_]+)\}")
 _PATH_TOKEN = re.compile(r"[^.\[\]]+|\[\d*\]")
 
+# Asked for nothing, Gemma 4 answers "nothing", "empty message" or invents a JSON box for an image with no text;
+# a fixed marker it gives reliably, mapped to empty text by "noText".
+_GEMMA_NO_TEXT = "NO_TEXT"
 _GEMMA_INSTRUCTION = (
-    "Transcribe all text in this image exactly as written, line by line. "
-    "Output only the text; if there is none, output nothing."
+    "Transcribe the text that appears in this image, exactly as written, one line per line. "
+    "Reply with the transcribed text only: no commentary, labels, code fences, JSON or coordinates. "
+    f"If the image contains no text, reply with exactly {_GEMMA_NO_TEXT} and nothing else."
 )
 PRESETS: dict[str, dict[str, Any]] = {
     # Gemma on an OpenAI-compatible chat endpoint (vLLM / Foundry) that accepts image input.
@@ -80,7 +85,7 @@ PRESETS: dict[str, dict[str, Any]] = {
                 }
             ],
         },
-        "text": {"path": "choices[0].message.content"},
+        "text": {"path": "choices[0].message.content", "noText": _GEMMA_NO_TEXT},
     },
     # Azure Computer Vision OCR v3.2, the call guardrails-service makes directly today (azure_vision.go).
     "azure_vision": {
@@ -133,6 +138,10 @@ def _compile_text(spec: Any) -> dict[str, Any]:
     if not isinstance(join, str):
         raise ValueError('"join" must be a string')
     compiled: dict[str, Any] = {"steps": steps, "join": join}
+    if "noText" in spec:
+        if not isinstance(spec["noText"], str) or not spec["noText"].strip():
+            raise ValueError('"noText" must be a non-empty string')
+        compiled["noText"] = spec["noText"].strip()
     if "each" in spec:
         compiled["each"] = _compile_text(spec["each"])
     return compiled
@@ -243,7 +252,8 @@ class HttpOCR:
             raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
         if self.text is None:
             return resp.text
-        return _extract(self.text, resp.json()) or ""
+        text = _extract(self.text, resp.json()) or ""
+        return "" if text.strip() == self.text.get("noText") else text
 
 
 def _entries() -> list[Any]:
