@@ -172,6 +172,16 @@ async def test_an_image_with_no_text_is_empty_text(monkeypatch):
     assert await ocr.ocr_payload({"image_b64": B64}) == (200, {"text": "", "provider": "google_vision"})
 
 
+async def test_gemma_answering_no_text_is_empty_text(monkeypatch):
+    _fake(monkeypatch, **{"gemma.example": {"choices": [{"message": {"content": " NO_TEXT\n"}}]}})
+    assert await ocr.ocr_payload({"image_b64": B64}) == (200, {"text": "", "provider": "gemma"})
+
+
+async def test_no_text_marker_only_matches_the_whole_reply(monkeypatch):
+    _fake(monkeypatch, **{"gemma.example": {"choices": [{"message": {"content": "Error code NO_TEXT"}}]}})
+    assert await ocr.ocr_payload({"image_b64": B64}) == (200, {"text": "Error code NO_TEXT", "provider": "gemma"})
+
+
 async def test_without_a_text_path_the_reply_body_is_the_text(monkeypatch):
     _config(monkeypatch, [_entry("ocr.internal")])
     fake = _fake(monkeypatch, **{"ocr.internal": "line one\nline two"})
@@ -242,6 +252,8 @@ async def test_an_entry_naming_an_unset_variable_is_skipped(monkeypatch):
         _entry("h.example", text={"path": "a..b"}),
         _entry("h.example", text={"path": "a", "join": 5}),
         _entry("h.example", text={"join": " "}),
+        _entry("h.example", text={"path": "a", "noText": ""}),
+        _entry("h.example", text={"path": "a", "noText": 5}),
         {**_entry("h.example"), "provider": "grpc"},
         "tesseract",  # not a preset
     ],
