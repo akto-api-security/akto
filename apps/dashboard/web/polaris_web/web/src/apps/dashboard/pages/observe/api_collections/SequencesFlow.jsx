@@ -15,8 +15,6 @@ const FAN_GAP = 600;
 const LABEL_OFFSET = 110;
 // Starting APIs and fan entries are shown six at a time
 const PAGE = 6;
-// Stored counts decay with a 24h half-life; multiplying by ln 2 gives a daily rate
-const PER_DAY = Math.LN2;
 
 const SequencesNode = createCustomNode('#ccc', '1px', '#555', '0 1px 3px rgba(0,0,0,0.1)', true);
 
@@ -60,7 +58,10 @@ const parseKey = (key) => {
 
 const edge = (id, source, target, label, width) => ({ id, source, target, sourceHandle: 'b', targetHandle: 't', type: 'explorerEdge', data: { label, width } });
 
-const stepLabel = (count, pathCount) => `${Math.round(100 * count / pathCount)}% · ~${Math.round(count * PER_DAY)}/day`;
+const share = (weight, total) => {
+  const percent = 100 * weight / total;
+  return percent > 0 && percent < 0.5 ? '<1%' : `${Math.round(percent)}%`;
+};
 
 // Starting APIs in the left column; the clicked path continues from the selected one, and the
 // last clicked API's next steps fan out to the right, busiest on top
@@ -71,7 +72,6 @@ function explorerGraph(starts, startsShown, steps, fan, fanShown) {
   visibleStarts.forEach((row, index) => {
     const y = index * ROW_HEIGHT;
     nodes.push({ id: `s${index}`, type: 'sequencesNode', position: { x: 0, y }, data: { ...parseKey(row.key), key: row.key, action: 'start', isSelected: steps.length === 1 && steps[0].key === row.key } });
-    nodes.push({ id: `s${index}-label`, type: 'textLabel', position: { x: -LABEL_WIDTH, y: y + 12 }, selectable: false, data: { text: `~${Math.round(row.count * PER_DAY)}/day` } });
   });
   if (starts.length > startsShown) {
     nodes.push({ id: 'more-starts', type: 'textLabel', position: { x: 0, y: visibleStarts.length * ROW_HEIGHT + 12 }, selectable: false, data: { text: `+ ${Math.min(PAGE, starts.length - startsShown)} more starting APIs`, align: 'left', action: 'more-starts' } });
@@ -93,8 +93,8 @@ function explorerGraph(starts, startsShown, steps, fan, fanShown) {
   const hidden = allNext - rows.reduce((sum, row) => sum + row.count, 0);
   const ended = fan.pathCount - allNext;
   const extras = [];
-  if (hidden > 0) extras.push({ text: `+ ${Math.min(PAGE, fan.rows.length - rows.length)} more · ${Math.round(100 * hidden / fan.pathCount)}%`, action: 'more-fan' });
-  if (ended > 0) extras.push({ text: `Session ends · ${Math.round(100 * ended / fan.pathCount)}%`, italic: true });
+  if (hidden > 0) extras.push({ text: `+ ${Math.min(PAGE, fan.rows.length - rows.length)} more · ${share(hidden, fan.pathCount)}`, action: 'more-fan' });
+  if (ended > 0) extras.push({ text: `Session ends · ${share(ended, fan.pathCount)}`, italic: true });
 
   const lastX = (steps.length - 1) * PATH_STEP;
   const x = lastX + NODE_WIDTH + FAN_GAP;
@@ -104,8 +104,8 @@ function explorerGraph(starts, startsShown, steps, fan, fanShown) {
   const topCount = rows.length ? rows[0].count : 1;
   rows.forEach((row, index) => {
     const id = `c${index}`;
-    nodes.push({ id, type: 'sequencesNode', position: { x, y: top + index * ROW_HEIGHT }, data: { ...parseKey(row.key), key: row.key, action: 'next', label: stepLabel(row.count, fan.pathCount) } });
-    edges.push(edge(`${parentId}-${id}`, parentId, id, stepLabel(row.count, fan.pathCount), Math.max(1.5, 6 * row.count / topCount)));
+    nodes.push({ id, type: 'sequencesNode', position: { x, y: top + index * ROW_HEIGHT }, data: { ...parseKey(row.key), key: row.key, action: 'next', label: share(row.count, fan.pathCount) } });
+    edges.push(edge(`${parentId}-${id}`, parentId, id, share(row.count, fan.pathCount), Math.max(1.5, 6 * row.count / topCount)));
   });
   extras.forEach((extra, index) => {
     nodes.push({ id: `extra${index}`, type: 'textLabel', position: { x, y: top + (rows.length + index) * ROW_HEIGHT + 12 }, selectable: false, data: { ...extra, align: 'left' } });
@@ -113,16 +113,17 @@ function explorerGraph(starts, startsShown, steps, fan, fanShown) {
 
   // At the first step keep the starting column in view; deeper, frame the last clicked API and its fan
   const fanBottom = top + (rows.length + extras.length) * ROW_HEIGHT;
-  const left = steps.length === 1 ? -LABEL_WIDTH : lastX;
+  const left = lastX;
   const minY = steps.length === 1 ? Math.min(0, top) : Math.min(pathY, top);
   const maxY = steps.length === 1 ? Math.max(fanBottom, (visibleStarts.length + 1) * ROW_HEIGHT) : Math.max(pathY + NODE_HEIGHT, fanBottom);
   const bounds = { x: left - 40, y: minY - 40, width: x + NODE_WIDTH - left + 80, height: maxY - minY + 80 };
   return { nodes, edges, bounds };
 }
 
+// Weights come back aged to now, so a fan's shares add up to at most 100%
 const toFan = (resp) => ({
-  rows: (resp?.nextSteps || []).map((row) => ({ key: row.next || row.seqKey, count: row.transitionCount })),
-  pathCount: resp?.pathCount || 0,
+  rows: (resp?.nextSteps || []).map((row) => ({ key: row.next || row.seqKey, count: row.weight })),
+  pathCount: resp?.pathWeight || 0,
 });
 
 // apiCollectionId 0 means the whole account
