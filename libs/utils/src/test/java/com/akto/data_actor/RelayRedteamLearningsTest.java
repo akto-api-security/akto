@@ -25,7 +25,7 @@ public class RelayRedteamLearningsTest {
 
     @Test
     public void onlyTheRedteamLearningApisCanBeRelayed() {
-        assertEquals(4, DataActor.REDTEAM_LEARNING_APIS.size());
+        assertEquals(5, DataActor.REDTEAM_LEARNING_APIS.size());
         assertThrows(IllegalArgumentException.class, () -> ClientActor.buildRelayRedteamLearningsRequest("deleteAll", "{}"));
         assertThrows(IllegalArgumentException.class, () -> ClientActor.buildRelayRedteamLearningsRequest("../fetchAgentModels", "{}"));
     }

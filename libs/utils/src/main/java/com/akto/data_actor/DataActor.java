@@ -409,7 +409,7 @@ public abstract class DataActor {
 
     public static final java.util.Set<String> REDTEAM_LEARNING_APIS = java.util.Collections.unmodifiableSet(
             new java.util.HashSet<>(java.util.Arrays.asList("storeRedteamObservations", "fetchRedteamConsolidationInput",
-                    "saveRedteamProfile", "fetchLatestRedteamProfile")));
+                    "saveRedteamProfile", "fetchLatestRedteamProfile", "fetchRedteamLearningsSettings")));
 
     public abstract Map<String, String> fetchDeviceUserMap();
 
