@@ -53,6 +53,9 @@ public class TestingRunIssues {
     public static final String LINEAR_ISSUE_URL = "linearIssueUrl";
     private String linearIssueUrl;
 
+    public static final String TICKET_CREATED_VIA = "ticketCreatedVia";
+    private String ticketCreatedVia;
+
     public static final String ID_API_COLLECTION_ID = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID;
     public static final String ID_URL = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL;
     public static final String ID_METHOD = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.METHOD;
@@ -267,5 +270,13 @@ public class TestingRunIssues {
 
     public void setLinearIssueUrl(String linearIssueUrl) {
         this.linearIssueUrl = linearIssueUrl;
+    }
+
+    public String getTicketCreatedVia() {
+        return ticketCreatedVia;
+    }
+
+    public void setTicketCreatedVia(String ticketCreatedVia) {
+        this.ticketCreatedVia = ticketCreatedVia;
     }
 }
