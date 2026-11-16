@@ -115,6 +115,11 @@ def _is_qwen(entry: dict[str, Any]) -> bool:
     return str(entry.get("provider", "")).lower().startswith("qwen")
 
 
+def observes(scanner_name: str, scanner_type: str) -> bool:
+    """The scans Tripwire observes: PromptInjection input only."""
+    return scanner_name == "PromptInjection" and scanner_type == "prompt"
+
+
 # Roles a single-model scanner draws its one model from, in preference order.
 _SINGLE_MODEL_ROLE_PREFERENCE = ("FAST_FALLBACK_SAFE_FILTER", "FINAL_ARBITER")
 

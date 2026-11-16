@@ -93,7 +93,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     private static final LoggerMaker logger = new LoggerMaker(SignupAction.class, LogDb.DASHBOARD);
     public static final String CHECK_INBOX_URI = "/check-inbox";
     public static final String BUSINESS_EMAIL_URI = "/business-email";
-    public static final String TEST_EDITOR_URL = "/tools/test-editor";
     public static final String SSO_URL = "/sso-login";
     public static final String ACCESS_DENIED_ERROR = "access_denied";
     public static final String VERIFY_EMAIL_ERROR = "VERIFY_EMAIL";

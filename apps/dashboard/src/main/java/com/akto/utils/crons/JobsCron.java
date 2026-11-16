@@ -10,6 +10,7 @@ import com.akto.dao.jobs.JobsDao;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobStatus;
+import com.akto.dto.jobs.JobType;
 import com.akto.jobs.JobExecutorFactory;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -39,7 +40,9 @@ public class JobsCron {
 
             long now = Context.now();
 
-            Bson executorFilter = Filters.eq(Job.JOB_EXECUTOR_TYPE, jobExecutorType.name());
+            // ATLAS_S3_EXPORT is executed only by the jobs lane deployment; this build has no executor for it.
+            Bson executorFilter = Filters.and(Filters.eq(Job.JOB_EXECUTOR_TYPE, jobExecutorType.name()),
+                Filters.ne(Job.JOB_PARAMS + ".jobType", JobType.ATLAS_S3_EXPORT.name()));
 
             Bson scheduledFilter =
                 Filters.and(executorFilter,

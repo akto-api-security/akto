@@ -8,6 +8,13 @@
                                      SAFE/INCONC. → ALLOW (best tier2 result)
     tier1 all INCONCLUSIVE       → FINAL_ARBITER decides
 
+With TRIPWIRE_ENABLED on, the Tripwire classifier observes every PromptInjection
+input scan, whatever its modelConfigs. It starts with the tiers and the scan
+never waits for it. If it has answered when the cascade decides, its verdict is
+in details.tripwire; otherwise it is recorded in the background once it answers
+(within 500 ms of the scan's start), and the scan's model results are stored
+then, together. It never changes the verdict.
+
 Verdict logic is identical to the container; only the executor changed
 (asyncio tasks + wait_for instead of a ThreadPoolExecutor).
 """
@@ -15,10 +22,12 @@ Verdict logic is identical to the container; only the executor changed
 import asyncio
 import logging
 import time
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 import metrics_push
-from providers import FallbackProvider, build_provider_from_config
+from constants import observes
+from providers import FallbackProvider, build_provider_from_config, tripwire_provider
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +46,20 @@ _DEFAULT_TIER_TIMEOUT_MS = 5000
 _DEFAULT_ARBITER_TIMEOUT_MS = 10000
 _DEFAULT_ARBITER_BACKUP_TIMEOUT_MS = 5000
 
+_TRIPWIRE_TIMEOUT_MS = 500
+_TRIPWIRE = {"provider": "tripwire"}  # the observer's entry, for its timeout and error labels
+
 ScannerEntry = tuple[Any, dict[str, Any]]
+TaskMap = dict[asyncio.Task, dict[str, Any]]
+
+_BACKGROUND: set[asyncio.Future] = set()
+
+
+def _spawn(coro: Coroutine[Any, Any, None]) -> None:
+    """Fire-and-forget when the caller passes no runtime hook. Holds a reference so the task isn't collected."""
+    task = asyncio.ensure_future(coro)
+    _BACKGROUND.add(task)
+    task.add_done_callback(_BACKGROUND.discard)
 
 
 def _role_entry(model_configs: Any, role: str) -> dict[str, Any] | None:
@@ -86,13 +108,16 @@ def _fire_store(store_fn: Any | None, completed: list[dict[str, Any]], scanner_n
 
 
 class ModelMapScanner:
-    def __init__(self, scanner_name, scanner_type, text, config, store_fn=None):
+    def __init__(self, scanner_name, scanner_type, text, config, store_fn=None, schedule_fn=None):
         self.scanner_name = scanner_name
         self.scanner_type = scanner_type
         self.text = text
         self.config = config
         self.store_fn = store_fn
+        # The runtime's fire-and-forget hook (waitUntil on Cloudflare, a task on the container).
+        self.schedule = schedule_fn or _spawn
         self.completed_all: list[dict[str, Any]] = []
+        self.tripwire_observes = False
 
     # ── Public entry point ──────────────────────────────────────────────────
 
@@ -121,10 +146,17 @@ class ModelMapScanner:
         if not scanners:
             raise ValueError("ModelMapScanner: no usable providers in modelConfigs")
 
+        tripwire = tripwire_provider() if observes(self.scanner_name, self.scanner_type) else None
+        observers: list[ScannerEntry] = [(LLMScanner(tripwire), _TRIPWIRE)] if tripwire is not None else []
+        self.tripwire_observes = bool(observers)
+
         start = time.time()
-        result = await self._run_pipeline(scanners)
+        result, late = await self._run_pipeline(scanners, observers)
         result["execution_time_ms"] = round((time.time() - start) * 1000, 2)
-        _fire_store(self.store_fn, self.completed_all, self.scanner_name)
+        if late:
+            self.schedule(self._observe_late(late, result))
+        else:
+            _fire_store(self.store_fn, self.completed_all, self.scanner_name)
         logger.info(
             f"[ModelMap] {self.scanner_name} isValid={result['is_valid']} "
             f"risk={result['risk_score']:.2f} ms={result['execution_time_ms']:.0f}"
@@ -133,20 +165,32 @@ class ModelMapScanner:
 
     # ── Pipeline core ───────────────────────────────────────────────────────
 
-    async def _run_pipeline(self, scanners: list[ScannerEntry]) -> dict[str, Any]:
+    async def _run_pipeline(
+        self, scanners: list[ScannerEntry], observers: list[ScannerEntry]
+    ) -> tuple[dict[str, Any], TaskMap]:
+        """The shaped verdict, and the observers that hadn't answered by then (never waited for)."""
         tier1 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER1]
         tier2 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER2]
         arbiters = [se for se in scanners if se[1].get("modelRole") == _ROLE_ARBITER]
 
-        t1 = self._submit(tier1, _DEFAULT_TIER_TIMEOUT_MS)
-        t2 = self._submit(tier2, _DEFAULT_TIER_TIMEOUT_MS)
-        eager = bool(self.config.get("parallelExecution", False)) and bool(arbiters)
-        arb = self._submit(arbiters, _DEFAULT_ARBITER_TIMEOUT_MS) if eager else None
-        if eager:
-            logger.info(f"[ModelMap] parallelExecution=true → {_ROLE_ARBITER} fired alongside tiers")
+        observed = self._submit(observers, _TRIPWIRE_TIMEOUT_MS)
+        try:
+            t1 = self._submit(tier1, _DEFAULT_TIER_TIMEOUT_MS)
+            t2 = self._submit(tier2, _DEFAULT_TIER_TIMEOUT_MS)
+            eager = bool(self.config.get("parallelExecution", False)) and bool(arbiters)
+            arb = self._submit(arbiters, _DEFAULT_ARBITER_TIMEOUT_MS) if eager else None
+            if eager:
+                logger.info(f"[ModelMap] parallelExecution=true → {_ROLE_ARBITER} fired alongside tiers")
 
-        winner = await self._cascade(t1, t2, arbiters, arb)
-        return self._shape_result(winner)
+            winner = await self._cascade(t1, t2, arbiters, arb)
+            # Split before awaiting anything, so an observer finishing meanwhile lands in exactly one of them.
+            answered = {t: e for t, e in observed.items() if t.done()}
+            late = {t: e for t, e in observed.items() if t not in answered}
+            await self._observe(answered, winner)
+            return self._shape_result(winner), late
+        except BaseException:
+            self._cancel(observed)  # the scan failed or was cancelled: nothing would ever await them
+            raise
 
     async def _cascade(self, t1, t2, arbiters, arb) -> dict[str, Any]:
         res1 = await self._collect_majority(t1, _ROLE_TIER1)
@@ -205,21 +249,11 @@ class ModelMapScanner:
             return {"majority": _SAFE, "completed": []}
         completed: list[dict[str, Any]] = []
         safe = unsafe = 0
-        for result, entry in await self._await_map(task_map):
-            provider_name = entry.get("provider") or "unknown"
-            if isinstance(result, Exception):
-                reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
-                metrics_push.COUNTS["provider_errors"].increment(f"{provider_name}:{reason}")
-                logger.error(
-                    f"[ModelMap] {label} '{entry.get('provider')}' failed "
-                    f"(model={entry.get('model') or '-'} baseUrl={entry.get('baseUrl') or '-'} "
-                    f"timeoutMs={entry.get('timeoutMs') or '-'}): {result!r}"
-                )
+        for outcome, entry in await self._await_map(task_map):
+            result = self._record_outcome(outcome, entry, label)
+            if result is None:
                 unsafe += 1  # conservative: failures count as unsafe
                 continue
-            exec_ms = result.get("execution_time_ms")
-            if isinstance(exec_ms, (int, float)):
-                metrics_push.SAMPLES["provider"].record(provider_name, float(exec_ms))
             completed.append(result)
             if _classify(result, entry):
                 unsafe += 1
@@ -241,21 +275,10 @@ class ModelMapScanner:
 
         task_map = pre_submitted if pre_submitted is not None else self._submit(arbiters, _DEFAULT_ARBITER_TIMEOUT_MS)
         completed: list[dict[str, Any]] = []
-        for result, entry in await self._await_map(task_map):
-            provider_name = entry.get("provider") or "unknown"
-            if isinstance(result, Exception):
-                reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
-                metrics_push.COUNTS["provider_errors"].increment(f"{provider_name}:{reason}")
-                logger.error(
-                    f"[ModelMap] {_ROLE_ARBITER} '{entry.get('provider')}' failed "
-                    f"(model={entry.get('model') or '-'} baseUrl={entry.get('baseUrl') or '-'} "
-                    f"timeoutMs={entry.get('timeoutMs') or '-'}): {result!r}"
-                )
-                continue
-            exec_ms = result.get("execution_time_ms")
-            if isinstance(exec_ms, (int, float)):
-                metrics_push.SAMPLES["provider"].record(provider_name, float(exec_ms))
-            completed.append(result)
+        for outcome, entry in await self._await_map(task_map):
+            result = self._record_outcome(outcome, entry, _ROLE_ARBITER)
+            if result is not None:
+                completed.append(result)
 
         self.completed_all.extend(completed)
         if not completed:
@@ -268,6 +291,47 @@ class ModelMapScanner:
         winner = pool[0]  # first-listed arbiter in modelConfigs wins ties/disagreement
         winner["is_valid"] = not unsafe
         return winner
+
+    @staticmethod
+    def _record_outcome(
+        outcome: Any, entry: dict[str, Any], label: str, log: Callable[..., Any] = logger.error
+    ) -> dict[str, Any] | None:
+        """Count a failed provider call, or record a successful one's latency. The result, or None if it failed."""
+        provider_name = entry.get("provider") or "unknown"
+        if isinstance(outcome, BaseException):
+            reason = "timeout" if isinstance(outcome, TimeoutError) else type(outcome).__name__
+            metrics_push.COUNTS["provider_errors"].increment(f"{provider_name}:{reason}")
+            log(
+                f"[ModelMap] {label} '{entry.get('provider')}' failed "
+                f"(model={entry.get('model') or '-'} baseUrl={entry.get('baseUrl') or '-'} "
+                f"timeoutMs={entry.get('timeoutMs') or '-'}): {outcome!r}"
+            )
+            return None
+        exec_ms = outcome.get("execution_time_ms")
+        if isinstance(exec_ms, (int, float)):
+            metrics_push.SAMPLES["provider"].record(provider_name, float(exec_ms))
+        return outcome
+
+    async def _observe(self, observed: TaskMap, winner: dict[str, Any]) -> None:
+        """Record the observers' verdicts next to the cascade's. A failed or slow observer is only logged."""
+        for outcome, entry in await self._await_map(observed):
+            result = self._record_outcome(outcome, entry, "observer", logger.warning)
+            if result is None:
+                continue
+            self.completed_all.append(result)
+            if (winner.get("details") or {}).get("error"):
+                continue  # the cascade failed open, so it has no verdict to disagree with
+            if result.get("is_valid", True) != winner.get("is_valid", True):
+                logger.info(
+                    f"[ModelMap] {self.scanner_name} observer disagreement: "
+                    f"cascade={'SAFE' if winner.get('is_valid', True) else 'UNSAFE'} "
+                    f"{entry.get('provider') or 'unknown'}={float(result.get('risk_score', 0.0)):.2f}"
+                )
+
+    async def _observe_late(self, late: TaskMap, verdict: dict[str, Any]) -> None:
+        """Record observers that answered after the verdict went out, then store the scan's results together."""
+        await self._observe(late, verdict)
+        _fire_store(self.store_fn, self.completed_all, self.scanner_name)
 
     @staticmethod
     def _error_result(error: str) -> dict[str, Any]:
@@ -333,6 +397,8 @@ class ModelMapScanner:
             stem = self._stem(entry.get("provider", ""))
             if stem:
                 details.setdefault(stem, self._summarize(completed_by_stem.get(stem)))
+        if self.tripwire_observes:
+            details["tripwire"] = self._summarize(completed_by_stem.get("tripwire"))
         return {
             "is_valid": winner.get("is_valid", True),
             "risk_score": float(winner.get("risk_score", 0.0)),

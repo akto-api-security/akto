@@ -46,6 +46,22 @@ export default {
         })
         return resp
     },
+    async fetchSmartTestingLive(testingRunResultSummaryHexId, afterTs) {
+        const resp = await request({
+            url: '/api/fetchSmartTestingLive',
+            method: 'post',
+            data: { testingRunResultSummaryHexId, afterTs }
+        })
+        return resp
+    },
+    async sendSmartTestingRunMessage(testingRunResultSummaryHexId, text) {
+        const resp = await request({
+            url: '/api/sendSmartTestingRunMessage',
+            method: 'post',
+            data: { testingRunResultSummaryHexId, text }
+        })
+        return resp
+    },
     async fetchTestRunResultsCount(testingRunResultSummaryHexId, filters) {
         const resp = await request({
             url: '/api/fetchTestRunResultsCount',

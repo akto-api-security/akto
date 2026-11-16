@@ -10,12 +10,13 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon } from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Modal, Text } from "@shopify/polaris";
 import { FileMinor } from '@shopify/polaris-icons';
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
 import threatDetectionFunc from "./transform";
 import InfoCard from "../dashboard/new_components/InfoCard";
+import SpinnerCentered from "../../components/progress/SpinnerCentered";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
@@ -148,19 +149,20 @@ const flaggedData = [
     }
 ]
 
-const ChartComponent = ({ categoryCount, severityCountMap, onThreatTypeClick, onSeverityClick }) => {
+const ChartComponent = ({ categoryCount, severityCountMap, categoryLoading, severityLoading, onThreatTypeClick, onSeverityClick }) => {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
           <TopThreatTypeChart
             key={"top-threat-types"}
             data={categoryCount}
+            loading={categoryLoading}
             onBarClick={onThreatTypeClick}
           />
           <InfoCard
                 title={`${mapLabel("Threat", getDashboardCategory())} by severity`}
                 titleToolTip={`Number of ${mapLabel("APIs", getDashboardCategory())} per each category`}
-                component={
+                component={severityLoading ? <SpinnerCentered height="280px" /> :
                     <BarGraph
                         data={severityCountMap}
                         areaFillHex="true"
@@ -352,6 +354,8 @@ function ThreatDetectionPage() {
     const [showNewTab, setShowNewTab] = useState(false)
     const [categoryCount, setCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
+    const [categoryLoading, setCategoryLoading] = useState(true);
+    const [severityLoading, setSeverityLoading] = useState(true);
     const [moreActions, setMoreActions] = useState(false);
     const [webhookIntegrationModalOpen, setWebhookIntegrationModalOpen] = useState(false);
     const [webhookIntegrationData, setWebhookIntegrationData] = useState(null);
@@ -359,6 +363,8 @@ function ThreatDetectionPage() {
     const [detailsLoading, setDetailsLoading] = useState(false);
     const pollingIntervalRef = useRef(null);
     const [pendingRowContext, setPendingRowContext] = useState(null);
+    const [revealedRefId, setRevealedRefId] = useState(null);
+    const [revealing, setRevealing] = useState(false);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
     const showNewLayoutToggle = isEndpointSecurityCategory() || isAgenticSecurityCategory();
@@ -366,7 +372,7 @@ function ThreatDetectionPage() {
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
     // Captured once at mount so a later URL cleanup (clearEventState) can't flip this.
-    const hadDashboardFilterLinkRef = useRef(Boolean(searchParams.get("filters") || searchParams.get("eventStatus")));
+    const hadDashboardFilterLinkRef = useRef(Boolean(searchParams.get("filters") || searchParams.get("eventStatus") || searchParams.get("tool")));
     useEffect(() => {
         if (showNewLayoutToggle && newLayout && !hadDashboardFilterLinkRef.current) {
             navigate("/dashboard/guardrails/violations", { replace: true });
@@ -426,6 +432,7 @@ function ThreatDetectionPage() {
     const handleDetailsVisibility = useCallback((visible) => {
         setShowDetails(visible);
         if (!visible) {
+            setRevealedRefId(null);
             clearEventState();
         }
     }, [clearEventState]);
@@ -522,12 +529,17 @@ function ThreatDetectionPage() {
 
       useEffect(() => {
         const fetchThreatCategoryCount = async () => {
-            const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
-            const finalObj = threatDetectionFunc.getGraphsData(res);
-            // categoryCountRes groups by policy name (category), not the generic rule-type
-            // subCategory (e.g. "UserDefinedLLMRule" shared by many distinct policies) — same
-            // source ThreatApiPage.jsx already uses for this same chart.
-            setCategoryCount(finalObj.categoryCountRes);
+            setCategoryLoading(true);
+            try {
+                const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
+                const finalObj = threatDetectionFunc.getGraphsData(res);
+                // categoryCountRes groups by policy name (category), not the generic rule-type
+                // subCategory (e.g. "UserDefinedLLMRule" shared by many distinct policies) — same
+                // source ThreatApiPage.jsx already uses for this same chart.
+                setCategoryCount(finalObj.categoryCountRes);
+            } finally {
+                setCategoryLoading(false);
+            }
           };
 
           const fetchCountBySeverity = async () => {
@@ -537,11 +549,16 @@ function ThreatDetectionPage() {
                 MEDIUM: 0,
                 LOW: 0,
             }
-            const res = await api.fetchCountBySeverity(startTimestamp, endTimestamp);
-            res.categoryCounts.forEach(({ subCategory, count }) => {
-                severityMap[subCategory] = count;
-            });
-            setSeverityCountMap(convertToGraphData(severityMap));
+            setSeverityLoading(true);
+            try {
+                const res = await api.fetchCountBySeverity(startTimestamp, endTimestamp);
+                res.categoryCounts.forEach(({ subCategory, count }) => {
+                    severityMap[subCategory] = count;
+                });
+                setSeverityCountMap(convertToGraphData(severityMap));
+            } finally {
+                setSeverityLoading(false);
+            }
         };
 
         const DEMO_ACCOUNT_ID = 1669322524;
@@ -732,7 +749,7 @@ function ThreatDetectionPage() {
           urlParams.get("filterId")
         );
         
-        if (!hasParams || !queryParams.hasQueryEvent) {
+        if (!hasParams || !queryParams.hasQueryEvent || revealedRefId !== queryParams.refId) {
             return;
         }
         
@@ -741,13 +758,30 @@ function ThreatDetectionPage() {
         return () => {
             isMountedRef.current = false;
         };
-      }, [queryParams.hasQueryEvent, queryParams.refId, fetchEventDetails, location.search]);
+      }, [queryParams.hasQueryEvent, queryParams.refId, fetchEventDetails, location.search, revealedRefId]);
+
+      const revealPending = queryParams.hasQueryEvent && revealedRefId !== queryParams.refId;
+
+      const confirmReveal = async () => {
+        if (revealing) return;
+        setRevealing(true);
+        try {
+            await threatDetectionRequests.auditContentView(queryParams.refId, pendingRowContext?.eventId);
+            setRevealedRefId(queryParams.refId);
+        } catch (e) {
+            func.setToast(true, true, 'Could not record this access in audit data. Please try again.');
+        } finally {
+            setRevealing(false);
+        }
+      };
 
     // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent
             categoryCount={categoryCount}
             severityCountMap={severityCountMap}
+            categoryLoading={categoryLoading}
+            severityLoading={severityLoading}
             onThreatTypeClick={handleThreatTypeClick}
             onSeverityClick={handleSeverityClick}
         />,
@@ -780,7 +814,7 @@ function ThreatDetectionPage() {
             key={"sus-sample-details"}
         /> :  <SampleDetails
                 title={"Attacker payload"}
-                showDetails={showDetails}
+                showDetails={showDetails && !revealPending}
                 setShowDetails={handleDetailsVisibility}
                 data={eventState.rowDataList}
                 key={`sus-sample-details-${eventState.currentRefId || 'default'}`}
@@ -793,9 +827,22 @@ function ThreatDetectionPage() {
                 humanResponse={eventState.currentHumanResponse}
                 loading={detailsLoading}
                 onAddAsSearchFilter={(text, side, line) => applyPayloadSearchRef.current?.(text, side, line)}
-            />
-            
-
+            />,
+        <Modal
+            key="reveal-content"
+            open={revealPending}
+            onClose={() => { if (!revealing) handleDetailsVisibility(false); }}
+            title="Show Guardrail Activity?"
+            primaryAction={{ content: "Show content", onAction: confirmReveal, loading: revealing }}
+            secondaryActions={[{ content: "Cancel", onAction: () => handleDetailsVisibility(false), disabled: revealing }]}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd">
+                    Guardrail Activity can contain sensitive data. Your email, IP address and the time of
+                    this access will be recorded in audit data.
+                </Text>
+            </Modal.Section>
+        </Modal>
     ]
 
     // Both reuse the exact filters/tab/search currently applied on the table (registered by

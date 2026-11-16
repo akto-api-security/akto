@@ -157,6 +157,13 @@ const threatDetectionRequests = {
             data: {refId, eventType, actor, filterId, ...(eventIds.length > 0 ? { eventIds } : {})}
         })
     },
+    auditContentView(refId, eventId) {
+        return request({
+            url: '/api/fetchGuardrailActivityDetail',
+            method: 'post',
+            data: {refId, eventId}
+        })
+    },
     fetchCountBySeverity(startTs, endTs, severityStatusFilter, skillEvaluationMode, configEvaluationMode) {
         const data = { startTs, endTs };
         if (severityStatusFilter) data.severityStatusFilter = severityStatusFilter;

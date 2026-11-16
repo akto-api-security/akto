@@ -8,6 +8,7 @@ Differences from the container version:
 """
 
 import asyncio
+import functools
 import json
 import logging
 import math
@@ -1007,6 +1008,78 @@ class GemmaFastArbiterProvider(OpenAIProvider):
         self.name = "gemma_fast_arbiter"
 
 
+class TripwireProvider(LLMProvider):
+    """Tripwire, a prompt-injection classifier (akto-api-security/Tripwire): POST {base_url}/v1/detect with the
+    raw text returns an attack_score in [0, 1]. Not an LLM, so LLMScanner sends it the text itself rather than a
+    scan prompt, and long text is windowed by the server, not chunked here. It only observes: see
+    tripwire_provider; it is never a modelConfigs entry."""
+
+    name = "tripwire"
+    # Its own connection pool: a hung Tripwire must not hold the shared pool's connections that Qwen/Gemma need.
+    _MAX_CONNECTIONS = 20
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip("/")
+        self._http: httpx.AsyncClient | None = None
+        logger.info(f"[Tripwire] base_url={self.base_url}")
+
+    def _client(self) -> httpx.AsyncClient:
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.AsyncClient(timeout=10.0, limits=httpx.Limits(max_connections=self._MAX_CONNECTIONS))
+        return self._http
+
+    async def detect(self, text: str) -> dict[str, Any]:
+        resp = await self._client().post(
+            f"{self.base_url}/v1/detect",
+            headers=dict(_IDENTITY, **{"Content-Type": "application/json"}),
+            json={"text": text},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def complete(self, prompt: str) -> str:
+        """Satisfies LLMProvider; the startup self-check pings Tripwire through it."""
+        return json.dumps(await self.detect(prompt))
+
+
+def parse_tripwire_result(body: dict[str, Any]) -> dict[str, Any]:
+    """A /v1/detect reply as a scanner result. is_attack applies the server's own THRESHOLD; risk_score is the
+    attack_score (1 - P(benign)), on the same scale as an LLM arbiter's risk_score."""
+    score = float(body["attack_score"])
+    verdict = body.get("verdict") or ""
+    is_attack = body.get("is_attack")
+    if is_attack is None:  # missing or null: fall back to the score
+        is_attack = score >= 0.5
+    details: dict[str, Any] = {"verdict": verdict, "attack_score": score}
+    if is_attack:
+        flagged = verdict.replace("_", " ") or "an attack"
+        details["reason"] = f"Tripwire flagged this as {flagged} (attack score {score:.2f})."
+    if body.get("windows_skipped"):  # a long input the server read only part of
+        details["windows_skipped"] = int(body["windows_skipped"])
+    return {
+        "is_valid": not is_attack,
+        "risk_score": score,
+        "decision_confidence": max(score, 1.0 - score),
+        "details": details,
+    }
+
+
+def tripwire_provider() -> TripwireProvider | None:
+    """The Tripwire observer when TRIPWIRE_ENABLED is on and TRIPWIRE_BASE_URL is set, else None."""
+    if settings.TRIPWIRE_ENABLED.strip().lower() not in ("1", "true", "yes", "on"):
+        return None
+    return _tripwire_for(settings.TRIPWIRE_BASE_URL.strip())
+
+
+@functools.cache
+def _tripwire_for(base_url: str) -> TripwireProvider | None:
+    """One provider, so one connection pool, per URL. A missing URL is warned about once, not on every scan."""
+    if not base_url:
+        logger.warning("[Tripwire] TRIPWIRE_ENABLED is on but TRIPWIRE_BASE_URL is unset; Tripwire is off")
+        return None
+    return TripwireProvider(base_url)
+
+
 _FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
 
 # Fast provider name → settings attr holding its default endpoint. An entry's
@@ -1324,6 +1397,10 @@ async def _startup_check_entry(entry: dict[str, Any]) -> None:
         # extra to say here, and staying silent avoids false-alarming on
         # providers this deployment was never meant to use.
         return
+    await _startup_ping(label, provider)
+
+
+async def _startup_ping(label: str, provider: LLMProvider) -> None:
     logger.info(f"[StartupCheck] {label}: pinging real endpoint...")
     t0 = time.time()
     try:
@@ -1344,5 +1421,9 @@ async def startup_self_check() -> None:
 
     entries = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON).get("modelConfigs", [])
     logger.info(f"[StartupCheck] checking {len(entries)} configured cascade entries")
-    await asyncio.gather(*(_startup_check_entry(e) for e in entries), return_exceptions=True)
+    checks = [_startup_check_entry(e) for e in entries]
+    tripwire = tripwire_provider()
+    if tripwire is not None:
+        checks.append(_startup_ping("tripwire[observer]", tripwire))
+    await asyncio.gather(*checks, return_exceptions=True)
     logger.info("[StartupCheck] done")

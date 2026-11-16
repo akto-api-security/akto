@@ -76,6 +76,8 @@ _FIELDS = (
     "REACHBACK_MTLS_CERT_FILE",
     "REACHBACK_MTLS_KEY_FILE",
     "REACHBACK_CA_FILE",
+    # Image OCR (POST /ocr) reads OCR_MODEL_CONFIG_JSON and the OCR_* variables its entries name through
+    # env_value() instead: the config decides which variables exist (see ocr.py).
     # Integrations
     "SLACK_WEBHOOK_URL",
     "DATABASE_ABSTRACTOR_SERVICE_URL",
@@ -124,6 +126,11 @@ _FIELDS = (
     "QWEN3GUARD_VLLM_BASE_URL",
     "GEMMA_VLLM_BASE_URL",
     "GEMMA_VLLM_ARBITER_BASE_URL",
+    # Tripwire prompt-injection classifier: when TRIPWIRE_ENABLED is on ("true"/"1"/"yes"/"on") it observes
+    # every PromptInjection input scan (POST {TRIPWIRE_BASE_URL}/v1/detect). The server has no auth of its
+    # own, so the URL must be internal only.
+    "TRIPWIRE_ENABLED",
+    "TRIPWIRE_BASE_URL",
     # Per-"_fast"-provider auth (sent as Authorization: Bearer) — one key per
     # container, matching the base URLs above.
     "QWEN_VLLM_KEY",
@@ -199,6 +206,8 @@ class Settings:
     QWEN3GUARD_VLLM_BASE_URL: str
     GEMMA_VLLM_BASE_URL: str
     GEMMA_VLLM_ARBITER_BASE_URL: str
+    TRIPWIRE_ENABLED: str
+    TRIPWIRE_BASE_URL: str
     QWEN_VLLM_KEY: str
     GEMMA_VLLM_KEY: str
     GEMMA_26B_VLLM_KEY: str
@@ -207,6 +216,7 @@ class Settings:
         for f in _FIELDS:
             setattr(self, f, "")
         self._loaded = False
+        self._env = None  # the Worker env binding, once init() has seen one
 
     def _apply(self, values: dict[str, str]) -> None:
         for f in _FIELDS:
@@ -217,6 +227,7 @@ class Settings:
         """Populate from the Worker `env` binding object (idempotent)."""
         if self._loaded:
             return
+        self._env = env
         values = {}
         for f in _FIELDS:
             v = getattr(env, f, None)
@@ -228,6 +239,12 @@ class Settings:
         if self._loaded:
             return
         self._apply({f: os.environ.get(f, "") for f in _FIELDS})
+
+    def env_value(self, name: str) -> str:
+        """Any variable by name, for settings that config names rather than code (OCR_*): from the Worker env
+        once init() has seen one, else the process environment."""
+        value = getattr(self._env, name, None) if self._env is not None else os.environ.get(name)
+        return "" if value is None else str(value)
 
 
 settings = Settings()

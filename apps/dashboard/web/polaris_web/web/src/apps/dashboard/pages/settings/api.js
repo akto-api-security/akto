@@ -869,6 +869,86 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchLinearIntegration() {
+        return request({
+            url: '/api/fetchLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchLinearTeams(apiToken) {
+        return request({
+            url: '/api/fetchLinearTeams',
+            method: 'post',
+            data: { apiToken }
+        })
+    },
+
+    createLinearTeam(apiToken, teamName, teamKey) {
+        return request({
+            url: '/api/createLinearTeam',
+            method: 'post',
+            data: { apiToken, teamName, teamKey }
+        })
+    },
+
+    addLinearIntegration(apiToken) {
+        return request({
+            url: '/api/addLinearIntegration',
+            method: 'post',
+            data: { apiToken }
+        })
+    },
+
+    saveLinearTeams(teamMappings) {
+        return request({
+            url: '/api/saveLinearTeams',
+            method: 'post',
+            data: { teamMappings }
+        })
+    },
+
+    removeLinearIntegration() {
+        return request({
+            url: '/api/removeLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchPortIOIntegration() {
+        return request({
+            url: '/api/fetchPortIOIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addPortIOIntegration(clientId, clientSecret, workflowId) {
+        return request({
+            url: '/api/addPortIOIntegration',
+            method: 'post',
+            data: { clientId, clientSecret, workflowId }
+        })
+    },
+
+    savePortIOSeverityMapping(severityToPriority) {
+        return request({
+            url: '/api/savePortIOSeverityMapping',
+            method: 'post',
+            data: { severityToPriority }
+        })
+    },
+
+    removePortIOIntegration() {
+        return request({
+            url: '/api/removePortIOIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     removeInvitation(email) {
         return request({
             url: '/api/removeInvitation',

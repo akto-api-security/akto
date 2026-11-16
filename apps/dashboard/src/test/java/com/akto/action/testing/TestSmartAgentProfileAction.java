@@ -207,11 +207,15 @@ public class TestSmartAgentProfileAction extends MongoBasedTest {
             assertEquals("checkout then pay".length(), file.getSize());
             String blobName = ACCOUNT_ID + "/" + sha.substring(0, 2) + "/" + sha;  // same layout as file inspection
             assertEquals("checkout then pay", new String(blobs.get(blobName), StandardCharsets.UTF_8));
-            assertEquals(1, uploads[0]);
+            // the knowledge file and the custom skill file both go to blob storage
+            assertEquals(2, uploads[0]);
+            String skillSha = SmartAgentProfileAction.sha256Hex("Try refunding an order twice.".getBytes(StandardCharsets.UTF_8));
+            assertNull(saved.getCustomSkills().get(0).getContent());
+            assertEquals(skillSha, saved.getCustomSkills().get(0).getSha256());
 
             // the same content again is not uploaded twice; a kept file comes back as its reference only
             valid("Blob agent 2").saveSmartAgentProfile();
-            assertEquals(1, uploads[0]);
+            assertEquals(2, uploads[0]);
             SmartAgentProfileAction keep = valid("Blob agent");
             keep.setHexId(saved.getHexId());
             Map<String, Object> kept = new HashMap<>();

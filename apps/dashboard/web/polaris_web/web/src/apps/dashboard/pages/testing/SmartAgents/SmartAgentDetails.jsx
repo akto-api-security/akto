@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Banner, Box, Button, Checkbox, DropZone, HorizontalStack, Icon, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { DeleteMinor, NoteMinor } from "@shopify/polaris-icons"
 import { useNavigate, useSearchParams } from "react-router-dom"
@@ -9,6 +9,7 @@ import { usePermissions } from "@/util/permissions"
 import func from "@/util/func"
 import api from "../api"
 import { BUILT_IN_SKILLS, KNOWLEDGE_FILE_TYPES, LIMITS, emptyProfile, fromForm, toForm, validate } from "./smartAgentUtils"
+import { SKILL_FILE_TYPES, groupSkills, isSkillFile, pathOf } from "./skillFiles"
 
 function SmartAgentDetails() {
     const navigate = useNavigate()
@@ -66,12 +67,34 @@ function SmartAgentDetails() {
         }
     }
 
-    // custom skills
-    const addCustomSkill = () => setForm(prev => ({ ...prev, customSkills: [...prev.customSkills, { name: "", content: "" }] }))
-    const setCustomSkill = (index, key) => (value) => setForm(prev => ({
-        ...prev, customSkills: prev.customSkills.map((skill, i) => i === index ? { ...skill, [key]: value } : skill),
-    }))
-    const removeCustomSkill = (index) => setForm(prev => ({ ...prev, customSkills: prev.customSkills.filter((_, i) => i !== index) }))
+    // custom skills: files picked one by one or a whole folder; each file keeps its path inside the folder, so
+    // skill folders (with a SKILL.md) stay together. Content goes to blob storage when saved.
+    const folderInput = useRef(null)
+    async function addSkillFiles(incoming) {
+        const picked = Array.from(incoming || []).filter(file => isSkillFile(pathOf(file)))
+        const room = Math.max(LIMITS.skillFiles - form.customSkills.length, 0)
+        if (picked.length > room) {
+            func.setToast(true, true, `Only ${room} more skill files fit (at most ${LIMITS.skillFiles})`)
+        }
+        const added = []
+        for (const file of picked.slice(0, room)) {
+            const content = await file.text()
+            if (!content.trim()) continue
+            if (content.length > LIMITS.fileChars) {
+                func.setToast(true, true, `${pathOf(file)} is too large (at most ${LIMITS.fileChars} characters)`)
+                continue
+            }
+            added.push({ name: pathOf(file), content, size: content.length })
+        }
+        if (added.length) {
+            const names = new Set(added.map(a => a.name))
+            setForm(prev => ({ ...prev, customSkills: [...prev.customSkills.filter(f => !names.has(f.name)), ...added] }))
+        }
+    }
+    const removeSkill = (skill) => {
+        const names = new Set(skill.files.map(f => f.name))
+        setForm(prev => ({ ...prev, customSkills: prev.customSkills.filter(f => !names.has(f.name)) }))
+    }
 
     // knowledge base files
     async function addFiles(_dropFiles, acceptedFiles, rejectedFiles) {
@@ -144,24 +167,31 @@ function SmartAgentDetails() {
                 ) : <Text color="subdued">No built-in skill selected.</Text>}
                 <VerticalStack gap="3">
                     <Text fontWeight="medium">Custom skills</Text>
-                    {form.customSkills.map((skill, index) => (
-                        <Box key={index} padding="3" borderWidth="1" borderColor="border-subdued" borderRadius="2">
-                            <VerticalStack gap="2">
-                                <HorizontalStack align="space-between" blockAlign="center">
-                                    <Box width="70%">
-                                        <TextField label="Skill name" labelHidden placeholder="Skill name, e.g. Refund abuse" value={skill.name}
-                                            onChange={setCustomSkill(index, "name")} maxLength={LIMITS.name} autoComplete="off" disabled={!canSave} />
-                                    </Box>
-                                    {canSave ? <Button plain destructive icon={DeleteMinor} accessibilityLabel={`Remove custom skill ${skill.name}`} onClick={() => removeCustomSkill(index)} /> : null}
-                                </HorizontalStack>
-                                <TextField label="What the skill does" labelHidden multiline={3} value={skill.content}
-                                    onChange={setCustomSkill(index, "content")} maxLength={LIMITS.customSkill} autoComplete="off"
-                                    placeholder="What the agent should try and what counts as a finding, e.g. refund the same order twice and check the balance"
-                                    disabled={!canSave} />
-                            </VerticalStack>
-                        </Box>
+                    <Text color="subdued">Markdown or text skill files, or a folder of skills where each skill is a folder with a SKILL.md and optional reference files. Only smart testing reads their content.</Text>
+                    {groupSkills(form.customSkills).map(skill => (
+                        <HorizontalStack key={skill.key} align="space-between" blockAlign="center">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Box><Icon source={NoteMinor} color="subdued" /></Box>
+                                <Text>{skill.name}</Text>
+                                <Text color="subdued">
+                                    {`${skill.files.length > 1 ? `${skill.files.length} files, ` : ""}${Math.max(1, Math.ceil(skill.size / 1000))}k characters`}
+                                </Text>
+                            </HorizontalStack>
+                            {canSave ? <Button plain destructive icon={DeleteMinor} accessibilityLabel={`Remove skill ${skill.name}`} onClick={() => removeSkill(skill)} /> : null}
+                        </HorizontalStack>
                     ))}
-                    {canSave ? <Box><Button onClick={addCustomSkill}>Add custom skill</Button></Box> : null}
+                    {canSave && form.customSkills.length < LIMITS.skillFiles ? (
+                        <VerticalStack gap="2">
+                            <DropZone accept={SKILL_FILE_TYPES} type="file" allowMultiple onDrop={(_dropFiles, acceptedFiles) => addSkillFiles(acceptedFiles)} accessibilityLabel="Add skill files">
+                                <DropZone.FileUpload actionTitle="Add skill files" actionHint={`Markdown or text files, up to ${LIMITS.skillFiles} files`} />
+                            </DropZone>
+                            <Box>
+                                <input ref={folderInput} type="file" multiple hidden webkitdirectory="" directory=""
+                                    onChange={(e) => { addSkillFiles(e.target.files); e.target.value = "" }} />
+                                <Button onClick={() => folderInput.current && folderInput.current.click()}>Import skills folder</Button>
+                            </Box>
+                        </VerticalStack>
+                    ) : null}
                 </VerticalStack>
             </VerticalStack>
         </LegacyCard>
