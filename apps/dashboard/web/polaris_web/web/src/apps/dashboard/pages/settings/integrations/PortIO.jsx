@@ -29,6 +29,7 @@ const PortIO = () => {
     const [syncEnabled, setSyncEnabled] = useState(false)
     const [updateWorkflowId, setUpdateWorkflowId] = useState(DEFAULT_UPDATE_WORKFLOW_ID)
     const [isSavingSync, setIsSavingSync] = useState(false)
+    const [showSyncForm, setShowSyncForm] = useState(false)
 
     async function loadIntegration() {
         try {
@@ -84,11 +85,22 @@ const PortIO = () => {
         try {
             await settingFunctions.savePortIOBiDirectionalSync(enabled, updateWorkflowId.trim())
             setSyncEnabled(enabled)
+            setShowSyncForm(false)
             func.setToast(true, false, enabled ? 'Bi-directional sync enabled' : 'Bi-directional sync disabled')
         } catch (error) {
             func.setToast(true, true, errorMessageOf(error, 'Failed to update bi-directional sync'))
         } finally {
             setIsSavingSync(false)
+        }
+    }
+
+    function onSyncCheckboxChange(checked) {
+        if (checked) {
+            setShowSyncForm(true)
+        } else if (syncEnabled) {
+            toggleSync(false)
+        } else {
+            setShowSyncForm(false)
         }
     }
 
@@ -210,22 +222,41 @@ const PortIO = () => {
                     <Text variant="bodyMd" color="subdued">
                         Every hour, Akto keeps issue status and the Linear tickets it created through Port.io aligned. Each Akto status change that has to reach Linear starts one run of the update workflow in Port.io.
                     </Text>
-                    <TextField
-                        label="Update workflow identifier"
-                        value={updateWorkflowId}
-                        onChange={setUpdateWorkflowId}
-                        helpText="Identifier of the Port.io workflow that updates the Linear issue status"
-                        autoComplete="off"
-                        disabled={syncEnabled}
-                    />
                     <AllowedAction allowed={canCall('api/savePortIOBiDirectionalSync')}>
                         <Checkbox
                             label="Enable bi-directional sync"
-                            checked={syncEnabled}
-                            onChange={toggleSync}
-                            disabled={!isIntegrated || isSavingSync || !updateWorkflowId.trim()}
+                            checked={syncEnabled || showSyncForm}
+                            onChange={onSyncCheckboxChange}
+                            disabled={!isIntegrated || isSavingSync}
                         />
                     </AllowedAction>
+                    {showSyncForm && !syncEnabled ? (
+                        <VerticalStack gap="4">
+                            <TextField
+                                label="Update workflow identifier"
+                                value={updateWorkflowId}
+                                onChange={setUpdateWorkflowId}
+                                helpText="Identifier of the Port.io workflow that updates the Linear issue status"
+                                autoComplete="off"
+                                requiredIndicator
+                            />
+                            <HorizontalStack>
+                                <Button
+                                    primary
+                                    onClick={() => toggleSync(true)}
+                                    loading={isSavingSync}
+                                    disabled={isSavingSync || !updateWorkflowId.trim()}
+                                >
+                                    Enable sync
+                                </Button>
+                            </HorizontalStack>
+                        </VerticalStack>
+                    ) : null}
+                    {syncEnabled ? (
+                        <Text variant="bodyMd" color="subdued">
+                            {`Update workflow: ${updateWorkflowId}`}
+                        </Text>
+                    ) : null}
                 </VerticalStack>
             </LegacyCard.Section>
         </LegacyCard>
