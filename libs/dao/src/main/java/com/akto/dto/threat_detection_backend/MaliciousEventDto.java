@@ -43,6 +43,8 @@ public class MaliciousEventDto {
   private String caseOwner;
   private String caseNotes;
   private List<CaseActivity> caseTimeline;
+  public static final String FIRST_TRIAGED_AT = "firstTriagedAt";
+  private Long firstTriagedAt;
   // Bedrock caller ARN + prompt hash: events with the same key close together in time are one activity.
   private String groupKey;
   // Set only by the grouped activity list (never stored): how many events are behind this row, the first
@@ -71,7 +73,8 @@ public class MaliciousEventDto {
     UNDER_REVIEW,
     IGNORED,
     TRAINING,
-    HUMAN_APPROVAL
+    HUMAN_APPROVAL,
+    FIXED
   }
 
   public enum Label {
@@ -610,6 +613,14 @@ public class MaliciousEventDto {
 
   public void setCaseTimeline(List<CaseActivity> caseTimeline) {
     this.caseTimeline = caseTimeline;
+  }
+
+  public Long getFirstTriagedAt() {
+    return firstTriagedAt;
+  }
+
+  public void setFirstTriagedAt(Long firstTriagedAt) {
+    this.firstTriagedAt = firstTriagedAt;
   }
 
   public List<OwaspCategory> getOwaspCategories() {

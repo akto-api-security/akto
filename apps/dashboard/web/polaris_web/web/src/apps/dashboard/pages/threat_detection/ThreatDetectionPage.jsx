@@ -366,7 +366,7 @@ function ThreatDetectionPage() {
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
     // Captured once at mount so a later URL cleanup (clearEventState) can't flip this.
-    const hadDashboardFilterLinkRef = useRef(Boolean(searchParams.get("filters") || searchParams.get("eventStatus")));
+    const hadDashboardFilterLinkRef = useRef(Boolean(searchParams.get("filters") || searchParams.get("eventStatus") || searchParams.get("tool")));
     useEffect(() => {
         if (showNewLayoutToggle && newLayout && !hadDashboardFilterLinkRef.current) {
             navigate("/dashboard/guardrails/violations", { replace: true });

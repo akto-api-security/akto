@@ -616,6 +616,17 @@ export default function LeftNav() {
                     url: "#",
                     key: "7",
                     subNavigationItems: [
+                        ...(dashboardCategory === "Endpoint Security" && func.isAktoUser() ? [{
+                            label: "Overview",
+                            requires: pageRequires("/dashboard/guardrails/atlas-overview"),
+                            badge: <Badge status="info">Beta</Badge>,
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/atlas-overview");
+                                handleSelect("dashboard_atlas_guardrails_overview");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_atlas_guardrails_overview",
+                        }] : []),
                         // Argus has no "AI Agent Guardrails" block (that one is Gen AI only), so Overview lives here.
                         ...(dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
                             label: "Overview",
@@ -627,7 +638,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_overview",
                         }] : []),
-                        ...((dashboardCategory === "API Security" || dashboardCategory === "Endpoint Security") ? [{
+                        ...((dashboardCategory === "API Security" || (dashboardCategory === "Endpoint Security" && !func.isAktoUser())) ? [{
                             label: "Dashboard",
                             requires: pageRequires("/dashboard/protection/threat-dashboard"),
                             onClick: () => {

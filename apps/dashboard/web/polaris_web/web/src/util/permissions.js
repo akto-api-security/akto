@@ -104,6 +104,7 @@ const PAGE_REQUIRES = {
     '/dashboard/protection/threat-activity': 'api/fetchSuspectSampleData',
     '/dashboard/protection/threat-api': 'api/fetchThreatApis',
     '/dashboard/protection/threat-policy': 'api/fetchThreatComplianceInfos',
+    '/dashboard/guardrails/atlas-overview': 'api/atlas/guardrails/overview/fetchSummary',
     '/dashboard/guardrails/overview': 'api/getDailyThreatActorsCount',
     '/dashboard/guardrails/activity': 'api/fetchSuspectSampleData',
     '/dashboard/guardrails/policies': 'api/fetchGuardrailPolicies',
