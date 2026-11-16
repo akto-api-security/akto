@@ -42,7 +42,11 @@ public class ApiSequencesDao extends AccountsContextDao<ApiSequences> {
     public static final int RULES_LIMIT = 50;
     public static final int RULES_MIN_COUNT = 100;
     public static final double RULES_MIN_PRECEDENCE_LOW = 0.99;
+    public static final double KNOWN_STEP_MIN_COUNT = 5;
+    public static final double KNOWN_STEP_MIN_SHARE = 0.01;
     private static final String LAST_SEEN_TTL_INDEX = "lastSeen_ttl";
+    // Serves findKnownSteps: order-0 rows, and order-1 rows by weight or probability
+    private static final String KNOWN_STEPS_INDEX = "order_1_weight_-1_probability_-1";
     private static final double DECAY_PER_SECOND = Math.log(2) / HALF_LIFE_SECONDS;
     private static final double Z = 1.645;
     private static final int DUPLICATE_KEY = 11000;
@@ -85,6 +89,9 @@ public class ApiSequencesDao extends AccountsContextDao<ApiSequences> {
                 new IndexOptions().name(LAST_SEEN_TTL_INDEX).expireAfter((long) TTL_DAYS, TimeUnit.DAYS));
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiSequences.CREATED_AT }, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiSequences.LAST_UPDATED_AT }, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                Indexes.compoundIndex(Indexes.ascending(ApiSequences.ORDER), Indexes.descending(ApiSequences.WEIGHT, ApiSequences.PROBABILITY)),
+                new IndexOptions().name(KNOWN_STEPS_INDEX));
         return hasWriteIndexes();
     }
 
@@ -270,6 +277,17 @@ public class ApiSequencesDao extends AccountsContextDao<ApiSequences> {
             if (rules.size() == RULES_LIMIT) break;
         }
         return rules;
+    }
+
+    // Every API's call count (order 0), and the steps users actually take (order 1): seen at least
+    // KNOWN_STEP_MIN_COUNT times or at least KNOWN_STEP_MIN_SHARE of what follows that API. Rare steps are left out.
+    public List<ApiSequences> findKnownSteps() {
+        Bson known = Filters.or(
+                Filters.eq(ApiSequences.ORDER, 0),
+                Filters.and(Filters.eq(ApiSequences.ORDER, 1), Filters.or(
+                        Filters.gte(ApiSequences.WEIGHT, KNOWN_STEP_MIN_COUNT),
+                        Filters.gte(ApiSequences.PROBABILITY, KNOWN_STEP_MIN_SHARE))));
+        return findAll(known, Projections.include(ApiSequences.SEQ_KEY, ApiSequences.ORDER));
     }
 
     public List<ApiSequences> findByApiCollectionId(int apiCollectionId) {
