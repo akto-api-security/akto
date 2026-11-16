@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge, HorizontalGrid, VerticalStack } from "@shopify/polaris";
+import { CustomersMajor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import AskBar from "@/apps/dashboard/components/shared/AskBar";
 import useElementSize from "@/apps/dashboard/components/shared/useElementSize";
@@ -141,6 +142,7 @@ function AgenticDiscoveryOverview() {
                 status={statusOf("teamCategoryMatrix")}
                 matrix={teamsMatrix}
                 emptyText="Tag devices with a team to see adoption by team."
+                emptyIcon={CustomersMajor}
                 format={(value) => `${value}%`}
                 emptyCellText="0%"
                 labelWidth={110}

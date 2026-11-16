@@ -115,6 +115,8 @@ import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDataExplorer";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
+import Linear from "../dashboard/pages/settings/integrations/Linear";
+import PortIO from "../dashboard/pages/settings/integrations/PortIO";
 import Wiz from "@/apps/dashboard/pages/settings/integrations/Wiz.jsx";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
@@ -132,6 +134,7 @@ import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies
 import GuardrailViolations from "../dashboard/pages/guardrails/violations/ViolationsPage";
 import GuardrailOverview from "../dashboard/pages/guardrails/overview/GuardrailOverview";
 import Misconfigurations from "../dashboard/pages/guardrails/Misconfigurations";
+import AtlasGuardrailsOverview from "../dashboard/pages/guardrails/atlasOverview/AtlasGuardrailsOverview";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 import ThreatProtectedLayout from "../dashboard/pages/threat_detection/ThreatProtectedLayout";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
@@ -430,6 +433,10 @@ const router = createBrowserRouter([
                                 element: <GuardrailOverview/>
                             },
                             {
+                                path: "atlas-overview",
+                                element: <AtlasGuardrailsOverview/>
+                            },
+                            {
                                 path: "activity",
                                 element: func.isDemoAccount() ? <GuardrailDetectionDemo/> : <GuardrailDetection/>
                             },
@@ -577,6 +584,14 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/devrev",
                         element: <DevRev/>,
+                    },
+                    {
+                        path: "integrations/linear",
+                        element: <Linear/>,
+                    },
+                    {
+                        path: "integrations/port",
+                        element: <PortIO/>,
                     },
                     {
                         path: "integrations/wiz",
