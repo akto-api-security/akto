@@ -130,7 +130,8 @@ _FIELDS = (
     "TRIPWIRE_ENABLED",
     "TRIPWIRE_BASE_URL",
     # Azure Blob Storage container URL with a SAS token that can create blobs; each Tripwire answer is stored
-    # there as one JSON file (alerts.store_tripwire_result). Unset: not stored. A secret: never logged.
+    # there as one JSON file (alerts.store_tripwire_result), with the prompt text when Tripwire and the scan
+    # disagree. Unset: not stored. A secret: never logged.
     "TRIPWIRE_RESULTS_BLOB_URL",
     # Per-"_fast"-provider auth (sent as Authorization: Bearer) — one key per
     # container, matching the base URLs above.

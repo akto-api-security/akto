@@ -335,9 +335,10 @@ class ModelMapScanner:
                 )
 
     def _tripwire_record(self, result: dict[str, Any], verdict: dict[str, Any]) -> dict[str, Any]:
-        """What's stored for one Tripwire answer: its verdict next to the scan's. Never the prompt text."""
+        """What's stored for one Tripwire answer: its verdict next to the scan's, plus the prompt text when the
+        two disagree, so the cases where one of them may be wrong can be reviewed. Never logged."""
         tripwire, scan = result.get("details") or {}, verdict.get("details") or {}
-        return {
+        record: dict[str, Any] = {
             "time": datetime.now(UTC).isoformat(timespec="milliseconds"),
             "scanner": self.scanner_name,
             "agent_host": self.agent_host,
@@ -355,6 +356,10 @@ class ModelMapScanner:
                 "failed_open": bool(scan.get("error")),
             },
         }
+        # A failed-open verdict isn't a judgement, so Tripwire can't disagree with it.
+        if record["tripwire"]["is_attack"] != record["scan"]["blocked"] and not record["scan"]["failed_open"]:
+            record["text"] = self.text
+        return record
 
     async def _observe_late(self, late: TaskMap, verdict: dict[str, Any]) -> None:
         """Record observers that answered after the verdict went out, then store the scan's results together."""
