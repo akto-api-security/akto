@@ -131,6 +131,12 @@ public class SensitiveDataCountingIT {
         msg.put("is_pending", pending ? "true" : "false");
         msg.put("source", "MIRRORING");
 
+        // Counting now requires an identifiable caller, so these fixtures carry one. What each test
+        // asserts - which values are counted, for which collection and hour - is unaffected by it.
+        msg.put("direction", HttpCallParser.DIRECTION_OUTBOUND);
+        msg.put("tag", gson.toJson(Collections.singletonMap(
+                HttpCallParser.SERVICE_TAG_KEY, "counting-test-caller")));
+
         HttpResponseParams params = HttpCallParser.parseKafkaMessage(gson.toJson(msg));
         RequestTemplate template = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
         sync.processResponse(template, params, new ArrayList<>());

@@ -98,4 +98,24 @@ public class TestSensitiveDataCountDao extends MongoBasedTest {
         assertEquals(HOUR + 3600, SensitiveDataCount.hourOf(HOUR + 3600));
         assertNull(new SensitiveDataCount().getSubType());
     }
+
+    /**
+     * An increment carries the caller alongside the callee. The sender is a plain collection id, so
+     * one service reads as one id whichever end of a call it is on, and a count with no identifiable
+     * caller is {@link SensitiveDataCount#UNKNOWN_COLLECTION_ID} rather than absent.
+     */
+    @Test
+    public void testIncrementCarriesSenderCollectionId() {
+        SensitiveDataCount withSender = new SensitiveDataCount(1, -172116369, "PASSPORT", HOUR, 3);
+        assertEquals(1, withSender.getApiCollectionId());
+        assertEquals(-172116369, withSender.getSenderCollectionId());
+        assertTrue(withSender.toString().contains("senderCollectionId=-172116369"));
+
+        SensitiveDataCount withoutSender = new SensitiveDataCount(1, "PASSPORT", HOUR, 3);
+        assertEquals(SensitiveDataCount.UNKNOWN_COLLECTION_ID, withoutSender.getSenderCollectionId());
+
+        withoutSender.setSenderCollectionId(686962825);
+        assertEquals(686962825, withoutSender.getSenderCollectionId());
+        assertEquals(SensitiveDataCount.UNKNOWN_COLLECTION_ID, new SensitiveDataCount().getSenderCollectionId());
+    }
 }
