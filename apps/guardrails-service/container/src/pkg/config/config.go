@@ -148,8 +148,10 @@ type FileConfig struct {
 
 // MediaConfig holds configuration for external media processing APIs.
 // Vision and Speech have independent key/endpoint pairs for separate Azure resources.
+// Provider "agent_guard" sends images to agent-guard's /ocr (AGENT_GUARD_ENGINE_URL)
+// and needs none of the Azure fields.
 type MediaConfig struct {
-	Provider      string // "azure" or "" (disabled)
+	Provider      string // "azure", "agent_guard" or "" (disabled)
 	VisionAPIKey  string
 	VisionBaseURL string
 	SpeechAPIKey  string

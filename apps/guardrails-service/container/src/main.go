@@ -309,7 +309,7 @@ func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Confi
 		return
 	}
 
-	ocr, transcriber := newMediaProviders(mc, logger)
+	ocr, transcriber := newMediaProviders(mc, cfg.AgentGuardEngineURL, logger)
 
 	if ocr != nil {
 		registry.RegisterWithLimit(fileprocessor.NewImageProcessor(ocr, mc.MaxImageBytes), mc.MaxImageBytes)
@@ -330,28 +330,32 @@ func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Confi
 	}
 }
 
-func newMediaProviders(mc config.MediaConfig, logger *zap.Logger) (mediaprovider.OCRProvider, mediaprovider.TranscriptionProvider) {
+func newMediaProviders(mc config.MediaConfig, agentGuardURL string, logger *zap.Logger) (mediaprovider.OCRProvider, mediaprovider.TranscriptionProvider) {
 	var ocr mediaprovider.OCRProvider
 	var transcriber mediaprovider.TranscriptionProvider
 
-	visionReady := mc.VisionAPIKey != "" && mc.VisionBaseURL != ""
-	speechReady := mc.SpeechAPIKey != "" && mc.SpeechBaseURL != ""
-
-	if mc.VisionAPIKey == "" || mc.VisionBaseURL == "" {
-		logger.Warn("Image OCR disabled (missing MEDIA_VISION_API_KEY or MEDIA_VISION_BASE_URL)")
-	}
-	if mc.SpeechAPIKey == "" || mc.SpeechBaseURL == "" {
-		logger.Warn("Audio/video transcription disabled (missing MEDIA_SPEECH_API_KEY or MEDIA_SPEECH_BASE_URL)")
-	}
-
 	switch mc.Provider {
 	case "azure":
-		if visionReady {
+		if mc.VisionAPIKey != "" && mc.VisionBaseURL != "" {
 			ocr = mediaprovider.NewAzureVision(mc.VisionAPIKey, mc.VisionBaseURL)
+		} else {
+			logger.Warn("Image OCR disabled (missing MEDIA_VISION_API_KEY or MEDIA_VISION_BASE_URL)")
 		}
-		if speechReady {
+		if mc.SpeechAPIKey != "" && mc.SpeechBaseURL != "" {
 			transcriber = mediaprovider.NewAzureSpeech(mc.SpeechAPIKey, mc.SpeechBaseURL)
+		} else {
+			logger.Warn("Audio/video transcription disabled (missing MEDIA_SPEECH_API_KEY or MEDIA_SPEECH_BASE_URL)")
 		}
+	case "agent_guard":
+		// Images go to agent-guard's /ocr (Gemma by default). agent-guard has no
+		// transcription, so audio and video stay uninspected.
+		if agentGuardURL != "" {
+			ocr = mediaprovider.NewAgentGuardOCR(agentGuardURL)
+		} else {
+			logger.Warn("Image OCR disabled (missing AGENT_GUARD_ENGINE_URL)")
+		}
+	default:
+		logger.Warn("Media processing disabled (unknown MEDIA_PROVIDER)", zap.String("provider", mc.Provider))
 	}
 	return ocr, transcriber
 }
