@@ -170,18 +170,7 @@ public class McpAgentAction extends UserAction {
                     // — see the agentic_observe system prompt in test-editor-services.
                     Object data = metaData.get("data");
                     if (data != null && data instanceof Map) {
-                        Map<String, Object> dataMap = (Map<String, Object>) data;
-                        String scope = (String) dataMap.getOrDefault("scope", "");
-                        String scopeLabel = "device".equals(scope) ? "Single device" : "asset".equals(scope) ? "Single agentic asset" : "Agentic context";
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            contextString = "CONTEXT SCOPE: " + scopeLabel
-                                + ". This is only the asset/device identity — use the akto_agentic_* tools "
-                                + "(with the collectionIds, assetName, or deviceId below) to fetch its data before answering.\n\n"
-                                + mapper.writeValueAsString(dataMap);
-                        } catch (Exception e) {
-                            contextString = "Agentic Observe Context: " + dataMap.toString();
-                        }
+                        contextString = agenticObserveContext((Map<String, Object>) data);
                         tokensLimit = 20000;
                     }
                 } else if (StringUtils.isNotEmpty(type) && type.equals("insight_result")) {
@@ -464,6 +453,27 @@ public class McpAgentAction extends UserAction {
         } catch (Exception e) {
             logger.error("Error deleting conversation history", e);            addActionError("Failed to delete conversation history: " + e.getMessage());
             return ERROR.toUpperCase();
+        }
+    }
+
+    // Same value as ARGUS_CHAT_SCOPE in the Agent discovery page.
+    static final String SCOPE_AGENT_DISCOVERY = "argus_agent_discovery";
+
+    // An asset or device goes in as identity only, and the agent fetches the rest with its tools. The discovery
+    // overview goes in whole instead: the user is looking at it, so the answer has to match it.
+    static String agenticObserveContext(Map<String, Object> dataMap) {
+        String scope = (String) dataMap.getOrDefault("scope", "");
+        boolean overview = SCOPE_AGENT_DISCOVERY.equals(scope);
+        String scopeLabel = overview ? "Agent discovery overview" : "device".equals(scope) ? "Single device" : "asset".equals(scope) ? "Single agentic asset" : "Agentic context";
+        String guidance = overview
+            ? "This is the Agent discovery page the user is looking at: counts, findings and the ranked to-do list. "
+                + "Answer from it, and use the akto_agentic_* tools (with the asset ids in it) for anything it does not show."
+            : "This is only the asset/device identity — use the akto_agentic_* tools "
+                + "(with the collectionIds, assetName, or deviceId below) to fetch its data before answering.";
+        try {
+            return "CONTEXT SCOPE: " + scopeLabel + ". " + guidance + "\n\n" + new ObjectMapper().writeValueAsString(dataMap);
+        } catch (Exception e) {
+            return "Agentic Observe Context: " + dataMap.toString();
         }
     }
 
