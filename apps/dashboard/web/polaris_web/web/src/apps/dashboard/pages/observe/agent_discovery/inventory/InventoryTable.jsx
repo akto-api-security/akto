@@ -1,17 +1,20 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Badge, Box, Button, HorizontalStack, ProgressBar, Tag, Text, VerticalStack } from '@shopify/polaris'
 import func from '@/util/func'
-import GithubSimpleTable from '../../../../components/tables/GithubSimpleTable'
+import GithubServerTable from '../../../../components/tables/GithubServerTable'
 import Dot from './Dot'
-import { ago, createdOn, filterChips, matches, plural } from './inventoryUtils'
+import { fetchAgents } from './inventoryApi'
+import { ago, createdOn, filterChips, plural } from './inventoryUtils'
 
 const HIGH_RISK_AT = 50
 const RISK_BAR_WIDTH = '72px'
+const PAGE_LIMIT = 25
+const EXPORT_PAGE = 500
 
-// textValue is what the CSV export writes where the cell is a component. The Source column filters on the platform.
+// textValue is what the CSV export writes where the cell is a component.
 const headers = [
     { title: 'Agent', text: 'Agent', value: 'nameComp', textValue: 'name' },
-    { title: 'Source', text: 'Source', value: 'sourceComp', textValue: 'platform', filterKey: 'platform', showFilter: true },
+    { title: 'Source', text: 'Source', value: 'sourceComp', textValue: 'platform', filterKey: 'platform' },
     { title: 'Owning teams', text: 'Owning teams', value: 'teamsComp', textValue: 'teamsText' },
     { title: 'Tools', text: 'Tools', value: 'toolsComp', textValue: 'toolsText' },
     { title: 'Risk score', text: 'Risk score', value: 'riskComp', textValue: 'risk', sortActive: true },
@@ -20,82 +23,106 @@ const headers = [
     { title: 'Last used', text: 'Last used', value: 'seenComp', textValue: 'seenText' },
 ]
 
-// "asc" lists the largest first. columnIndex is the column's position, counting the leading one.
+// columnIndex is the column's position, counting the leading one.
 const sortOptions = [
-    { label: 'Risk score', value: 'risk asc', directionLabel: 'Highest first', sortKey: 'risk', columnIndex: 5 },
-    { label: 'Risk score', value: 'risk desc', directionLabel: 'Lowest first', sortKey: 'risk', columnIndex: 5 },
-    { label: 'Last used', value: 'seenTs asc', directionLabel: 'Most recent', sortKey: 'seenTs', columnIndex: 8 },
-    { label: 'Last used', value: 'seenTs desc', directionLabel: 'Least recent', sortKey: 'seenTs', columnIndex: 8 },
-    { label: 'Created', value: 'createdTs asc', directionLabel: 'Newest', sortKey: 'createdTs', columnIndex: 7 },
-    { label: 'Created', value: 'createdTs desc', directionLabel: 'Oldest', sortKey: 'createdTs', columnIndex: 7 },
+    { label: 'Risk score', value: 'risk desc', directionLabel: 'Highest first', sortKey: 'risk', columnIndex: 5 },
+    { label: 'Risk score', value: 'risk asc', directionLabel: 'Lowest first', sortKey: 'risk', columnIndex: 5 },
+    { label: 'Last used', value: 'seenTs desc', directionLabel: 'Most recent', sortKey: 'seenTs', columnIndex: 8 },
+    { label: 'Last used', value: 'seenTs asc', directionLabel: 'Least recent', sortKey: 'seenTs', columnIndex: 8 },
+    { label: 'Created', value: 'createdTs desc', directionLabel: 'Newest', sortKey: 'createdTs', columnIndex: 7 },
+    { label: 'Created', value: 'createdTs asc', directionLabel: 'Oldest', sortKey: 'createdTs', columnIndex: 7 },
 ]
 
 const resourceName = { singular: 'agent', plural: 'agents' }
 
-function rowOf(asset, generatedAt, colors) {
-    const high = asset.risk >= HIGH_RISK_AT
+function rowOf(agent, generatedAt, colors) {
+    const high = agent.risk >= HIGH_RISK_AT
     return {
-        id: asset.id,
-        name: asset.name,
+        id: agent.id,
+        name: agent.name,
         nameComp: (
             <VerticalStack gap="0">
-                <Text as="span" fontWeight="semibold">{asset.name}</Text>
-                {asset.reason && <Text as="span" variant="bodySm" color={high ? 'critical' : 'subdued'}>{asset.reason}</Text>}
+                <Text as="span" fontWeight="semibold">{agent.name}</Text>
+                {agent.reason && <Text as="span" variant="bodySm" color={high ? 'critical' : 'subdued'}>{agent.reason}</Text>}
             </VerticalStack>
         ),
-        platform: asset.platform,
-        type: asset.type,
+        platform: agent.platform,
         sourceComp: (
             <VerticalStack gap="0">
                 <HorizontalStack gap="2" blockAlign="center">
-                    <Dot color={colors[asset.platform]} />
-                    <Text as="span">{asset.platform}</Text>
+                    <Dot color={colors[agent.platform]} />
+                    <Text as="span">{agent.platform}</Text>
                 </HorizontalStack>
-                <Text as="span" variant="bodySm" color="subdued">{asset.type}</Text>
+                <Text as="span" variant="bodySm" color="subdued">{agent.type}</Text>
             </VerticalStack>
         ),
-        teamsText: asset.teams.join(', ') || 'No team',
-        teamsComp: asset.teams.length === 0
+        teamsText: agent.teams.join(', ') || 'No team',
+        teamsComp: agent.teams.length === 0
             ? <Badge status="critical">No team</Badge>
             : (
                 <HorizontalStack gap="1" blockAlign="center" wrap={false}>
-                    <Badge>{asset.teams[0]}</Badge>
-                    {asset.teams.length > 1 && <Text as="span" color="subdued">{`+${asset.teams.length - 1}`}</Text>}
+                    <Badge>{agent.teams[0]}</Badge>
+                    {agent.teams.length > 1 && <Text as="span" color="subdued">{`+${agent.teams.length - 1}`}</Text>}
                 </HorizontalStack>
             ),
-        toolsText: `${asset.tools} · ${asset.privileged} privileged`,
+        toolsText: `${agent.tools} · ${agent.privileged} privileged`,
         toolsComp: (
-            <Text as="span">{asset.tools} <Text as="span" color="subdued">· {asset.privileged} privileged</Text></Text>
+            <Text as="span">{agent.tools} <Text as="span" color="subdued">· {agent.privileged} privileged</Text></Text>
         ),
-        // Searched as one piece of text: the tools by name.
-        toolNamesText: asset.toolNames.join(' '),
-        risk: asset.risk,
+        risk: agent.risk,
         riskComp: (
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                <Text as="span" fontWeight="semibold" color={high ? 'critical' : undefined}>{asset.risk}</Text>
-                <Box minWidth={RISK_BAR_WIDTH}><ProgressBar progress={asset.risk} size="small" color={high ? 'critical' : 'primary'} animated={false} /></Box>
+                <Text as="span" fontWeight="semibold" color={high ? 'critical' : undefined}>{agent.risk}</Text>
+                <Box minWidth={RISK_BAR_WIDTH}><ProgressBar progress={agent.risk} size="small" color={high ? 'critical' : 'primary'} animated={false} /></Box>
             </HorizontalStack>
         ),
-        policies: asset.policies,
-        policiesComp: asset.policies ? <Text as="span">{asset.policies}</Text> : <Text as="span" fontWeight="semibold" color="critical">None</Text>,
-        createdTs: asset.createdTs,
-        createdText: createdOn(asset.createdTs, generatedAt),
-        seenTs: asset.seenTs,
-        seenText: ago(asset.seenTs, generatedAt),
-        seenComp: <Text as="span" color={asset.flags.includes('dormant') ? 'warning' : undefined}>{ago(asset.seenTs, generatedAt)}</Text>,
+        policies: agent.policies,
+        policiesComp: agent.policies ? <Text as="span">{agent.policies}</Text> : <Text as="span" fontWeight="semibold" color="critical">None</Text>,
+        createdText: createdOn(agent.createdTs, generatedAt),
+        seenText: ago(agent.seenTs, generatedAt),
+        seenComp: <Text as="span" color={agent.dormant ? 'warning' : undefined}>{ago(agent.seenTs, generatedAt)}</Text>,
     }
 }
 
 // The Export button on the page: every agent, whatever the table is showing.
-export function exportAgents(data) {
-    func.exportTableAsCSV(headers, data.assets.map((asset) => rowOf(asset, data.generatedAt, {})), 'agent-inventory')
+export async function exportAgents() {
+    try {
+        const rows = []
+        let total = 0
+        do {
+            const page = await fetchAgents({ skip: rows.length, limit: EXPORT_PAGE, sortKey: 'risk', sortOrder: -1 })
+            total = page.total
+            if (page.agents.length === 0) break
+            rows.push(...page.agents.map((agent) => rowOf(agent, page.generatedAt, {})))
+        } while (rows.length < total)
+        func.exportTableAsCSV(headers, rows, 'agent-inventory')
+    } catch (error) {
+        func.setToast(true, true, 'Failed to export the agents')
+    }
 }
 
-// The agents that pass the filter, with the chips that say what is filtered and a way to remove each.
-function InventoryTable({ data, colors, filter, onFilter, onOpen }) {
-    const assets = useMemo(() => data.assets.filter((asset) => matches(asset, filter)), [data, filter])
-    const rows = useMemo(() => assets.map((asset) => rowOf(asset, data.generatedAt, colors)), [assets, data.generatedAt, colors])
+// The agents that pass the filter, paged by the backend, with chips that say what is filtered and a way to remove each.
+function InventoryTable({ platforms, colors, filter, onFilter, onOpen }) {
+    const [matchCount, setMatchCount] = useState(null)
     const chips = filterChips(filter)
+    const filters = useMemo(() => [{
+        key: 'platform', label: 'Source', title: 'Source', type: 'select', multiple: true,
+        choices: platforms.map((platform) => ({ label: platform.name, value: platform.name })),
+    }], [platforms])
+
+    const fetchData = useCallback(async (sortKey, sortOrder, skip, limit, tableFilters, filterOperators, queryValue) => {
+        const scope = { ...filter }
+        delete scope.flagLabel
+        try {
+            // The table sends -1 for "asc" and 1 for "desc", the reverse of Mongo.
+            const page = await fetchAgents({ ...scope, platforms: tableFilters?.platform || [], queryValue, sortKey, sortOrder: sortOrder === -1 ? 1 : -1, skip, limit })
+            setMatchCount(page.total)
+            return { value: page.agents.map((agent) => rowOf(agent, page.generatedAt, colors)), total: page.total }
+        } catch (error) {
+            func.setToast(true, true, 'Failed to load the agents')
+            return { value: [], total: 0 }
+        }
+    }, [filter, colors])
 
     const remove = (key) => {
         const rest = { ...filter }
@@ -109,23 +136,24 @@ function InventoryTable({ data, colors, filter, onFilter, onOpen }) {
             <Text variant="headingMd" as="h2">All agents</Text>
             {chips.length > 0 && (
                 <HorizontalStack gap="2" blockAlign="center">
-                    <Text as="span" fontWeight="semibold">{`${plural(assets.length, 'agent')} match`}</Text>
+                    {matchCount !== null && <Text as="span" fontWeight="semibold">{`${plural(matchCount, 'agent')} match`}</Text>}
                     {chips.map((chip) => <Tag key={chip.key} onRemove={() => remove(chip.key)}>{chip.label}</Tag>)}
                     <Button plain onClick={() => onFilter({})}>Clear all</Button>
                 </HorizontalStack>
             )}
             {/* The key restarts the table's own page and search whenever the filter changes. */}
-            <GithubSimpleTable
+            <GithubServerTable
                 key={JSON.stringify(filter)}
+                fetchData={fetchData}
                 resourceName={resourceName}
                 useNewRow={true}
                 condensedHeight={true}
                 headers={headers}
                 headings={headers}
-                data={rows}
+                filters={filters}
+                disambiguateLabel={(key, value) => func.convertToDisambiguateLabelObj(value, null, 2)}
                 sortOptions={sortOptions}
-                searchKeys={['name', 'platform', 'type', 'teamsText', 'toolNamesText']}
-                pageLimit={25}
+                pageLimit={PAGE_LIMIT}
                 selectable={false}
                 rowClickable={true}
                 onRowClick={(row) => onOpen(row.id)}

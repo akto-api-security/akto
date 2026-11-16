@@ -13,6 +13,7 @@ import { agentPath, platformColors, plural } from './inventoryUtils'
 const TAB_SUMMARY = 0
 const TAB_ANALYTICS = 1
 const TAB_AGENTS = 2
+const IDENTITIES_PATH = '/dashboard/nhi/identities'
 const NAMED_PLATFORMS = 3
 
 function AgentInventory() {
@@ -21,6 +22,7 @@ function AgentInventory() {
     const [loading, setLoading] = useState(true)
     const [tab, setTab] = useState(TAB_SUMMARY)
     const [filter, setFilter] = useState({})
+    const [reloadKey, setReloadKey] = useState(0)
 
     useEffect(() => {
         let cancelled = false
@@ -29,7 +31,7 @@ function AgentInventory() {
             .catch(() => { if (!cancelled) setData(null) })
             .finally(() => { if (!cancelled) setLoading(false) })
         return () => { cancelled = true }
-    }, [])
+    }, [reloadKey])
 
     // Every number and chart on the other tabs opens the assets behind it.
     const showAssets = useCallback((next) => {
@@ -37,6 +39,8 @@ function AgentInventory() {
         setTab(TAB_AGENTS)
     }, [])
     const openAsset = useCallback((id) => navigate(agentPath(id)), [navigate])
+    const openIdentities = useCallback(() => navigate(IDENTITIES_PATH), [navigate])
+    const reload = useCallback(() => setReloadKey((key) => key + 1), [])
     const colors = useMemo(() => (data ? platformColors(data.platforms) : {}), [data])
 
     let body
@@ -54,9 +58,9 @@ function AgentInventory() {
             <VerticalStack gap="4">
                 {/* Moving between tabs by hand clears the filter; opening the assets from a chart sets it. */}
                 <Tabs tabs={tabs} selected={tab} onSelect={(index) => { setFilter({}); setTab(index) }} />
-                {tab === TAB_SUMMARY && <InventorySummary data={data} colors={colors} onFilter={showAssets} onOpen={openAsset} onAnalytics={() => { setFilter({}); setTab(TAB_ANALYTICS) }} />}
+                {tab === TAB_SUMMARY && <InventorySummary data={data} colors={colors} onFilter={showAssets} onOpen={openAsset} onIdentities={openIdentities} onRevoked={reload} onAnalytics={() => { setFilter({}); setTab(TAB_ANALYTICS) }} />}
                 {tab === TAB_ANALYTICS && <InventoryAnalytics data={data} colors={colors} onFilter={showAssets} onOpen={openAsset} />}
-                {tab === TAB_AGENTS && <InventoryTable data={data} colors={colors} filter={filter} onFilter={setFilter} onOpen={openAsset} />}
+                {tab === TAB_AGENTS && <InventoryTable platforms={data.platforms} colors={colors} filter={filter} onFilter={setFilter} onOpen={openAsset} />}
             </VerticalStack>
         )
     }
@@ -80,7 +84,7 @@ function AgentInventory() {
             }
             subtitle={subtitle}
             isFirstPage
-            secondaryActions={data && <Button onClick={() => exportAgents(data)}>Export</Button>}
+            secondaryActions={data && <Button onClick={exportAgents}>Export</Button>}
             components={[<Box key="body">{body}</Box>]}
         />
     )

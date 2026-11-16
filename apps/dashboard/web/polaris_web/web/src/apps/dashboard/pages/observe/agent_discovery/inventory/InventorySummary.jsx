@@ -3,9 +3,9 @@ import func from '@/util/func'
 import DonutChart from '../../../../components/shared/DonutChart'
 import SegmentBar from '../../../../components/shared/SegmentBar'
 import LineChart from '../../../../components/charts/LineChart'
-import BarGraph from '../../../../components/charts/BarGraph'
 import Dot from './Dot'
 import MiniBar from './MiniBar'
+import { revokeIdentity } from './inventoryApi'
 import { POSTURE_COLORS, ago, lastUsedText, percent, plural } from './inventoryUtils'
 
 const DONUT_SIZE = 168
@@ -20,15 +20,6 @@ const TREND_OPTIONS = {
 const WEEKS_BACK = 4
 const CARD_ACCENT = { critical: 'border-critical', caution: 'border-caution' }
 const HEALTHY_FADED = `${POSTURE_COLORS.healthy}8C`
-const SPARK_COLOR = '#C9CCCF'
-const SPARK_OPTIONS = {
-    chart: { margin: [0, 0, 0, 0], spacing: [0, 0, 0, 0], width: 60 },
-    title: { text: null },
-    legend: { enabled: false },
-    tooltip: { enabled: false },
-    xAxis: { visible: false },
-}
-const REVOKE_SOON = 'Revoking credentials will be available once non-human identities are connected.'
 
 const donutOf = (posture, counts) => Object.fromEntries(posture.map((group) => [group.label, { text: counts[group.key], color: POSTURE_COLORS[group.key] }]))
 
@@ -238,37 +229,34 @@ function Recent({ recent, generatedAt, colors, onOpen, onFilter }) {
     )
 }
 
-// Agents that went quiet but can still act. This is the slot for non-human identities (keys and tokens): until that data exists
-// the rows are the dormant agents with privileged tools, and the bars beside them are placeholders from the JSON.
-function Quiet({ quiet, generatedAt, onOpen, onFilter }) {
+// Identities unused for 30 days that still hold access; Revoke disables the identity after a confirm.
+function Quiet({ quiet, generatedAt, onIdentities, onRevoked }) {
+    const revoke = (identity) => func.showConfirmationModal(`Revoke ${identity.name}? It will lose its access.`, 'Revoke', async () => {
+        try {
+            if (!await revokeIdentity(identity.id)) throw new Error('not revoked')
+            func.setToast(true, false, 'Identity revoked')
+            onRevoked()
+        } catch (error) {
+            func.setToast(true, true, 'Failed to revoke the identity')
+        }
+    })
     return (
         <Card padding="4">
             <VerticalStack gap="3">
                 <HorizontalStack align="space-between" blockAlign="center">
                     <Text variant="headingMd" as="h2">Gone quiet, still has access</Text>
-                    {quiet.total > 0 && <Button plain onClick={() => onFilter({ flag: 'comboDormant', flagLabel: 'Dormant + Privileged tools' })}>{`View all ${quiet.total}`}</Button>}
+                    {quiet.total > 0 && <Button plain onClick={onIdentities}>{`View all ${quiet.total}`}</Button>}
                 </HorizontalStack>
-                {quiet.items.length === 0 && <Text variant="bodyMd" color="subdued">Every agent with privileged tools has had traffic in the last 30 days.</Text>}
-                {quiet.items.map((asset) => (
-                    <HorizontalStack key={asset.id} gap="3" blockAlign="center" wrap={false}>
+                {quiet.items.length === 0 && <Text variant="bodyMd" color="subdued">No identities have gone quiet in the last 30 days.</Text>}
+                {quiet.items.map((identity) => (
+                    <HorizontalStack key={identity.id} gap="3" blockAlign="center" wrap={false}>
                         <Box width="100%">
                             <VerticalStack gap="0">
-                                <Box><Button plain monochrome removeUnderline onClick={() => onOpen(asset.id)}><Text as="span" fontWeight="semibold">{asset.name}</Text></Button></Box>
-                                <Text variant="bodySm" color="subdued">{`Last used ${lastUsedText(asset.seenTs, generatedAt)} · ${plural(asset.privileged, 'privileged tool')}`}</Text>
+                                <Text as="span" fontWeight="semibold" truncate>{identity.name}</Text>
+                                <Text variant="bodySm" color="subdued">{`Last used ${lastUsedText(identity.lastUsedTs, generatedAt)} · ${identity.agentName || identity.accessLevel}`}</Text>
                             </VerticalStack>
                         </Box>
-                        <Box minWidth="60px">
-                            <BarGraph
-                                data={asset.spark.map((value, index) => ({ text: String(index), value, color: SPARK_COLOR }))}
-                                height={24}
-                                barWidth={5}
-                                barGap={1}
-                                showYAxis={false}
-                                backgroundColor="transparent"
-                                extraChartOptions={SPARK_OPTIONS}
-                            />
-                        </Box>
-                        <Button size="slim" outline destructive onClick={() => func.setToast(true, false, REVOKE_SOON)}>Revoke</Button>
+                        <Button size="slim" outline destructive onClick={() => revoke(identity)}>Revoke</Button>
                     </HorizontalStack>
                 ))}
             </VerticalStack>
@@ -276,7 +264,7 @@ function Quiet({ quiet, generatedAt, onOpen, onFilter }) {
     )
 }
 
-function InventorySummary({ data, colors, onFilter, onOpen, onAnalytics }) {
+function InventorySummary({ data, colors, onFilter, onOpen, onAnalytics, onIdentities, onRevoked }) {
     return (
         <VerticalStack gap="4">
             <Hero data={data} onFilter={onFilter} />
@@ -285,7 +273,7 @@ function InventorySummary({ data, colors, onFilter, onOpen, onAnalytics }) {
             <HorizontalGrid columns={{ xs: 1, md: 2, lg: 3 }} gap="4">
                 <RiskByTeam teams={data.teams} onFilter={onFilter} onAnalytics={onAnalytics} />
                 <Recent recent={data.recent} generatedAt={data.generatedAt} colors={colors} onOpen={onOpen} onFilter={onFilter} />
-                <Quiet quiet={data.quiet} generatedAt={data.generatedAt} onOpen={onOpen} onFilter={onFilter} />
+                <Quiet quiet={data.quiet} generatedAt={data.generatedAt} onIdentities={onIdentities} onRevoked={onRevoked} />
             </HorizontalGrid>
         </VerticalStack>
     )

@@ -1,7 +1,7 @@
-import inventory from './inventory.mock.json'
+import dashboardApi from '../../../dashboard/api'
+import observeApi from '../../api'
 
-// Real rows from the local database, saved as JSON. It has the shape the backend will return,
-// so this is the only function to change when the page is connected to it.
-export async function fetchInventory() {
-    return inventory
-}
+export const fetchInventory = () => dashboardApi.fetchArgusInventory()
+export const fetchAgents = (params) => dashboardApi.fetchArgusInventoryAgents(params)
+// Revoking a quiet identity is the existing NHI disable.
+export const revokeIdentity = (identityId) => observeApi.disableNhiIdentity(identityId)

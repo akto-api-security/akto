@@ -35,8 +35,7 @@ const onActivate = (action) => (event) => {
 const CORNERS = [["top-left", "critical"], ["top-right", "warning"], ["bottom-left", "subdued"], ["bottom-right", "subdued"]];
 
 // Circles on a positioned grid; bubbles: [{ key, x, y, radius, fill, stroke, tip, label, priority, onClick }]
-// Optional quadrants: { splitX, heightPct, labels: [topLeft, topRight, bottomLeft, bottomRight] } tints the two top
-// quadrants, draws the dashed split lines and names each corner.
+// Optional quadrants: { splitX, heightPct, labels: [tl, tr, bl, br] } tints the top zones, draws dashed splits and names the corners.
 export default function BubblePlot({ bubbles, height = 300, bands = 4, bandLabels, tickLabels, zone, quadrants }) {
     const [plotRef, { width }] = useElementSize();
     // Names are placed once the plot's width is known, so none covers another name or circle.

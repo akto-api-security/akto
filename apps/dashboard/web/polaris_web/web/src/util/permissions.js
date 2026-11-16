@@ -89,8 +89,7 @@ const PAGE_REQUIRES = {
     '/dashboard/observe/endpoint-shield': 'api/fetchEndpointShieldAgents',
     '/dashboard/observe/agentic-discovery': 'api/fetchAtlasDiscoveryOverview',
     '/dashboard/observe/agent-discovery': 'api/fetchArgusDiscoveryOverview',
-    // Static data for now; the same area as the overview until the inventory has its own call.
-    '/dashboard/observe/agent-inventory': 'api/fetchArgusDiscoveryOverview',
+    '/dashboard/observe/agent-inventory': 'api/fetchArgusInventory',
     '/dashboard/nhi/identities': 'api/fetchAllNhiIdentities',
     '/dashboard/nhi/violations': 'api/fetchAllNhiViolations',
     '/dashboard/nhi/policies': 'api/fetchNhiPolicies',

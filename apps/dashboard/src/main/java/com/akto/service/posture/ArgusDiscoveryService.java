@@ -32,16 +32,16 @@ import java.util.stream.Collectors;
 // list ranked by severity. Counts come from the shared bundle; only tool counts and last-seen are read here.
 public class ArgusDiscoveryService {
 
-    private static final int WEEK_SECONDS = 7 * 86400;
-    private static final int STALE_SECONDS = 30 * 86400;
+    static final int WEEK_SECONDS = 7 * 86400;
+    static final int STALE_SECONDS = 30 * 86400;
     private static final int TODO_LIMIT = 10;
     private static final int ASSETS_PER_TODO = 5;
 
     // Sub-score cut-offs from AgenticPostureScoreCron: public and unauthenticated; delete or critical-write tool.
-    private static final double EXPOSED_AT = 100;
-    private static final double DESTRUCTIVE_AT = 70;
+    static final double EXPOSED_AT = 100;
+    static final double DESTRUCTIVE_AT = 70;
 
-    private static final String OTHER_PLATFORM = "Other";
+    static final String OTHER_PLATFORM = "Other";
     private static final Map<String, String> PLATFORM_NAMES = Map.of(
             "N8N", "n8n", "LANGCHAIN", "LangChain", "COPILOT_STUDIO", "Copilot Studio",
             "AWS_BEDROCK", "AWS Bedrock", "aws-vpc", "AWS VPC", "k8s-svc", "Kubernetes");
@@ -72,23 +72,11 @@ public class ArgusDiscoveryService {
         List<ApiCollection> agents = ofType(assets, AgenticObserveUtil.CLIENT_TYPE_AI_AGENT, AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT);
         List<ApiCollection> servers = ofType(assets, AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER);
 
-        // Reviewed means someone approved or rejected it, or it is on the allowlist (the rule Atlas uses for shadow AI).
-        // Audit rows link to their server by collection id, since mcpHost is often missing, so that link is checked too.
-        // Only a decision on the server itself counts: not "Under review", and not a decision on one of its tools.
-        Map<String, String> remarks = InsightUtil.remarksByServiceName(bundle.auditRows);
-        Set<Integer> decided = bundle.auditRows.stream()
-                .filter(a -> Constants.AKTO_MCP_SERVER_TAG.equals(a.getType()) && isDecision(a.getRemarks()))
-                .map(McpAuditInfo::getHostCollectionId).collect(Collectors.toSet());
-        Predicate<ApiCollection> unreviewed = c -> {
-            GovernanceBucket bucket = InsightUtil.governanceBucket(c, bundle.allowlistNamesLower, remarks);
-            return !decided.contains(c.getId())
-                    && (bucket == GovernanceBucket.SHADOW || bucket == GovernanceBucket.UNAPPROVED || bucket == GovernanceBucket.PERSONAL);
-        };
-        // Shadow AI: unreviewed, with at least one exposure signal. Unreviewed alone is nearly every agent.
-        Predicate<ApiCollection> sensitive = c -> !bundle.sensitiveByCollection.getOrDefault(c.getId(), Collections.emptyList()).isEmpty();
-        Predicate<ApiCollection> observedOnly = c -> InsightUtil.everSeenObserve(c) && !InsightUtil.everSeenInline(c);
+        Predicate<ApiCollection> unreviewed = unreviewedIn(bundle);
+        Predicate<ApiCollection> sensitive = sensitiveIn(bundle);
+        Predicate<ApiCollection> observedOnly = ArgusDiscoveryService::observedOnly;
         Predicate<ApiCollection> personal = InsightUtil::isPersonalAccount;
-        List<ApiCollection> shadow = filter(agents, c -> unreviewed.test(c) && (sensitive.test(c) || observedOnly.test(c) || personal.test(c)));
+        List<ApiCollection> shadow = filter(agents, c -> isShadow(c, unreviewed, sensitive));
 
         ArgusPostureUtils.GuardrailsCoverageBreakdown coverage = ArgusPostureUtils.computeCoverage(assets, bundle.policies);
         Set<Integer> uncoveredIds = coverage.uncovered.stream().map(ApiCollection::getId).collect(Collectors.toSet());
@@ -132,6 +120,34 @@ public class ArgusDiscoveryService {
                 .append("coverage", new BasicDBObject("assets", assets.size()).append("withTraffic", withTraffic)
                         .append("withPolicy", assets.size() - uncoveredIds.size()))
                 .append("todos", todos);
+    }
+
+    // Reviewed means someone approved or rejected it, or it is on the allowlist (the rule Atlas uses for shadow AI).
+    // Audit rows link to their server by collection id, since mcpHost is often missing, so that link is checked too.
+    // Only a decision on the server itself counts: not "Under review", and not a decision on one of its tools.
+    static Predicate<ApiCollection> unreviewedIn(InsightDataBundle bundle) {
+        Map<String, String> remarks = InsightUtil.remarksByServiceName(bundle.auditRows);
+        Set<Integer> decided = bundle.auditRows.stream()
+                .filter(a -> Constants.AKTO_MCP_SERVER_TAG.equals(a.getType()) && isDecision(a.getRemarks()))
+                .map(McpAuditInfo::getHostCollectionId).collect(Collectors.toSet());
+        return c -> {
+            GovernanceBucket bucket = InsightUtil.governanceBucket(c, bundle.allowlistNamesLower, remarks);
+            return !decided.contains(c.getId())
+                    && (bucket == GovernanceBucket.SHADOW || bucket == GovernanceBucket.UNAPPROVED || bucket == GovernanceBucket.PERSONAL);
+        };
+    }
+
+    static Predicate<ApiCollection> sensitiveIn(InsightDataBundle bundle) {
+        return c -> !bundle.sensitiveByCollection.getOrDefault(c.getId(), Collections.emptyList()).isEmpty();
+    }
+
+    static boolean observedOnly(ApiCollection c) {
+        return InsightUtil.everSeenObserve(c) && !InsightUtil.everSeenInline(c);
+    }
+
+    // Shadow AI: unreviewed, with at least one exposure signal. Unreviewed alone is nearly every agent.
+    static boolean isShadow(ApiCollection c, Predicate<ApiCollection> unreviewed, Predicate<ApiCollection> sensitive) {
+        return unreviewed.test(c) && (sensitive.test(c) || observedOnly(c) || InsightUtil.isPersonalAccount(c));
     }
 
     private static BasicDBObject shadowTodo(List<ApiCollection> shadow, Predicate<ApiCollection> sensitive,

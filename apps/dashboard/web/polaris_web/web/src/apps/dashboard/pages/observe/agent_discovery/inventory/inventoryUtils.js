@@ -39,20 +39,7 @@ export const QUAD_LABELS = {
 
 export const USED_LABELS = { today: 'Today', w: '1–7 days', m: '8–30 days', q: '31–90 days', old: '90+ days', never: 'Never' }
 
-// A filter is any of { flag, platform, team, type, quad, used, week, tool }; team "none" means no owning team. The table keeps the assets that pass all of them.
-// Combination flags carry their own `flagLabel`, since their names come with the data.
-export function matches(asset, filter) {
-    return (!filter.flag || asset.flags.includes(filter.flag))
-        && (!filter.platform || asset.platform === filter.platform)
-        && (!filter.team || (filter.team === 'none' ? asset.teams.length === 0 : asset.teams.includes(filter.team)))
-        && (!filter.type || asset.type === filter.type)
-        && (!filter.quad || asset.quad === filter.quad)
-        && (!filter.used || asset.used === filter.used)
-        && (filter.week === undefined || asset.week === filter.week)
-        && (!filter.tool || asset.toolNames.includes(filter.tool))
-}
-
-// One removable chip per filter in use.
+// One removable chip per filter in use: any of { flag, platform, team, type, quad, used, week, tool }.
 export function filterChips(filter) {
     const labels = {
         flag: filter.flagLabel || FLAG_LABELS[filter.flag],

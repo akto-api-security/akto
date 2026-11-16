@@ -41,8 +41,8 @@ function xOf(asset, generatedAt) {
 // The same asset always lands on the same spot, so assets seen at the same time do not sit on one line.
 const spread = (id, steps, size) => ((Math.abs(id) % steps) - (steps - 1) / 2) * size
 
-function bubblesOf(assets, generatedAt, colors, onOpen) {
-    return assets.map((asset) => ({
+function bubblesOf(points, generatedAt, colors, onOpen) {
+    return points.map((asset) => ({
         key: asset.id,
         x: Math.min(98, Math.max(2, xOf(asset, generatedAt) + spread(asset.id, 7, 0.8))),
         y: Math.min(98, Math.max(2, asset.risk + spread(asset.id, 5, 0.8))),
@@ -81,7 +81,7 @@ function Kpis({ counts, onFilter }) {
 }
 
 function RiskVsLastUsed({ data, colors, onFilter, onOpen }) {
-    const bubbles = useMemo(() => bubblesOf(data.assets, data.generatedAt, colors, onOpen), [data, colors, onOpen])
+    const bubbles = useMemo(() => bubblesOf(data.points, data.generatedAt, colors, onOpen), [data, colors, onOpen])
     const legend = (
         <HorizontalStack gap="3" blockAlign="center">
             {data.platforms.map((p) => (
@@ -94,7 +94,7 @@ function RiskVsLastUsed({ data, colors, onFilter, onOpen }) {
         </HorizontalStack>
     )
     return (
-        <Panel title="Risk vs. last used" aside={legend} empty={data.assets.length === 0} emptyText="No agents to plot yet.">
+        <Panel title="Risk vs. last used" aside={legend} empty={data.points.length === 0} emptyText="No agents to plot yet.">
             <VerticalStack gap="3">
                 <BubblePlot bubbles={bubbles} height={PLOT_HEIGHT} bands={RISK_BANDS_TOP_DOWN.length} bandLabels={RISK_BANDS_TOP_DOWN} tickLabels={TIME_TICKS} quadrants={QUADRANTS} />
                 <HorizontalGrid columns={{ xs: 1, sm: 2, lg: 4 }} gap="2">
