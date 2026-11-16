@@ -169,6 +169,21 @@ public class AdminSettingsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    /** Absent means "not sent", which is refused rather than read as off. */
+    @Setter
+    private Boolean redteamLearningsEnabled;
+
+    public String updateRedteamLearningsEnabled() {
+        if (redteamLearningsEnabled == null) {
+            addActionError("redteamLearningsEnabled is required");
+            return ERROR.toUpperCase();
+        }
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.REDTEAM_LEARNINGS_ENABLED, redteamLearningsEnabled));
+        return SUCCESS.toUpperCase();
+    }
+
     public String toggleNewMergingEnabled() {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),

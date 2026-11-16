@@ -158,6 +158,15 @@ public class AccountSettings {
     @Setter
     private boolean allowMergingOnVersions;
 
+    /**
+     * Red-team learnings for this account's agentic tests. Null means never set, which counts as on; the agent
+     * server's REDTEAM_LEARNINGS_ENABLED must also be true for learnings to run. Keep in sync with the abstractor copy.
+     */
+    public static final String REDTEAM_LEARNINGS_ENABLED = "redteamLearningsEnabled";
+    @Getter
+    @Setter
+    private Boolean redteamLearningsEnabled;
+
     public static final String JIRA_TICKET_URL_MAP = "jiraTicketUrlMap";
     private Map<String, String> jiraTicketUrlMap = new HashMap<>();
 

@@ -1,5 +1,6 @@
 package com.akto.dao.redteam_learnings;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.akto.dto.redteam_learnings.AgentRedteamProfile;
@@ -54,9 +55,16 @@ public class AgentRedteamProfileDao extends AgentRedteamDao<AgentRedteamProfile>
                 Projections.exclude(AgentRedteamProfile.CELLS, AgentRedteamProfile.INSIGHTS));
     }
 
-    /** Every version written during one run, across the agents it tested, latest batch first. */
+    /** Every version written during one run, across the agents it tested, latest batch first, without cells and insights. */
     public List<AgentRedteamProfile> findByRun(String testingRunResultSummaryId, int limit) {
         return findAll(Filters.eq(AgentRedteamRecord.TESTING_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId), 0, limit,
-                Sorts.descending(AgentRedteamProfile.BATCH_NO), null);
+                Sorts.descending(AgentRedteamProfile.BATCH_NO),
+                Projections.exclude(AgentRedteamProfile.CELLS, AgentRedteamProfile.INSIGHTS));
+    }
+
+    /** The full versions with these ids, in no particular order; ids the caller cannot see are left out. */
+    public List<AgentRedteamProfile> findByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) return new ArrayList<>();
+        return findAll(Filters.in("_id", ids), 0, ids.size(), null, null);
     }
 }

@@ -157,6 +157,12 @@ public class TestAgentRedteamDaos extends MongoBasedTest {
         assertEquals(3, found.size());
         assertEquals(2, found.get(0).getBatchNo());
         assertTrue(found.stream().allMatch(p -> "run-1".equals(p.getTestingRunResultSummaryId())));
+        assertTrue("a run's list leaves the heavy fields out", found.get(0).getCells().isEmpty() && found.get(0).getInsights().isEmpty());
+
+        List<AgentRedteamProfile> full = AgentRedteamProfileDao.instance.findByIds(Arrays.asList("123:POST:h:run-1:2", "nope"));
+        assertEquals(1, full.size());
+        assertEquals(1, full.get(0).getInsights().size());
+        assertTrue(AgentRedteamProfileDao.instance.findByIds(Collections.emptyList()).isEmpty());
     }
 
     // ── drafts ───────────────────────────────────────────────────────────────
