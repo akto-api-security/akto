@@ -16,6 +16,7 @@ import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
 import threatDetectionFunc from "./transform";
 import InfoCard from "../dashboard/new_components/InfoCard";
+import SpinnerCentered from "../../components/progress/SpinnerCentered";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
@@ -148,19 +149,20 @@ const flaggedData = [
     }
 ]
 
-const ChartComponent = ({ categoryCount, severityCountMap, onThreatTypeClick, onSeverityClick }) => {
+const ChartComponent = ({ categoryCount, severityCountMap, categoryLoading, severityLoading, onThreatTypeClick, onSeverityClick }) => {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
           <TopThreatTypeChart
             key={"top-threat-types"}
             data={categoryCount}
+            loading={categoryLoading}
             onBarClick={onThreatTypeClick}
           />
           <InfoCard
                 title={`${mapLabel("Threat", getDashboardCategory())} by severity`}
                 titleToolTip={`Number of ${mapLabel("APIs", getDashboardCategory())} per each category`}
-                component={
+                component={severityLoading ? <SpinnerCentered height="280px" /> :
                     <BarGraph
                         data={severityCountMap}
                         areaFillHex="true"
@@ -352,6 +354,8 @@ function ThreatDetectionPage() {
     const [showNewTab, setShowNewTab] = useState(false)
     const [categoryCount, setCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
+    const [categoryLoading, setCategoryLoading] = useState(true);
+    const [severityLoading, setSeverityLoading] = useState(true);
     const [moreActions, setMoreActions] = useState(false);
     const [webhookIntegrationModalOpen, setWebhookIntegrationModalOpen] = useState(false);
     const [webhookIntegrationData, setWebhookIntegrationData] = useState(null);
@@ -522,12 +526,17 @@ function ThreatDetectionPage() {
 
       useEffect(() => {
         const fetchThreatCategoryCount = async () => {
-            const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
-            const finalObj = threatDetectionFunc.getGraphsData(res);
-            // categoryCountRes groups by policy name (category), not the generic rule-type
-            // subCategory (e.g. "UserDefinedLLMRule" shared by many distinct policies) — same
-            // source ThreatApiPage.jsx already uses for this same chart.
-            setCategoryCount(finalObj.categoryCountRes);
+            setCategoryLoading(true);
+            try {
+                const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
+                const finalObj = threatDetectionFunc.getGraphsData(res);
+                // categoryCountRes groups by policy name (category), not the generic rule-type
+                // subCategory (e.g. "UserDefinedLLMRule" shared by many distinct policies) — same
+                // source ThreatApiPage.jsx already uses for this same chart.
+                setCategoryCount(finalObj.categoryCountRes);
+            } finally {
+                setCategoryLoading(false);
+            }
           };
 
           const fetchCountBySeverity = async () => {
@@ -537,11 +546,16 @@ function ThreatDetectionPage() {
                 MEDIUM: 0,
                 LOW: 0,
             }
-            const res = await api.fetchCountBySeverity(startTimestamp, endTimestamp);
-            res.categoryCounts.forEach(({ subCategory, count }) => {
-                severityMap[subCategory] = count;
-            });
-            setSeverityCountMap(convertToGraphData(severityMap));
+            setSeverityLoading(true);
+            try {
+                const res = await api.fetchCountBySeverity(startTimestamp, endTimestamp);
+                res.categoryCounts.forEach(({ subCategory, count }) => {
+                    severityMap[subCategory] = count;
+                });
+                setSeverityCountMap(convertToGraphData(severityMap));
+            } finally {
+                setSeverityLoading(false);
+            }
         };
 
         const DEMO_ACCOUNT_ID = 1669322524;
@@ -748,6 +762,8 @@ function ThreatDetectionPage() {
         <ChartComponent
             categoryCount={categoryCount}
             severityCountMap={severityCountMap}
+            categoryLoading={categoryLoading}
+            severityLoading={severityLoading}
             onThreatTypeClick={handleThreatTypeClick}
             onSeverityClick={handleSeverityClick}
         />,
