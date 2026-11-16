@@ -28,6 +28,16 @@ _IDENTITY = {"Accept-Encoding": "identity"}
 _SLACK_TIMEOUT_S = 5.0
 _STORE_TIMEOUT_S = 10.0
 _TEXT_PREVIEW_CHARS = 1500
+_BLOB_CLIENT: httpx.AsyncClient | None = None
+
+
+def _blob_client() -> httpx.AsyncClient:
+    # One client for every Tripwire upload, so each answer reuses a connection to Blob Storage instead of paying
+    # a new TCP + TLS handshake.
+    global _BLOB_CLIENT
+    if _BLOB_CLIENT is None or _BLOB_CLIENT.is_closed:
+        _BLOB_CLIENT = httpx.AsyncClient(timeout=_STORE_TIMEOUT_S, limits=httpx.Limits(max_connections=20))
+    return _BLOB_CLIENT
 
 
 def _fmt_num(v: Any) -> str:
@@ -130,7 +140,8 @@ async def store_results(completed: list[dict[str, Any]], scanner_name: str) -> N
 async def store_tripwire_result(record: dict[str, Any]) -> None:
     """Upload one Tripwire record as its own JSON blob (Azure Put Blob, authorised by the SAS token in
     TRIPWIRE_RESULTS_BLOB_URL). Blobs are named <yyyy>/<mm>/<dd>/<hh>/<time>-<id>.json, so an hour or a day
-    lists together. The URL is never logged: it carries the SAS token."""
+    lists together. The URL carries the SAS token, so it is never logged: not here, and not by httpx, which
+    every runtime keeps at WARNING (scan_diag.quiet_http_client_logs)."""
     container = (settings.TRIPWIRE_RESULTS_BLOB_URL or "").strip()
     if not container:
         return
@@ -140,12 +151,11 @@ async def store_tripwire_result(record: dict[str, Any]) -> None:
     url = f"{base.rstrip('/')}/{name}" + (f"?{sas}" if sas else "")
     started = time.perf_counter()
     try:
-        async with httpx.AsyncClient(timeout=_STORE_TIMEOUT_S) as client:
-            resp = await client.put(
-                url,
-                headers={"x-ms-blob-type": "BlockBlob", "Content-Type": "application/json"},
-                content=json.dumps(record),
-            )
+        resp = await _blob_client().put(
+            url,
+            headers={"x-ms-blob-type": "BlockBlob", "Content-Type": "application/json"},
+            content=json.dumps(record),
+        )
         metrics_push.SAMPLES["alert"].record("tripwire_blob", (time.perf_counter() - started) * 1000.0)
         if resp.status_code >= 400:
             metrics_push.COUNTS["alert_errors"].increment(f"tripwire_blob:status_{resp.status_code}")
