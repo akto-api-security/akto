@@ -950,6 +950,14 @@ const settingRequests = {
         })
     },
 
+    savePortIOBiDirectionalSync(biDirectionalSyncEnabled, updateWorkflowId) {
+        return request({
+            url: '/api/savePortIOBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled, updateWorkflowId }
+        })
+    },
+
     removePortIOIntegration() {
         return request({
             url: '/api/removePortIOIntegration',

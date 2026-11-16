@@ -452,6 +452,13 @@ const settingFunctions = {
       })
       return portInteg
     },
+    savePortIOBiDirectionalSync: async function(biDirectionalSyncEnabled, updateWorkflowId) {
+      let portInteg = {}
+      await settingRequests.savePortIOBiDirectionalSync(biDirectionalSyncEnabled, updateWorkflowId).then((resp)=>{
+        portInteg = resp.portIOIntegration
+      })
+      return portInteg
+    },
     removePortIOIntegration: async function() {
       let trafficData = {}
       await settingRequests.removePortIOIntegration().then((resp)=>{

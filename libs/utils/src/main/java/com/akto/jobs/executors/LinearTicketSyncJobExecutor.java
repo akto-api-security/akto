@@ -11,6 +11,7 @@ import com.akto.jobs.JobExecutor;
 import com.akto.linear.LinearApiClient;
 import com.akto.linear.LinearApiClient.LinearIssueState;
 import com.akto.linear.LinearApiClient.LinearWorkflowState;
+import com.akto.linear.LinearStatusMapping;
 import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
@@ -19,8 +20,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -35,23 +34,6 @@ public class LinearTicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams
     public static final LinearTicketSyncJobExecutor INSTANCE = new LinearTicketSyncJobExecutor();
 
     private static final LoggerMaker logger = new LoggerMaker(LinearTicketSyncJobExecutor.class);
-
-    private static final Map<String, TestRunIssueStatus> LINEAR_TYPE_TO_AKTO = new HashMap<>();
-    private static final Map<TestRunIssueStatus, List<String>> AKTO_TO_LINEAR_TYPES = new HashMap<>();
-
-    static {
-        LINEAR_TYPE_TO_AKTO.put("triage", TestRunIssueStatus.OPEN);
-        LINEAR_TYPE_TO_AKTO.put("backlog", TestRunIssueStatus.OPEN);
-        LINEAR_TYPE_TO_AKTO.put("unstarted", TestRunIssueStatus.OPEN);
-        LINEAR_TYPE_TO_AKTO.put("started", TestRunIssueStatus.OPEN);
-        LINEAR_TYPE_TO_AKTO.put("completed", TestRunIssueStatus.FIXED);
-        LINEAR_TYPE_TO_AKTO.put("canceled", TestRunIssueStatus.IGNORED);
-        LINEAR_TYPE_TO_AKTO.put("duplicate", TestRunIssueStatus.IGNORED);
-
-        AKTO_TO_LINEAR_TYPES.put(TestRunIssueStatus.OPEN, Arrays.asList("unstarted", "backlog"));
-        AKTO_TO_LINEAR_TYPES.put(TestRunIssueStatus.FIXED, Collections.singletonList("completed"));
-        AKTO_TO_LINEAR_TYPES.put(TestRunIssueStatus.IGNORED, Collections.singletonList("canceled"));
-    }
 
     private LinearTicketSyncJobExecutor() {
         super(TicketSyncJobParams.class);
@@ -127,7 +109,7 @@ public class LinearTicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams
     }
 
     private int applyLinearStatusToAkto(TestingRunIssues issue, LinearIssueState linear) {
-        TestRunIssueStatus status = linear.getStateType() == null ? null : LINEAR_TYPE_TO_AKTO.get(linear.getStateType());
+        TestRunIssueStatus status = LinearStatusMapping.toAktoStatus(linear.getStateType());
         if (status == null || status == issue.getTestRunIssueStatus()) {
             return 0;
         }
@@ -147,13 +129,13 @@ public class LinearTicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams
     private int applyAktoStatusToLinear(String token, TestingRunIssues issue, LinearIssueState linear,
         Map<String, List<LinearWorkflowState>> statesByTeam) throws Exception {
         TestRunIssueStatus aktoStatus = issue.getTestRunIssueStatus();
-        List<String> targetTypes = aktoStatus == null ? null : AKTO_TO_LINEAR_TYPES.get(aktoStatus);
+        List<String> targetTypes = LinearStatusMapping.targetStateTypes(aktoStatus);
         if (targetTypes == null) {
             return 0;
         }
 
         LinearIssueState current = linear != null ? linear : LinearApiClient.fetchIssue(token, issue.getTicketId());
-        if (aktoStatus == LINEAR_TYPE_TO_AKTO.get(current.getStateType())) {
+        if (aktoStatus == LinearStatusMapping.toAktoStatus(current.getStateType())) {
             return 0;
         }
 

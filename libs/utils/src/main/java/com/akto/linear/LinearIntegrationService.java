@@ -2,15 +2,9 @@ package com.akto.linear;
 
 import com.akto.dao.LinearIntegrationDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.BidirectionalSyncSettingsDao;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.linear_integration.LinearIntegration;
-import com.akto.dto.jobs.Job;
-import com.akto.dto.jobs.JobExecutorType;
-import com.akto.dto.jobs.TicketSyncJobParams;
 import com.akto.dto.linear_integration.LinearTeamMapping;
-import com.akto.dto.testing.BidirectionalSyncSettings;
-import com.akto.jobs.JobScheduler;
 import com.akto.jobs.executors.LinearTicketSyncJobExecutor;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -22,12 +16,12 @@ import com.akto.linear.LinearApiClient.LinearIssue;
 import com.akto.linear.LinearApiClient.LinearTeam;
 import com.akto.log.LoggerMaker;
 import com.akto.ticketing.ATicketIntegrationService;
+import com.akto.ticketing.TicketSyncScheduler;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.utils.CurlUtils;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
@@ -39,7 +33,6 @@ import java.util.Map;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
 
 @NoArgsConstructor
 public class LinearIntegrationService extends ATicketIntegrationService<LinearIntegration> {
@@ -65,8 +58,6 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         DEFAULT_SEVERITY_TO_PRIORITY.put(Severity.MEDIUM.name(), PRIORITY_MEDIUM);
         DEFAULT_SEVERITY_TO_PRIORITY.put(Severity.LOW.name(), PRIORITY_LOW);
     }
-
-    private static final int SYNC_INTERVAL_SECONDS = 3600;
 
     private String apiToken;
 
@@ -174,9 +165,9 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         }
 
         if (enabled) {
-            startSyncJob();
+            TicketSyncScheduler.start(GlobalEnums.TicketSource.LINEAR, LinearTicketSyncJobExecutor.SYNC_KEY);
         } else {
-            stopSyncJob();
+            TicketSyncScheduler.stop(GlobalEnums.TicketSource.LINEAR, LinearTicketSyncJobExecutor.SYNC_KEY);
         }
 
         LinearIntegration updated = LinearIntegrationDao.instance.getMCollection().findOneAndUpdate(
@@ -191,73 +182,6 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
             updated.setApiToken(null);
         }
         return updated;
-    }
-
-    private void startSyncJob() throws Exception {
-        BidirectionalSyncSettings settings = findSyncSettings();
-
-        if (settings == null) {
-            Job job = JobScheduler.scheduleRecurringJob(Context.accountId.get(),
-                new TicketSyncJobParams(GlobalEnums.TicketSource.LINEAR.name(),
-                    LinearTicketSyncJobExecutor.SYNC_KEY, Context.now()),
-                JobExecutorType.DASHBOARD, SYNC_INTERVAL_SECONDS);
-            if (job == null) {
-                throw new Exception("Failed to schedule the Linear sync job. Please try again.");
-            }
-
-            BidirectionalSyncSettings created = new BidirectionalSyncSettings();
-            created.setSource(GlobalEnums.TicketSource.LINEAR);
-            created.setProjectKey(LinearTicketSyncJobExecutor.SYNC_KEY);
-            created.setActive(true);
-            created.setLastSyncedAt(Context.now());
-            created.setJobId(job.getId());
-            BidirectionalSyncSettingsDao.instance.insertOne(created);
-            return;
-        }
-
-        ObjectId jobId = settings.getJobId();
-        if (!settings.isActive()) {
-            Job job = JobScheduler.restartJob(jobId);
-            if (job == null) {
-                throw new Exception("Failed to restart the Linear sync job. Please try again.");
-            }
-            jobId = job.getId();
-        }
-
-        BidirectionalSyncSettingsDao.instance.updateOne(
-            Filters.eq(BidirectionalSyncSettings.ID, settings.getId()),
-            Updates.combine(
-                Updates.set(BidirectionalSyncSettings.ACTIVE, true),
-                Updates.set(BidirectionalSyncSettings.LAST_SYNCED_AT, Context.now()),
-                Updates.set(BidirectionalSyncSettings.JOB_ID, jobId)
-            )
-        );
-    }
-
-    private void stopSyncJob() {
-        BidirectionalSyncSettings settings = findSyncSettings();
-        if (settings == null || !settings.isActive()) {
-            return;
-        }
-
-        BidirectionalSyncSettingsDao.instance.updateOne(
-            Filters.eq(BidirectionalSyncSettings.ID, settings.getId()),
-            Updates.combine(
-                Updates.set(BidirectionalSyncSettings.ACTIVE, false),
-                Updates.set(BidirectionalSyncSettings.LAST_SYNCED_AT, Context.now())
-            )
-        );
-
-        if (settings.getJobId() != null) {
-            JobScheduler.deleteJob(settings.getJobId());
-        }
-    }
-
-    private BidirectionalSyncSettings findSyncSettings() {
-        return BidirectionalSyncSettingsDao.instance.findOne(Filters.and(
-            Filters.eq(BidirectionalSyncSettings.SOURCE, GlobalEnums.TicketSource.LINEAR.name()),
-            Filters.eq(BidirectionalSyncSettings.PROJECT_KEY, LinearTicketSyncJobExecutor.SYNC_KEY)
-        ));
     }
 
     public LinearIntegration fetchLinearIntegration() {
@@ -287,7 +211,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
 
     public void removeIntegration() throws Exception {
         try {
-            stopSyncJob();
+            TicketSyncScheduler.stop(GlobalEnums.TicketSource.LINEAR, LinearTicketSyncJobExecutor.SYNC_KEY);
             LinearIntegrationDao.instance.getMCollection().deleteOne(new BasicDBObject());
             logger.infoAndAddToDb("Linear integration removed successfully", LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {
