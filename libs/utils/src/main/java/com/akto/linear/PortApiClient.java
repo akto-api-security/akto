@@ -3,6 +3,7 @@ package com.akto.linear;
 import com.akto.linear.LinearApiClient.LinearIssue;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import lombok.AccessLevel;
@@ -26,6 +27,7 @@ public final class PortApiClient {
     private static final String STATUS_COMPLETED = "COMPLETED";
     private static final String RESULT_SUCCESS = "SUCCESS";
     private static final String ISSUE_URL_KEY = "issueUrl";
+    private static final List<String> PRIORITY_LABELS = Arrays.asList("No priority", "Urgent", "High", "Normal", "Low");
     private static final int MAX_OUTPUT_DEPTH = 3;
 
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
@@ -57,7 +59,7 @@ public final class PortApiClient {
         int priority) throws Exception {
         BasicDBObject inputs = new BasicDBObject("title", title)
             .append("description", description)
-            .append("priority", priority);
+            .append("priority", priorityLabel(priority));
 
         BasicDBObject started = call(authorized(accessToken, "/workflows/" + workflowId.trim() + "/runs")
             .post(RequestBody.create(new BasicDBObject("inputs", inputs).toJson(), JSON_MEDIA_TYPE))
@@ -82,6 +84,10 @@ public final class PortApiClient {
         }
 
         throw new Exception("Port workflow run " + runId + " did not finish in time.");
+    }
+
+    static String priorityLabel(int priority) {
+        return priority >= 0 && priority < PRIORITY_LABELS.size() ? PRIORITY_LABELS.get(priority) : PRIORITY_LABELS.get(0);
     }
 
     static LinearIssue extractIssue(BasicDBObject run) throws Exception {

@@ -55,6 +55,16 @@ public class PortApiClientTest {
     }
 
     @Test
+    public void mapsPriorityNumbersToPortLabels() {
+        assertEquals("No priority", PortApiClient.priorityLabel(0));
+        assertEquals("Urgent", PortApiClient.priorityLabel(1));
+        assertEquals("High", PortApiClient.priorityLabel(2));
+        assertEquals("Normal", PortApiClient.priorityLabel(3));
+        assertEquals("Low", PortApiClient.priorityLabel(4));
+        assertEquals("No priority", PortApiClient.priorityLabel(9));
+    }
+
+    @Test
     public void reportsLinearErrorWhenNoIssueIsReturned() {
         Exception e = assertThrows(Exception.class,
             () -> PortApiClient.extractIssue(BasicDBObject.parse(GRAPHQL_ERROR_RUN)));
