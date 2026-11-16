@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,6 +40,9 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.testing.login_flow.LoginFlowCookieJar;
+import com.akto.testing.login_flow.PlaceholderException;
+import com.akto.testing.login_flow.PlaceholderResolver;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -146,63 +150,58 @@ public class Utils {
             }
         }
 
+        if (headers == null) return;
+        List<String> rawSetCookies = new ArrayList<>();
         for (String headerName: headers.keySet()) {
             List<String> headerValues = headers.get(headerName);
-            String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;
+            if (headerValues == null || headerValues.isEmpty()) continue;
 
-            switch (headerValues.size()) {
-                case 0: 
-                    continue;
-                case 1: 
-                    valuesMap.put(key, headerValues.get(0));
-                    continue;
-                default: 
-                    String val =  String.join(";", headers.get(headerName));
-                    valuesMap.put(key, val);
+            // HTTP/2 servers send lower-case names; also expose every header under its lower-case name
+            List<String> names = new ArrayList<>();
+            names.add(headerName);
+            String lower = headerName.toLowerCase();
+            if (!lower.equals(headerName) && !headers.containsKey(lower)) names.add(lower);
+
+            String headerValue = headerValues.size() == 1 ? headerValues.get(0) : String.join(";", headerValues);
+            for (String name : names) {
+                valuesMap.put(nodeId + "." + reqOrResp + ".header." + name, headerValue);
             }
 
-            if (headerName.equalsIgnoreCase("cookie") || headerName.equalsIgnoreCase("set-cookie")) {
-                for (String headerValue : headerValues) {
-                    if (headerValue == null || headerValue.isEmpty()) {
-                        continue;
-                    }
+            boolean isSetCookie = lower.equals("set-cookie");
+            if (!isSetCookie && !lower.equals("cookie")) continue;
+            if (isSetCookie && !isRequest) rawSetCookies.addAll(headerValues);
 
-                    // Parse cookies from the header value
-                    // Cookie format: "key1=value1; key2=value2"
-                    // Set-Cookie format: "key=value; Path=/; HttpOnly" (may have attributes)
-                    String[] cookiePairs = headerValue.split(";");
-                    for (String cookiePair : cookiePairs) {
-                        cookiePair = cookiePair.trim();
-                        int equalsIndex = cookiePair.indexOf('=');
-                        if (equalsIndex > 0) {
-                            String cookieKey = cookiePair.substring(0, equalsIndex).trim();
-                            String cookieValue = cookiePair.substring(equalsIndex + 1).trim();
-
-                            // Skip Set-Cookie attributes (Path, Domain, Secure, HttpOnly, SameSite, Max-Age, Expires)
-                            if (headerName.equalsIgnoreCase("set-cookie")) {
-                                if (cookieKey.equalsIgnoreCase("Path") ||
-                                    cookieKey.equalsIgnoreCase("Domain") ||
-                                    cookieKey.equalsIgnoreCase("Secure") ||
-                                    cookieKey.equalsIgnoreCase("HttpOnly") ||
-                                    cookieKey.equalsIgnoreCase("SameSite") ||
-                                    cookieKey.equalsIgnoreCase("Max-Age") ||
-                                    cookieKey.equalsIgnoreCase("Expires")) {
-                                    continue;
-                                }
-                            }
-
-                            // Store individual cookie key-value pair
-                            String cookieMapKey = nodeId + "." + reqOrResp + "." + "header" + "." + headerName + "." + cookieKey;
-                            valuesMap.put(cookieMapKey, cookieValue);
-                        }
+            // individual cookie values: <node>.<req|resp>.header.<header name>.<cookie name>
+            for (String value : headerValues) {
+                if (value == null || value.isEmpty()) continue;
+                List<String[]> cookies = new ArrayList<>();
+                if (isSetCookie) {
+                    LoginFlowCookieJar.ParsedSetCookie parsed = LoginFlowCookieJar.parseSetCookie(value);
+                    if (parsed != null) cookies.add(new String[]{parsed.getName(), parsed.getValue()});
+                } else {
+                    cookies.addAll(LoginFlowCookieJar.parseCookieHeader(value));
+                }
+                for (String[] cookie : cookies) {
+                    for (String name : names) {
+                        valuesMap.put(nodeId + "." + reqOrResp + ".header." + name + "." + cookie[0], cookie[1]);
                     }
                 }
             }
-
+        }
+        if (!rawSetCookies.isEmpty()) {
+            valuesMap.put(nodeId + LoginFlowCookieJar.RAW_SET_COOKIE_SUFFIX, LoginFlowCookieJar.joinRaw(rawSetCookies));
         }
     }
 
     public static OriginalHttpRequest buildHttpRequest(WorkflowUpdatedSampleData updatedSampleData, Map<String, Object> valuesMap) throws Exception {
+        return buildHttpRequest(updatedSampleData, valuesMap, null);
+    }
+
+    /**
+     * @param loginFlowNodeId node id of a login-flow step (enables stepK aliases and ${cookies...}, scoped to
+     *                        nodes before this one); null for API workflow tests (original placeholder behaviour)
+     */
+    public static OriginalHttpRequest buildHttpRequest(WorkflowUpdatedSampleData updatedSampleData, Map<String, Object> valuesMap, String loginFlowNodeId) throws Exception {
 
         String sampleData = updatedSampleData.getOrig();
         OriginalHttpRequest request = new OriginalHttpRequest();
@@ -214,12 +213,15 @@ public class Utils {
         String requestUrl = updatedSampleData.getRequestUrl();
 
         String queryFromReplacedUrl = null;
+        boolean loginFlow = loginFlowNodeId != null;
 
         boolean userSuppliedQueryParamsNullOrEmpty = queryParams == null || queryParams.trim().length() == 0;
         if (requestUrl != null) {
             loggerMaker.infoAndAddToDb("requestUrl: " + requestUrl);
-            String rawUrl = executeCode(requestUrl, valuesMap);
-            loggerMaker.infoAndAddToDb("rawUrl: " + requestUrl);
+            // the URL itself has no request URL to scope ${cookies} to
+            String rawUrl = loginFlow
+                    ? resolveTemplate(requestUrl, valuesMap, PlaceholderResolver.Options.loginFlow(loginFlowNodeId, null))
+                    : executeCode(requestUrl, valuesMap);
             // this url might contain urlQueryParams. We need to move it queryParams
             String[] rawUrlArr = rawUrl.split("\\?");
             request.setUrl(rawUrlArr[0]);
@@ -227,8 +229,12 @@ public class Utils {
                 queryFromReplacedUrl = rawUrlArr[1];
             }
             loggerMaker.infoAndAddToDb("final url: " + request.getUrl());
-            loggerMaker.infoAndAddToDb("queryFromReplacedUrl: " + queryFromReplacedUrl);
+            loggerMaker.infoAndAddToDb("queryFromReplacedUrl length: " + (queryFromReplacedUrl == null ? 0 : queryFromReplacedUrl.length()));
         }
+
+        PlaceholderResolver.Options options = loginFlow
+                ? PlaceholderResolver.Options.loginFlow(loginFlowNodeId, request.getUrl())
+                : PlaceholderResolver.Options.standard(true, true);
 
         if (userSuppliedQueryParamsNullOrEmpty) {
             loggerMaker.infoAndAddToDb("setting null");
@@ -236,12 +242,12 @@ public class Utils {
         }
 
         if (requestPayload != null) {
-            String finalPayload =  executeCode(requestPayload, valuesMap);
+            String finalPayload = resolveTemplate(requestPayload, valuesMap, options);
             request.setBody(finalPayload);
         }
 
         if (requestHeaders != null) {
-            String finalPayload = executeCode(requestHeaders, valuesMap);
+            String finalPayload = resolveTemplate(requestHeaders, valuesMap, options);
             Map<String, List<String>> res = OriginalHttpRequest.buildHeadersMap(finalPayload);
             request.setHeaders(res);
         }
@@ -250,14 +256,14 @@ public class Utils {
 
         if (!userSuppliedQueryParamsNullOrEmpty) {
             loggerMaker.infoAndAddToDb("user has supplied query params");
-            String finalQueryParams = executeCode(queryParams, valuesMap);
-            loggerMaker.infoAndAddToDb("finalQueryParams: " + finalQueryParams);
+            String finalQueryParams = resolveTemplate(queryParams, valuesMap, options);
+            loggerMaker.infoAndAddToDb("finalQueryParams length: " + finalQueryParams.length());
             if (queryFromReplacedUrlNullOrEmpty) {
                 request.setQueryParams(finalQueryParams);
             } else {
                 // combine original query params and user defined query params and latter overriding former
                 String combinedQueryParams = OriginalHttpRequest.combineQueryParams(queryFromReplacedUrl, finalQueryParams);
-                loggerMaker.infoAndAddToDb("combinedQueryParams: " + combinedQueryParams);
+                loggerMaker.infoAndAddToDb("combinedQueryParams length: " + (combinedQueryParams == null ? 0 : combinedQueryParams.length()));
                 request.setQueryParams(combinedQueryParams);
             }
         } else if (!queryFromReplacedUrlNullOrEmpty) {
@@ -267,98 +273,144 @@ public class Utils {
         return request;
     }
 
-    private static final ScriptEngineManager factory = new ScriptEngineManager();
+    public static final String JS_ENGINE_UNAVAILABLE = "JS expression (#[ ... ]#) can't be evaluated: no JavaScript "
+            + "engine (Nashorn) is available in this runtime; use filters instead, e.g. "
+            + "${x1.response.body.token|regex:<pattern>} or |urlencode";
+    public static final String TEST_VALIDATOR_NOT_EVALUATED = "testValidatorCode was not evaluated (no JavaScript "
+            + "engine in this runtime, or the script failed or did not return a boolean); see logs";
+    // same pattern the original executeCode used (single line, non-greedy)
+    private static final Pattern JS_BLOCK = Pattern.compile("#\\[(.*?)]#");
+    private static final ScriptEngineManager SCRIPT_ENGINE_MANAGER = new ScriptEngineManager();
+    // Nashorn: built in on Java 8; on JDK 11+ builds the standalone nashorn-core comes from the nashorn-standalone
+    // profile in libs/utils/pom.xml. A fresh engine per template, as before. Replaceable in tests only.
+    static volatile Supplier<ScriptEngine> jsEngineSupplier = () -> SCRIPT_ENGINE_MANAGER.getEngineByName("nashorn");
+    // mini-only: ${x0.unique_<suffix>} generates "<suffix>_<nanoTime>" when the key is absent (kept from the old resolver)
+    private static final Pattern UNIQUE_PLACEHOLDER = Pattern.compile("\\$\\{\\s*(x0\\.[^|}\\s]+)");
+    private static final String UNIQUE_PREFIX = "x0.unique_";
 
+    // Resolves placeholders, then evaluates #[ ... ]# blocks with the JS engine (see resolveTemplate).
     public static String executeCode(String ogPayload, Map<String, Object> valuesMap) throws Exception {
-        String variablesReplacedPayload = replaceVariables(ogPayload,valuesMap, true);
-
-        String regex = "\\#\\[(.*?)]#";
-        Pattern p = Pattern.compile(regex);
-        Matcher matcher = p.matcher(variablesReplacedPayload);
-        StringBuffer sb = new StringBuffer();
-
-        // create a Nashorn script engine
-        ScriptEngine engine = factory.getEngineByName("nashorn");
-
-        while (matcher.find()) {
-            String code = matcher.group(1);
-            code = code.trim();
-            if (!code.endsWith(";")) code = code+";";
-            try {
-                Object val = engine.eval(code);
-                matcher.appendReplacement(sb, val.toString());
-            } catch (final ScriptException se) {
-            }
-
-        }
-
-        matcher.appendTail(sb); 
-        return sb.toString();
+        return resolveTemplate(ogPayload, valuesMap, PlaceholderResolver.Options.standard(true, true));
     }
 
-
+    // mini stays strict: a missing key always throws (akto's 4-arg variant can skip it)
     public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
-        String regex = "\\$\\{((x|step)\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
-        Pattern p = Pattern.compile(regex);
-
-        // replace with values
-        Matcher matcher = p.matcher(payload);
-        StringBuffer sb = new StringBuffer();
-        while (matcher.find()) {
-            String key = matcher.group(1);
-            if (key == null) continue;
-            Object obj = valuesMap.get(key);
-            if (obj == null) {
-                if (key.toLowerCase().startsWith("x0.unique_")) {
-                    String suffix = key.substring(key.toLowerCase().indexOf("_")+1);
-                    obj = suffix+"_"+System.nanoTime();
-                } else {
-                    loggerMaker.errorAndAddToDb("couldn't find: " + key);
-                    throw new Exception("Couldn't find " + key);
-                }
-            }
-            String val = obj.toString();
-            if (escapeString) {
-                val = val.replace("\\", "\\\\")
-                        .replace("\t", "\\t")
-                        .replace("\b", "\\b")
-                        .replace("\n", "\\n")
-                        .replace("\r", "\\r")
-                        .replace("\f", "\\f")
-                        .replace("\'", "\\'")
-                        .replace("\"", "\\\"");
-            }
-            matcher.appendReplacement(sb, "");
-            sb.append(val);
-        }
-
-        matcher.appendTail(sb);
-
-        return sb.toString();
+        return resolvePlaceholders(payload, valuesMap, PlaceholderResolver.Options.standard(escapeString, true));
     }
 
-    public static boolean validateTest(String testValidatorCode, Map<String, Object> valuesMap) {
-        if (testValidatorCode == null) return false;
-        testValidatorCode = testValidatorCode.trim();
-
-        boolean vulnerable = false;
-        if (testValidatorCode.length() == 0) return false;
-
-        ScriptEngine engine = factory.getEngineByName("nashorn");
+    public static String resolvePlaceholders(String payload, Map<String, Object> valuesMap, PlaceholderResolver.Options options) throws PlaceholderException {
         try {
-            String code = replaceVariables(testValidatorCode, valuesMap, true);
-            loggerMaker.infoAndAddToDb("*******************************************************************");
-            loggerMaker.infoAndAddToDb("TEST VALIDATOR CODE:");
-            loggerMaker.infoAndAddToDb(code);
-            Object o = engine.eval(code);
-            loggerMaker.infoAndAddToDb("TEST VALIDATOR RESULT: " + o.toString());
-            loggerMaker.infoAndAddToDb("*******************************************************************");
-            vulnerable = ! (boolean) o;
-        } catch (Exception e) {
-            ;
+            return PlaceholderResolver.resolve(payload, withUniqueValues(payload, valuesMap), options);
+        } catch (PlaceholderException e) {
+            // resolver messages name keys and patterns only, never values
+            loggerMaker.errorAndAddToDb("placeholder resolution failed: " + e.getMessage());
+            throw e;
         }
+    }
 
-        return vulnerable;
+    /**
+     * Resolves a request template and evaluates the #[ ... ]# blocks written in it, as executeCode always did.
+     * Differences from the original (which substituted the whole payload, then evaluated every block in the result):
+     * - only blocks present in the template are evaluated; a resolved value containing "#[ ]#" is never run as JS
+     * - placeholders inside a block get JS-string escaping (' -> \'), outside they get JSON escaping
+     * - no JS engine in this runtime -> explicit error instead of a NullPointerException
+     * A block whose script fails (or returns null) is left in place, as before, and the failure is logged.
+     */
+    public static String resolveTemplate(String template, Map<String, Object> valuesMap, PlaceholderResolver.Options options) throws PlaceholderException {
+        if (template == null) return null;
+        Matcher block = JS_BLOCK.matcher(template);
+        if (!block.find()) {
+            return resolvePlaceholders(template, valuesMap, options);
+        }
+        ScriptEngine engine = jsEngineSupplier.get();
+        if (engine == null) {
+            loggerMaker.errorAndAddToDb(JS_ENGINE_UNAVAILABLE);
+            throw new PlaceholderException(JS_ENGINE_UNAVAILABLE);
+        }
+        StringBuilder out = new StringBuilder(template.length());
+        int last = 0;
+        do {
+            out.append(resolvePlaceholders(template.substring(last, block.start()), valuesMap, options));
+            String code = resolvePlaceholders(block.group(1), valuesMap, options.forJsExpression());
+            out.append(evaluateJsBlock(engine, code, block.group()));
+            last = block.end();
+        } while (block.find());
+        out.append(resolvePlaceholders(template.substring(last), valuesMap, options));
+        return out.toString();
+    }
+
+    private static String evaluateJsBlock(ScriptEngine engine, String resolvedCode, String originalBlock) {
+        String code = resolvedCode.trim();
+        if (!code.endsWith(";")) code = code + ";";
+        try {
+            Object val = engine.eval(code);
+            if (val != null) return val.toString();
+            loggerMaker.errorAndAddToDb("JS expression returned null; block left unevaluated");
+        } catch (ScriptException se) {
+            // the message can quote substituted values, so log only where it failed
+            loggerMaker.errorAndAddToDb("JS expression failed at line " + se.getLineNumber() + ", column "
+                    + se.getColumnNumber() + "; block left unevaluated");
+        }
+        return originalBlock;
+    }
+
+    public static boolean isJsEngineAvailable() {
+        return jsEngineSupplier.get() != null;
+    }
+
+    // Overlay (the caller's map is never modified) holding a generated value for each absent ${x0.unique_<suffix>}.
+    static Map<String, Object> withUniqueValues(String template, Map<String, Object> valuesMap) {
+        if (template == null || !template.contains("${")) return valuesMap;
+        Map<String, Object> overlay = null;
+        Matcher m = UNIQUE_PLACEHOLDER.matcher(template);
+        while (m.find()) {
+            String key = m.group(1);
+            if (!key.toLowerCase().startsWith(UNIQUE_PREFIX)) continue;
+            if (valuesMap != null && valuesMap.get(key) != null) continue;
+            if (overlay == null) overlay = valuesMap == null ? new HashMap<String, Object>() : new HashMap<>(valuesMap);
+            if (!overlay.containsKey(key)) {
+                overlay.put(key, key.substring(key.indexOf('_') + 1) + "_" + System.nanoTime());
+            }
+        }
+        return overlay == null ? valuesMap : overlay;
+    }
+
+    public static boolean hasTestValidator(String testValidatorCode) {
+        return testValidatorCode != null && !testValidatorCode.trim().isEmpty();
+    }
+
+    // Original behaviour: a validator returning true means "not vulnerable"; anything else that runs is false.
+    public static boolean validateTest(String testValidatorCode, Map<String, Object> valuesMap) {
+        return Boolean.TRUE.equals(evaluateTestValidator(testValidatorCode, valuesMap));
+    }
+
+    /**
+     * Runs the JS validator like validateTest always did, but tells "not evaluated" apart from "not vulnerable":
+     * returns null when there is no validator, no JS engine, or the script fails / doesn't return a boolean.
+     * Callers with a validator set should report null as TEST_VALIDATOR_NOT_EVALUATED.
+     */
+    public static Boolean evaluateTestValidator(String testValidatorCode, Map<String, Object> valuesMap) {
+        if (!hasTestValidator(testValidatorCode)) return null;
+        ScriptEngine engine = jsEngineSupplier.get();
+        if (engine == null) {
+            loggerMaker.errorAndAddToDb("testValidatorCode not evaluated: no JavaScript engine in this runtime");
+            return null;
+        }
+        try {
+            String code = resolvePlaceholders(testValidatorCode.trim(), valuesMap,
+                    PlaceholderResolver.Options.standard(true, true).forJsExpression());
+            Object o = engine.eval(code);
+            if (!(o instanceof Boolean)) {
+                loggerMaker.errorAndAddToDb("testValidatorCode not evaluated: result is not a boolean");
+                return null;
+            }
+            // resolved code and values can carry secrets: log only the outcome
+            loggerMaker.infoAndAddToDb("test validator evaluated: " + o);
+            return !((Boolean) o);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("testValidatorCode not evaluated: " + e.getClass().getSimpleName());
+            return null;
+        }
     }
 
     public static MediaType getMediaType(String fileUrl) {

@@ -138,6 +138,8 @@ Independent of test runs, `checkForPlaygroundTest`
 interactive one-off requests from the test editor UI: test-editor playground,
 Postman imports, login-flow tests, recorded JSON flows. These run inline (not via
 Kafka) and write results straight back to the `TestingRunPlayground` document.
+Login-flow (LOGIN_REQUEST) execution, placeholders, error messages and log redaction:
+[workflow_node_executor/CLAUDE.md](src/main/java/com/akto/testing/workflow_node_executor/CLAUDE.md).
 
 ## Key env vars
 
