@@ -952,6 +952,8 @@ function Violations() {
     const [summaryData, setSummaryData] = useState(null);
     const [summaryLoading, setSummaryLoading] = useState(true);
     const [selectedViolation, setSelectedViolation] = useState(null);
+    const [pendingReveal, setPendingReveal] = useState(null);
+    const [revealing, setRevealing] = useState(false);
     // Deep link from openViolationInGuardrailViolations (?refId=...) — auto-opens that exact
     // row's flyout as soon as it shows up in a fetched page, instead of only landing on the
     // filtered list. Cleared once matched so it doesn't re-trigger on a later, unrelated fetch.
@@ -1588,7 +1590,7 @@ function Violations() {
             if (pendingDeepLinkRefId.current) {
                 const deepLinkMatch = value.find(r => r.refId === pendingDeepLinkRefId.current);
                 if (deepLinkMatch) {
-                    setSelectedViolation(deepLinkMatch);
+                    setPendingReveal(deepLinkMatch);
                     pendingDeepLinkRefId.current = null;
                 }
             }
@@ -1723,7 +1725,23 @@ function Violations() {
     }, [isHumanApprovalTab, bulkPendingCount, handleBulkStatusUpdate, handleBulkHumanApproval]);
 
     const handleRowClick = (e) => {
-        if (e?.data) setSelectedViolation(e.data);
+        if (e?.data) setPendingReveal(e.data);
+    };
+
+    // Opens the content only after the view is audited.
+    const confirmReveal = async () => {
+        const row = pendingReveal;
+        if (!row || revealing) return;
+        setRevealing(true);
+        try {
+            await threatDetectionApi.auditContentView(row.refId, row.id);
+            setSelectedViolation(row);
+            setPendingReveal(null);
+        } catch (e) {
+            func.setToast(true, true, "Could not record this access in audit data. Please try again.");
+        } finally {
+            setRevealing(false);
+        }
     };
 
     const handleAddSearchFilter = useCallback((text, side, line) => {
@@ -1915,6 +1933,21 @@ function Violations() {
             onStatusUpdate={handleCaseUpdate}
             onHumanApproval={(response) => selectedViolation && handleHumanApproval(selectedViolation, response)}
         />,
+        <Modal
+            key="reveal-content"
+            open={!!pendingReveal}
+            onClose={() => { if (!revealing) setPendingReveal(null); }}
+            title="Show Guardrail Activity?"
+            primaryAction={{ content: "Show content", onAction: confirmReveal, loading: revealing }}
+            secondaryActions={[{ content: "Cancel", onAction: () => setPendingReveal(null), disabled: revealing }]}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd">
+                    Guardrail Activity can contain sensitive data. Your email, IP address and the time of
+                    this access will be recorded in audit data.
+                </Text>
+            </Modal.Section>
+        </Modal>,
         <ReviewCaseModal
             key="review-case"
             open={reviewModalOpen}
