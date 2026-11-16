@@ -37,7 +37,7 @@ const PortIO = () => {
             setWorkflowId(portInteg.workflowId || DEFAULT_WORKFLOW_ID)
             setSeverityToPriority({ ...DEFAULT_SEVERITY_TO_PRIORITY, ...portInteg.severityToPriority })
         } catch (error) {
-            func.setToast(true, true, errorMessageOf(error, 'Error fetching Port integration'))
+            func.setToast(true, true, errorMessageOf(error, 'Error fetching Port.io integration'))
         }
     }
 
@@ -51,10 +51,10 @@ const PortIO = () => {
             await settingFunctions.addPortIOIntegration(clientId.trim(), clientSecret.trim(), workflowId.trim())
             window.PORT_IO_INTEGRATED = 'true'
             setClientSecret('')
-            func.setToast(true, false, isIntegrated ? 'Successfully updated Port credentials' : 'Successfully saved Port credentials')
+            func.setToast(true, false, isIntegrated ? 'Successfully updated Port.io credentials' : 'Successfully saved Port.io credentials')
             await loadIntegration()
         } catch (error) {
-            func.setToast(true, true, errorMessageOf(error, 'Failed to save Port credentials'))
+            func.setToast(true, true, errorMessageOf(error, 'Failed to save Port.io credentials'))
         } finally {
             setIsSaving(false)
         }
@@ -84,9 +84,9 @@ const PortIO = () => {
             setWorkflowId(DEFAULT_WORKFLOW_ID)
             setSeverityToPriority(DEFAULT_SEVERITY_TO_PRIORITY)
             setEditingMapping(false)
-            func.setToast(true, false, 'Successfully removed Port integration')
+            func.setToast(true, false, 'Successfully removed Port.io integration')
         } catch (error) {
-            func.setToast(true, true, errorMessageOf(error, 'Failed to remove Port integration'))
+            func.setToast(true, true, errorMessageOf(error, 'Failed to remove Port.io integration'))
         } finally {
             setIsSaving(false)
         }
@@ -111,7 +111,7 @@ const PortIO = () => {
             }]}
         >
             <LegacyCard.Section>
-                <Text variant="headingMd">Integrate Port</Text>
+                <Text variant="headingMd">Integrate Port.io</Text>
             </LegacyCard.Section>
             <LegacyCard.Section>
                 <VerticalStack gap="4">
@@ -126,18 +126,18 @@ const PortIO = () => {
                         label="Client secret"
                         helpText={isIntegrated
                             ? 'Your client secret is saved. Enter it again to update the credentials'
-                            : 'Port client secret. It is only used to run your Port workflow'}
+                            : 'Port.io client secret. It is only used to run your Port.io workflow'}
                         field={clientSecret}
                         onFunc={true}
                         setField={setClientSecret}
-                        placeholder="Port client secret"
+                        placeholder="Port.io client secret"
                         requiredIndicator
                     />
                     <TextField
                         label="Workflow identifier"
                         value={workflowId}
                         onChange={setWorkflowId}
-                        helpText="Identifier of the Port workflow that creates the Linear issue. The Linear team is set inside that workflow"
+                        helpText="Identifier of the Port.io workflow that creates the Linear issue. The Linear team is set inside that workflow"
                         autoComplete="off"
                         requiredIndicator
                     />
@@ -155,7 +155,7 @@ const PortIO = () => {
                     <VerticalStack gap="1">
                         <Text variant="headingMd">Severity to Priority Mapping</Text>
                         <Text variant="bodyMd" color="subdued">
-                            Akto sends the mapped priority to your Port workflow as the priority input
+                            Akto sends the mapped priority to your Port.io workflow as the priority input
                         </Text>
                     </VerticalStack>
                     <AllowedAction allowed={canCall('api/savePortIOSeverityMapping')}>
@@ -181,11 +181,11 @@ const PortIO = () => {
         </LegacyCard>
     )
 
-    const cardContent = "Create Linear issues for " + mapLabel('API', getDashboardCategory()) + " vulnerability findings through your Port workflow. Akto only needs Port credentials; the Linear key and team stay in Port"
+    const cardContent = "Create Linear issues for " + mapLabel('API', getDashboardCategory()) + " vulnerability findings through your Port.io workflow. Akto only needs Port.io credentials; the Linear key and team stay in Port.io"
 
     return (
         <IntegrationsLayout
-            title="Port"
+            title="Port.io"
             cardContent={cardContent}
             component={
                 <VerticalStack gap="4">

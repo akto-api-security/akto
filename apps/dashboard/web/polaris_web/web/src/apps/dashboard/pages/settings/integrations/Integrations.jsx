@@ -105,7 +105,7 @@ function Integrations() {
     }
     let portIOObj={
       id: 'port',
-      name:'Port',
+      name:'Port.io',
       source: '/public/portio.svg'
     }
     let jenkinsObj={

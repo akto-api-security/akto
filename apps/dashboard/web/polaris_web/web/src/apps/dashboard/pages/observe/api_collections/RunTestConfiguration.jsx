@@ -65,7 +65,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
     const ticketToolOptions = [
         ...(jiraProjectMap ? [{ label: 'Jira', value: 'JIRA' }] : []),
         ...(linearTeamsMap ? [{ label: 'Linear', value: 'LINEAR' }] : []),
-        ...(portIOIntegrated ? [{ label: 'Linear via Port', value: 'PORT_IO' }] : [])
+        ...(portIOIntegrated ? [{ label: 'Linear via Port.io', value: 'PORT_IO' }] : [])
     ]
 
     const ticketSource = testRun?.autoTicketingDetails?.ticketSource || 'JIRA'

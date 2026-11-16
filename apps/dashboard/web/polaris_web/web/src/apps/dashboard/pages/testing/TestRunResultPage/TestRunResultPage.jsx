@@ -479,17 +479,17 @@ function TestRunResultPage(props) {
   }
 
   async function createPortIOTicket(issueId) {
-    setToast(true, false, "Creating Linear Ticket through Port")
+    setToast(true, false, "Creating Linear Ticket through Port.io")
 
     await issuesApi.createPortIOTickets([issueId], window.location.origin).then(async (res) => {
       await fetchData();
       if (res?.errorMessage) {
         setToast(true, false, res.errorMessage)
       } else {
-        setToast(true, false, "Linear Ticket Created through Port, scroll down to view")
+        setToast(true, false, "Linear Ticket Created through Port.io, scroll down to view")
       }
     }).catch((err) => {
-      setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating Linear ticket through Port")
+      setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating Linear ticket through Port.io")
     })
   }
 

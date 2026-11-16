@@ -465,7 +465,7 @@ function TestRunResultFlyout(props) {
             onCreate: handleLinearClick
         },
         {
-            id: 'port', label: 'Linear via Port', logo: '/public/portio.svg',
+            id: 'port', label: 'Linear via Port.io', logo: '/public/portio.svg',
             integrated: window.PORT_IO_INTEGRATED === 'true',
             allowed: canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets'),
             ticketUrl: linearIssueUrl, ticketKey: hasTicket(linearIssueUrl) ? getLinearKey(linearIssueUrl) : '',
@@ -790,7 +790,7 @@ function TestRunResultFlyout(props) {
                                 issueId={issueDetails.id}
                             />
                            
-                            {!showTicketMenu && window.PORT_IO_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets')}><Button id={"create-port-ticket-button"} primary onClick={handlePortClick} disabled={!!linearIssueUrl}>Create Linear Ticket via Port</Button></AllowedAction> : <></>}
+                            {!showTicketMenu && window.PORT_IO_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets')}><Button id={"create-port-ticket-button"} primary onClick={handlePortClick} disabled={!!linearIssueUrl}>Create Linear Ticket via Port.io</Button></AllowedAction> : <></>}
 
                             { window?.WIZ_INTEGRATED === 'true' ? 
                                 <AllowedAction allowed={canCall('api/createWizFindings')}>
