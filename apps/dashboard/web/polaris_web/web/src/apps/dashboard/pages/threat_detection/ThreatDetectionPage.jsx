@@ -10,7 +10,7 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon } from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Modal, Text } from "@shopify/polaris";
 import { FileMinor } from '@shopify/polaris-icons';
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
@@ -359,6 +359,8 @@ function ThreatDetectionPage() {
     const [detailsLoading, setDetailsLoading] = useState(false);
     const pollingIntervalRef = useRef(null);
     const [pendingRowContext, setPendingRowContext] = useState(null);
+    const [revealedRefId, setRevealedRefId] = useState(null);
+    const [revealing, setRevealing] = useState(false);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
     const showNewLayoutToggle = isEndpointSecurityCategory() || isAgenticSecurityCategory();
@@ -426,6 +428,7 @@ function ThreatDetectionPage() {
     const handleDetailsVisibility = useCallback((visible) => {
         setShowDetails(visible);
         if (!visible) {
+            setRevealedRefId(null);
             clearEventState();
         }
     }, [clearEventState]);
@@ -732,7 +735,7 @@ function ThreatDetectionPage() {
           urlParams.get("filterId")
         );
         
-        if (!hasParams || !queryParams.hasQueryEvent) {
+        if (!hasParams || !queryParams.hasQueryEvent || revealedRefId !== queryParams.refId) {
             return;
         }
         
@@ -741,7 +744,22 @@ function ThreatDetectionPage() {
         return () => {
             isMountedRef.current = false;
         };
-      }, [queryParams.hasQueryEvent, queryParams.refId, fetchEventDetails, location.search]);
+      }, [queryParams.hasQueryEvent, queryParams.refId, fetchEventDetails, location.search, revealedRefId]);
+
+      const revealPending = queryParams.hasQueryEvent && revealedRefId !== queryParams.refId;
+
+      const confirmReveal = async () => {
+        if (revealing) return;
+        setRevealing(true);
+        try {
+            await threatDetectionRequests.auditContentView(queryParams.refId, pendingRowContext?.eventId);
+            setRevealedRefId(queryParams.refId);
+        } catch (e) {
+            func.setToast(true, true, 'Could not record this access in audit data. Please try again.');
+        } finally {
+            setRevealing(false);
+        }
+      };
 
     // Normal mode - show table, charts, and sidebar
     const components = [
@@ -780,7 +798,7 @@ function ThreatDetectionPage() {
             key={"sus-sample-details"}
         /> :  <SampleDetails
                 title={"Attacker payload"}
-                showDetails={showDetails}
+                showDetails={showDetails && !revealPending}
                 setShowDetails={handleDetailsVisibility}
                 data={eventState.rowDataList}
                 key={`sus-sample-details-${eventState.currentRefId || 'default'}`}
@@ -793,9 +811,22 @@ function ThreatDetectionPage() {
                 humanResponse={eventState.currentHumanResponse}
                 loading={detailsLoading}
                 onAddAsSearchFilter={(text, side, line) => applyPayloadSearchRef.current?.(text, side, line)}
-            />
-            
-
+            />,
+        <Modal
+            key="reveal-content"
+            open={revealPending}
+            onClose={() => { if (!revealing) handleDetailsVisibility(false); }}
+            title="Show prompt content?"
+            primaryAction={{ content: "Show content", onAction: confirmReveal, loading: revealing }}
+            secondaryActions={[{ content: "Cancel", onAction: () => handleDetailsVisibility(false), disabled: revealing }]}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd">
+                    Prompts and responses can contain sensitive data. Your email, IP address and the time of
+                    this access will be recorded in audit data.
+                </Text>
+            </Modal.Section>
+        </Modal>
     ]
 
     // Both reuse the exact filters/tab/search currently applied on the table (registered by

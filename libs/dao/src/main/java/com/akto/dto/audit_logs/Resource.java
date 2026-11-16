@@ -19,4 +19,5 @@ public enum Resource {
     USER_ACCESS,
     CUSTOM_ROLE,
     SSO_CONFIG,
+    GUARDRAIL_ACTIVITY,
 }
