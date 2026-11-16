@@ -3,7 +3,6 @@ package com.akto.action;
 import static com.akto.action.SignupAction.BUSINESS_EMAIL_URI;
 import static com.akto.action.SignupAction.CHECK_INBOX_URI;
 import static com.akto.action.SignupAction.SSO_URL;
-import static com.akto.action.SignupAction.TEST_EDITOR_URL;
 import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 import com.akto.dao.SSOConfigsDao;
