@@ -181,7 +181,7 @@ const PortIO = () => {
         </LegacyCard>
     )
 
-    const cardContent = "Create Linear issues for " + mapLabel('API', getDashboardCategory()) + " findings by running a workflow in your Port.io organization. Akto starts the workflow and Port.io creates the issue in Linear, so your Linear API key and team stay in Port.io. Enter your Port.io client ID, client secret and the workflow identifier to connect."
+    const cardContent = "Create Linear issues for " + mapLabel('API', getDashboardCategory()) + " vulnerability findings through your Port.io workflow"
 
     return (
         <IntegrationsLayout
