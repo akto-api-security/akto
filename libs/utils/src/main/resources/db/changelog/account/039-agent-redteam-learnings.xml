@@ -33,7 +33,7 @@
         so createIndexIfAbsent treats them as already present.
     -->
 
-    <changeSet id="034-account-create-agent-redteam-observations" author="akto">
+    <changeSet id="039-account-create-agent-redteam-observations" author="akto">
         <preConditions onFail="MARK_RAN">
             <not>
                 <mongodb:collectionExists collectionName="agent_redteam_observations"/>
@@ -45,7 +45,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="034-account-agent-redteam-observations-run-identity-outcome-index" author="akto">
+    <changeSet id="039-account-agent-redteam-observations-run-identity-outcome-index" author="akto">
         <preConditions onFail="MARK_RAN">
             <mongodb:collectionExists collectionName="agent_redteam_observations"/>
         </preConditions>
@@ -60,7 +60,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="034-account-agent-redteam-observations-expire-at-ttl" author="akto">
+    <changeSet id="039-account-agent-redteam-observations-expire-at-ttl" author="akto">
         <preConditions onFail="MARK_RAN">
             <mongodb:collectionExists collectionName="agent_redteam_observations"/>
         </preConditions>
@@ -75,7 +75,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="034-account-create-agent-redteam-profiles" author="akto">
+    <changeSet id="039-account-create-agent-redteam-profiles" author="akto">
         <preConditions onFail="MARK_RAN">
             <not>
                 <mongodb:collectionExists collectionName="agent_redteam_profiles"/>
@@ -87,7 +87,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="034-account-agent-redteam-profiles-identity-created-at-index" author="akto">
+    <changeSet id="039-account-agent-redteam-profiles-identity-created-at-index" author="akto">
         <preConditions onFail="MARK_RAN">
             <mongodb:collectionExists collectionName="agent_redteam_profiles"/>
         </preConditions>
@@ -102,7 +102,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="034-account-agent-redteam-profiles-run-batch-index" author="akto">
+    <changeSet id="039-account-agent-redteam-profiles-run-batch-index" author="akto">
         <preConditions onFail="MARK_RAN">
             <mongodb:collectionExists collectionName="agent_redteam_profiles"/>
         </preConditions>
@@ -117,7 +117,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="034-account-create-agent-redteam-template-drafts" author="akto">
+    <changeSet id="039-account-create-agent-redteam-template-drafts" author="akto">
         <preConditions onFail="MARK_RAN">
             <not>
                 <mongodb:collectionExists collectionName="agent_redteam_template_drafts"/>
@@ -129,7 +129,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="034-account-agent-redteam-template-drafts-identity-status-index" author="akto">
+    <changeSet id="039-account-agent-redteam-template-drafts-identity-status-index" author="akto">
         <preConditions onFail="MARK_RAN">
             <mongodb:collectionExists collectionName="agent_redteam_template_drafts"/>
         </preConditions>
@@ -144,7 +144,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="034-account-agent-redteam-template-drafts-run-index" author="akto">
+    <changeSet id="039-account-agent-redteam-template-drafts-run-index" author="akto">
         <preConditions onFail="MARK_RAN">
             <mongodb:collectionExists collectionName="agent_redteam_template_drafts"/>
         </preConditions>

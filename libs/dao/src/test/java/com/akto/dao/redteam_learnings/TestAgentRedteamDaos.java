@@ -35,7 +35,7 @@ import com.akto.dto.redteam_learnings.AgentRedteamProfile.Insight;
 public class TestAgentRedteamDaos extends MongoBasedTest {
 
     private static final String URL = "https://agent.example/chat";
-    private static final String CHANGELOG = "../utils/src/main/resources/db/changelog/account/034-agent-redteam-learnings.xml";
+    private static final String CHANGELOG = "../utils/src/main/resources/db/changelog/account/039-agent-redteam-learnings.xml";
 
     @Before
     public void clean() {

@@ -15,7 +15,7 @@ import com.mongodb.client.model.Indexes;
 /**
  * Shared by the red-team learning DAOs. Reads go through the RBAC overrides, scoped by the apiCollectionId every
  * record carries, so a user only sees learnings for collections they can see. The database-abstractor writes these
- * collections with its own DAOs; index names here, there and in Liquibase 034 must stay the same.
+ * collections with its own DAOs; index names here, there and in Liquibase 039 must stay the same.
  */
 public abstract class AgentRedteamDao<T extends AgentRedteamRecord> extends AccountsContextDaoWithRbac<T> {
 
