@@ -130,8 +130,16 @@ public class APICatalogSync {
         try {
             processResponseParams(requestTemplate, responseParams, deletedInfo);
         } finally {
-            for (Map.Entry<Integer, Set<String>> seen : SensitiveDataEvents.drain().entrySet()) {
-                SensitiveDataCounter.instance.record(seen.getKey(), seen.getValue(), responseParams.getTimeOrNow());
+            Map<Integer, Set<String>> seenByCollection = SensitiveDataEvents.drain();
+            if (!seenByCollection.isEmpty()) {
+                // Resolved once per message rather than per collection: the caller is a property of
+                // the message, not of the collection a value happened to be detected in. The key of
+                // each entry is already the receiving end.
+                int senderCollectionId = SensitiveDataParties.senderCollectionId(responseParams);
+                for (Map.Entry<Integer, Set<String>> seen : seenByCollection.entrySet()) {
+                    SensitiveDataCounter.instance.record(seen.getKey(), seen.getValue(), senderCollectionId,
+                            responseParams.getTimeOrNow());
+                }
             }
         }
     }

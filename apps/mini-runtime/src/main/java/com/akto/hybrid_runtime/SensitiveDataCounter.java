@@ -65,15 +65,23 @@ public class SensitiveDataCounter {
         flusher.scheduleWithFixedDelay(this::flushQuietly, FLUSH_INTERVAL_SECONDS, FLUSH_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
-    /** Counts one message that carried these types. */
-    public void record(int apiCollectionId, Set<String> types, int messageTimestamp) {
+    /**
+     * Counts one message that carried these types, from {@code senderCollectionId} to
+     * {@code apiCollectionId} - the collection the message itself belongs to, which is the callee's.
+     */
+    public void record(int apiCollectionId, Set<String> types, int senderCollectionId, int messageTimestamp) {
         if (types == null || types.isEmpty()) return;
         int hour = SensitiveDataCount.hourOf(messageTimestamp);
         synchronized (this) {
             for (String type : types) {
-                add(new Bucket(apiCollectionId, type, hour), 1L);
+                add(new Bucket(apiCollectionId, senderCollectionId, type, hour), 1L);
             }
         }
+    }
+
+    /** Counts a message whose caller could not be identified. */
+    public void record(int apiCollectionId, Set<String> types, int messageTimestamp) {
+        record(apiCollectionId, types, SensitiveDataCount.UNKNOWN_COLLECTION_ID, messageTimestamp);
     }
 
     /** Must be called holding the lock. */
@@ -135,7 +143,8 @@ public class SensitiveDataCounter {
             List<SensitiveDataCount> increments = new ArrayList<>(chunk.size());
             for (Map.Entry<Bucket, Long> e : chunk) {
                 Bucket b = e.getKey();
-                increments.add(new SensitiveDataCount(b.apiCollectionId, b.subType, b.hour, e.getValue()));
+                increments.add(new SensitiveDataCount(b.apiCollectionId, b.senderCollectionId, b.subType,
+                        b.hour, e.getValue()));
             }
 
             boolean written;
@@ -168,11 +177,17 @@ public class SensitiveDataCounter {
 
     static final class Bucket {
         final int apiCollectionId;
+        final int senderCollectionId;
         final String subType;
         final int hour;
 
         Bucket(int apiCollectionId, String subType, int hour) {
+            this(apiCollectionId, SensitiveDataCount.UNKNOWN_COLLECTION_ID, subType, hour);
+        }
+
+        Bucket(int apiCollectionId, int senderCollectionId, String subType, int hour) {
             this.apiCollectionId = apiCollectionId;
+            this.senderCollectionId = senderCollectionId;
             this.subType = subType;
             this.hour = hour;
         }
@@ -182,12 +197,13 @@ public class SensitiveDataCounter {
             if (this == o) return true;
             if (!(o instanceof Bucket)) return false;
             Bucket b = (Bucket) o;
-            return apiCollectionId == b.apiCollectionId && hour == b.hour && subType.equals(b.subType);
+            return apiCollectionId == b.apiCollectionId && senderCollectionId == b.senderCollectionId
+                    && hour == b.hour && subType.equals(b.subType);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(apiCollectionId, subType, hour);
+            return Objects.hash(apiCollectionId, senderCollectionId, subType, hour);
         }
     }
 }
