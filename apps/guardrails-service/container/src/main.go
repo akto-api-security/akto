@@ -305,7 +305,7 @@ func parseLogLevel(logLevel string) zapcore.Level {
 
 func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Config, logger *zap.Logger) {
 	mc := cfg.File.Media
-	if mc.Provider == "" {
+	if mc.Provider == "none" {
 		return
 	}
 

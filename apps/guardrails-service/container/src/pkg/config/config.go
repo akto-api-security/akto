@@ -148,10 +148,10 @@ type FileConfig struct {
 
 // MediaConfig holds configuration for external media processing APIs.
 // Vision and Speech have independent key/endpoint pairs for separate Azure resources.
-// Provider "agent_guard" sends images to agent-guard's /ocr (AGENT_GUARD_ENGINE_URL)
-// and needs none of the Azure fields.
+// Provider "agent_guard" (the default when MEDIA_PROVIDER is unset) sends images to
+// agent-guard's /ocr (AGENT_GUARD_ENGINE_URL) and needs none of the Azure fields.
 type MediaConfig struct {
-	Provider      string // "azure", "agent_guard" or "" (disabled)
+	Provider      string // "agent_guard" (default), "azure" or "none" (disabled)
 	VisionAPIKey  string
 	VisionBaseURL string
 	SpeechAPIKey  string
@@ -250,7 +250,7 @@ func LoadConfig() *Config {
 			URLTimeoutSec:    getEnvAsInt("FILE_VALIDATE_URL_TIMEOUT_SEC", 30),
 			BlockOnRedaction: getEnvAsBool("FILE_VALIDATE_BLOCK_ON_REDACTION", true),
 			Media: MediaConfig{
-				Provider:      getEnv("MEDIA_PROVIDER", ""),
+				Provider:      getEnv("MEDIA_PROVIDER", "agent_guard"),
 				VisionAPIKey:  getEnv("MEDIA_VISION_API_KEY", ""),
 				VisionBaseURL: getEnv("MEDIA_VISION_BASE_URL", ""),
 				SpeechAPIKey:  getEnv("MEDIA_SPEECH_API_KEY", ""),
