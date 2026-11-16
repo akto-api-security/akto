@@ -135,7 +135,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         return updated;
     }
 
-    private static Map<String, String> sanitizeSeverityMapping(LinearTeamMapping requested) throws Exception {
+    static Map<String, String> sanitizeSeverityMapping(LinearTeamMapping requested) throws Exception {
         Map<String, String> sanitized = new LinkedHashMap<>();
         for (String severity : MAPPED_SEVERITIES) {
             String value = requested != null && requested.getSeverityToPriority() != null
@@ -213,9 +213,11 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         LinearTeamMapping mapping = integration.getTeamMappings() == null
             ? null
             : integration.getTeamMappings().get(teamId);
-        String value = mapping != null && mapping.getSeverityToPriority() != null
-            ? mapping.getSeverityToPriority().get(severity.name())
-            : null;
+        return resolvePriority(mapping == null ? null : mapping.getSeverityToPriority(), severity);
+    }
+
+    static int resolvePriority(Map<String, String> severityToPriority, Severity severity) {
+        String value = severityToPriority == null ? null : severityToPriority.get(severity.name());
         if (value == null) {
             value = DEFAULT_SEVERITY_TO_PRIORITY.getOrDefault(severity.name(), PRIORITY_NONE);
         }
@@ -316,7 +318,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         }
     }
 
-    private String buildDescription(Info testInfo, TestingRunResult testingRunResult, Severity severity,
+    static String buildDescription(Info testInfo, TestingRunResult testingRunResult, Severity severity,
         String method, Pair<String, String> endpointDetails, String aktoIssueUrl) {
         StringBuilder body = new StringBuilder();
 
@@ -346,7 +348,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         return body.toString();
     }
 
-    private String buildRequestResponseData(TestingRunResult testingRunResult) {
+    private static String buildRequestResponseData(TestingRunResult testingRunResult) {
         try {
             if (testingRunResult.getTestResults() == null || testingRunResult.getTestResults().isEmpty()) {
                 return "";
