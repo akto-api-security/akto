@@ -27,6 +27,7 @@ const initialAutoTicketingDetails = {
     projectId: "",
     severities: [],
     issueType: "",
+    ticketSource: "JIRA",
 }
 
 function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable, warningMessage }) {
@@ -126,6 +127,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
 
     const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
     const [jiraProjectMap, setJiraProjectMap] = useState(null);
+    const [linearTeamsMap, setLinearTeamsMap] = useState(null);
+    const portIOIntegrated = window.PORT_IO_INTEGRATED === 'true'
+    const ticketingAvailable = !!(jiraProjectMap || linearTeamsMap || portIOIntegrated)
     const isAgenticCategory = getDashboardCategory() !== 'API Security'
     const [agenticMode, setAgenticMode] = useState(false)
 
@@ -146,7 +150,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         Promise.all([
             observeApi.fetchSlackWebhooks(),
             observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS"),
-            settingsApi.fetchJiraIntegration()]).then(([slackResp, teamsResp, jiraResp]) => {
+            settingsApi.fetchJiraIntegration(),
+            window.LINEAR_INTEGRATED === 'true' ? settingsApi.fetchLinearIntegration() : Promise.resolve(null)]).then(([slackResp, teamsResp, jiraResp, linearResp]) => {
                 const apiTokenList = slackResp.apiTokenList
                 setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
                 setSlackChannels(apiTokenList.map(token => {
@@ -169,6 +174,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                 }
 
                 setJiraProjectMap(jiraResp?.projectIdsMap || null);
+                const linearTeams = linearResp?.linearIntegration?.teamsMap;
+                setLinearTeamsMap(linearTeams && Object.keys(linearTeams).length > 0 ? linearTeams : null);
             })
 
         let metaDataObj = {
@@ -623,7 +630,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         // with smart testing on, the chosen smart agent (if any) runs it; none: the default smart testing
         const scriptSelection = { preRequestScriptId, postRequestScriptId, ...(runAutomatedTests && testRun.smartAgentProfileId ? { smartAgentProfileId: testRun.smartAgentProfileId } : {}) }
         let {testName} = testRun;
-        const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
+        const autoTicketingDetails = ticketingAvailable ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
         const isMultiCollection = apiCollectionIds && apiCollectionIds.length > 0;
 
@@ -809,7 +816,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     function generateLabelForJiraIntegration() {
         return (
             <HorizontalStack gap={1}>
-                {!jiraProjectMap && <Link url='/dashboard/settings/integrations/jira' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                {!ticketingAvailable && <Link url='/dashboard/settings/integrations/jira' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
                     Enable
                 </Link>}
                 <Text>
@@ -827,7 +834,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     // only for configurations
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
-        let autoTicketingDetails = jiraProjectMap? testRun.autoTicketingDetails : null;
+        let autoTicketingDetails = ticketingAvailable ? testRun.autoTicketingDetails : null;
         const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,autoTicketingDetails)
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
@@ -870,6 +877,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
             generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
             getLabel={getLabel}
             jiraProjectMap={jiraProjectMap}
+            linearTeamsMap={linearTeamsMap}
+            portIOIntegrated={portIOIntegrated}
             generateLabelForJiraIntegration={generateLabelForJiraIntegration}
             miniTestingServiceNames={miniTestingServiceNames}
             slackChannels={slackChannels}

@@ -50,6 +50,8 @@ message ListMaliciousRequestsResponse {
       string case_owner = 35;  // login of the account member the case is assigned to; empty = unassigned
       string case_notes = 36;
       repeated CaseActivity case_timeline = 37;  // oldest first
+      string behaviour = 38;
+      int64 first_triaged_at = 39;
     }
     // One entry of an event's case history. activity_type says which of status, owner and notes the entry is
     // about; the others are empty. STATUS: status = the new status. OWNER: owner = the new owner (empty when

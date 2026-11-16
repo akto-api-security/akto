@@ -5,7 +5,9 @@ import com.akto.dto.jobs.JobType;
 import com.akto.jobs.executors.DatadogTrafficCollectorJobExecutor;
 import com.akto.jobs.executors.ImpervaApiEndpointsImportJobExecutor;
 import com.akto.jobs.executors.JiraTicketJobExecutor;
+import com.akto.jobs.executors.LinearTicketJobExecutor;
 import com.akto.jobs.executors.PendingTestsAlertsJobExecutor;
+import com.akto.jobs.executors.PortIOTicketJobExecutor;
 import com.akto.jobs.executors.SkillRevalidationJobExecutor;
 import com.akto.jobs.executors.TicketSyncJobExecutor;
 import com.akto.jobs.executors.WizApiEndpointsImportJobExecutor;
@@ -21,6 +23,8 @@ public class JobExecutorFactory {
     static {
         Map<JobType, JobExecutor<? extends JobParams>> map = new HashMap<>();
         map.put(JobType.JIRA_AUTO_CREATE_TICKETS, JiraTicketJobExecutor.INSTANCE);
+        map.put(JobType.LINEAR_AUTO_CREATE_TICKETS, LinearTicketJobExecutor.INSTANCE);
+        map.put(JobType.PORT_IO_AUTO_CREATE_TICKETS, PortIOTicketJobExecutor.INSTANCE);
         map.put(JobType.TICKET_SYNC, TicketSyncJobExecutor.INSTANCE);
         map.put(JobType.PENDING_TESTS_ALERTS, PendingTestsAlertsJobExecutor.INSTANCE);
         map.put(JobType.DATADOG_TRAFFIC_COLLECTOR, DatadogTrafficCollectorJobExecutor.INSTANCE);

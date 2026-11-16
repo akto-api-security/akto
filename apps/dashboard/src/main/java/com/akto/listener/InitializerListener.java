@@ -2359,6 +2359,12 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void updateCustomCollections() {
+        try {
+            ApiCollectionUsers.removeNonApiSecurityApisFromApiSecurityGroups();
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error removing non API Security APIs from API Security groups: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         for (ApiCollection apiCollection : apiCollections) {
             if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType())) {
@@ -4982,6 +4988,11 @@ public class InitializerListener implements ServletContextListener {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
+                        try {
+                            ApiCollectionUsers.removeNonApiSecurityApisFromApiSecurityGroups();
+                        } catch (Exception e) {
+                            logger.errorAndAddToDb(e, "Error removing non API Security APIs from API Security groups: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
                         try {
                             AutomatedApiGroupsUtils.processAutomatedGroups(apiGroupRecords);
                         } catch (Exception e) {

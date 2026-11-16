@@ -51,7 +51,8 @@ import ReRunModal from "./ReRunModal";
 import TestingStore from "../testingStore";
 import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../TestRunResultPage/TestRunResultPage";
-import { isRunAutomatedTestsEnabled } from "../TestRunResultPage/smartTestingUtils";
+import { isRunAutomatedTestsEnabled, shouldShowSmartTestingExecutionTrace } from "../TestRunResultPage/smartTestingUtils";
+import SmartTestingLive from "./SmartTestingLive";
 import LocalStore from "../../../../main/LocalStorageStore";
 import { produce } from "immer"
 import GithubServerTable from "../../../components/tables/GithubServerTable";
@@ -179,6 +180,7 @@ function SingleTestRunPage() {
   const [workflowTest, setWorkflowTest] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
   const [logsModalActive, setLogsModalActive] = useState(false)
+  const [liveActive, setLiveActive] = useState(false)
   const setErrorsObject = TestingStore((state) => state.setErrorsObject)
   const setTestingEndpointsApisList = TestingStore((state) => state.setTestingEndpointsApisList)
   const currentTestingRuns = []
@@ -521,8 +523,8 @@ function SingleTestRunPage() {
         limit,
         filters,
         queryValue
-      ).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults }) => {
-        testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults)
+      ).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults, linearIssuesMapForResults }) => {
+        testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults, linearIssuesMapForResults)
         if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
           errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
           setErrorsObject(errorEnums)
@@ -637,6 +639,8 @@ function SingleTestRunPage() {
   };
 
   const showVerifyWithAi = !workflowTest && (testRunCountMap?.VULNERABLE || 0) > 0
+  const showSmartTestingLive = Boolean(currentSummary?.hexId)
+    && shouldShowSmartTestingExecutionTrace(testingRunResultSummariesObj?.testingRun?.runAutomatedTests)
 
   // Reopens the issues behind the selected results in the Ignored Issues tab, the same as "Reopen"
   // in the result flyout, then recounts this run so the results move back to Vulnerable.
@@ -967,7 +971,7 @@ function SingleTestRunPage() {
         if (!Array.isArray(res?.testingRunResults)) {
           throw new Error("Could not fetch all test results for the export")
         }
-        transform.prepareTestRunResults(hexId, res.testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, res.issuesDescriptionMap, res.jiraIssuesMapForResults, res.devrevIssuesMapForResults)
+        transform.prepareTestRunResults(hexId, res.testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, res.issuesDescriptionMap, res.jiraIssuesMapForResults, res.devrevIssuesMapForResults, res.linearIssuesMapForResults)
           .forEach((result) => {
             if (!seen.has(result.id)) {
               seen.add(result.id)
@@ -1516,11 +1520,19 @@ function SingleTestRunPage() {
       <PageWithMultipleCards
         title={headingComp}
         primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => exportTestRunResults()}>Export results</Button></Box> : undefined}
-        secondaryActions={!workflowTest ? moreActionsComp : undefined}
+        secondaryActions={!workflowTest ? (showSmartTestingLive ? (
+          <>
+            <Button onClick={() => setLiveActive(true)}>Live</Button>
+            {moreActionsComp}
+          </>
+        ) : moreActionsComp) : undefined}
         components={useComponents}
         backUrl={"/dashboard/testing"}
       />
       <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false} />
+      {showSmartTestingLive ? (
+        <SmartTestingLive show={liveActive} setShow={setLiveActive} summaryHexId={currentSummary.hexId} />
+      ) : null}
       {currentSummary?.hexId ? (
         <TestRunLogs
           open={logsModalActive}

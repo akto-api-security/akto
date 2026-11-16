@@ -15,7 +15,10 @@ function FlowGraphLayout({
   bannerTitle,
   bannerStats = [],
   showData,
-  miniMapNodeColor = '#5c6ac4'
+  miniMapNodeColor = '#5c6ac4',
+  onNodeClick,
+  onInit,
+  showMiniMap = true
 }) {
 
   const Banner = () => (
@@ -60,6 +63,8 @@ function FlowGraphLayout({
             fitView
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
+            onNodeClick={onNodeClick}
+            onInit={onInit}
             defaultEdgeOptions={{
               type: defaultEdgeType,
               animated: false,
@@ -82,7 +87,7 @@ function FlowGraphLayout({
                 }
               }}
             />
-            <MiniMap
+            {showMiniMap && <MiniMap
               nodeColor={() => miniMapNodeColor}
               maskColor="rgba(0, 0, 0, 0.1)"
               style={{
@@ -90,7 +95,7 @@ function FlowGraphLayout({
                 border: '1px solid #e1e3e5',
                 borderRadius: '4px',
               }}
-            />
+            />}
           </ReactFlow>
         </div>
       )}

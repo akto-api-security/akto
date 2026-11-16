@@ -6,6 +6,7 @@ import testingTransform from "../testing/transform.js"
 import { history } from "@/util/history";
 import IssuesCheckbox from "./IssuesPage/IssuesCheckbox.jsx"
 import TooltipText from "../../components/shared/TooltipText.jsx"
+import LinearTicketDisplay from "../../components/shared/LinearTicketDisplay.jsx"
 
 function normalizeComplianceLabel(s) {
     if (!s || typeof s !== 'string') return '';
@@ -82,6 +83,7 @@ const transform = {
                                         </HorizontalStack>
                                     </Tag>
                                 }
+                                <LinearTicketDisplay linearIssueUrl={ele?.linearIssueUrl} />
                             </HorizontalStack>
                         </HorizontalStack>
                     </Box>
@@ -155,7 +157,8 @@ const transform = {
                         id: urlObj.id,
                         issueDescription: urlObj.issueDescription,
                         jiraIssueUrl: urlObj.jiraIssueUrl || "",
-                        devrevWorkUrl: urlObj.devrevWorkUrl || ""
+                        devrevWorkUrl: urlObj.devrevWorkUrl || "",
+                        linearIssueUrl: urlObj.linearIssueUrl || ""
                     })), isCompliancePage)
                 }
             }))

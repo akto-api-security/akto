@@ -95,6 +95,7 @@ public class Utils {
         Map<String, String> descriptionMap = new HashMap<>();
         Map<String, String> jiraIssueMap = new HashMap<>();
         Map<String, String> devrevIssueMap = new HashMap<>();
+        Map<String, String> linearIssueMap = new HashMap<>();
         Map<String, String> statusMap = new HashMap<>();
         for (TestingRunIssues issue : issues) {
             TestingRunResult result = idToResultMap.get(issue.getId());
@@ -107,6 +108,9 @@ public class Utils {
             if (StringUtils.isNotBlank(issue.getDevrevWorkUrl())) {
                 devrevIssueMap.put(result.getHexId(), issue.getDevrevWorkUrl());
             }
+            if (StringUtils.isNotBlank(issue.getLinearIssueUrl())) {
+                linearIssueMap.put(result.getHexId(), issue.getLinearIssueUrl());
+            }
             if(issue.getTestRunIssueStatus() != null && (statusList == null || statusList.contains(issue.getTestRunIssueStatus()))) {
                 statusMap.put(result.getHexId(), issue.getTestRunIssueStatus().name());
             }
@@ -115,6 +119,7 @@ public class Utils {
         issueMetaDataMap.put("descriptions", descriptionMap);
         issueMetaDataMap.put("jiraIssues", jiraIssueMap);
         issueMetaDataMap.put("devrevIssues", devrevIssueMap);
+        issueMetaDataMap.put("linearIssues", linearIssueMap);
         issueMetaDataMap.put("statuses", statusMap);
         return issueMetaDataMap;
     }

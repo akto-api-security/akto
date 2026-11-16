@@ -3,6 +3,9 @@ package com.akto.testing;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.LinearAutoTicketParams;
+import com.akto.dto.jobs.PortIOAutoTicketParams;
+import com.akto.dto.testing.AutoTicketingDetails;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.jobs.JobScheduler;
 import com.akto.billing.UsageMetricUtils;
@@ -19,6 +22,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -113,6 +117,23 @@ public class TestCompletion {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "JIRA_INTEGRATION");
             if (!featureAccess.getIsGranted()) {
                 logger.error("Auto Create Tickets plan is not activated for the account - {}", accountId);
+                return;
+            }
+
+            if (TicketSource.LINEAR.name().equals(testRunConfig.getAutoTicketingDetails().getTicketSource())) {
+                JobScheduler.scheduleRunOnceJob(accountId,
+                    new LinearAutoTicketParams(testingRun.getId(), summaryId,
+                        testRunConfig.getAutoTicketingDetails().getProjectId(),
+                        testRunConfig.getAutoTicketingDetails().getSeverities()),
+                    JobExecutorType.DASHBOARD);
+                return;
+            }
+
+            if (AutoTicketingDetails.PORT_IO_TICKET_SOURCE.equals(testRunConfig.getAutoTicketingDetails().getTicketSource())) {
+                JobScheduler.scheduleRunOnceJob(accountId,
+                    new PortIOAutoTicketParams(testingRun.getId(), summaryId,
+                        testRunConfig.getAutoTicketingDetails().getSeverities()),
+                    JobExecutorType.DASHBOARD);
                 return;
             }
 
