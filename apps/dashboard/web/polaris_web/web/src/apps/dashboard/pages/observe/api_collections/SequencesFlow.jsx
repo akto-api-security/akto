@@ -94,7 +94,7 @@ function explorerGraph(starts, startsShown, steps, fan, fanShown) {
   const ended = fan.pathCount - allNext;
   const extras = [];
   if (hidden > 0) extras.push({ text: `+ ${Math.min(PAGE, fan.rows.length - rows.length)} more · ${share(hidden, fan.pathCount)}`, action: 'more-fan' });
-  if (ended > 0) extras.push({ text: `Session ends · ${share(ended, fan.pathCount)}`, italic: true });
+  if (ended > 0) extras.push({ text: `Ends here · ${share(ended, fan.pathCount)}`, italic: true });
 
   const lastX = (steps.length - 1) * PATH_STEP;
   const x = lastX + NODE_WIDTH + FAN_GAP;
@@ -144,15 +144,35 @@ function SequencesFlow({ apiCollectionId }) {
     return fanCache.current.get(cacheKey);
   }, [collectionId]);
 
+  // Next new APIs after the path. A step back to an API already on the path (a list reloading after
+  // an action) is looked through once, so list → remove → list → add shows as list → remove → add
+  const loadNewSteps = useCallback(async (keys) => {
+    const direct = await loadFan(keys);
+    const onPath = new Set(keys);
+    const last = keys[keys.length - 1];
+    const merged = new Map();
+    const add = (key, weight) => merged.set(key, (merged.get(key) || 0) + weight);
+    const returns = direct.rows.filter((row) => onPath.has(row.key));
+    direct.rows.filter((row) => !onPath.has(row.key)).forEach((row) => add(row.key, row.count));
+    const afterReturns = await Promise.all(returns.map((row) => loadFan([last, row.key])));
+    returns.forEach((row, index) => {
+      const after = afterReturns[index];
+      if (!after.pathCount) return;
+      after.rows.filter((next) => !onPath.has(next.key)).forEach((next) => add(next.key, row.count * next.count / after.pathCount));
+    });
+    const rows = [...merged].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count);
+    return { rows, pathCount: direct.pathCount };
+  }, [loadFan]);
+
   const goTo = useCallback(async (nextSteps) => {
     try {
-      setFan(await loadFan(nextSteps.map((s) => s.key)));
+      setFan(await loadNewSteps(nextSteps.map((s) => s.key)));
       setFanShown(PAGE);
       setSteps(nextSteps);
     } catch (error) {
       console.error('Error fetching session steps:', error);
     }
-  }, [loadFan]);
+  }, [loadNewSteps]);
 
   // Opens on the busiest API, already fanned out
   const openExplorer = useCallback(async () => {
