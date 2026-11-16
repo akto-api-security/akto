@@ -816,13 +816,13 @@ function ThreatDetectionPage() {
             key="reveal-content"
             open={revealPending}
             onClose={() => { if (!revealing) handleDetailsVisibility(false); }}
-            title="Show prompt content?"
+            title="Show Guardrail Activity?"
             primaryAction={{ content: "Show content", onAction: confirmReveal, loading: revealing }}
             secondaryActions={[{ content: "Cancel", onAction: () => handleDetailsVisibility(false), disabled: revealing }]}
         >
             <Modal.Section>
                 <Text variant="bodyMd">
-                    Prompts and responses can contain sensitive data. Your email, IP address and the time of
+                    Guardrail Activity can contain sensitive data. Your email, IP address and the time of
                     this access will be recorded in audit data.
                 </Text>
             </Modal.Section>

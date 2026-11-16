@@ -1950,13 +1950,13 @@ function Violations() {
             key="reveal-content"
             open={!!pendingReveal}
             onClose={() => { if (!revealing) setPendingReveal(null); }}
-            title="Show prompt content?"
+            title="Show Guardrail Activity?"
             primaryAction={{ content: "Show content", onAction: confirmReveal, loading: revealing }}
             secondaryActions={[{ content: "Cancel", onAction: () => setPendingReveal(null), disabled: revealing }]}
         >
             <Modal.Section>
                 <Text variant="bodyMd">
-                    Prompts and responses can contain sensitive data. Your email, IP address and the time of
+                    Guardrail Activity can contain sensitive data. Your email, IP address and the time of
                     this access will be recorded in audit data.
                 </Text>
             </Modal.Section>
