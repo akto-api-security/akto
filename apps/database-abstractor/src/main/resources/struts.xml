@@ -564,7 +564,7 @@
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <!-- Only what the threat client reads; full DTO rows overflow its 5 MB response limit -->
-                <param name="includeProperties">^apiSequencesList\[\d+\]\.seqKey,^apiSequencesList\[\d+\]\.order</param>
+                <param name="includeProperties">^apiSequencesList\[\d+\]\.seqKey,^apiSequencesList\[\d+\]\.order,^lastSeqKey</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
