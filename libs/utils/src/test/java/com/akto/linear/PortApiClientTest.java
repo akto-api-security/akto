@@ -32,6 +32,29 @@ public class PortApiClientTest {
     }
 
     @Test
+    public void extractsIssueFromLinearIntegrationActionOutput() throws Exception {
+        String run = "{\"nodeRuns\":[{\"output\":{\"title\":\"t\"},\"node\":{\"identifier\":\"trigger\"}},"
+            + "{\"output\":{\"issueId\":\"dc6163e4\",\"identifier\":\"AKT-8\","
+            + "\"issueUrl\":\"https://linear.app/akto-testing/issue/AKT-8/t\"},"
+            + "\"node\":{\"identifier\":\"linear_action\"}}]}";
+
+        LinearIssue issue = PortApiClient.extractIssue(BasicDBObject.parse(run));
+
+        assertEquals("dc6163e4", issue.getId());
+        assertEquals("AKT-8", issue.getIdentifier());
+        assertEquals("https://linear.app/akto-testing/issue/AKT-8/t", issue.getUrl());
+    }
+
+    @Test
+    public void extractsIssueFromActionOutputNestedUnderResult() throws Exception {
+        String run = "{\"nodeRuns\":[{\"output\":{\"result\":{\"issueId\":\"dc6163e4\",\"identifier\":\"AKT-8\","
+            + "\"issueUrl\":\"https://linear.app/akto-testing/issue/AKT-8/t\"}},"
+            + "\"node\":{\"identifier\":\"linear_action\"}}]}";
+
+        assertEquals("AKT-8", PortApiClient.extractIssue(BasicDBObject.parse(run)).getIdentifier());
+    }
+
+    @Test
     public void reportsLinearErrorWhenNoIssueIsReturned() {
         Exception e = assertThrows(Exception.class,
             () -> PortApiClient.extractIssue(BasicDBObject.parse(GRAPHQL_ERROR_RUN)));
