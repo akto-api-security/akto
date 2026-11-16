@@ -56,7 +56,11 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
     protected void runJob(Job job) throws Exception {
         TicketSyncJobParams params = paramClass.cast(job.getJobParams());
         if (TicketSource.LINEAR.name().equals(params.getTicketSource())) {
-            LinearTicketSyncJobExecutor.INSTANCE.runJob(job);
+            if (PortIOTicketSyncJobExecutor.SYNC_KEY.equals(params.getProjectKey())) {
+                PortIOTicketSyncJobExecutor.INSTANCE.runJob(job);
+            } else {
+                LinearTicketSyncJobExecutor.INSTANCE.runJob(job);
+            }
             return;
         }
         String projectKey = params.getProjectKey();
