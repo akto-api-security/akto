@@ -177,6 +177,41 @@ public class TestSensitiveDataCountDao extends MongoBasedTest {
         assertEquals(7, storedFrom(1, SensitiveDataCount.UNKNOWN_COLLECTION_ID, "PASSPORT", HOUR).getCount());
     }
 
+    /**
+     * A bucket written before senderCollectionId existed has no such field. Mongo matches a
+     * missing field against null but not against 0, so an unattributed increment must look for
+     * both or the original bucket stops accumulating the moment this ships - and, where the
+     * pre-change unique index is still in place, the second document cannot even be inserted.
+     */
+    @Test
+    public void testIncrementsKeepUpdatingBucketsWrittenBeforeTheFieldExisted() {
+        SensitiveDataCountDao.instance.getMCollection().withDocumentClass(Document.class)
+                .insertOne(new Document("apiCollectionId", 1).append("subType", "PASSPORT")
+                        .append("hour", HOUR).append("count", 100L));
+
+        SensitiveDataCountDao.instance.bulkInc(Collections.singletonList(
+                new SensitiveDataCount(1, "PASSPORT", HOUR, 25)));
+
+        // one bucket, not two: the legacy document was found and incremented
+        assertEquals(1, SensitiveDataCountDao.instance.count(new Document()));
+        assertEquals(125, SensitiveDataCountDao.instance
+                .findOne(Filters.eq(SensitiveDataCount.API_COLLECTION_ID, 1)).getCount());
+    }
+
+    /** A bucket created by an unattributed increment must carry the field, or it is invisible later. */
+    @Test
+    public void testNewUnattributedBucketStillCarriesTheField() {
+        SensitiveDataCountDao.instance.bulkInc(Collections.singletonList(
+                new SensitiveDataCount(5, "PASSPORT", HOUR, 4)));
+
+        Document raw = SensitiveDataCountDao.instance.getMCollection().withDocumentClass(Document.class)
+                .find(Filters.eq("apiCollectionId", 5)).first();
+        assertTrue("senderCollectionId must be written on insert: " + raw.toJson(),
+                raw.containsKey(SensitiveDataCount.SENDER_COLLECTION_ID));
+        assertEquals(SensitiveDataCount.UNKNOWN_COLLECTION_ID,
+                raw.getInteger(SensitiveDataCount.SENDER_COLLECTION_ID).intValue());
+    }
+
     private static SensitiveDataCount storedFrom(int apiCollectionId, int senderCollectionId, String subType, int hour) {
         return SensitiveDataCountDao.instance.findOne(Filters.and(
                 Filters.eq(SensitiveDataCount.API_COLLECTION_ID, apiCollectionId),
