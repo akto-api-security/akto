@@ -1128,16 +1128,6 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String fetchKnownSequenceSteps() {
-        try {
-            apiSequencesList = ApiSequencesDao.instance.findKnownSteps();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error in fetchKnownSequenceSteps: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
     public String fetchApiSequences() {
         try {
             apiSequencesList = ApiSequencesDao.instance.findAll(new BasicDBObject(), skip, 1000, null);
