@@ -97,21 +97,11 @@
         <filter-name>RateLimitFilter</filter-name>
         <url-pattern>/auth/login</url-pattern>
         <url-pattern>/api/inviteUsers</url-pattern>
-        <url-pattern>/tools/*</url-pattern>
         <url-pattern>/auth/sendPasswordResetLink</url-pattern>
         <url-pattern>/auth/resetPassword</url-pattern>
         <url-pattern>/trigger-google-sso</url-pattern>
         <url-pattern>/oauth/register</url-pattern>
         <url-pattern>/oauth/authorize</url-pattern>
-    </filter-mapping>
-
-    <filter>
-        <filter-name>GrowthToolsFilter</filter-name>
-        <filter-class>com.akto.filter.GrowthToolsFilter</filter-class>
-    </filter>
-    <filter-mapping>
-        <filter-name>GrowthToolsFilter</filter-name>
-        <url-pattern>/tools/*</url-pattern>
     </filter-mapping>
 
     <filter>

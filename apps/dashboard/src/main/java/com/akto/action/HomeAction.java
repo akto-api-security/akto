@@ -128,7 +128,6 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
 
         if(servletRequest.getRequestURI().equals(CHECK_INBOX_URI) ||
             servletRequest.getRequestURI().contains(BUSINESS_EMAIL_URI) ||
-            servletRequest.getRequestURI().contains(TEST_EDITOR_URL) || 
             servletRequest.getRequestURI().contains(SSO_URL)
             ) {
             return "SUCCESS";

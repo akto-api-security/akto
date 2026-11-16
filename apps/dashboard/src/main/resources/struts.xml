@@ -7394,54 +7394,12 @@
             </result>
         </action>
 
-        <action name="tools/publicApi" class="com.akto.action.growth_tools.PublicApiAction">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="tools/fetchAllSubCategories" class="com.akto.action.testing_issues.IssuesAction" method="fetchAllSubCategories">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json">
-                <param name="enumAsBean">true</param>
-            </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
         <action name="api/fetchVulnerableRequests" class="com.akto.action.testing_issues.IssuesAction" method="fetchVulnerableRequests">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="enumAsBean">true</param>
             </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
-        <action name="tools/fetchVulnerableRequests" class="com.akto.action.testing_issues.IssuesAction" method="fetchVulnerableRequests">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json">
-                <param name="enumAsBean">true</param>
-            </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
-        <action name="tools/fetchSampleData" class="com.akto.action.TrafficAction" method="fetchSampleData">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"  type="json"/>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
             </result>
@@ -11386,17 +11344,6 @@
             </result>
         </action>
 
-        <action name="tools/runTestForGivenTemplate" class="com.akto.action.test_editor.SaveTestEditorAction" method="runTestForGivenTemplate">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
         <action name="api/fetchTestingRunPlaygroundStatus" class="com.akto.action.test_editor.SaveTestEditorAction" method="fetchTestingRunPlaygroundStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -11431,16 +11378,6 @@
             </result>
         </action>
 
-        <action name="tools/createSampleDataJson" class="com.akto.action.growth_tools.PublicApiAction" method="createSampleDataJson">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
 <!--        <action name="callback" class="com.akto.action.Auth0CallbackAction">-->
 <!--            <result name="SUCCESS">/pages/login.jsp</result>-->
 <!--        </action>-->
@@ -11532,19 +11469,6 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-
-        <action name="tools/addLLmData" class="com.akto.action.ExportSampleDataAction" method="insertLlmData">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
             </result>
             <result name="ERROR" type="json">
@@ -12561,29 +12485,6 @@
                  <param name="statusCode">403</param>
                  <param name="ignoreHierarchy">false</param>
                  <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="tools/convertSamleDataToBurpRequest" class="com.akto.action.ExportSampleDataAction" method="generateBurpRequest">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="tools/convertSampleDataToCurl" class="com.akto.action.ExportSampleDataAction" method="generateCurl">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 

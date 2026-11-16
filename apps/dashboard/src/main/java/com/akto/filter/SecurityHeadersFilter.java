@@ -54,9 +54,6 @@ public class SecurityHeadersFilter implements Filter {
             }
         }
 
-        if (!httpServletRequest.getRequestURI().startsWith("/tools/")) {
-            httpServletResponse.addHeader("X-Frame-Options", "deny");
-        }
         httpServletResponse.addHeader("X-XSS-Protection", "1");
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
