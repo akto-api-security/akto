@@ -79,7 +79,13 @@ public class SensitiveDataCounter {
         }
     }
 
-    /** Counts a message whose caller could not be identified. */
+    /**
+     * Counts a message whose caller could not be identified.
+     *
+     * This counter is a plain accumulator and applies no policy: whether such a count is worth
+     * keeping is decided where the message is known, by {@code SensitiveDataParties.shouldRecord}
+     * at the call site in APICatalogSync. Calling this directly bypasses that.
+     */
     public void record(int apiCollectionId, Set<String> types, int messageTimestamp) {
         record(apiCollectionId, types, SensitiveDataCount.UNKNOWN_COLLECTION_ID, messageTimestamp);
     }
