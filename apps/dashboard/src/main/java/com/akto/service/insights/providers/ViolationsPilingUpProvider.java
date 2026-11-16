@@ -21,13 +21,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 public class ViolationsPilingUpProvider extends AbstractInsightProvider {
 
     private static final int EVIDENCE_ROWS = 10;
+    private static final int MIN_OPEN_VIOLATIONS = 5;
 
     public ViolationsPilingUpProvider() { super(InsightId.VIOLATIONS_PILING_UP, 1); }
 
@@ -36,14 +35,15 @@ public class ViolationsPilingUpProvider extends AbstractInsightProvider {
         List<DashboardMaliciousEvent> events = AtlasGuardrailUtils.currentPeriodEvents(bundle);
         if (events == null) return failed("THREAT_BACKEND", "Could not load violations");
         if (bundle.policies == null) return failed("POLICY_STORE", "Could not load guardrail policies");
-        Set<String> policyNames = bundle.policies.stream().map(GuardrailPolicies::getName).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<String, GuardrailPolicies> policiesByName = bundle.policies.stream().filter(p -> p.getName() != null)
+                .collect(Collectors.toMap(GuardrailPolicies::getName, p -> p, (first, second) -> first));
 
         Map<Integer, ApiCollection> collectionsById = new HashMap<>();
         for (ApiCollection c : bundle.collections) collectionsById.put(c.getId(), c);
         HostCollectionResolver resolver = bundle.hostResolver();
         Map<String, PolicyOnAsset> groups = new HashMap<>();
         for (DashboardMaliciousEvent e : events) {
-            if (e == null || !AtlasGuardrailUtils.isOpen(e) || StringUtils.isBlank(e.getFilterId()) || !policyNames.contains(e.getFilterId())
+            if (e == null || !AtlasGuardrailUtils.isOpen(e) || StringUtils.isBlank(e.getFilterId()) || !policiesByName.containsKey(e.getFilterId())
                     || AtlasGuardrailUtils.isConfigFinding(e) || AtlasGuardrailUtils.isSkillFinding(e)) continue;
             List<Integer> ids = resolver.resolveEvent(e.getHost(), e.getActor());
             ApiCollection c = ids.isEmpty() ? null : collectionsById.get(ids.get(0));
@@ -57,11 +57,12 @@ public class ViolationsPilingUpProvider extends AbstractInsightProvider {
         }
 
         InsightResult r = skeleton();
-        if (groups.isEmpty()) {
-            r.setHeadline("No open violations of your guardrail policies in this period.");
+        List<PolicyOnAsset> ranked = groups.values().stream().filter(g -> g.count >= MIN_OPEN_VIOLATIONS)
+                .sorted(ViolationGroup.MOST_REACH).collect(Collectors.toList());
+        if (ranked.isEmpty()) {
+            r.setHeadline("No agent has " + MIN_OPEN_VIOLATIONS + " or more open violations of one policy in this period.");
             return r;
         }
-        List<PolicyOnAsset> ranked = groups.values().stream().sorted(ViolationGroup.WORST_FIRST).collect(Collectors.toList());
         PolicyOnAsset worst = ranked.get(0);
 
         r.setStatus(InsightResult.Status.READY.name());
@@ -82,7 +83,9 @@ public class ViolationsPilingUpProvider extends AbstractInsightProvider {
             review.put("atlasToolName", worst.name);
         }
         r.addCta(new InsightResult.Cta("review_violations", "Review", "NAVIGATE", InsightRoutes.THREAT_ACTIVITY, review, true));
-        r.addCta(worst.blocked == 0
+        GuardrailPolicies policy = policiesByName.get(worst.policy);
+        boolean canSwitchToBlock = policy.isActive() && !AtlasGuardrailUtils.BEHAVIOUR_BLOCK.equalsIgnoreCase(policy.getBehaviour());
+        r.addCta(canSwitchToBlock
                 ? new InsightResult.Cta("switch_to_block", "Switch to block", "NAVIGATE", InsightRoutes.GUARDRAIL_POLICIES, InsightUtil.guardrailPolicyParams(worst.policy), false)
                 : new InsightResult.Cta("open_policy", "Open policy", "NAVIGATE", InsightRoutes.GUARDRAIL_POLICIES, InsightUtil.guardrailPolicyParams(worst.policy), false));
         return r;

@@ -16,9 +16,10 @@ import java.util.Set;
 
 class ViolationGroup {
 
-    static final Comparator<ViolationGroup> WORST_FIRST = Comparator.comparingInt((ViolationGroup g) -> InsightUtil.severityRank(g.severity))
-            .thenComparing(Comparator.comparingInt((ViolationGroup g) -> g.people.size()).reversed())
+    static final Comparator<ViolationGroup> MOST_REACH = Comparator.comparingInt((ViolationGroup g) -> g.people.size()).reversed()
             .thenComparing(Comparator.comparingLong((ViolationGroup g) -> g.count).reversed());
+    static final Comparator<ViolationGroup> WORST_FIRST = Comparator.comparingInt((ViolationGroup g) -> InsightUtil.severityRank(g.severity))
+            .thenComparing(MOST_REACH);
 
     final String name;
     final Set<String> devices = new HashSet<>();

@@ -90,9 +90,10 @@ public class ViolationSpikeProvider extends AbstractInsightProvider {
                                     Map<Integer, ApiCollection> collectionsById, Map<String, Spike> employees, Map<String, Spike> agents) {
         HostCollectionResolver resolver = bundle.hostResolver();
         for (DashboardMaliciousEvent e : events) {
+            if (!AtlasGuardrailUtils.isOpen(e) || AtlasGuardrailUtils.isSkillFinding(e) || AtlasGuardrailUtils.isConfigFinding(e)) continue;
             String employee = employeeKey(e, bundle);
             if (employee != null) {
-                if (current) employees.computeIfAbsent(employee, k -> new Spike(k, KIND_EMPLOYEE, k, null)).add(e, bundle);
+                if (current) employees.computeIfAbsent(employee, k -> new Spike(employeeName(e, k), KIND_EMPLOYEE, k, null)).add(e, bundle);
                 else if (employees.containsKey(employee)) employees.get(employee).previous++;
             }
             List<Integer> ids = resolver.resolveEvent(e.getHost(), e.getActor());
@@ -116,6 +117,10 @@ public class ViolationSpikeProvider extends AbstractInsightProvider {
         if (deviceId == null) return null;
         String username = bundle.usernameForDevice(deviceId);
         return username != null ? username : deviceId;
+    }
+
+    private static String employeeName(DashboardMaliciousEvent e, String employeeKey) {
+        return employeeKey.equals(AgenticObserveUtil.extractEndpointId(e.getHost())) ? "device " + employeeKey : employeeKey;
     }
 
     private static class Spike extends ViolationGroup {

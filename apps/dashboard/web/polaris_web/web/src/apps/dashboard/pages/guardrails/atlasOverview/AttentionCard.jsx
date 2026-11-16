@@ -5,7 +5,6 @@ import SeverityPill from "@/apps/dashboard/components/shared/SeverityPill";
 import CompactButton from "@/apps/dashboard/components/shared/CompactButton";
 import { THREAT_ACTIVITY_PATH } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import { OverviewListRow, OverviewLoadError } from "./OverviewCard";
-import { formatCount } from "./atlasOverviewUtils";
 
 export default function AttentionCard({ data, onOpenActivity, onOpenPolicy }) {
     const rows = data?.rows || [];
@@ -35,7 +34,7 @@ export default function AttentionCard({ data, onOpenActivity, onOpenPolicy }) {
                                             </VerticalStack>
                                             <HorizontalStack gap="2" wrap={false}>
                                                 {secondary && <CompactButton onClick={() => openCta(secondary)}>{secondary.label}</CompactButton>}
-                                                {review && <CompactButton onClick={() => openCta(review)}>{row.count == null ? "Review" : `Review ${formatCount(row.count)}`}</CompactButton>}
+                                                {review && <CompactButton onClick={() => openCta(review)}>{review.label}</CompactButton>}
                                             </HorizontalStack>
                                         </HorizontalGrid>
                                     </Box>
