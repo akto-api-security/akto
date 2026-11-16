@@ -242,6 +242,15 @@ export default {
         return resp
     },
 
+    async fetchAttention(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchAttention',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
     async suggestGuardrailCompliance(inputType, payload) {
         const resp = await request({
             url: '/api/ask_ai',

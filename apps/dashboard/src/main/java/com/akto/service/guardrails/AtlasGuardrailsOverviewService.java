@@ -10,14 +10,27 @@ import com.akto.service.atlas.AtlasAssetStatusService;
 import com.akto.service.atlas.AtlasAssetStatus;
 import com.akto.service.insights.HostCollectionResolver;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightId;
+import com.akto.service.insights.InsightProvider;
+import com.akto.service.insights.InsightResult;
+import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
+import com.akto.service.insights.providers.AlertFatigueProvider;
+import com.akto.service.insights.providers.CredentialExposureProvider;
+import com.akto.service.insights.providers.MaliciousSkillsInUseProvider;
+import com.akto.service.insights.providers.PromptInjectionRepeatsProvider;
+import com.akto.service.insights.providers.RiskyConfigSettingsProvider;
 import com.akto.service.insights.providers.SkillEvaluationConcentrationProvider;
+import com.akto.service.insights.providers.ViolationSpikeProvider;
+import com.akto.service.insights.providers.ViolationsPilingUpProvider;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,6 +43,12 @@ import java.util.stream.Collectors;
 public class AtlasGuardrailsOverviewService {
 
     private static final int TOP_ROWS_LIMIT = 10;
+    private static final int ATTENTION_ROWS_LIMIT = 5;
+    private static final List<InsightProvider> ATTENTION_PROVIDERS = Arrays.asList(new ViolationsPilingUpProvider(),
+            new MaliciousSkillsInUseProvider(), new RiskyConfigSettingsProvider(), new ViolationSpikeProvider());
+    private static final List<InsightProvider> DETAIL_ATTENTION_PROVIDERS = Arrays.asList(new AlertFatigueProvider(),
+            new PromptInjectionRepeatsProvider(), new CredentialExposureProvider());
+    private static final String UNATTRIBUTED_ACTOR = "(unattributed)";
 
     public BasicDBObject buildTriage(InsightDataBundle bundle) {
         BasicDBObject triage = new BasicDBObject();
@@ -214,8 +233,7 @@ public class AtlasGuardrailsOverviewService {
             String type = AgenticObserveUtil.getTypeFromCollection(c);
             if (!AtlasGuardrailUtils.AGENTIC_ASSET_TYPES.contains(type)) continue;
             AtlasToolRow asset = AtlasGuardrailUtils.collectionAsset(c, type);
-            String key = asset == null ? AtlasAssetStatusService.toolKey(type, c.getHostName())
-                    : AtlasAssetStatusService.toolKey(asset.getRowType(), asset.getGroupKey());
+            String key = AtlasGuardrailUtils.assetKey(c, type, asset);
             TopAgenticAssetRow row = byAsset.computeIfAbsent(key, k -> new TopAgenticAssetRow(k, asset == null ? c.getHostName() : asset.getName(), type, asset == null ? c.getHostName() : null));
             row.addCount(entry.getValue().getOrDefault(AtlasGuardrailUtils.PERIOD_CURRENT, 0));
             if (InsightUtil.isPersonalAccount(c)) row.markPersonal();
@@ -255,6 +273,25 @@ public class AtlasGuardrailsOverviewService {
                 .sorted(Comparator.comparingLong((TopEmployeeRow row) -> row.critical).thenComparingLong(row -> row.count).reversed())
                 .limit(TOP_ROWS_LIMIT)
                 .map(TopEmployeeRow::toResponse)
+                .collect(Collectors.toList()));
+        return response;
+    }
+
+    public BasicDBObject buildAttention(InsightDataBundle bundle) {
+        List<BasicDBObject> rows = new ArrayList<>();
+        for (InsightProvider provider : ATTENTION_PROVIDERS) {
+            InsightResult r = provider.compute(bundle, bundle.ctx, InsightProvider.Scope.LIST);
+            if (isAttentionReady(r)) rows.add(attentionRow(r));
+        }
+        for (InsightProvider provider : DETAIL_ATTENTION_PROVIDERS) {
+            InsightResult r = provider.compute(bundle, bundle.ctx, InsightProvider.Scope.DETAIL);
+            BasicDBObject row = isAttentionReady(r) ? detailAttentionRow(r, bundle) : null;
+            if (row != null) rows.add(row);
+        }
+        BasicDBObject response = new BasicDBObject();
+        response.put("rows", rows.stream()
+                .sorted(Comparator.comparingInt(row -> InsightUtil.severityRank(row.getString("severity"))))
+                .limit(ATTENTION_ROWS_LIMIT)
                 .collect(Collectors.toList()));
         return response;
     }
@@ -322,6 +359,75 @@ public class AtlasGuardrailsOverviewService {
         Long median = AtlasGuardrailUtils.medianOf(waits);
         if (median != null) kpi.put("seconds", median);
         return kpi;
+    }
+
+    private static long metricValue(InsightResult r, String key) {
+        for (InsightResult.Metric m : r.getMetrics()) {
+            if (key.equals(m.getKey()) && m.getValue() != null) return m.getValue().longValue();
+        }
+        return 0;
+    }
+
+    private static BasicDBObject attentionRow(InsightResult r) {
+        List<BasicDBObject> ctas = new ArrayList<>();
+        for (InsightResult.Cta cta : r.getCtas()) {
+            ctas.add(new BasicDBObject("id", cta.getId()).append("label", cta.getLabel()).append("route", cta.getRoute())
+                    .append("params", cta.getParams()).append("primary", cta.isPrimary()));
+        }
+        return new BasicDBObject("id", r.getInsightId()).append("severity", r.getSeverity()).append("title", r.getTitle())
+                .append("meta", r.getHeadline()).append("count", metricValue(r, AtlasGuardrailUtils.METRIC_VIOLATIONS))
+                .append("ctas", ctas);
+    }
+
+    private static boolean isAttentionReady(InsightResult r) {
+        return InsightResult.Status.READY.name().equals(r.getStatus()) && r.getSeverity() != null;
+    }
+
+    private static BasicDBObject detailAttentionRow(InsightResult r, InsightDataBundle bundle) {
+        if (r.getCtas() == null || r.getCtas().isEmpty() || r.getEvidence() == null || r.getEvidence().isEmpty()) return null;
+        List<Map<String, Object>> evidence = r.getEvidence().get(0).getRows();
+        if (evidence == null || evidence.isEmpty()) return null;
+
+        String user;
+        String policy = null;
+        String meta;
+        if (InsightId.ALERT_FATIGUE.name().equals(r.getInsightId())) {
+            Map<String, Object> params = r.getCtas().stream().map(InsightResult.Cta::getParams)
+                    .filter(p -> p != null && p.get("user") != null).findFirst().orElse(null);
+            if (params == null) return null;
+            user = String.valueOf(params.get("user"));
+            policy = String.valueOf(params.get("policy"));
+            String displayUser = bundle.deviceIdToUsername == null ? user : bundle.deviceIdToUsername.getOrDefault(user, user);
+            String policyName = policy;
+            Map<String, Object> incident = evidence.stream()
+                    .filter(row -> policyName.equals(row.get("Policy")) && displayUser.equals(row.get("User")))
+                    .max(Comparator.comparingInt(row -> Integer.parseInt(String.valueOf(row.get("Max in 24h")))))
+                    .orElse(null);
+            if (incident == null) return null;
+            meta = displayUser + " · " + policy + " · " + incident.get("Evidence type") + " · "
+                    + InsightUtil.grouped(Long.parseLong(String.valueOf(incident.get("Max in 24h")))) + " in 24h";
+        } else if (InsightId.PROMPT_INJECTION_REPEATS.name().equals(r.getInsightId())) {
+            Map<String, Object> params = r.getCtas().get(0).getParams();
+            if (params == null || params.get("user") == null) return null;
+            user = String.valueOf(params.get("user"));
+            policy = String.valueOf(params.get("policy"));
+            Map<String, Object> repeat = evidence.get(0);
+            meta = repeat.get("Source") + " · " + policy + " · " + repeat.get("Count") + " with the same phrase";
+        } else if (InsightId.CREDENTIAL_EXPOSURE.name().equals(r.getInsightId())) {
+            Map<String, Object> match = evidence.get(0);
+            user = String.valueOf(match.get("User"));
+            meta = user + " · " + match.get("Pattern type") + " · labeled as " + match.get("Currently labeled as");
+        } else {
+            return null;
+        }
+
+        Map<String, Object> review = new HashMap<>();
+        if (policy != null) review.put("latestAttack", policy);
+        if (!UNATTRIBUTED_ACTOR.equals(user)) review.put("actor", user);
+        BasicDBObject cta = new BasicDBObject("id", "review_violations").append("label", "Review")
+                .append("route", InsightRoutes.THREAT_ACTIVITY).append("params", review).append("primary", true);
+        return new BasicDBObject("id", r.getInsightId()).append("severity", r.getSeverity()).append("title", r.getTitle())
+                .append("meta", meta).append("count", null).append("ctas", Collections.singletonList(cta));
     }
 
     private static class TopAgenticAssetRow {

@@ -34,10 +34,10 @@ public class AtlasGuardrailUtils {
     private AtlasGuardrailUtils() {}
 
     static final int TRIAGE_TARGET_HOURS = 4;
-    static final String BEHAVIOUR_BLOCK = "block";
+    public static final String BEHAVIOUR_BLOCK = "block";
     static final String BEHAVIOUR_APPROVAL = "approval";
     private static final String UNASSIGNED_OWNER = "__unassigned__";
-    private static final String CONFIG_ENDPOINT_SEGMENT = "/config/";
+    public static final String CONFIG_ENDPOINT_SEGMENT = "/config/";
     static final String ASSET_TYPE_OTHER = "Other";
     static final List<String> ASSET_TYPES = Arrays.asList(AgenticObserveUtil.CLIENT_TYPE_AI_AGENT,
             AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT, AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER, AgenticObserveUtil.CLIENT_TYPE_LLM,
@@ -46,13 +46,17 @@ public class AtlasGuardrailUtils {
     static final String PERIOD_PREVIOUS = "previous";
     private static final int ASSET_TYPE_EXAMPLES = 5;
     private static final String EXAMPLE_COUNTS = "exampleCounts";
-    static final List<String> AGENTIC_ASSET_TYPES = Arrays.asList(AgenticObserveUtil.CLIENT_TYPE_AI_AGENT,
+    public static final List<String> AGENTIC_ASSET_TYPES = Arrays.asList(AgenticObserveUtil.CLIENT_TYPE_AI_AGENT,
             AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT, AgenticObserveUtil.CLIENT_TYPE_LLM, AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER);
     private static final List<String> EMPLOYEE_TAG_KEYS = Arrays.asList("team", "group", "role");
     private static final List<String> ASSET_STATUS_PRIORITY = Arrays.asList(AtlasAssetStatus.UNAPPROVED.name(),
             AtlasAssetStatus.UNDER_REVIEW.name(), AtlasAssetStatus.BLOCKED.name(), AtlasAssetStatus.APPROVED.name());
+    public static final String METRIC_VIOLATIONS = "violations";
+    public static final String METRIC_EMPLOYEES = "employees";
+    public static final String ACTIVITY_TAB_SKILLS_EVALUATIONS = "skills_evaluations";
+    public static final String ACTIVITY_TAB_MISCONFIGURED_SETTINGS = "misconfigured_settings";
 
-    static List<DashboardMaliciousEvent> collapseConfigFindings(List<DashboardMaliciousEvent> events) {
+    public static List<DashboardMaliciousEvent> collapseConfigFindings(List<DashboardMaliciousEvent> events) {
         Map<String, DashboardMaliciousEvent> latestConfigFinding = new LinkedHashMap<>();
         List<DashboardMaliciousEvent> out = new ArrayList<>();
         for (DashboardMaliciousEvent e : events) {
@@ -71,11 +75,11 @@ public class AtlasGuardrailUtils {
         return out;
     }
 
-    static boolean isConfigFinding(DashboardMaliciousEvent e) {
+    public static boolean isConfigFinding(DashboardMaliciousEvent e) {
         return e.getUrl() != null && e.getUrl().contains(CONFIG_ENDPOINT_SEGMENT);
     }
 
-    static Long periodDays(InsightDataBundle bundle) {
+    public static Long periodDays(InsightDataBundle bundle) {
         if (bundle.ctx.getStartTs() <= 0) return null;
         return Math.round((bundle.ctx.getEndTs() - bundle.ctx.getStartTs()) / 86400.0);
     }
@@ -104,7 +108,7 @@ public class AtlasGuardrailUtils {
         return isOpen(e) && isCritical(e) && isUnassigned(e.getCaseOwner());
     }
 
-    static boolean isOpen(DashboardMaliciousEvent e) {
+    public static boolean isOpen(DashboardMaliciousEvent e) {
         String status = e.getStatus();
         return status == null || status.isEmpty() || ThreatDetectionConstants.ACTIVE.equalsIgnoreCase(status);
     }
@@ -121,7 +125,7 @@ public class AtlasGuardrailUtils {
         return e.getTimestamp() >= startTs ? PERIOD_CURRENT : PERIOD_PREVIOUS;
     }
 
-    static boolean isSkillFinding(DashboardMaliciousEvent e) {
+    public static boolean isSkillFinding(DashboardMaliciousEvent e) {
         return SkillEvaluationConcentrationProvider.extractSkillName(e.getUrl()) != null;
     }
 
@@ -170,7 +174,7 @@ public class AtlasGuardrailUtils {
         return bundle.eventsBetween(startTs - (endTs - startTs), endTs);
     }
 
-    static Pair<List<DashboardMaliciousEvent>, List<DashboardMaliciousEvent>> splitByPeriod(InsightDataBundle bundle) {
+    public static Pair<List<DashboardMaliciousEvent>, List<DashboardMaliciousEvent>> splitByPeriod(InsightDataBundle bundle) {
         List<DashboardMaliciousEvent> fetched = periodEvents(bundle);
         if (fetched == null) return null;
         int startTs = bundle.ctx.getStartTs();
@@ -183,14 +187,14 @@ public class AtlasGuardrailUtils {
         return new Pair<>(current, previous);
     }
 
-    static List<DashboardMaliciousEvent> currentPeriodEvents(InsightDataBundle bundle) {
+    public static List<DashboardMaliciousEvent> currentPeriodEvents(InsightDataBundle bundle) {
         List<DashboardMaliciousEvent> events = periodEvents(bundle);
         if (events == null) return null;
         int startTs = bundle.ctx.getStartTs();
         return events.stream().filter(e -> e != null && e.getTimestamp() >= startTs).collect(Collectors.toList());
     }
 
-    static AtlasToolRow collectionAsset(ApiCollection c, String type) {
+    public static AtlasToolRow collectionAsset(ApiCollection c, String type) {
         String rowType;
         String groupKey;
         String name;
@@ -240,5 +244,10 @@ public class AtlasGuardrailUtils {
     static int assetStatusPriority(String status) {
         int index = ASSET_STATUS_PRIORITY.indexOf(status);
         return index < 0 ? ASSET_STATUS_PRIORITY.size() : index;
+    }
+
+    public static String assetKey(ApiCollection c, String type, AtlasToolRow asset) {
+        return asset == null ? AtlasAssetStatusService.toolKey(type, c.getHostName())
+                : AtlasAssetStatusService.toolKey(asset.getRowType(), asset.getGroupKey());
     }
 }

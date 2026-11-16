@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  */
 public class SkillEvaluationConcentrationProvider extends AbstractInsightProvider {
 
-    private static final String SKILLS_PREFIX = "/skills/";
+    public static final String SKILLS_PREFIX = "/skills/";
     private static final int EVENT_PAGE_LIMIT = 2000;
     private static final int EVIDENCE_ROW_CAP = 20;
 
