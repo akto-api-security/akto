@@ -525,6 +525,15 @@ export default {
             }
         })
     },
+    updateRedteamLearningsEnabled(redteamLearningsEnabled) {
+        return request({
+            url: '/api/updateRedteamLearningsEnabled',
+            method: 'post',
+            data: {
+                redteamLearningsEnabled
+            }
+        })
+    },
     fetchAccessMatrixUrlToRoles(){
         return request({
             url: '/api/fetchAccessMatrixUrlToRoles',

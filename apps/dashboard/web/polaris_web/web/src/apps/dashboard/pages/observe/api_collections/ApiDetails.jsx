@@ -22,6 +22,7 @@ import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
+import AgentLearningsTab from "../../testing/redteam_learnings/AgentLearningsTab";
 import ForbiddenRole from "../../../components/shared/ForbiddenRole";
 import SkillMarkdownViewer from "../agentic/SkillEvidenceView";
 import { parseSkillSample } from "../agentic/SkillComponentsView";
@@ -759,6 +760,17 @@ function ApiDetails(props) {
         </Box>,
     }
 
+    const LearningsTab = {
+        id: 'redteam-learnings',
+        content: "Learnings",
+        component: <AgentLearningsTab
+            key={`${apiDetail.apiCollectionId}|${apiDetail.method}|${apiDetail.endpoint}`}
+            apiCollectionId={apiDetail.apiCollectionId}
+            url={apiDetail.endpoint}
+            method={apiDetail.method}
+        />
+    }
+
     const hasIssues = apiDetail?.severityObj && Object.values(apiDetail.severityObj).some(count => count > 0);
 
     const IssuesTab = {
@@ -982,6 +994,7 @@ function ApiDetails(props) {
                     ValuesTab,
                     ...(!isSkillEndpoint ? [SchemaTab] : []),
                     ...(shouldShowBasePromptTab ? [BasePromptTab] : []),
+                    ...(!isSkillEndpoint && hasGenAiTag() ? [LearningsTab] : []),
                     ...(hasIssues ? [IssuesTab] : []),
                     ...(apiDetail?.isThreatEnabled ? [ThreatIssuesTab] : []),
                     ApiCallStatsTab,
