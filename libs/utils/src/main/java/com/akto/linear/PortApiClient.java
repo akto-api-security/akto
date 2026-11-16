@@ -25,6 +25,8 @@ public final class PortApiClient {
     private static final int HTTP_TOO_MANY_REQUESTS = 429;
     private static final String STATUS_COMPLETED = "COMPLETED";
     private static final String RESULT_SUCCESS = "SUCCESS";
+    private static final String ISSUE_URL_KEY = "issueUrl";
+    private static final int MAX_OUTPUT_DEPTH = 3;
 
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -89,6 +91,11 @@ public final class PortApiClient {
                 return new LinearIssue(issue.getString("id"), issue.getString("identifier"),
                     issue.getString("url"));
             }
+            BasicDBObject actionOutput = findActionOutput(nodeRun);
+            if (actionOutput != null) {
+                return new LinearIssue(actionOutput.getString("issueId"), actionOutput.getString("identifier"),
+                    actionOutput.getString("issueUrl"));
+            }
         }
         throw new Exception("Port workflow finished without returning a Linear issue: " + failureMessage(run));
     }
@@ -120,6 +127,30 @@ public final class PortApiClient {
         }
         Object issue = ((BasicDBObject) issueCreate).get("issue");
         return issue instanceof BasicDBObject ? (BasicDBObject) issue : null;
+    }
+
+    private static BasicDBObject findActionOutput(Object nodeRun) {
+        if (!(nodeRun instanceof BasicDBObject)) {
+            return null;
+        }
+        return findObjectWithKey(((BasicDBObject) nodeRun).get("output"), ISSUE_URL_KEY, MAX_OUTPUT_DEPTH);
+    }
+
+    private static BasicDBObject findObjectWithKey(Object node, String key, int depth) {
+        if (!(node instanceof BasicDBObject) || depth < 0) {
+            return null;
+        }
+        BasicDBObject object = (BasicDBObject) node;
+        if (StringUtils.isNotBlank(object.getString(key))) {
+            return object;
+        }
+        for (Object value : object.values()) {
+            BasicDBObject found = findObjectWithKey(value, key, depth - 1);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 
     private static BasicDBObject responseData(Object nodeRun) {
