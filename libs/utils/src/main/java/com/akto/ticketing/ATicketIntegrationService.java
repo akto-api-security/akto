@@ -22,7 +22,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.conversions.Bson;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -190,15 +193,23 @@ public abstract class ATicketIntegrationService<T> {
     }
 
     private void updateIssueWithTicketInfo(TestingIssuesId issueId, String ticketId, String ticketUrl) {
+        List<Bson> updates = new ArrayList<>(Arrays.asList(
+            Updates.set(getTicketUrlFieldName(), ticketUrl),
+            Updates.set(TestingRunIssues.TICKET_ID, ticketId),
+            Updates.set(TestingRunIssues.TICKET_SOURCE, getTicketSource()),
+            Updates.set(TestingRunIssues.TICKET_LAST_UPDATED_AT, Context.now())
+        ));
+        if (StringUtils.isNotBlank(getTicketCreatedVia())) {
+            updates.add(Updates.set(TestingRunIssues.TICKET_CREATED_VIA, getTicketCreatedVia()));
+        }
         TestingRunIssuesDao.instance.updateOneNoUpsert(
             Filters.eq(Constants.ID, issueId),
-            Updates.combine(
-                Updates.set(getTicketUrlFieldName(), ticketUrl),
-                Updates.set(TestingRunIssues.TICKET_ID, ticketId),
-                Updates.set(TestingRunIssues.TICKET_SOURCE, getTicketSource()),
-                Updates.set(TestingRunIssues.TICKET_LAST_UPDATED_AT, Context.now())
-            )
+            Updates.combine(updates)
         );
+    }
+
+    protected String getTicketCreatedVia() {
+        return null;
     }
 
     protected Pair<String, String> getEndpointDetails(String fullUrl) {

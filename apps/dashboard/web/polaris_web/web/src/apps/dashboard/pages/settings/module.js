@@ -424,6 +424,34 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchPortIOIntegration: async function(){
+      let portInteg = {}
+      await settingRequests.fetchPortIOIntegration().then((resp)=>{
+        portInteg = resp.portIOIntegration
+      })
+      return portInteg
+    },
+    addPortIOIntegration: async function(clientId, clientSecret, workflowId) {
+      let trafficData = {}
+      await settingRequests.addPortIOIntegration(clientId, clientSecret, workflowId).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    savePortIOSeverityMapping: async function(severityToPriority) {
+      let portInteg = {}
+      await settingRequests.savePortIOSeverityMapping(severityToPriority).then((resp)=>{
+        portInteg = resp.portIOIntegration
+      })
+      return portInteg
+    },
+    removePortIOIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removePortIOIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     getSetupOptions: function(){
       return setupOptions;
     },

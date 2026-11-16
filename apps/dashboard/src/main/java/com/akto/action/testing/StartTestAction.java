@@ -1771,12 +1771,13 @@ public class StartTestAction extends UserAction {
             }
 
             String ticketSource = autoTicketingDetails.getTicketSource();
-            if (!TicketSource.JIRA.name().equals(ticketSource) && !TicketSource.LINEAR.name().equals(ticketSource)) {
+            boolean isPortIO = AutoTicketingDetails.PORT_IO_TICKET_SOURCE.equals(ticketSource);
+            if (!TicketSource.JIRA.name().equals(ticketSource) && !TicketSource.LINEAR.name().equals(ticketSource) && !isPortIO) {
                 addActionError("Invalid parameter: ticketSource.");
                 return false;
             }
 
-            if (autoTicketingDetails.getProjectId() == null) {
+            if (!isPortIO && autoTicketingDetails.getProjectId() == null) {
                 addActionError("Project Id is required.");
                 return false;
             }
