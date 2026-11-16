@@ -1,6 +1,9 @@
 package com.akto.action;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
+import com.mongodb.client.model.UpdateOptions;
 import com.akto.dao.redteam_learnings.AgentRedteamObservationDao;
 import com.akto.dao.redteam_learnings.AgentRedteamProfileDao;
 import com.akto.dao.redteam_learnings.AgentRedteamTemplateDraftDao;
@@ -240,6 +243,32 @@ public class RedteamLearningsActionTest extends MongoBasedTest {
         RedteamLearningsAction action = save(1, insight("i1"), draft("not-an-insight"));
         assertEquals("ERROR", action.saveRedteamProfile());
         assertEquals(0, AgentRedteamProfileDao.instance.count(new BasicDBObject()));
+    }
+
+    private static Map<String, Object> learningsSettings() throws Exception {
+        RedteamLearningsAction action = action("{}");
+        assertEquals("SUCCESS", action.fetchRedteamLearningsSettings());
+        return action.getResponse();
+    }
+
+    @Test
+    public void learningsAreOnUntilTheAccountTurnsThemOff() throws Exception {
+        AccountSettingsDao.instance.getMCollection().deleteMany(AccountSettingsDao.generateFilter());
+        assertEquals(true, learningsSettings().get("enabled"));
+        assertEquals(false, learningsSettings().get("configured"));
+
+        AccountSettingsDao.instance.getMCollection().updateOne(AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.REDTEAM_LEARNINGS_ENABLED, false), new UpdateOptions().upsert(true));
+        assertEquals(false, learningsSettings().get("enabled"));
+        assertEquals(true, learningsSettings().get("configured"));
+
+        Context.accountId.set(ACCOUNT_ID + 1);
+        try {
+            assertEquals("another account's setting does not apply", true, learningsSettings().get("enabled"));
+        } finally {
+            Context.accountId.set(ACCOUNT_ID);
+            AccountSettingsDao.instance.getMCollection().deleteMany(AccountSettingsDao.generateFilter());
+        }
     }
 
     @Test

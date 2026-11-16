@@ -1,9 +1,11 @@
 package com.akto.action;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.redteam_learnings.AgentRedteamObservationDao;
 import com.akto.dao.redteam_learnings.AgentRedteamProfileDao;
 import com.akto.dao.redteam_learnings.AgentRedteamTemplateDraftDao;
 import com.akto.dao.testing.AgentConversationResultDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.redteam_learnings.AgentRedteamObservation;
 import com.akto.dto.redteam_learnings.AgentRedteamProfile;
 import com.akto.dto.redteam_learnings.AgentRedteamProfile.Insight;
@@ -15,6 +17,7 @@ import com.akto.dto.testing.AgentConversationResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.opensymphony.xwork2.Action;
+import com.mongodb.client.model.Projections;
 import com.opensymphony.xwork2.ActionSupport;
 import lombok.Getter;
 import lombok.Setter;
@@ -237,6 +240,24 @@ public class RedteamLearningsAction extends ActionSupport {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             return error("Failed to fetch red-team profile", e);
+        }
+    }
+
+    /**
+     * Whether the account has red-team learnings on (Testing → User config). Never set counts as on; a failed read is
+     * an ERROR, never a default, so the agent server keeps the value it last read.
+     */
+    public String fetchRedteamLearningsSettings() {
+        try {
+            AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(),
+                    Projections.include(AccountSettings.REDTEAM_LEARNINGS_ENABLED));
+            Boolean configured = settings == null ? null : settings.getRedteamLearningsEnabled();
+            response = new LinkedHashMap<>();
+            response.put("enabled", !Boolean.FALSE.equals(configured));
+            response.put("configured", configured != null);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            return error("Failed to fetch red-team learnings settings", e);
         }
     }
 

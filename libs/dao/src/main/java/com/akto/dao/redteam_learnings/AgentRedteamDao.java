@@ -21,7 +21,7 @@ import com.mongodb.client.model.Indexes;
 
 /**
  * Shared by the red-team learning DAOs the database-abstractor writes through. The dashboard reads the same
- * collections with its own DAOs and creates the same indexes from DaoInit and Liquibase 034; the names here
+ * collections with its own DAOs and creates the same indexes from DaoInit and Liquibase 039; the names here
  * must stay the same as there.
  */
 public abstract class AgentRedteamDao<T extends AgentRedteamRecord> extends AccountsContextDao<T> {
