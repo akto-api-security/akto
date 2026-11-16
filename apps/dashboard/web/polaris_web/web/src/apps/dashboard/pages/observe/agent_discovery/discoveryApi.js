@@ -2,12 +2,16 @@ import { useState } from 'react'
 import dashboardApi from '../../dashboard/api'
 
 const WINDOW_SECONDS = 7 * 86400
+const HOUR_SECONDS = 3600
 const SNOOZE_MS = 24 * 60 * 60 * 1000
 
 // The overview and "since last week" ask for the same window, so the backend loads its shared data once for both.
+// The window ends on the next hour boundary, not at this second: the backend caches its shared data under the exact
+// window and never evicts it, so a window that differs on every visit would add an entry every time and never hit.
+// Neither response uses the window's threat counts (both are built from the current state), so rounding changes no result.
 // changes is null when its call failed, so the page can say so instead of leaving a gap; a failed overview fails the page.
 export async function fetchDiscovery() {
-    const end = Math.floor(Date.now() / 1000)
+    const end = Math.ceil(Date.now() / 1000 / HOUR_SECONDS) * HOUR_SECONDS
     const start = end - WINDOW_SECONDS
     const [overview, changes] = await Promise.all([
         dashboardApi.fetchArgusDiscoveryOverview(start, end),

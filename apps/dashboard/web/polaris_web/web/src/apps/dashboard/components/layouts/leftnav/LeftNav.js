@@ -268,7 +268,6 @@ export default function LeftNav() {
                 },
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
-                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [
                     ...(dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
                         label: "Overview",
                         requires: pageRequires("/dashboard/observe/agent-discovery"),
@@ -279,6 +278,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_agent_discovery",
                     }] : []),
+                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [
                     // { label: "Agentic assets (legacy)", onClick: () => { navigate("/dashboard/observe/agentic-assets"); handleSelect("dashboard_observe_agentic_assets"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_agentic_assets" },
                     {
                         label: "Overview",
