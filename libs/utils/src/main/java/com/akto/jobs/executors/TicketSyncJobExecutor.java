@@ -16,6 +16,7 @@ import com.akto.log.LoggerMaker;
 import org.slf4j.event.Level;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -54,6 +55,10 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
     @Override
     protected void runJob(Job job) throws Exception {
         TicketSyncJobParams params = paramClass.cast(job.getJobParams());
+        if (TicketSource.LINEAR.name().equals(params.getTicketSource())) {
+            LinearTicketSyncJobExecutor.INSTANCE.runJob(job);
+            return;
+        }
         String projectKey = params.getProjectKey();
         int lastSyncedAt = params.getLastSyncedAt();
         JiraIntegration jira = loadJiraIntegration();

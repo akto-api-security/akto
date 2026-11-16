@@ -16,11 +16,13 @@ public class LinearIntegration {
 
     public static final String API_TOKEN = "apiToken";
     public static final String TEAM_MAPPINGS = "teamMappings";
+    public static final String BI_DIRECTIONAL_SYNC_ENABLED = "biDirectionalSyncEnabled";
     public static final String CREATED_TS = "createdTs";
     public static final String UPDATED_TS = "updatedTs";
 
     private String apiToken;
     private Map<String, LinearTeamMapping> teamMappings;
+    private boolean biDirectionalSyncEnabled;
     private int createdTs;
     private int updatedTs;
 
