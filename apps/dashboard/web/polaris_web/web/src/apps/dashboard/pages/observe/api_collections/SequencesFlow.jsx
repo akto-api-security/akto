@@ -39,7 +39,7 @@ function ExplorerEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, 
           <path d="M0,0 L9,7 L0,14" fill="none" stroke="#8c9196" />
         </marker>
       </defs>
-      <path id={id} className="react-flow__edge-path" d={getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })} style={{ stroke: '#8c9196', strokeWidth: data.width, strokeDasharray: data.dashed ? '6 4' : undefined, fill: 'none' }} markerEnd={`url(#${markerId})`} />
+      <path id={id} className="react-flow__edge-path" d={getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })} style={{ stroke: '#8c9196', strokeWidth: data.width, fill: 'none' }} markerEnd={`url(#${markerId})`} />
       {data.label ? (
         <EdgeText x={targetX - LABEL_OFFSET} y={targetY - 14} label={data.label} labelStyle={{ fontSize: 13, fill: '#202223' }} labelShowBg labelBgStyle={{ fill: '#ffffff', stroke: '#c9cccf', strokeWidth: 0.5 }} labelBgPadding={[6, 3]} labelBgBorderRadius={4} />
       ) : null}
@@ -56,7 +56,7 @@ const parseKey = (key) => {
   return { method: parts[parts.length - 1], url: parts.slice(1, -1).join(' ') };
 };
 
-const edge = (id, source, target, label, width, dashed = false) => ({ id, source, target, sourceHandle: 'b', targetHandle: 't', type: 'explorerEdge', data: { label, width, dashed } });
+const edge = (id, source, target, label, width) => ({ id, source, target, sourceHandle: 'b', targetHandle: 't', type: 'explorerEdge', data: { label, width } });
 
 const share = (weight, total) => {
   const percent = 100 * weight / total;
@@ -88,35 +88,24 @@ function explorerGraph(starts, startsShown, steps, fan, fanShown) {
   });
   if (!fan) return { nodes, edges, bounds: null };
 
-  const shownRows = fan.rows.slice(0, fanShown);
-  // A next step already on the path is the same step repeating: point back to its box instead of adding a new one
-  const pathIndex = (key) => steps.findIndex((s) => s.key === key);
-  const lastKey = steps[steps.length - 1].key;
-  const rows = shownRows.filter((row) => pathIndex(row.key) < 0);
-  const repeats = shownRows.filter((row) => pathIndex(row.key) >= 0);
+  const rows = fan.rows.slice(0, fanShown);
   const allNext = fan.rows.reduce((sum, row) => sum + row.count, 0);
-  const hidden = allNext - shownRows.reduce((sum, row) => sum + row.count, 0);
+  const hidden = allNext - rows.reduce((sum, row) => sum + row.count, 0);
   const ended = fan.pathCount - allNext;
   const extras = [];
-  const self = repeats.find((row) => row.key === lastKey);
-  if (self) extras.push({ text: `Calls itself again · ${share(self.count, fan.pathCount)}`, italic: true });
-  if (hidden > 0) extras.push({ text: `+ ${Math.min(PAGE, fan.rows.length - shownRows.length)} more · ${share(hidden, fan.pathCount)}`, action: 'more-fan' });
-  if (ended > 0) extras.push({ text: `Session ends · ${share(ended, fan.pathCount)}`, italic: true });
+  if (hidden > 0) extras.push({ text: `+ ${Math.min(PAGE, fan.rows.length - rows.length)} more · ${share(hidden, fan.pathCount)}`, action: 'more-fan' });
+  if (ended > 0) extras.push({ text: `Ends here · ${share(ended, fan.pathCount)}`, italic: true });
 
   const lastX = (steps.length - 1) * PATH_STEP;
   const x = lastX + NODE_WIDTH + FAN_GAP;
   const top = pathY - ((rows.length + extras.length - 1) / 2) * ROW_HEIGHT;
   const parentId = nodeId(steps.length - 1);
   // Thickness relative to the busiest next step, so the ranking shows even when every share is small
-  const topCount = shownRows.length ? shownRows[0].count : 1;
+  const topCount = rows.length ? rows[0].count : 1;
   rows.forEach((row, index) => {
     const id = `c${index}`;
     nodes.push({ id, type: 'sequencesNode', position: { x, y: top + index * ROW_HEIGHT }, data: { ...parseKey(row.key), key: row.key, action: 'next', label: share(row.count, fan.pathCount) } });
     edges.push(edge(`${parentId}-${id}`, parentId, id, share(row.count, fan.pathCount), Math.max(1.5, 6 * row.count / topCount)));
-  });
-  repeats.filter((row) => row.key !== lastKey).forEach((row) => {
-    const targetId = nodeId(pathIndex(row.key));
-    edges.push(edge(`${parentId}-${targetId}-repeat`, parentId, targetId, `${share(row.count, fan.pathCount)} · repeats`, Math.max(1.5, 6 * row.count / topCount), true));
   });
   extras.forEach((extra, index) => {
     nodes.push({ id: `extra${index}`, type: 'textLabel', position: { x, y: top + (rows.length + index) * ROW_HEIGHT + 12 }, selectable: false, data: { ...extra, align: 'left' } });
@@ -155,15 +144,35 @@ function SequencesFlow({ apiCollectionId }) {
     return fanCache.current.get(cacheKey);
   }, [collectionId]);
 
+  // Next new APIs after the path. A step back to an API already on the path (a list reloading after
+  // an action) is looked through once, so list → remove → list → add shows as list → remove → add
+  const loadNewSteps = useCallback(async (keys) => {
+    const direct = await loadFan(keys);
+    const onPath = new Set(keys);
+    const last = keys[keys.length - 1];
+    const merged = new Map();
+    const add = (key, weight) => merged.set(key, (merged.get(key) || 0) + weight);
+    const returns = direct.rows.filter((row) => onPath.has(row.key));
+    direct.rows.filter((row) => !onPath.has(row.key)).forEach((row) => add(row.key, row.count));
+    const afterReturns = await Promise.all(returns.map((row) => loadFan([last, row.key])));
+    returns.forEach((row, index) => {
+      const after = afterReturns[index];
+      if (!after.pathCount) return;
+      after.rows.filter((next) => !onPath.has(next.key)).forEach((next) => add(next.key, row.count * next.count / after.pathCount));
+    });
+    const rows = [...merged].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count);
+    return { rows, pathCount: direct.pathCount };
+  }, [loadFan]);
+
   const goTo = useCallback(async (nextSteps) => {
     try {
-      setFan(await loadFan(nextSteps.map((s) => s.key)));
+      setFan(await loadNewSteps(nextSteps.map((s) => s.key)));
       setFanShown(PAGE);
       setSteps(nextSteps);
     } catch (error) {
       console.error('Error fetching session steps:', error);
     }
-  }, [loadFan]);
+  }, [loadNewSteps]);
 
   // Opens on the busiest API, already fanned out
   const openExplorer = useCallback(async () => {
