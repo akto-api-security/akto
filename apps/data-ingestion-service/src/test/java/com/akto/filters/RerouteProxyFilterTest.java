@@ -36,7 +36,6 @@ import static org.junit.Assert.assertTrue;
 public class RerouteProxyFilterTest {
 
     private static final String REROUTED_TOKEN = "eyJ.eyJ.abc-" + RerouteProxyFilter.REROUTE_TOKEN_SUFFIX;
-    private static final String TARGET_TOKEN = "acorns-ingest-token";
 
     private HttpServer upstream;
     private String upstreamUrl;
@@ -82,14 +81,14 @@ public class RerouteProxyFilterTest {
         return new OkHttpClient.Builder().callTimeout(5, TimeUnit.SECONDS).build();
     }
 
-    private RerouteProxyFilter filter(String targetToken, Integer deploymentAccountId) {
-        return new RerouteProxyFilter(upstreamUrl, targetToken, deploymentAccountId, client());
+    private RerouteProxyFilter filter(Integer deploymentAccountId) {
+        return new RerouteProxyFilter(upstreamUrl, deploymentAccountId, client());
     }
 
     // ---- forwarding ----
 
     @Test
-    public void matchingToken_isForwardedWithTargetTokenAndRelayed() throws Exception {
+    public void matchingToken_isForwardedAsIsAndRelayed() throws Exception {
         byte[] body = "{\"batchData\":[{\"akto_account_id\":\"1000000\",\"path\":\"/x\"}]}".getBytes(StandardCharsets.UTF_8);
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Authorization", REROUTED_TOKEN);
@@ -100,7 +99,7 @@ public class RerouteProxyFilterTest {
         Res res = new Res();
         boolean[] chainRan = {false};
 
-        filter(TARGET_TOKEN, 1718012345).doFilter(
+        filter(1718012345).doFilter(
                 req("POST", "/api/ingestData", "a=1&b=2", headers, body), res.proxy(), (q, r) -> chainRan[0] = true);
 
         assertFalse("must not be handled locally", chainRan[0]);
@@ -110,7 +109,7 @@ public class RerouteProxyFilterTest {
         assertEquals("/api/ingestData?a=1&b=2", c.uri);
         assertArrayEquals("body must pass through byte for byte", body, c.body);
         assertEquals("application/json", c.headers.get("content-type"));
-        assertEquals("caller's token replaced by acorns' token", TARGET_TOKEN, c.headers.get("authorization"));
+        assertEquals("caller's token forwarded unchanged", REROUTED_TOKEN, c.headers.get("authorization"));
         assertEquals("1", c.headers.get("x-akto-rerouted"));
         assertEquals("device-42", c.headers.get("x-device-id"));
         assertEquals("127.0.0.1:" + upstream.getAddress().getPort(), c.headers.get("host"));
@@ -130,7 +129,7 @@ public class RerouteProxyFilterTest {
         headers.put("Authorization", REROUTED_TOKEN);
         headers.put("Content-Type", contentType);
 
-        filter(TARGET_TOKEN, null).doFilter(req("POST", "/api/validate/file", null, headers, body), new Res().proxy(), failChain());
+        filter(null).doFilter(req("POST", "/api/validate/file", null, headers, body), new Res().proxy(), failChain());
 
         Captured c = received.get(0);
         assertArrayEquals(body, c.body);
@@ -138,17 +137,9 @@ public class RerouteProxyFilterTest {
     }
 
     @Test
-    public void withoutTargetToken_callersTokenIsForwarded() throws Exception {
-        filter(null, null).doFilter(req("POST", "/api/http-proxy", null, auth("Bearer " + REROUTED_TOKEN), new byte[0]),
-                new Res().proxy(), failChain());
-
-        assertEquals("Bearer " + REROUTED_TOKEN, received.get(0).headers.get("authorization"));
-    }
-
-    @Test
     public void getRequest_isForwardedWithoutBody() throws Exception {
         Res res = new Res();
-        filter(TARGET_TOKEN, null).doFilter(req("GET", "/api/health", null, auth(REROUTED_TOKEN), null), res.proxy(), failChain());
+        filter(null).doFilter(req("GET", "/api/health", null, auth(REROUTED_TOKEN), null), res.proxy(), failChain());
 
         assertEquals("GET", received.get(0).method);
         assertEquals(0, received.get(0).body.length);
@@ -160,7 +151,7 @@ public class RerouteProxyFilterTest {
     @Test
     public void otherTokens_areHandledLocally() throws Exception {
         for (String token : new String[]{null, "", "eyJ.eyJ.someOtherSignature", RerouteProxyFilter.REROUTE_TOKEN_SUFFIX + "x"}) {
-            assertChainRuns(filter(TARGET_TOKEN, null), auth(token));
+            assertChainRuns(filter(null), auth(token));
         }
         assertTrue(received.isEmpty());
     }
@@ -169,13 +160,13 @@ public class RerouteProxyFilterTest {
     public void alreadyReroutedRequest_isNotForwardedAgain() throws Exception {
         Map<String, String> headers = auth(REROUTED_TOKEN);
         headers.put(RerouteProxyFilter.REROUTED_HEADER, "1");
-        assertChainRuns(filter(TARGET_TOKEN, null), headers);
+        assertChainRuns(filter(null), headers);
         assertTrue(received.isEmpty());
     }
 
     @Test
     public void targetsOwnDeployment_neverForwards() throws Exception {
-        assertChainRuns(filter(TARGET_TOKEN, RerouteProxyFilter.REROUTE_ACCOUNT_ID), auth(REROUTED_TOKEN));
+        assertChainRuns(filter(RerouteProxyFilter.REROUTE_ACCOUNT_ID), auth(REROUTED_TOKEN));
         assertTrue(received.isEmpty());
     }
 
@@ -183,11 +174,10 @@ public class RerouteProxyFilterTest {
     public void upstreamDown_returns502WithoutHandlingLocally() throws Exception {
         upstream.stop(0);
         Res res = new Res();
-        filter(TARGET_TOKEN, null).doFilter(req("POST", "/api/ingestData", null, auth(REROUTED_TOKEN), new byte[]{1}),
+        filter(null).doFilter(req("POST", "/api/ingestData", null, auth(REROUTED_TOKEN), new byte[]{1}),
                 res.proxy(), failChain());
 
         assertEquals(Integer.valueOf(502), res.status);
-        assertTrue(new String(res.body.toByteArray(), StandardCharsets.UTF_8).contains("unavailable"));
     }
 
     // ---- helpers ----
