@@ -325,6 +325,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     if (filters != null && !filters.isEmpty()) {
       for (FilterConfig apiFilter : filters.values()) {
       boolean hasPassedFilter = false;
+      String sequenceReason = null;
       boolean successFilterPassed = false;
       boolean failureFilterPassed = false;
        // Create a fresh vulnerable list for each filter
@@ -368,8 +369,8 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
           }, catalogTemplates);
           if (sequenceUrl == null) sequenceUrl = urlForAggregation;
           boolean skippedRequiredStep = sequenceCache.checkSequenceAnomaly(responseParam, apiCollectionId, sequenceUrl, method);
-          boolean unknownPath = sequenceCache.checkUnknownPath(responseParam, apiCollectionId, sequenceUrl, method);
-          hasPassedFilter = skippedRequiredStep || unknownPath;
+          sequenceReason = sequenceCache.checkUnknownPath(responseParam, apiCollectionId, sequenceUrl, method);
+          hasPassedFilter = skippedRequiredStep || sequenceReason != null;
         }
       } else {
         boolean hasSuccessFailureFilters = (apiFilter.getSuccessFilter() != null || apiFilter.getFailureFilter() != null);
@@ -445,6 +446,8 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
           reason = threatDetector.getWeakAuthenticationReason(responseParam);
         } else if (filterId.equals(ThreatDetector.VPN_DETECTION_FILTER_ID)) {
           reason = threatDetector.getVpnReason(responseParam);
+        } else if (filterId.equals(ThreatDetector.SEQUENCE_ANOMALY_FILTER_ID)) {
+          reason = sequenceReason;
         }
 
         // Later we will also add aggregation support

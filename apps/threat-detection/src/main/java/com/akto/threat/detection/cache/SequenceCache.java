@@ -42,14 +42,12 @@ public class SequenceCache {
 
     // Steps "A|B" users take (cyborg leaves out rare ones), and every API with a call count; steps between other APIs are not judged
     private volatile Set<String> knownSteps = new HashSet<>();
-    private volatile Set<String> knownApis = new HashSet<>();
+    // API key -> the same key; paths keep this shared instance instead of a copy per call
+    private volatile Map<String, String> knownApis = new HashMap<>();
     private int stepsUpdatedAt = 0;
 
-    private final Cache<String, String> lastApi = Caffeine.newBuilder()
-            .maximumSize(MAX_SESSIONS)
-            .expireAfterAccess(HISTORY_WINDOW_MILLIS, TimeUnit.MILLISECONDS)
-            .build();
-    private final Cache<String, Integer> unknownRun = Caffeine.newBuilder()
+    // Session -> its last API, then the APIs of its current run of unknown steps (at most UNKNOWN_STEPS_TO_ALERT + 1)
+    private final Cache<String, List<String>> sessionPath = Caffeine.newBuilder()
             .maximumSize(MAX_SESSIONS)
             .expireAfterAccess(HISTORY_WINDOW_MILLIS, TimeUnit.MILLISECONDS)
             .build();
@@ -88,27 +86,49 @@ public class SequenceCache {
         return anomalous;
     }
 
-    // True once a session has taken UNKNOWN_STEPS_TO_ALERT unknown steps in a row; a known step resets the run
-    public boolean checkUnknownPath(HttpResponseParams responseParam, int apiCollectionId, String url, Method method) {
+    // Reason text once a session has taken UNKNOWN_STEPS_TO_ALERT unknown steps in a row, otherwise null.
+    // A known step resets the run, so a session's path is just its last API whenever it behaves normally.
+    public String checkUnknownPath(HttpResponseParams responseParam, int apiCollectionId, String url, Method method) {
         refreshKnownSteps();
-        if (knownApis.isEmpty()) return false;
+        if (knownApis.isEmpty()) return null;
         String sessionId = sessionIdentifier.extractUserId(responseParam);
-        if (sessionId == null) return false;
-        String apiKey = apiCollectionId + " " + normalizeUrl(url) + " " + method;
-        if (!knownApis.contains(apiKey)) return false;
+        if (sessionId == null) return null;
+        String apiKey = knownApis.get(apiCollectionId + " " + normalizeUrl(url) + " " + method);
+        if (apiKey == null) return null;
 
-        String previous = lastApi.getIfPresent(sessionId);
-        lastApi.put(sessionId, apiKey);
-        if (previous == null || previous.equals(apiKey)) return false;
-
-        if (knownSteps.contains(previous + "|" + apiKey)) {
-            unknownRun.invalidate(sessionId);
-            return false;
+        List<String> path = sessionPath.getIfPresent(sessionId);
+        if (path == null) {
+            sessionPath.put(sessionId, newPath(apiKey));
+            return null;
         }
-        int run = unknownRun.asMap().merge(sessionId, 1, Integer::sum);
-        if (run < UNKNOWN_STEPS_TO_ALERT) return false;
-        unknownRun.invalidate(sessionId);
-        return true;
+        String previous = path.get(path.size() - 1);
+        if (previous.equals(apiKey)) return null;
+        if (knownSteps.contains(previous + "|" + apiKey)) {
+            sessionPath.put(sessionId, newPath(apiKey));
+            return null;
+        }
+        path.add(apiKey);
+        if (path.size() <= UNKNOWN_STEPS_TO_ALERT) return null;
+        sessionPath.put(sessionId, newPath(apiKey));
+        return UNKNOWN_STEPS_TO_ALERT + " steps in a row that users almost never take: " + describe(path);
+    }
+
+    private static List<String> newPath(String apiKey) {
+        List<String> path = new ArrayList<>(UNKNOWN_STEPS_TO_ALERT + 1);
+        path.add(apiKey);
+        return path;
+    }
+
+    // "METHOD /url → METHOD /url ..." from "<collectionId> <url> <method>" keys
+    private static String describe(List<String> path) {
+        StringBuilder text = new StringBuilder();
+        for (String apiKey : path) {
+            int first = apiKey.indexOf(' ');
+            int last = apiKey.lastIndexOf(' ');
+            if (text.length() > 0) text.append(" → ");
+            text.append(apiKey.substring(last + 1)).append(' ').append(apiKey.substring(first + 1, last));
+        }
+        return text.toString();
     }
 
     private void refreshKnownSteps() {
@@ -119,12 +139,13 @@ public class SequenceCache {
         stepsUpdatedAt = now;
         try {
             Set<String> steps = new HashSet<>();
-            Set<String> apis = new HashSet<>();
+            Map<String, String> apis = new HashMap<>();
             for (ApiSequences seq : dataActor.fetchKnownSequenceSteps()) {
                 String seqKey = seq.getSeqKey();
                 if (seqKey == null) continue;
                 if (seq.getOrder() == 0) {
-                    apis.add(normalizeKey(seqKey));
+                    String apiKey = normalizeKey(seqKey);
+                    apis.put(apiKey, apiKey);
                 } else if (seq.getOrder() == 1) {
                     int split = seqKey.indexOf('|');
                     if (split > 0) steps.add(normalizeKey(seqKey.substring(0, split)) + "|" + normalizeKey(seqKey.substring(split + 1)));
