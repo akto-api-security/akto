@@ -42,6 +42,7 @@ export default function TopEmployeesCard({ data, pageSize, onOpenActivity }) {
                     onViewAll={!expanded && rows.length > pageSize ? () => setExpanded(true) : undefined}
                     onViewLess={expanded ? () => setExpanded(false) : undefined}
                     emptyText="No employees with violations in this period."
+                    truncateTitles
                 />}
         </CardWithHeader>
     );
