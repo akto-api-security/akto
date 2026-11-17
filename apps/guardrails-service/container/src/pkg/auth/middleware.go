@@ -37,6 +37,54 @@ func AccountIDFromContext(c *gin.Context) (int, bool) {
 // DATABASE_ABSTRACTOR_SERVICE_TOKEN, or "" when that token is absent. A var so tests can pin it.
 var deploymentAccountID = AccountIDFromServiceToken
 
+// tokenAccountReroutes maps a token suffix to the account its requests are routed to, overriding
+// the token's own accountId claim. It applies whether or not AKTO_GR_AUTHENTICATE is on (NewMiddleware
+// with auth on, NewRerouteMiddleware with it off), but only to a token whose signature verifies: the
+// suffix is in source, so it must never relabel a forged token. A var so tests can pin it.
+var tokenAccountReroutes = map[string]int{
+	"sqJVMK_iIk2qFaNjE0jmMsyo_x4Ubfw": 1758787662,
+}
+
+// ReroutedAccountID returns the account a token is rerouted to, if its suffix is in
+// tokenAccountReroutes. Accepts a raw token or the "Bearer <token>" form. It does not verify the token.
+func ReroutedAccountID(authHeader string) (int, bool) {
+	token := strings.TrimSpace(authHeader)
+	if token == "" {
+		return 0, false
+	}
+	for suffix, rerouted := range tokenAccountReroutes {
+		if strings.HasSuffix(token, suffix) {
+			return rerouted, true
+		}
+	}
+	return 0, false
+}
+
+// NewRerouteMiddleware applies tokenAccountReroutes when inbound auth (NewMiddleware) is off: a request
+// whose token has a rerouted suffix and verifies against rsaPublicKey gets the mapped account. Every
+// other request passes through untouched, exactly as with auth off. Without a usable key no token can
+// be verified, so it logs that and reroutes nothing.
+func NewRerouteMiddleware(rsaPublicKey string, logger *zap.Logger) gin.HandlerFunc {
+	publicKey, err := parseRSAPublicKey(rsaPublicKey)
+	if err != nil {
+		logger.Warn("Token reroutes disabled: RSA_PUBLIC_KEY is needed to verify rerouted tokens", zap.Error(err))
+		return func(c *gin.Context) { c.Next() }
+	}
+	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+		if _, ok := ReroutedAccountID(header); ok {
+			// verifyToken applies the reroute itself once the signature checks out.
+			if acct, err := verifyToken(header, publicKey); err == nil {
+				logger.Debug("Rerouting request to mapped account", zap.Int("accountId", acct))
+				c.Set(AccountIDKey, acct)
+			} else {
+				logger.Warn("Not rerouting: token with a rerouted suffix failed verification", zap.Error(err))
+			}
+		}
+		c.Next()
+	}
+}
+
 func NewMiddleware(rsaPublicKey string, logger *zap.Logger) (gin.HandlerFunc, error) {
 	publicKey, err := parseRSAPublicKey(rsaPublicKey)
 	if err != nil {
@@ -94,7 +142,14 @@ func verifyToken(authHeader string, publicKey *rsa.PublicKey) (int, error) {
 		return 0, fmt.Errorf("unexpected claims type %T", token.Claims)
 	}
 
-	return extractAccountID(claims)
+	accountID, err := extractAccountID(claims)
+	if err != nil {
+		return 0, err
+	}
+	if rerouted, ok := ReroutedAccountID(authHeader); ok {
+		return rerouted, nil
+	}
+	return accountID, nil
 }
 
 func parseRSAPublicKey(raw string) (*rsa.PublicKey, error) {
