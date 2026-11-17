@@ -83,8 +83,6 @@ and the role. Its `_id` is a hash of `validationId`, so a retried click schedule
 **Shipped (cyborg and dashboard only; works with any mini-testing build):**
 - Cyborg's `DbLayer.fetchTestScriptById` serves from `TestScriptProviders.served()`: library, then drafts, then legacy.
   Mini-testing already fetches scripts by id, so it runs a draft without a code change.
-- `AKTO_SERVE_SCRIPT_DRAFTS=false` on cyborg stops serving drafts without a deploy. The replay then runs with no script,
-  and an older module cannot say so (below).
 - The outcome is built from the result mini-testing already writes back: `ReplayOutcome.from(result, null, reason)`
   marks diagnostics unavailable.
 
@@ -93,7 +91,7 @@ and the role. Its `_id` is a hash of `validationId`, so a retried click schedule
   steer it, and on that machine a script can read the module's environment. The Validate modal warns before the run.
 - It reports no script errors or logs (its engine swallows them), so a script that threw looks like one that never ran.
   The outcome says "unavailable" and the user compares the replay with the original request.
-- With `TEST_PRE_SCRIPT` not granted, or cyborg's switch off, no script runs and nothing says so.
+- With `TEST_PRE_SCRIPT` not granted on the module's account, no script runs and nothing says so.
 
 **Next (a mini-testing release):**
 1. Cherry-pick the libs/utils commit (`ScriptEngines`, `ScriptDiagnosticsCollector`, the `ApiExecutorUtil` hooks) into
@@ -154,7 +152,7 @@ Deploy order: cyborg, dashboard, mini-testing. An older cyborg ignores the new f
     `useValidationPolling`
   - `testing/api.js`, `testing/scripts/ScriptsPage.jsx`
 - cyborg (own repo, branch `feature/cyborg-release`): `DbLayer.fetchTestScriptById`, `TestScriptProviders.served`,
-  `SwitchedTestScriptProvider`, `DraftTestScriptProvider` (copied unchanged from master), the libs/dao drafts files.
+  `DraftTestScriptProvider` (copied unchanged from master), the libs/dao drafts files.
 - Tests:
   - libs/dao: `TestScriptDraftsDaoTest`
   - libs/utils: `ScriptEnginesTest`, `ScriptDiagnosticsCollectorTest`
