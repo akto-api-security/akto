@@ -10,6 +10,9 @@ Touches three repos that must stay in sync:
 - `akto-mini-2/akto` (cyborg = the database-abstractor that mini-testing calls)
 - `akto-mini-services/akto` (mini-testing)
 
+Ask Akto writing and validating scripts (drafts, replay, diagnostics) is documented in
+`validation/CLAUDE.md`.
+
 ## Id semantics (Java, JSON and JS must agree)
 `TestingRunConfig.preRequestScriptId` / `postRequestScriptId` (String). Interpreted ONLY by
 `ScriptSelection.from(rawId, type)`; no caller re-implements the checks.
