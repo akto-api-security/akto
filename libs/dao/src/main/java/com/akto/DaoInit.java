@@ -23,6 +23,7 @@ import com.akto.dao.testing.SmartTestingMessageDao;
 import com.akto.dao.testing.SmartTestingRunDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunConfigDao;
+import com.akto.dao.testing.config.TestScriptDraftsDao;
 import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.AgentConversationDao;
@@ -534,6 +535,7 @@ public class DaoInit {
         SensitiveDataCountDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
         TestScriptsDao.instance.createIndicesIfAbsent();
+        TestScriptDraftsDao.instance.createIndicesIfAbsent();
         TestingRunConfigDao.instance.createIndicesIfAbsent();
         UsersDao.instance.createIndicesIfAbsent();
         AccountsDao.instance.createIndexIfAbsent();
