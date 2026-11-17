@@ -4,7 +4,6 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.ClientActor;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.log.LoggerMaker;
-import com.akto.utils.TokenReroutes;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
@@ -22,7 +21,6 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.function.BooleanSupplier;
 
 public class AuthFilter implements Filter {
 
@@ -42,32 +40,6 @@ public class AuthFilter implements Filter {
      */
     static boolean isForThisDeployment(int tokenAccountId, Integer deploymentAccountId) {
         return deploymentAccountId == null || deploymentAccountId == tokenAccountId;
-    }
-
-    /** Verifies a token's signature and returns its claims; throws when it doesn't verify. */
-    interface TokenVerifier {
-        Jws<Claims> verify(String token) throws Exception;
-    }
-
-    private final TokenVerifier verifier;
-    private final BooleanSupplier authEnabled;
-
-    public AuthFilter() {
-        this(AuthFilter::verifyToken, AuthFilter::isAuthEnabledFromEnv);
-    }
-
-    AuthFilter(TokenVerifier verifier, BooleanSupplier authEnabled) {
-        this.verifier = verifier;
-        this.authEnabled = authEnabled;
-    }
-
-    private static boolean isAuthEnabledFromEnv() {
-        String isAuthenticated = System.getenv().getOrDefault("AKTO_DI_AUTHENTICATE", "");
-        return !(isAuthenticated.isEmpty() || isAuthenticated.equalsIgnoreCase("false"));
-    }
-
-    private static Jws<Claims> verifyToken(String token) throws Exception {
-        return useEnvironmentPublicKey() ? authenticateUsingEnvironmentPublicKey(token) : JwtAuthenticator.authenticate(token);
     }
 
     private static Set<String> loadRevokedTokens() {
@@ -144,34 +116,21 @@ public class AuthFilter implements Filter {
             return;
         }
 
-        // A rerouted token's traffic goes to its mapped account (and that account's topic) whether or not
-        // auth is on. The suffix is public, so the reroute only ever applies to a token that verifies.
-        TokenReroutes.Route route = TokenReroutes.routeFor(accessTokenFromRequest);
-
-        if (!authEnabled.getAsBoolean()) {
+        String isAuthenticated = System.getenv().getOrDefault("AKTO_DI_AUTHENTICATE", "");
+        if (isAuthenticated.isEmpty() || isAuthenticated.equalsIgnoreCase("false")) {
             logger.warn("Skipping authentication as AKTO_DI_AUTHENTICATE=true is not set");
-            if (route != null && !verifies(accessTokenFromRequest)) {
-                logger.warn("Not rerouting: token with a rerouted suffix failed verification");
-                route = null;
-            }
-            if (route == null) {
-                chain.doFilter(servletRequest, servletResponse);
-                return;
-            }
-            // Nothing else sets the account when auth is off, so clear it after the request:
-            // the thread is pooled and the next request on it must not inherit this account.
-            Context.accountId.set(route.accountId);
-            try {
-                runRerouted(route, servletRequest, servletResponse, chain);
-            } finally {
-                Context.accountId.remove();
-            }
+            chain.doFilter(servletRequest, servletResponse);
             return;
         }
 
         try {
-            Jws<Claims> claims = verifier.verify(accessTokenFromRequest);
-            int tokenAccountId = route != null ? route.accountId : (int) claims.getBody().get("accountId");
+            Jws<Claims> claims;
+            if (useEnvironmentPublicKey()) {
+                claims = authenticateUsingEnvironmentPublicKey(accessTokenFromRequest);
+            } else {
+                claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
+            }
+            int tokenAccountId = (int) claims.getBody().get("accountId");
             if (!isForThisDeployment(tokenAccountId, DEPLOYMENT_ACCOUNT_ID)) {
                 logger.error("Rejected a token for account {} on the deployment of account {}",
                         tokenAccountId, DEPLOYMENT_ACCOUNT_ID);
@@ -188,30 +147,8 @@ public class AuthFilter implements Filter {
             }
             return;
         }
-        if (route == null) {
-            chain.doFilter(servletRequest, servletResponse);
-        } else {
-            runRerouted(route, servletRequest, servletResponse, chain);
-        }
-    }
+        chain.doFilter(servletRequest, servletResponse);
 
-    private boolean verifies(String token) {
-        try {
-            verifier.verify(token);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private static void runRerouted(TokenReroutes.Route route, ServletRequest request, ServletResponse response,
-                                    FilterChain chain) throws IOException, ServletException {
-        TokenReroutes.setCurrent(route);
-        try {
-            chain.doFilter(request, response);
-        } finally {
-            TokenReroutes.clearCurrent();
-        }
     }
 
     @Override
