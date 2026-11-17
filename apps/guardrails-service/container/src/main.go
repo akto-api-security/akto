@@ -48,7 +48,7 @@ func main() {
 	logger.Info("Starting guardrails-service",
 		zap.Int("port", cfg.ServerPort),
 		zap.String("database_abstractor_url", cfg.DatabaseAbstractorURL),
-		zap.String("agent_guard_engine_url", cfg.AgentGuardEngineURL),
+		zap.String("scanner_api_url", scannerAPIURL()),
 		zap.Bool("kafka_enabled", cfg.KafkaEnabled))
 
 	if os.Getenv("GUARDRAILS_SKIP_PII_REDACTION") == "true" {
@@ -58,9 +58,6 @@ func main() {
 		logger.Warn("GUARDRAILS_SKIP_PII_SYNC=true: synchronous PII rules disabled — load-test only, never use in production")
 	}
 
-	if cfg.AgentGuardEngineURL != "" {
-		os.Setenv("AGENT_GUARD_ENGINE_URL", cfg.AgentGuardEngineURL)
-	}
 	if cfg.DatabaseAbstractorToken != "" {
 		os.Setenv("AKTO_API_TOKEN", cfg.DatabaseAbstractorToken)
 	}
@@ -316,7 +313,7 @@ func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Confi
 		return
 	}
 
-	ocr, transcriber := newMediaProviders(mc, cfg.AgentGuardEngineURL, logger)
+	ocr, transcriber := newMediaProviders(mc, scannerAPIURL(), logger)
 
 	if ocr != nil {
 		registry.RegisterWithLimit(fileprocessor.NewImageProcessor(ocr, mc.MaxImageBytes), mc.MaxImageBytes)
@@ -335,6 +332,16 @@ func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Confi
 			zap.String("provider", mc.Provider),
 			zap.Int("maxBytes", mc.MaxVideoBytes))
 	}
+}
+
+// scannerAPIURL is agent-guard's base URL, resolved the way the scanner client resolves it
+// (mcp.NewScannerClient): SCANNER_API_URL, else the library default. Image OCR (/ocr) goes to
+// the same agent-guard as the text scans (/scan), so the two can't point at different ones.
+func scannerAPIURL() string {
+	if u := os.Getenv(utils.ScannerAPIURLEnv); u != "" {
+		return u
+	}
+	return utils.DefaultScannerAPIURL
 }
 
 func newMediaProviders(mc config.MediaConfig, agentGuardURL string, logger *zap.Logger) (mediaprovider.OCRProvider, mediaprovider.TranscriptionProvider) {
@@ -359,7 +366,7 @@ func newMediaProviders(mc config.MediaConfig, agentGuardURL string, logger *zap.
 		if agentGuardURL != "" {
 			ocr = mediaprovider.NewAgentGuardOCR(agentGuardURL)
 		} else {
-			logger.Warn("Image OCR disabled (missing AGENT_GUARD_ENGINE_URL)")
+			logger.Warn("Image OCR disabled (no agent-guard URL: SCANNER_API_URL)")
 		}
 	default:
 		logger.Warn("Media processing disabled (unknown MEDIA_PROVIDER)", zap.String("provider", mc.Provider))

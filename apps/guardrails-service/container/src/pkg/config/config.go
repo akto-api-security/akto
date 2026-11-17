@@ -11,7 +11,6 @@ type Config struct {
 
 	DatabaseAbstractorURL   string
 	DatabaseAbstractorToken string
-	AgentGuardEngineURL     string
 	ThreatBackendURL        string
 	ThreatBackendToken      string
 	LogLevel                string
@@ -154,7 +153,8 @@ type FileConfig struct {
 // MediaConfig holds configuration for external media processing APIs.
 // Vision and Speech have independent key/endpoint pairs for separate Azure resources.
 // Provider "agent_guard" (the default when MEDIA_PROVIDER is unset) sends images to
-// agent-guard's /ocr (AGENT_GUARD_ENGINE_URL) and needs none of the Azure fields.
+// agent-guard's /ocr - the same agent-guard as the text scans (SCANNER_API_URL) - and
+// needs none of the Azure fields.
 type MediaConfig struct {
 	Provider      string // "agent_guard" (default), "azure" or "none" (disabled)
 	VisionAPIKey  string
@@ -201,7 +201,6 @@ func LoadConfig() *Config {
 		ServerPort:                       getEnvAsInt("SERVER_PORT", 8080),
 		DatabaseAbstractorURL:            getEnv("DATABASE_ABSTRACTOR_SERVICE_URL", "https://ultron.akto.io"),
 		DatabaseAbstractorToken:          dbAbstractorToken,
-		AgentGuardEngineURL:              getEnv("AGENT_GUARD_ENGINE_URL", "https://akto-agent-guard-engine.billing-53a.workers.dev"),
 		ThreatBackendURL:                 getEnv("THREAT_BACKEND_URL", "https://tbs.akto.io"),
 		ThreatBackendToken:               getEnv("THREAT_BACKEND_TOKEN", dbAbstractorToken),
 		LogLevel:                         getEnv("LOG_LEVEL", "info"),
