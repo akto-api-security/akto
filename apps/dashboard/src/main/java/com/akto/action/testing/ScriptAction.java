@@ -55,8 +55,15 @@ public class ScriptAction extends UserAction {
     // response
     @Getter
     private TestScript testScript;
+    /** Set when the replay ran inline (dashboard module) or a scheduled mini-testing run has finished. */
     @Getter
     private ReplayOutcome scriptValidationResult;
+    /** A mini-testing validation: returned by validateTestScript, sent back to fetchScriptValidation. */
+    @Getter @Setter
+    private String scriptValidationPlaygroundId;
+    /** fetchScriptValidation only: the module has not reported yet (waiting or running, not failed). */
+    @Getter
+    private boolean scriptValidationPending;
     @Getter
     private List<TestScriptSummary> scripts;
 
@@ -122,12 +129,28 @@ public class ScriptAction extends UserAction {
 
     public String validateTestScript() {
         try {
-            this.scriptValidationResult = validationService.validate(this.validationRequest, getSUser());
+            if (TestScriptValidationService.isMiniTesting(this.validationRequest)) {
+                this.scriptValidationPlaygroundId = validationService.startInMiniTesting(this.validationRequest, getSUser());
+            } else {
+                this.scriptValidationResult = validationService.validate(this.validationRequest, getSUser());
+            }
             return Action.SUCCESS.toUpperCase();
         } catch (TestScriptException e) {
             return rejected(e);
         } catch (Exception e) {
             return unexpected(e, "validateTestScript", "Failed to run the validation");
+        }
+    }
+
+    public String fetchScriptValidation() {
+        try {
+            this.scriptValidationResult = validationService.fetchMiniTestingOutcome(this.scriptValidationPlaygroundId, getSUser());
+            this.scriptValidationPending = this.scriptValidationResult == null;
+            return Action.SUCCESS.toUpperCase();
+        } catch (TestScriptException e) {
+            return rejected(e);
+        } catch (Exception e) {
+            return unexpected(e, "fetchScriptValidation", "Failed to read the validation");
         }
     }
 
