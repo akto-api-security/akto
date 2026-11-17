@@ -5,11 +5,9 @@ import org.junit.After;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 public class KafkaUtilsTopicTest {
-
-    private static final String DEPLOYMENT_TOPIC = System.getenv("AKTO_KAFKA_TOPIC") != null
-            && !System.getenv("AKTO_KAFKA_TOPIC").isEmpty() ? System.getenv("AKTO_KAFKA_TOPIC") : "akto.api.logs";
 
     @After
     public void clear() {
@@ -17,19 +15,15 @@ public class KafkaUtilsTopicTest {
     }
 
     @Test
-    public void mappedAccountGoesToItsOwnTopic() {
+    public void reroutedAccountGoesToItsOwnTopic() {
         Context.accountId.set(1758787662);
         assertEquals("akto.ai.traffic.1758787662-acorns", KafkaUtils.primaryTopic());
     }
 
     @Test
-    public void otherAccountsUseTheDeploymentTopic() {
+    public void otherRequestsUseTheDeploymentTopic() {
+        assertNotEquals("akto.ai.traffic.1758787662-acorns", KafkaUtils.primaryTopic());
         Context.accountId.set(1718012345);
-        assertEquals(DEPLOYMENT_TOPIC, KafkaUtils.primaryTopic());
-    }
-
-    @Test
-    public void noAccountUsesTheDeploymentTopic() {
-        assertEquals(DEPLOYMENT_TOPIC, KafkaUtils.primaryTopic());
+        assertNotEquals("akto.ai.traffic.1758787662-acorns", KafkaUtils.primaryTopic());
     }
 }

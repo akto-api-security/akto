@@ -6,9 +6,6 @@ import com.akto.dto.IngestDataBatch;
 import com.akto.kafka.Kafka;
 import com.mongodb.BasicDBObject;
 
-import java.util.Collections;
-import java.util.Map;
-
 public class KafkaUtils {
 
     private static final LoggerMaker logger = new LoggerMaker(KafkaUtils.class, LoggerMaker.LogDb.DATA_INGESTION);
@@ -19,10 +16,6 @@ public class KafkaUtils {
         String env = System.getenv(KAFKA_TOPIC_KEY);
         API_LOGS_TOPIC = (env != null && !env.isEmpty()) ? env : DEFAULT_API_LOGS_TOPIC;
     }
-    // Accounts whose traffic goes to their own topic (format akto.ai.traffic.${ACCOUNT_ID}-${CLIENT}) instead of
-    // this deployment's AKTO_KAFKA_TOPIC. Keyed on Context.accountId, which AuthFilter sets for rerouted tokens.
-    private static final Map<Integer, String> ACCOUNT_TOPICS =
-            Collections.singletonMap(1758787662, "akto.ai.traffic.1758787662-acorns");
     private static Kafka kafkaProducer;
     private static TrafficPublisher topicPublisher;
 
@@ -49,11 +42,10 @@ public class KafkaUtils {
         topicPublisher.publish(obj.toString(), primaryTopic(), publishToGuardrails);
     }
 
-    /** The traffic topic for the request's account (Context.accountId), else this deployment's AKTO_KAFKA_TOPIC. */
-    public static String primaryTopic() {
+    // The rerouted account's traffic goes to its own topic instead of this deployment's AKTO_KAFKA_TOPIC.
+    static String primaryTopic() {
         Integer accountId = Context.accountId.get();
-        String topic = accountId != null ? ACCOUNT_TOPICS.get(accountId) : null;
-        return topic != null ? topic : API_LOGS_TOPIC;
+        return accountId != null && accountId == 1758787662 ? "akto.ai.traffic.1758787662-acorns" : API_LOGS_TOPIC;
     }
 
     /**

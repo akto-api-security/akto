@@ -180,7 +180,7 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 	}
 	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc, fileCache)
 
-	var authMiddleware, rerouteMiddleware gin.HandlerFunc
+	var authMiddleware gin.HandlerFunc
 	if cfg.AuthEnabled {
 		m, err := auth.NewMiddleware(cfg.RSAPublicKey, logger)
 		if err != nil {
@@ -190,10 +190,9 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 		logger.Info("Inbound JWT authentication enabled for /api endpoints")
 	} else {
 		logger.Warn("Inbound authentication disabled (set AKTO_GR_AUTHENTICATE=true to enable)")
-		rerouteMiddleware = auth.NewRerouteMiddleware(cfg.RSAPublicKey, logger)
 	}
 
-	router := setupRouter(validationHandler, authMiddleware, rerouteMiddleware, logger)
+	router := setupRouter(validationHandler, authMiddleware, logger)
 
 	addr := fmt.Sprintf(":%d", cfg.ServerPort)
 	logger.Info("Server starting in HTTP mode", zap.String("address", addr))
@@ -238,7 +237,7 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware, rerouteMiddleware gin.HandlerFunc, logger *zap.Logger) *gin.Engine {
+func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware gin.HandlerFunc, logger *zap.Logger) *gin.Engine {
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -257,9 +256,8 @@ func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware, 
 	api := router.Group("/api")
 	if authMiddleware != nil {
 		api.Use(authMiddleware)
-	} else if rerouteMiddleware != nil {
-		// With auth off, a verified rerouted token still gets its mapped account.
-		api.Use(rerouteMiddleware)
+	} else {
+		api.Use(func(c *gin.Context) { auth.Reroute(c); c.Next() })
 	}
 	{
 		api.POST("/health", validationHandler.HealthCheck)
