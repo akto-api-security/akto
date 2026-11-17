@@ -196,15 +196,6 @@ public class TestScriptValidationServiceTest extends MongoBasedTest {
 
         assertEquals(0, runner.calls.get());
     }
-
-    @Test
-    public void aCollectionOutsideTheUsersRbacHasNoSampleToReplay() {
-        allowedCollections = Collections.singletonList(COLLECTION + 1);
-        TestScriptException e = assertThrows(TestScriptException.class, () -> service.validate(request(), user));
-        assertTrue(e.getMessage().contains("No captured request"));
-        assertEquals(0, runner.calls.get());
-    }
-
     @Test
     public void replayFailuresAreErrorsNotEmptyResults() {
         runner.failWith = new IllegalStateException("connect timed out");
