@@ -3,6 +3,7 @@ package com.akto.filters;
 import com.akto.data_actor.ClientActor;
 import com.akto.log.LoggerMaker;
 import com.akto.util.http_util.CoreHTTPClient;
+import okhttp3.ConnectionPool;
 import okhttp3.Headers;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -49,9 +50,17 @@ public class RerouteProxyFilter implements Filter {
     private final Integer deploymentAccountId;
     private final OkHttpClient client;
 
+    // Acorns' data-ingestion container, reached directly over the shared Docker network (the one nginx routes
+    // 1758787662-guardrails.akto.io to), skipping public DNS/TLS.
+    static final String TARGET_URL = "http://acorns-data-ingestion-service:8080";
+
     public RerouteProxyFilter() {
-        this("https://" + REROUTE_ACCOUNT_ID + "-guardrails.akto.io", ClientActor.getAbstractorAccountIdFromEnvOrNull(),
-                CoreHTTPClient.client.newBuilder().callTimeout(90, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build());
+        this(TARGET_URL, ClientActor.getAbstractorAccountIdFromEnvOrNull(),
+                CoreHTTPClient.client.newBuilder()
+                        .connectionPool(new ConnectionPool(20, 5, TimeUnit.MINUTES)) // own pool: one connection per in-flight request over HTTP/1.1
+                        .callTimeout(90, TimeUnit.SECONDS)
+                        .readTimeout(60, TimeUnit.SECONDS)
+                        .build());
     }
 
     RerouteProxyFilter(String targetUrl, Integer deploymentAccountId, OkHttpClient client) {
