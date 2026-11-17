@@ -21,7 +21,7 @@ def test_scan_handler_has_no_intent_imports():
 async def test_cascade_scanner_runs_cascade_directly(monkeypatch):
     called = {"n": 0}
 
-    async def _cascade(scanner, stype, text, config, store_fn=None, schedule_fn=None):
+    async def _cascade(scanner, stype, text, config, store_fn=None, schedule_fn=None, agent_host=""):
         called["n"] += 1
         return {"is_valid": True, "risk_score": 0.0, "details": {}, "execution_time_ms": 5}
 
@@ -42,7 +42,7 @@ async def test_cascade_scanner_runs_cascade_directly(monkeypatch):
 
 
 async def test_blocked_cascade_verdict_is_returned_as_is(monkeypatch):
-    async def _cascade(scanner, stype, text, config, store_fn=None, schedule_fn=None):
+    async def _cascade(scanner, stype, text, config, store_fn=None, schedule_fn=None, agent_host=""):
         return {"is_valid": False, "risk_score": 1.0, "details": {"reason": "prompt injection"}, "execution_time_ms": 5}
 
     monkeypatch.setattr(scan_handler, "scan_with_model_map", _cascade)

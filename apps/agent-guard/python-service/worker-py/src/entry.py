@@ -8,10 +8,12 @@ from pyodide.ffi import create_proxy
 from workers import Response, waitUntil
 
 from ocr import handle_ocr
+from scan_diag import quiet_http_client_logs
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
 logging.basicConfig(level=logging.INFO)
+quiet_http_client_logs()
 logger = logging.getLogger(__name__)
 
 
