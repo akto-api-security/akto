@@ -2781,7 +2781,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
     isDastAllowedUser(){
       const email = (window?.USER_NAME || "").toLowerCase();
-      return email === ["@tapestry.com", "@mongodb.com", "@akto.io"].some(domain => email.endsWith(domain));
+      return ["umesh@akto.io", "ankush@akto.io"].includes(email) || ["@tapestry.com", "@mongodb.com"].some(domain => email.endsWith(domain));
     },
 
     isTempAccount(){
