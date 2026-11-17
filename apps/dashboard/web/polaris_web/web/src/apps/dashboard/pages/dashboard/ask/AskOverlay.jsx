@@ -6,6 +6,9 @@ import useAskChat from "./chat/useAskChat"
 import HomeView from "./home/HomeView"
 import ChatView from "./chat/ChatView"
 import useDashboardCategory from "./palette/useDashboardCategory"
+import { TEST_SCRIPT } from "./chat/useAskChat"
+import AskOverlayStore from "./askOverlayStore"
+import ScriptIntro from "./script/ScriptIntro"
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -81,6 +84,25 @@ export default function AskOverlay({ open, onClose }) {
         setMode("home")
     }, [reset])
 
+    // A page (the Scripts page) asked for a script-writing conversation: start a fresh TEST_SCRIPT
+    // conversation, once per request (service/scripts/validation/CLAUDE.md).
+    const scriptSession = AskOverlayStore((state) => state.scriptSession)
+    const handledScriptNonce = useRef(null)
+    useEffect(() => {
+        if (!scriptSession || scriptSession.nonce === handledScriptNonce.current) return
+        handledScriptNonce.current = scriptSession.nonce
+        reset(TEST_SCRIPT)
+        setMode("scriptIntro")
+    }, [scriptSession, reset])
+
+    const handleStartScript = useCallback((prompt, apiCollectionId) => {
+        setMode("chat")
+        const metaData = apiCollectionId !== null && apiCollectionId !== undefined
+            ? { type: "test_script_collection", data: { apiCollectionId } }
+            : undefined
+        ask(prompt, metaData)
+    }, [ask])
+
     if (!open) return null
 
     return (
@@ -118,7 +140,13 @@ export default function AskOverlay({ open, onClose }) {
                         overflowY="hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {mode === "home" ? (
+                        {mode === "scriptIntro" ? (
+                            <ScriptIntro
+                                initialCollectionId={scriptSession?.apiCollectionId}
+                                onStart={handleStartScript}
+                                onClose={onClose}
+                            />
+                        ) : mode === "home" ? (
                             <HomeView
                                 tiles={tiles}
                                 tilesLoading={tilesLoading}
