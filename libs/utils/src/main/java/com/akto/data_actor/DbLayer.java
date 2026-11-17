@@ -3640,7 +3640,7 @@ public class DbLayer {
     }
 
     public static TestScript fetchTestScriptById(String id){
-        return TestScriptProviders.database().findById(id);
+        return TestScriptProviders.served().findById(id);
     }
 
     public static List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod) {
