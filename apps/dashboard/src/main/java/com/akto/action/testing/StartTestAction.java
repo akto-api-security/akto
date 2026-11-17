@@ -5,7 +5,6 @@ import com.akto.audit_logs_util.Audit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
@@ -21,7 +20,6 @@ import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.User;
 import com.akto.dto.billing.FeatureAccess;
-import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -48,6 +46,7 @@ import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.DeleteTestRunUtils;
+import com.akto.utils.MiniTestingModules;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -1802,17 +1801,10 @@ public class StartTestAction extends UserAction {
 
     private Set<String> miniTestingServiceNames;
     public String fetchMiniTestingServiceNames() {
-        List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(Filters.and(
-                        Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING),
-                        Filters.gt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, Context.now() - 20 * 60)));
         if (this.miniTestingServiceNames == null) {
             this.miniTestingServiceNames = new HashSet<>();
         }
-        for (ModuleInfo moduleInfo : moduleInfos) {
-            if (moduleInfo.getName() != null) {
-                this.miniTestingServiceNames.add(moduleInfo.getName());
-            }
-        }
+        this.miniTestingServiceNames.addAll(MiniTestingModules.activeNames());
         return SUCCESS.toUpperCase();
     }
 

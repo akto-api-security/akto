@@ -8,18 +8,22 @@ import observeApi from "../../../observe/api"
 import { SCRIPT_TYPES, scriptTypeLabel } from "../../../testing/scripts/scriptTypes"
 import ScriptTypePicker from "./ScriptTypePicker"
 import ValidationResultView from "./ValidationResultView"
+import useMiniTestingModules from "./useMiniTestingModules"
+import useValidationPolling from "./useValidationPolling"
 import { collectionLabel, collectionOptions as toCollectionOptions } from "./collectionOptions"
 
 const NO_ROLE = ""
+const DASHBOARD_MODULE = ""
 const PAIR_NONE = "none"
 const PAIR_CONVERSATION = "conversation"
 const LIBRARY_PREFIX = "library:"
 
 const otherType = (type) => (type === SCRIPT_TYPES.PRE_REQUEST ? SCRIPT_TYPES.POST_REQUEST : SCRIPT_TYPES.PRE_REQUEST)
 
-// Validate an Ask Akto script: replay one captured request of the collection with it in the dashboard
-// module, optionally with a test role (service/scripts/validation/CLAUDE.md). The replay hits the real
-// API and runs inline, like the test editor's Run test.
+// Validate an Ask Akto script: replay one captured request of the collection with it, optionally with a test
+// role (service/scripts/validation/CLAUDE.md). In the dashboard module the replay runs inline, like the test
+// editor's Run test; in a mini-testing module it is scheduled and polled until the module reports. Either way
+// the replay hits the real API.
 export default function ValidateScriptModal({ block, type, onTypeChange, conversationScripts, onAskToFix, onClose }) {
     const allCollections = PersistStore((state) => state.allCollections)
     const [apiCollectionId, setApiCollectionId] = useState(block.apiCollectionId)
@@ -37,6 +41,10 @@ export default function ValidateScriptModal({ block, type, onTypeChange, convers
     const [result, setResult] = useState(null)
     // The scripts the shown result ran with, for "Ask Akto to fix".
     const [ranWith, setRanWith] = useState(null)
+    const modules = useMiniTestingModules()
+    const polling = useValidationPolling()
+    const [moduleName, setModuleName] = useState(DASHBOARD_MODULE)
+    const [playgroundId, setPlaygroundId] = useState(null)
 
     const collectionOptions = useMemo(() => toCollectionOptions(allCollections), [allCollections])
     const knownCollection = (allCollections || []).find((c) => c.id === apiCollectionId)
@@ -89,7 +97,15 @@ export default function ValidateScriptModal({ block, type, onTypeChange, convers
 
     const endpointOptions = useMemo(() => (endpoints || []).map((e, i) => ({ label: `${e.method} ${e.url}`, value: String(i) })), [endpoints])
     const roleOptions = [{ label: "No role (captured auth)", value: NO_ROLE }, ...roles]
-    const canRun = Boolean(type && endpoint && !running)
+    const moduleOptions = useMemo(
+        () => [{ label: "Default (dashboard)", value: DASHBOARD_MODULE }, ...modules.names.map((name) => ({ label: name, value: name }))],
+        [modules.names]
+    )
+    // A mini-testing result arrives through polling; a dashboard result comes back with the request.
+    const shownResult = polling.phase === "done" ? polling.result : result
+    const waiting = polling.phase === "waiting"
+    const busy = running || waiting
+    const canRun = Boolean(type && endpoint && !busy)
 
     // { preJavascript | preScriptId, postJavascript | postScriptId } for this script and the chosen counterpart.
     const phases = () => {
@@ -107,6 +123,9 @@ export default function ValidateScriptModal({ block, type, onTypeChange, convers
         setRunning(true)
         setRunError(null)
         setResult(null)
+        polling.stop()
+        setPlaygroundId(null)
+        setRanWith({ ...scripts, endpoint })
         try {
             const resp = await api.validateTestScript({
                 validationId: uuidv4(),
@@ -115,9 +134,14 @@ export default function ValidateScriptModal({ block, type, onTypeChange, convers
                 method: endpoint.method,
                 ...scripts,
                 testRoleId: role || undefined,
+                miniTestingName: moduleName || undefined,
             })
-            setResult(resp?.scriptValidationResult || null)
-            setRanWith({ ...scripts, endpoint })
+            if (resp?.scriptValidationPlaygroundId) {
+                setPlaygroundId(resp.scriptValidationPlaygroundId)
+                polling.start(resp.scriptValidationPlaygroundId)
+            } else {
+                setResult(resp?.scriptValidationResult || null)
+            }
         } catch (e) {
             setRunError(e?.response?.data?.actionErrors?.[0] || "The validation could not be run. Nothing was saved.")
         }
@@ -131,7 +155,7 @@ export default function ValidateScriptModal({ block, type, onTypeChange, convers
             {
                 type: "test_script_validation",
                 data: {
-                    ...result,
+                    ...shownResult,
                     method: ranWith.endpoint.method,
                     url: ranWith.endpoint.url,
                     preJavascript: ranWith.preJavascript,
@@ -148,17 +172,17 @@ export default function ValidateScriptModal({ block, type, onTypeChange, convers
             large
             onClose={onClose}
             title={`Validate script ${block.index + 1}`}
-            primaryAction={result
+            primaryAction={shownResult
                 ? { content: "Ask Akto to fix", onAction: askToFix }
-                : { content: "Run replay", onAction: run, loading: running, disabled: !canRun }}
-            secondaryActions={result
+                : { content: "Run replay", onAction: run, loading: busy, disabled: !canRun }}
+            secondaryActions={shownResult
                 ? [{ content: "Run again", onAction: run, disabled: !canRun }, { content: "Close", onAction: onClose }]
                 : [{ content: "Close", onAction: onClose }]}
         >
             <Modal.Section>
                 <VerticalStack gap="4">
                     <Text as="p" color="subdued">
-                        Akto replays the newest captured request of the endpoint with this script in the dashboard module. The request goes to the real API, so anything it creates there is created for real. Scripts that poll can take a few minutes.
+                        Akto replays the newest captured request of the endpoint with this script in {moduleName ? `the mini-testing module ${moduleName}` : "the dashboard module"}. The request goes to the real API, so anything it creates there is created for real. Scripts that poll can take a few minutes.
                     </Text>
                     {!block.type ? <ScriptTypePicker type={type} onChange={onTypeChange} /> : null}
 
@@ -198,6 +222,24 @@ export default function ValidateScriptModal({ block, type, onTypeChange, convers
                         </VerticalStack>
                     ) : null}
 
+                    {modules.hybridEnabled ? (
+                        <DropdownSearch
+                            id="validate-script-module"
+                            label="Run on"
+                            placeholder="Select module"
+                            optionsList={moduleOptions}
+                            setSelected={(v) => setModuleName(v ?? DASHBOARD_MODULE)}
+                            value={moduleOptions.find((o) => o.value === moduleName)?.label ?? ""}
+                            preSelected={[moduleName]}
+                        />
+                    ) : null}
+                    {modules.loadFailed ? <Text as="p" color="subdued">Mini-testing modules could not be loaded, so the replay will run in the dashboard module.</Text> : null}
+                    {moduleName ? (
+                        <Banner status="warning" title="This replay runs in a mini-testing module">
+                            <Text as="p">The script runs on {moduleName} without the dashboard's sandbox, and older module builds do not report script errors or logs. Read the script before you run it.</Text>
+                        </Banner>
+                    ) : null}
+
                     <VerticalStack gap="1">
                         <DropdownSearch
                             id="validate-script-role"
@@ -212,7 +254,22 @@ export default function ValidateScriptModal({ block, type, onTypeChange, convers
                     </VerticalStack>
 
                     {runError ? <Banner status="critical">{runError}</Banner> : null}
-                    <ValidationResultView result={result} running={running} />
+                    {polling.phase === "failed" ? <Banner status="critical">{polling.error}</Banner> : null}
+                    {polling.phase === "timedOut" ? (
+                        <Banner
+                            status="warning"
+                            title="No result yet"
+                            action={{ content: "Check again", onAction: () => polling.start(playgroundId) }}
+                        >
+                            <Text as="p">{moduleName} has not reported in 12 minutes. It may be offline, busy, or still running the script. This is not a failure of the script.</Text>
+                        </Banner>
+                    ) : null}
+                    {polling.transientError ? <Text as="p" color="subdued">The dashboard could not be reached just now. Still trying.</Text> : null}
+                    <ValidationResultView
+                        result={shownResult}
+                        running={busy}
+                        runningText={waiting ? `Waiting for ${moduleName} to pick up the replay and run it. This can take a few minutes.` : undefined}
+                    />
                 </VerticalStack>
             </Modal.Section>
         </Modal>
