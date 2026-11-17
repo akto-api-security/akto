@@ -239,7 +239,9 @@ func LoadConfig() *Config {
 			Agents:  getEnvAsList("GUARDRAILS_BROWSER_ATTACHMENT_AGENTS", defaultBrowserAttachmentAgents),
 		},
 		File: FileConfig{
-			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
+			// On unless FILE_VALIDATION_ENABLED=false: a file nobody inspects is a gap, and a caller with no
+			// applicable policy is allowed before any content is read.
+			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", true),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
 			MaxTextFileBytes: maxTextFileBytes,
 			ChunkSize:        chunkSize,
