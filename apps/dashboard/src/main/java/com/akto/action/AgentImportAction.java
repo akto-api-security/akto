@@ -25,14 +25,10 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class AgentImportAction extends UserAction{
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentImportAction.class, LoggerMaker.LogDb.DASHBOARD);
-    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     
     @Getter @Setter
     private String url;
@@ -72,17 +68,17 @@ public class AgentImportAction extends UserAction{
 
             loggerMaker.info("Starting URL import for: " + url, LoggerMaker.LogDb.DASHBOARD);
 
-            // Create API collection based on host name
-            createApiCollectionFromUrl();
+            String message = buildMessageFromApiCall();
 
-            // Execute API call in separate thread
-            int accountId = Context.accountId.get();
-            executorService.schedule(new Runnable() {
-                public void run() {
-                    Context.accountId.set(accountId);
-                    executeApiCall();
+            boolean collectionCreated = createApiCollectionFromUrl();
+            try {
+                saveToDatabase(Arrays.asList(message));
+            } catch (Exception e) {
+                if (collectionCreated) {
+                    ApiCollectionsDao.instance.deleteAll(Filters.eq(Constants.ID, apiCollectionId));
                 }
-            }, 0, TimeUnit.SECONDS);
+                throw e;
+            }
 
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -92,8 +88,8 @@ public class AgentImportAction extends UserAction{
             return Action.ERROR.toUpperCase();
         }
     }
-    
-    private void createApiCollectionFromUrl() {
+
+    private boolean createApiCollectionFromUrl() {
         try {
             String name = !StringUtils.isEmpty(collectionName)
                     ? collectionName.trim()
@@ -108,7 +104,7 @@ public class AgentImportAction extends UserAction{
                 loggerMaker.info("Found existing API collection with ID: " + apiCollectionId + " for name: " + name, LoggerMaker.LogDb.DASHBOARD);
                 // Add Gen AI tag if not already present
                 addGenAiTagIfNeeded(existingCollection);
-                return;
+                return false;
             }
             
             // Create new collection using DAO
@@ -121,7 +117,7 @@ public class AgentImportAction extends UserAction{
             // Add Gen AI tag to the new collection
             addGenAiTagToCollection(apiCollectionId);
             loggerMaker.info("Created new API collection with ID: " + apiCollectionId + " for name: " + name, LoggerMaker.LogDb.DASHBOARD);
-            
+            return true;
         } catch (Exception e) {
             loggerMaker.error("Error creating API collection from URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             throw new RuntimeException("Failed to create API collection", e);
@@ -165,7 +161,7 @@ public class AgentImportAction extends UserAction{
         }
     }
     
-    private void executeApiCall() {
+    private String buildMessageFromApiCall() throws Exception {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Content-Type", Arrays.asList("application/json"));
 
@@ -196,43 +192,30 @@ public class AgentImportAction extends UserAction{
             int statusCode = customResponseStatusCode != null ? customResponseStatusCode : 200;
             response = new OriginalHttpResponse(customResponseBody, customRespHeaders, statusCode);
         } else {
-            try {
-                OriginalHttpRequest requestToSend = request;
-                if (!StringUtils.isEmpty(testRoleId)) {
-                    // Auth goes on a copy so the token/cookie is sent but never persisted in the saved sample.
-                    requestToSend = request.copy();
-                    TestRoleAuthUtils.applyTestRoleAuth(requestToSend, testRoleId);
-                }
-
-                if (!StringUtils.isEmpty(miniTestingName)) {
-                    // Target is internal to the customer's network — have their mini-testing send it.
-                    loggerMaker.info("Sending request via mini-testing " + miniTestingName + " for URL: " + url, LoggerMaker.LogDb.DASHBOARD);
-                    response = com.akto.testing.Utils.runRequestOnHybridTesting(requestToSend, miniTestingName);
-                } else {
-                    response = ApiExecutor.sendRequest(requestToSend, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
-                }
-                if (response == null) {
-                    throw new Exception("No response received from URL: " + url);
-                }
-                loggerMaker.info("Successfully received response from URL", LoggerMaker.LogDb.DASHBOARD);
-            } catch (Exception e) {
-                // Request never reached the target (SSRF block, DNS/connection failure, timeout, etc).
-                // Save a placeholder entry so the attempted call still shows up instead of vanishing silently.
-                loggerMaker.error("Error calling URL: " + url + " - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-                response = new OriginalHttpResponse("", new HashMap<>(), 0);
+            OriginalHttpRequest requestToSend = request;
+            if (!StringUtils.isEmpty(testRoleId)) {
+                // Auth goes on a copy so the token/cookie is sent but never persisted in the saved sample.
+                requestToSend = request.copy();
+                TestRoleAuthUtils.applyTestRoleAuth(requestToSend, testRoleId);
             }
+
+            if (!StringUtils.isEmpty(miniTestingName)) {
+                // Target is internal to the customer's network — have their mini-testing send it.
+                loggerMaker.info("Sending request via mini-testing " + miniTestingName + " for URL: " + url, LoggerMaker.LogDb.DASHBOARD);
+                response = com.akto.testing.Utils.runRequestOnHybridTesting(requestToSend, miniTestingName);
+            } else {
+                response = ApiExecutor.sendRequest(requestToSend, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
+            }
+            if (response == null || response.getStatusCode() <= 0) {
+                throw new Exception("No response received from URL: " + url);
+            }
+            loggerMaker.info("Successfully received response from URL", LoggerMaker.LogDb.DASHBOARD);
         }
 
-        try {
-            // Remove x-akto-ignore header before converting to message
-            headers.remove(Constants.AKTO_IGNORE_FLAG);
+        // Remove x-akto-ignore header before converting to message
+        headers.remove(Constants.AKTO_IGNORE_FLAG);
 
-            String message = convertToMessage(url, headers, requestBody, response);
-            saveToDatabase(Arrays.asList(message));
-        } catch (Exception e) {
-            loggerMaker.error("Error during async API execution: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-            e.printStackTrace();
-        }
+        return convertToMessage(url, headers, requestBody, response);
     }
     
     private final static ObjectMapper mapper = new ObjectMapper();
