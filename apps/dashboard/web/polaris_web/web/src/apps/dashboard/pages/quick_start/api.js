@@ -224,6 +224,14 @@ const api = {
         })
     },
 
+    fetchAgentImportStatus(uploadId) {
+        return request({
+            url: '/api/fetchAgentImportStatus',
+            method: 'post',
+            data: {uploadId}
+        })
+    },
+
     initiateMCPRecon(ipRange) {
         return request({
             url: '/api/initiateMCPRecon',

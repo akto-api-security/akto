@@ -2,11 +2,13 @@ package com.akto.action;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.upload.FileUpload;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.HostValidator;
@@ -23,12 +25,17 @@ import com.opensymphony.xwork2.Action;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class AgentImportAction extends UserAction{
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentImportAction.class, LoggerMaker.LogDb.DASHBOARD);
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     
     @Getter @Setter
     private String url;
@@ -57,7 +64,43 @@ public class AgentImportAction extends UserAction{
     @Getter @Setter
     private String miniTestingName;
 
+    @Getter @Setter
+    private String uploadId;
+
+    @Getter
+    private FileUpload.UploadStatus uploadStatus;
+
+    @Getter
+    private String errorMessage;
+
     private int apiCollectionId;
+
+    private void updateUpload(ObjectId id, FileUpload.UploadStatus status, String error) {
+        try {
+            FileUploadsDao.instance.updateOne(
+                Filters.eq(Constants.ID, id),
+                Updates.combine(Updates.set("uploadStatus", status.name()), Updates.set("fatalError", error))
+            );
+        } catch (Exception e) {
+            loggerMaker.error("Error updating agent import upload " + id + ": " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+        }
+    }
+
+    public String fetchAgentImportStatus() {
+        try {
+            FileUpload upload = FileUploadsDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(uploadId)));
+            if (upload == null) {
+                addActionError("Invalid upload id");
+                return Action.ERROR.toUpperCase();
+            }
+            uploadStatus = upload.getUploadStatus();
+            errorMessage = upload.getFatalError();
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Invalid upload id");
+            return Action.ERROR.toUpperCase();
+        }
+    }
     
     public String importFromUrl() {
         try {
@@ -68,17 +111,23 @@ public class AgentImportAction extends UserAction{
 
             loggerMaker.info("Starting URL import for: " + url, LoggerMaker.LogDb.DASHBOARD);
 
-            String message = executeApiCall();
+            FileUpload upload = new FileUpload(FileUpload.UploadType.AGENT_URL, FileUpload.UploadStatus.IN_PROGRESS);
+            ObjectId id = FileUploadsDao.instance.insertOne(upload).getInsertedId().asObjectId().getValue();
+            uploadId = id.toString();
 
-            boolean collectionCreated = createApiCollectionFromUrl();
-            try {
-                saveToDatabase(Arrays.asList(message));
-            } catch (Exception e) {
-                if (collectionCreated) {
-                    ApiCollectionsDao.instance.deleteAll(Filters.eq(Constants.ID, apiCollectionId));
+            // Execute API call in separate thread
+            int accountId = Context.accountId.get();
+            executorService.schedule(new Runnable() {
+                public void run() {
+                    Context.accountId.set(accountId);
+                    try {
+                        executeApiCall();
+                        updateUpload(id, FileUpload.UploadStatus.SUCCEEDED, null);
+                    } catch (Exception e) {
+                        updateUpload(id, FileUpload.UploadStatus.FAILED, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                    }
                 }
-                throw e;
-            }
+            }, 0, TimeUnit.SECONDS);
 
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -89,7 +138,7 @@ public class AgentImportAction extends UserAction{
         }
     }
     
-    private boolean createApiCollectionFromUrl() {
+    private void createApiCollectionFromUrl() {
         try {
             String name = !StringUtils.isEmpty(collectionName)
                     ? collectionName.trim()
@@ -104,7 +153,7 @@ public class AgentImportAction extends UserAction{
                 loggerMaker.info("Found existing API collection with ID: " + apiCollectionId + " for name: " + name, LoggerMaker.LogDb.DASHBOARD);
                 // Add Gen AI tag if not already present
                 addGenAiTagIfNeeded(existingCollection);
-                return false;
+                return;
             }
             
             // Create new collection using DAO
@@ -117,7 +166,7 @@ public class AgentImportAction extends UserAction{
             // Add Gen AI tag to the new collection
             addGenAiTagToCollection(apiCollectionId);
             loggerMaker.info("Created new API collection with ID: " + apiCollectionId + " for name: " + name, LoggerMaker.LogDb.DASHBOARD);
-            return true;
+            
         } catch (Exception e) {
             loggerMaker.error("Error creating API collection from URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             throw new RuntimeException("Failed to create API collection", e);
@@ -161,7 +210,7 @@ public class AgentImportAction extends UserAction{
         }
     }
     
-    private String executeApiCall() throws Exception {
+    private void executeApiCall() throws Exception {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Content-Type", Arrays.asList("application/json"));
 
@@ -221,7 +270,9 @@ public class AgentImportAction extends UserAction{
             // Remove x-akto-ignore header before converting to message
             headers.remove(Constants.AKTO_IGNORE_FLAG);
 
-            return convertToMessage(url, headers, requestBody, response);
+            String message = convertToMessage(url, headers, requestBody, response);
+            createApiCollectionFromUrl();
+            saveToDatabase(Arrays.asList(message));
         } catch (Exception e) {
             loggerMaker.error("Error during async API execution: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
