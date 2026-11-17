@@ -88,7 +88,7 @@ public class AgentImportAction extends UserAction{
             return Action.ERROR.toUpperCase();
         }
     }
-
+    
     private boolean createApiCollectionFromUrl() {
         try {
             String name = !StringUtils.isEmpty(collectionName)
@@ -192,30 +192,41 @@ public class AgentImportAction extends UserAction{
             int statusCode = customResponseStatusCode != null ? customResponseStatusCode : 200;
             response = new OriginalHttpResponse(customResponseBody, customRespHeaders, statusCode);
         } else {
-            OriginalHttpRequest requestToSend = request;
-            if (!StringUtils.isEmpty(testRoleId)) {
-                // Auth goes on a copy so the token/cookie is sent but never persisted in the saved sample.
-                requestToSend = request.copy();
-                TestRoleAuthUtils.applyTestRoleAuth(requestToSend, testRoleId);
-            }
+            try {
+                OriginalHttpRequest requestToSend = request;
+                if (!StringUtils.isEmpty(testRoleId)) {
+                    // Auth goes on a copy so the token/cookie is sent but never persisted in the saved sample.
+                    requestToSend = request.copy();
+                    TestRoleAuthUtils.applyTestRoleAuth(requestToSend, testRoleId);
+                }
 
-            if (!StringUtils.isEmpty(miniTestingName)) {
-                // Target is internal to the customer's network — have their mini-testing send it.
-                loggerMaker.info("Sending request via mini-testing " + miniTestingName + " for URL: " + url, LoggerMaker.LogDb.DASHBOARD);
-                response = com.akto.testing.Utils.runRequestOnHybridTesting(requestToSend, miniTestingName);
-            } else {
-                response = ApiExecutor.sendRequest(requestToSend, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
+                if (!StringUtils.isEmpty(miniTestingName)) {
+                    // Target is internal to the customer's network — have their mini-testing send it.
+                    loggerMaker.info("Sending request via mini-testing " + miniTestingName + " for URL: " + url, LoggerMaker.LogDb.DASHBOARD);
+                    response = com.akto.testing.Utils.runRequestOnHybridTesting(requestToSend, miniTestingName);
+                } else {
+                    response = ApiExecutor.sendRequest(requestToSend, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
+                }
+                if (response == null || response.getStatusCode() <= 0) {
+                    throw new Exception("No response received from URL: " + url);
+                }
+                loggerMaker.info("Successfully received response from URL", LoggerMaker.LogDb.DASHBOARD);
+            } catch (Exception e) {
+                loggerMaker.error("Error calling URL: " + url + " - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                throw e;
             }
-            if (response == null || response.getStatusCode() <= 0) {
-                throw new Exception("No response received from URL: " + url);
-            }
-            loggerMaker.info("Successfully received response from URL", LoggerMaker.LogDb.DASHBOARD);
         }
 
-        // Remove x-akto-ignore header before converting to message
-        headers.remove(Constants.AKTO_IGNORE_FLAG);
+        try {
+            // Remove x-akto-ignore header before converting to message
+            headers.remove(Constants.AKTO_IGNORE_FLAG);
 
-        return convertToMessage(url, headers, requestBody, response);
+            return convertToMessage(url, headers, requestBody, response);
+        } catch (Exception e) {
+            loggerMaker.error("Error during async API execution: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            e.printStackTrace();
+            throw e;
+        }
     }
     
     private final static ObjectMapper mapper = new ObjectMapper();
