@@ -68,7 +68,7 @@ public class AgentImportAction extends UserAction{
 
             loggerMaker.info("Starting URL import for: " + url, LoggerMaker.LogDb.DASHBOARD);
 
-            String message = buildMessageFromApiCall();
+            String message = executeApiCall();
 
             boolean collectionCreated = createApiCollectionFromUrl();
             try {
@@ -161,7 +161,7 @@ public class AgentImportAction extends UserAction{
         }
     }
     
-    private String buildMessageFromApiCall() throws Exception {
+    private String executeApiCall() throws Exception {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Content-Type", Arrays.asList("application/json"));
 
