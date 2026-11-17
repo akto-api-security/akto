@@ -34,6 +34,7 @@ public class RequestData {
         this.regex = regex;
         this.otpRefUuid = otpRefUuid;
         this.tokenFetchCommand = tokenFetchCommand;
+        this.allowAllStatusCodes = allowAllStatusCodes;
     }
 
     public String getBody() {
