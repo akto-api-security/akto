@@ -105,6 +105,17 @@ export default function AskOverlay({ open, onClose }) {
 
     if (!open) return null
 
+    // Rendered on its own as a Polaris Modal (see ScriptIntro) so its dropdown opens above it.
+    if (mode === "scriptIntro") {
+        return (
+            <ScriptIntro
+                initialCollectionId={scriptSession?.apiCollectionId}
+                onStart={handleStartScript}
+                onClose={onClose}
+            />
+        )
+    }
+
     return (
         <Portal idPrefix="ask-akto">
             <ScrollLock />
@@ -140,13 +151,7 @@ export default function AskOverlay({ open, onClose }) {
                         overflowY="hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {mode === "scriptIntro" ? (
-                            <ScriptIntro
-                                initialCollectionId={scriptSession?.apiCollectionId}
-                                onStart={handleStartScript}
-                                onClose={onClose}
-                            />
-                        ) : mode === "home" ? (
+                        {mode === "home" ? (
                             <HomeView
                                 tiles={tiles}
                                 tilesLoading={tilesLoading}
