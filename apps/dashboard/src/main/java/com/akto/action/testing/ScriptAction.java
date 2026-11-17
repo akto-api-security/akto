@@ -17,6 +17,9 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.scripts.TestScriptException;
 import com.akto.service.scripts.TestScriptService;
+import com.akto.service.scripts.validation.ReplayOutcome;
+import com.akto.service.scripts.validation.ScriptValidationRequest;
+import com.akto.service.scripts.validation.TestScriptValidationService;
 import com.opensymphony.xwork2.Action;
 
 import lombok.Getter;
@@ -28,6 +31,7 @@ public class ScriptAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ScriptAction.class, LogDb.DASHBOARD);
 
     private final TestScriptService testScriptService = new TestScriptService();
+    private final TestScriptValidationService validationService = new TestScriptValidationService();
 
     @Override
     public String execute() throws Exception {
@@ -44,9 +48,15 @@ public class ScriptAction extends UserAction {
     @Setter
     private String javascript;
 
+    // api/validateTestScript; see service/scripts/validation/CLAUDE.md
+    @Setter
+    private ScriptValidationRequest validationRequest;
+
     // response
     @Getter
     private TestScript testScript;
+    @Getter
+    private ReplayOutcome scriptValidationResult;
     @Getter
     private List<TestScriptSummary> scripts;
 
@@ -107,6 +117,17 @@ public class ScriptAction extends UserAction {
             return rejected(e);
         } catch (Exception e) {
             return unexpected(e, "deleteScript", "Failed to delete script");
+        }
+    }
+
+    public String validateTestScript() {
+        try {
+            this.scriptValidationResult = validationService.validate(this.validationRequest, getSUser());
+            return Action.SUCCESS.toUpperCase();
+        } catch (TestScriptException e) {
+            return rejected(e);
+        } catch (Exception e) {
+            return unexpected(e, "validateTestScript", "Failed to run the validation");
         }
     }
 

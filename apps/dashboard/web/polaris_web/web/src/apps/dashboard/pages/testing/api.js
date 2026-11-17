@@ -621,6 +621,16 @@ export default {
             data: { scriptId }
         })
     },
+    // Ask Akto script validation (service/scripts/validation/CLAUDE.md). Runs the replay inline like the test
+    // editor; a polling script can take minutes, so this call waits longer than the default 60s.
+    validateTestScript(validationRequest) {
+        return request({
+            url: '/api/validateTestScript',
+            method: 'post',
+            data: { validationRequest },
+            timeout: 11 * 60 * 1000
+        })
+    },
     updateDeltaTimeForSummaries(deltaTimeForScheduledSummaries){
         return request({
             url: '/api/updateIgnoreTimeForSummaries',
