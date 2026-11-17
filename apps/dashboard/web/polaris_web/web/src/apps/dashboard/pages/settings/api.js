@@ -910,6 +910,14 @@ const settingRequests = {
         })
     },
 
+    saveLinearBiDirectionalSync(biDirectionalSyncEnabled) {
+        return request({
+            url: '/api/saveLinearBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled }
+        })
+    },
+
     removeLinearIntegration() {
         return request({
             url: '/api/removeLinearIntegration',
@@ -939,6 +947,14 @@ const settingRequests = {
             url: '/api/savePortIOSeverityMapping',
             method: 'post',
             data: { severityToPriority }
+        })
+    },
+
+    savePortIOBiDirectionalSync(biDirectionalSyncEnabled, updateWorkflowId) {
+        return request({
+            url: '/api/savePortIOBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled, updateWorkflowId }
         })
     },
 

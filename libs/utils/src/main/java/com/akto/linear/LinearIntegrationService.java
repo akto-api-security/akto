@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.linear_integration.LinearIntegration;
 import com.akto.dto.linear_integration.LinearTeamMapping;
+import com.akto.jobs.executors.LinearTicketSyncJobExecutor;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -15,6 +16,7 @@ import com.akto.linear.LinearApiClient.LinearIssue;
 import com.akto.linear.LinearApiClient.LinearTeam;
 import com.akto.log.LoggerMaker;
 import com.akto.ticketing.ATicketIntegrationService;
+import com.akto.ticketing.TicketSyncScheduler;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -153,6 +155,35 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         return sanitized;
     }
 
+    public LinearIntegration saveBiDirectionalSync(boolean enabled) throws Exception {
+        LinearIntegration existing = LinearIntegrationDao.instance.findOne(new BasicDBObject());
+        if (existing == null || StringUtils.isBlank(existing.getApiToken())) {
+            throw new Exception("Please save your Linear API key first.");
+        }
+        if (enabled && (existing.getTeamMappings() == null || existing.getTeamMappings().isEmpty())) {
+            throw new Exception("Please add at least one team before enabling sync.");
+        }
+
+        if (enabled) {
+            TicketSyncScheduler.start(GlobalEnums.TicketSource.LINEAR, LinearTicketSyncJobExecutor.SYNC_KEY);
+        } else {
+            TicketSyncScheduler.stop(GlobalEnums.TicketSource.LINEAR, LinearTicketSyncJobExecutor.SYNC_KEY);
+        }
+
+        LinearIntegration updated = LinearIntegrationDao.instance.getMCollection().findOneAndUpdate(
+            new BasicDBObject(),
+            Updates.combine(
+                Updates.set(LinearIntegration.BI_DIRECTIONAL_SYNC_ENABLED, enabled),
+                Updates.set(LinearIntegration.UPDATED_TS, Context.now())
+            ),
+            new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+        );
+        if (updated != null) {
+            updated.setApiToken(null);
+        }
+        return updated;
+    }
+
     public LinearIntegration fetchLinearIntegration() {
         LinearIntegration integration = LinearIntegrationDao.instance.findOne(new BasicDBObject());
         if (integration != null) {
@@ -180,6 +211,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
 
     public void removeIntegration() throws Exception {
         try {
+            TicketSyncScheduler.stop(GlobalEnums.TicketSource.LINEAR, LinearTicketSyncJobExecutor.SYNC_KEY);
             LinearIntegrationDao.instance.getMCollection().deleteOne(new BasicDBObject());
             logger.infoAndAddToDb("Linear integration removed successfully", LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {

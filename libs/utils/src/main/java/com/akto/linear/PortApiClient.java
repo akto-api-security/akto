@@ -3,10 +3,16 @@ package com.akto.linear;
 import com.akto.linear.LinearApiClient.LinearIssue;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -29,6 +35,11 @@ public final class PortApiClient {
     private static final String ISSUE_URL_KEY = "issueUrl";
     private static final List<String> PRIORITY_LABELS = Arrays.asList("No priority", "Urgent", "High", "Normal", "Low");
     private static final int MAX_OUTPUT_DEPTH = 3;
+    private static final String LINEAR_ISSUE_BLUEPRINT = "linearIssue";
+    private static final String LINEAR_STATE_BLUEPRINT = "linearWorkflowState";
+    private static final int SEARCH_BATCH_SIZE = 100;
+    private static final int SEARCH_PAGE_SIZE = 1000;
+    private static final int MAX_SEARCH_PAGES = 20;
 
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -55,12 +66,76 @@ public final class PortApiClient {
         return accessToken;
     }
 
+    @Getter
+    @AllArgsConstructor
+    public static class PortLinearIssue {
+        private final String identifier;
+        private final String stateId;
+        private final String teamId;
+        private final int updatedAt;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class PortWorkflowState {
+        private final String id;
+        private final String type;
+        private final String teamId;
+        private final double position;
+    }
+
     public static LinearIssue createIssue(String accessToken, String workflowId, String title, String description,
         int priority) throws Exception {
         BasicDBObject inputs = new BasicDBObject("title", title)
             .append("description", description)
             .append("priority", priorityLabel(priority));
 
+        return extractIssue(runWorkflow(accessToken, workflowId, inputs));
+    }
+
+    public static void updateIssueState(String accessToken, String workflowId, String issueIdentifier,
+        String stateId) throws Exception {
+        runWorkflow(accessToken, workflowId,
+            new BasicDBObject("issue", issueIdentifier).append("stateId", stateId));
+    }
+
+    public static Map<String, PortLinearIssue> fetchLinearIssues(String accessToken, List<String> identifiers)
+        throws Exception {
+        Map<String, PortLinearIssue> issues = new HashMap<>();
+        for (int from = 0; from < identifiers.size(); from += SEARCH_BATCH_SIZE) {
+            List<String> batch = identifiers.subList(from, Math.min(from + SEARCH_BATCH_SIZE, identifiers.size()));
+            BasicDBObject rule = new BasicDBObject("property", "$identifier")
+                .append("operator", "in")
+                .append("value", batch);
+
+            for (BasicDBObject entity : searchEntities(accessToken, LINEAR_ISSUE_BLUEPRINT, rule)) {
+                BasicDBObject properties = objectOrEmpty(entity.get("properties"));
+                BasicDBObject relations = objectOrEmpty(entity.get("relations"));
+                String updated = properties.getString("updated");
+                issues.put(entity.getString("identifier"), new PortLinearIssue(entity.getString("identifier"),
+                    relations.getString("workflowState"), relations.getString("team"),
+                    StringUtils.isBlank(updated) ? 0 : (int) Instant.parse(updated).getEpochSecond()));
+            }
+        }
+        return issues;
+    }
+
+    public static Map<String, PortWorkflowState> fetchWorkflowStates(String accessToken) throws Exception {
+        BasicDBObject rule = new BasicDBObject("property", "$identifier").append("operator", "isNotEmpty");
+
+        Map<String, PortWorkflowState> states = new HashMap<>();
+        for (BasicDBObject entity : searchEntities(accessToken, LINEAR_STATE_BLUEPRINT, rule)) {
+            BasicDBObject properties = objectOrEmpty(entity.get("properties"));
+            BasicDBObject relations = objectOrEmpty(entity.get("relations"));
+            Object position = properties.get("position");
+            states.put(entity.getString("identifier"), new PortWorkflowState(entity.getString("identifier"),
+                properties.getString("type"), relations.getString("team"),
+                position instanceof Number ? ((Number) position).doubleValue() : 0));
+        }
+        return states;
+    }
+
+    static BasicDBObject runWorkflow(String accessToken, String workflowId, BasicDBObject inputs) throws Exception {
         BasicDBObject started = call(authorized(accessToken, "/workflows/" + workflowId.trim() + "/runs")
             .post(RequestBody.create(new BasicDBObject("inputs", inputs).toJson(), JSON_MEDIA_TYPE))
             .build());
@@ -78,12 +153,44 @@ public final class PortApiClient {
                 if (!RESULT_SUCCESS.equals(run.getString("result"))) {
                     throw new Exception("Port workflow run " + runId + " failed: " + failureMessage(run));
                 }
-                return extractIssue(run);
+                return run;
             }
             pause();
         }
 
         throw new Exception("Port workflow run " + runId + " did not finish in time.");
+    }
+
+    private static List<BasicDBObject> searchEntities(String accessToken, String blueprint, BasicDBObject rule)
+        throws Exception {
+        List<BasicDBObject> entities = new ArrayList<>();
+        String from = null;
+
+        for (int page = 0; page < MAX_SEARCH_PAGES; page++) {
+            BasicDBObject body = new BasicDBObject("query",
+                new BasicDBObject("combinator", "and").append("rules", Arrays.asList(rule)))
+                .append("limit", SEARCH_PAGE_SIZE);
+            if (from != null) {
+                body.append("from", from);
+            }
+
+            BasicDBObject response = call(authorized(accessToken, "/blueprints/" + blueprint + "/entities/search")
+                .post(RequestBody.create(body.toJson(), JSON_MEDIA_TYPE))
+                .build());
+            for (Object entity : asList(response.get("entities"), "entities")) {
+                entities.add(asObject(entity, "entity"));
+            }
+
+            from = response.getString("next");
+            if (StringUtils.isBlank(from)) {
+                break;
+            }
+        }
+        return entities;
+    }
+
+    private static BasicDBObject objectOrEmpty(Object value) {
+        return value instanceof BasicDBObject ? (BasicDBObject) value : new BasicDBObject();
     }
 
     static String priorityLabel(int priority) {

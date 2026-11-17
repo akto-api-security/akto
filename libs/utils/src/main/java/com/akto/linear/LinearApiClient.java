@@ -2,6 +2,7 @@ package com.akto.linear;
 
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +39,16 @@ public final class LinearApiClient {
         "mutation TeamCreate($input: TeamCreateInput!) { teamCreate(input: $input) { success team { id key name } } }";
     private static final String ISSUE_CREATE_MUTATION =
         "mutation IssueCreate($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { id identifier url } } }";
+    private static final String ISSUES_UPDATED_QUERY =
+        "query IssuesUpdated($first: Int!, $after: String, $filter: IssueFilter) { issues(first: $first, after: $after, filter: $filter) { nodes { id identifier updatedAt state { id type } team { id } } pageInfo { hasNextPage endCursor } } }";
+    private static final String ISSUE_QUERY =
+        "query IssueByIdentifier($id: String!) { issue(id: $id) { id identifier updatedAt state { id type } team { id } } }";
+    private static final String TEAM_STATES_QUERY =
+        "query TeamStates($id: String!) { team(id: $id) { states { nodes { id type position } } } }";
+    private static final String ISSUE_UPDATE_MUTATION =
+        "mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }";
+    private static final int ISSUES_PAGE_SIZE = 100;
+    private static final int MAX_ISSUE_PAGES = 50;
     private static final String ATTACHMENT_CREATE_MUTATION =
         "mutation AttachmentCreate($input: AttachmentCreateInput!) { attachmentCreate(input: $input) { success attachment { id } } }";
 
@@ -59,6 +70,24 @@ public final class LinearApiClient {
         private final String id;
         private final String identifier;
         private final String url;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class LinearIssueState {
+        private final String id;
+        private final String identifier;
+        private final int updatedAt;
+        private final String stateType;
+        private final String teamId;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class LinearWorkflowState {
+        private final String id;
+        private final String type;
+        private final double position;
     }
 
     public static List<LinearTeam> fetchTeams(String token) throws Exception {
@@ -105,6 +134,74 @@ public final class LinearApiClient {
             execute(token, ISSUE_CREATE_MUTATION, new BasicDBObject("input", input)), "issueCreate");
         BasicDBObject issue = asObject(payload.get("issue"), "issue");
         return new LinearIssue(issue.getString("id"), issue.getString("identifier"), issue.getString("url"));
+    }
+
+    public static List<LinearIssueState> fetchIssuesUpdatedAfter(String token, int sinceEpochSeconds,
+        List<String> teamIds) throws Exception {
+        List<LinearIssueState> issues = new ArrayList<>();
+        if (teamIds == null || teamIds.isEmpty()) {
+            return issues;
+        }
+
+        BasicDBObject filter = new BasicDBObject("updatedAt",
+            new BasicDBObject("gt", Instant.ofEpochSecond(sinceEpochSeconds).toString()))
+            .append("team", new BasicDBObject("id", new BasicDBObject("in", teamIds)));
+        String cursor = null;
+
+        for (int page = 0; page < MAX_ISSUE_PAGES; page++) {
+            BasicDBObject variables = new BasicDBObject("first", ISSUES_PAGE_SIZE)
+                .append("after", cursor)
+                .append("filter", filter);
+            BasicDBObject connection = asObject(execute(token, ISSUES_UPDATED_QUERY, variables).get("issues"), "issues");
+
+            for (Object node : asList(connection.get("nodes"), "issues")) {
+                issues.add(toIssueState(asObject(node, "issue")));
+            }
+
+            BasicDBObject pageInfo = asObject(connection.get("pageInfo"), "pageInfo");
+            if (!pageInfo.getBoolean("hasNextPage", false)) {
+                break;
+            }
+            cursor = pageInfo.getString("endCursor");
+        }
+
+        return issues;
+    }
+
+    public static LinearIssueState fetchIssue(String token, String identifier) throws Exception {
+        return toIssueState(asObject(
+            execute(token, ISSUE_QUERY, new BasicDBObject("id", identifier)).get("issue"), "issue"));
+    }
+
+    public static List<LinearWorkflowState> fetchTeamStates(String token, String teamId) throws Exception {
+        BasicDBObject team = asObject(
+            execute(token, TEAM_STATES_QUERY, new BasicDBObject("id", teamId)).get("team"), "team");
+        BasicDBObject states = asObject(team.get("states"), "states");
+
+        List<LinearWorkflowState> workflowStates = new ArrayList<>();
+        for (Object node : asList(states.get("nodes"), "states")) {
+            BasicDBObject state = asObject(node, "state");
+            Number position = state.get("position") instanceof Number ? (Number) state.get("position") : 0;
+            workflowStates.add(new LinearWorkflowState(state.getString("id"), state.getString("type"),
+                position.doubleValue()));
+        }
+        return workflowStates;
+    }
+
+    public static void updateIssueState(String token, String issueId, String stateId) throws Exception {
+        BasicDBObject variables = new BasicDBObject("id", issueId)
+            .append("input", new BasicDBObject("stateId", stateId));
+        mutationPayload(execute(token, ISSUE_UPDATE_MUTATION, variables), "issueUpdate");
+    }
+
+    private static LinearIssueState toIssueState(BasicDBObject issue) {
+        BasicDBObject state = issue.get("state") instanceof BasicDBObject ? (BasicDBObject) issue.get("state") : null;
+        BasicDBObject team = issue.get("team") instanceof BasicDBObject ? (BasicDBObject) issue.get("team") : null;
+        String updatedAt = issue.getString("updatedAt");
+        return new LinearIssueState(issue.getString("id"), issue.getString("identifier"),
+            StringUtils.isBlank(updatedAt) ? 0 : (int) Instant.parse(updatedAt).getEpochSecond(),
+            state != null ? state.getString("type") : null,
+            team != null ? team.getString("id") : null);
     }
 
     public static void createAttachment(String token, String issueId, String title, String subtitle, String url,
