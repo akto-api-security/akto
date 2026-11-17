@@ -176,15 +176,3 @@ func TestMiddleware_UnknownDeploymentAccountSkipsCheck(t *testing.T) {
 		t.Fatalf("status = %d, want 200 when the deployment account is unknown", status)
 	}
 }
-
-func TestMiddleware_ReroutedTokenGetsMappedAccount(t *testing.T) {
-	pinDeploymentAccount(t, "1718000000") // would reject any other account's token
-	_, pub := mustKeyPair(t)
-
-	for _, h := range []string{"x.y.z-" + rerouteTokenSuffix, "Bearer x.y.z-" + rerouteTokenSuffix} {
-		status, accountID, set := runRequest(t, pub, h)
-		if status != http.StatusOK || !set || accountID != rerouteAccountID {
-			t.Fatalf("%q: status=%d set=%v accountId=%d, want 200 true %d", h, status, set, accountID, rerouteAccountID)
-		}
-	}
-}

