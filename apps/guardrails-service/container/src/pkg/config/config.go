@@ -143,6 +143,11 @@ type FileConfig struct {
 	// set FILE_VALIDATE_BLOCK_ON_REDACTION=false to go back to allowing them.
 	BlockOnRedaction bool
 
+	// CacheTTLSec is how long an inspected, allowed file is remembered in Redis (REDIS_URL), keyed
+	// on its bytes and the policies that apply, so the copies an agent re-sends every turn are not
+	// inspected again. 0 turns the cache off; without REDIS_URL there is none.
+	CacheTTLSec int
+
 	Media MediaConfig
 }
 
@@ -251,6 +256,7 @@ func LoadConfig() *Config {
 			MaxConcurrent:    getEnvAsInt("FILE_VALIDATE_MAX_CONCURRENT", 5),
 			URLTimeoutSec:    getEnvAsInt("FILE_VALIDATE_URL_TIMEOUT_SEC", 30),
 			BlockOnRedaction: getEnvAsBool("FILE_VALIDATE_BLOCK_ON_REDACTION", true),
+			CacheTTLSec:      getEnvAsInt("FILE_VALIDATE_CACHE_TTL_SEC", 3600),
 			Media: MediaConfig{
 				Provider:      getEnv("MEDIA_PROVIDER", "agent_guard"),
 				VisionAPIKey:  getEnv("MEDIA_VISION_API_KEY", ""),
