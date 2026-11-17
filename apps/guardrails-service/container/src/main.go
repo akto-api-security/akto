@@ -18,6 +18,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/auth"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
+	"github.com/akto-api-security/guardrails-service/pkg/filecache"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/kafka"
 	"github.com/akto-api-security/guardrails-service/pkg/logsink"
@@ -174,7 +175,13 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 		logger.Info("NHI sources disabled (NHI_ENABLED=false)")
 	}
 
-	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc)
+	fileCache := filecache.NewRedis(guardcache.GetRedisClient(), time.Duration(cfg.File.CacheTTLSec)*time.Second, logger)
+	if fileCache == nil {
+		logger.Info("File verdict cache off (needs REDIS_URL and FILE_VALIDATE_CACHE_TTL_SEC > 0)")
+	} else {
+		logger.Info("File verdict cache on", zap.Int("ttlSec", cfg.File.CacheTTLSec))
+	}
+	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc, fileCache)
 
 	var authMiddleware gin.HandlerFunc
 	if cfg.AuthEnabled {

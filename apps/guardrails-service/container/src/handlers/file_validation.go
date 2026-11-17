@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/filecache"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
@@ -146,10 +148,11 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
+	cacheScope := h.fileCacheScope(c, meta)
 	var fileResults []*fileResult
 
 	for _, input := range inputs {
-		fr := h.validateSingleFile(ctx, input, meta, sessionID, requestID)
+		fr := h.validateCachedFile(ctx, input, meta, sessionID, requestID, cacheScope)
 		fileResults = append(fileResults, fr)
 
 		if !fr.Allowed {
@@ -168,6 +171,55 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		zap.Int("allowedCount", allowedCount),
 		zap.String("sessionID", sessionID))
 	h.writeMultiFileResponse(c, fileResults, dropped)
+}
+
+// fileCacheScope is everything besides a file's bytes that its verdict depends on: the account,
+// context source and tag, the policies that apply (content included, so an edited policy misses),
+// and the settings that turn chunk verdicts into a file verdict. "" turns the cache off for the
+// request, as when the policies can't be resolved.
+func (h *ValidationHandler) fileCacheScope(c *gin.Context, meta *models.ValidateRequestParams) string {
+	if h.fileCache == nil || h.policyFingerprint == nil {
+		return ""
+	}
+	policies, err := h.policyFingerprint(meta.ContextSource, meta.RequestHeaders, meta.Tag)
+	if err != nil {
+		h.logger.Warn("Could not fingerprint the applicable policies; file cache skipped", zap.Error(err))
+		return ""
+	}
+	// Partition by the deployment-owned account, never the untrusted body field alone.
+	owner := *meta
+	applyAuthenticatedAccount(c, &owner)
+	f := h.cfg.File
+	return fmt.Sprintf("%s|%s|%s|%s|redact=%t|chunks=%d/%d/%d", owner.AktoAccountID, meta.ContextSource, meta.Tag,
+		policies, f.BlockOnRedaction, f.ChunkSize, f.ChunkOverlap, f.MaxChunks)
+}
+
+// validateCachedFile serves a file from the cache when the same bytes were inspected and allowed
+// under the same scope, and remembers an inspected allow. Blocks and uninspected allows are never
+// remembered, so those files are checked again.
+func (h *ValidationHandler) validateCachedFile(ctx context.Context, input *fileInput, meta *models.ValidateRequestParams, sessionID, requestID, scope string) *fileResult {
+	if scope == "" || input.Err != nil {
+		return h.validateSingleFile(ctx, input, meta, sessionID, requestID)
+	}
+	// The bytes are needed for the key; they are already capped per type by resolveInputs.
+	data, err := io.ReadAll(input.Reader)
+	_ = input.Reader.Close()
+	input.Reader = io.NopCloser(bytes.NewReader(data))
+	if err != nil {
+		input.Err = fmt.Errorf("read file: %w", err)
+		return h.validateSingleFile(ctx, input, meta, sessionID, requestID)
+	}
+	key := filecache.Key(scope, data)
+	if h.fileCache.Allowed(ctx, key) {
+		h.logger.Info("File allowed from cache; already inspected under the same policies",
+			zap.String("file", input.Filename), zap.String("sessionID", sessionID))
+		return &fileResult{Filename: input.Filename, Allowed: true}
+	}
+	fr := h.validateSingleFile(ctx, input, meta, sessionID, requestID)
+	if fr.Allowed && !fr.Uninspected {
+		h.fileCache.Remember(ctx, key)
+	}
+	return fr
 }
 
 func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileInput, meta *models.ValidateRequestParams, sessionID, requestID string) (fr *fileResult) {
@@ -240,7 +292,7 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 			zap.Int("chunkOverlap", h.cfg.File.ChunkOverlap))
 	}
 
-	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID, h.validatorService.ValidateRequest)
+	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID, h.validateFileChunk)
 	return h.applyFileChunkResults(fr, results)
 }
 
