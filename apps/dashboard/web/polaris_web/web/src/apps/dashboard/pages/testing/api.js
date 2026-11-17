@@ -621,14 +621,23 @@ export default {
             data: { scriptId }
         })
     },
-    // Ask Akto script validation (service/scripts/validation/CLAUDE.md). Runs the replay inline like the test
-    // editor; a polling script can take minutes, so this call waits longer than the default 60s.
+    // Ask Akto script validation (service/scripts/validation/CLAUDE.md). In the dashboard module the replay runs
+    // inline like the test editor, and a polling script can take minutes, so this call waits longer than the
+    // default 60s. With a miniTestingName it returns scriptValidationPlaygroundId at once; poll
+    // fetchScriptValidation for the result.
     validateTestScript(validationRequest) {
         return request({
             url: '/api/validateTestScript',
             method: 'post',
             data: { validationRequest },
             timeout: 11 * 60 * 1000
+        })
+    },
+    fetchScriptValidation(scriptValidationPlaygroundId) {
+        return request({
+            url: '/api/fetchScriptValidation',
+            method: 'post',
+            data: { scriptValidationPlaygroundId }
         })
     },
     updateDeltaTimeForSummaries(deltaTimeForScheduledSummaries){

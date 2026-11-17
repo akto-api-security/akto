@@ -125,6 +125,46 @@ public class ScriptActionTest extends MongoBasedTest {
     }
 
     @Test
+    public void testMiniTestingRequestsAreScheduledNotRunInline() {
+        com.akto.service.scripts.validation.ScriptValidationRequest request = validationRequest(java.util.UUID.randomUUID().toString());
+        request.setMiniTestingName("no-such-module");
+        ScriptAction action = createAction("a@akto.io");
+        action.setValidationRequest(request);
+
+        assertEquals("ERROR", action.validateTestScript());
+        // the mini-testing path answered (a dashboard replay would have said "No captured request")
+        assertTrue(action.getActionErrors().iterator().next().contains("Mini-testing"));
+        assertNull(action.getScriptValidationResult());
+        assertNull(action.getScriptValidationPlaygroundId());
+    }
+
+    @Test
+    public void testFetchScriptValidationRejectsUnknownAndMalformedIds() {
+        ScriptAction unknown = createAction("a@akto.io");
+        unknown.setScriptValidationPlaygroundId(new org.bson.types.ObjectId().toHexString());
+        assertEquals("ERROR", unknown.fetchScriptValidation());
+        assertTrue(unknown.getActionErrors().iterator().next().contains("not found"));
+        assertNull(unknown.getScriptValidationResult());
+
+        ScriptAction malformed = createAction("a@akto.io");
+        malformed.setScriptValidationPlaygroundId("nope");
+        assertEquals("ERROR", malformed.fetchScriptValidation());
+        assertTrue(malformed.getActionErrors().iterator().next().contains("Invalid validation id"));
+    }
+
+    @Test
+    public void testFetchScriptValidation_blocksNonAktoNonWhitelistedOnSaas() {
+        try (MockedStatic<DashboardMode> dashboardModeMock = mockStatic(DashboardMode.class)) {
+            dashboardModeMock.when(DashboardMode::isSaasDeployment).thenReturn(true);
+            Context.accountId.set(1);
+            ScriptAction action = createAction("test@notakto.com");
+            action.setScriptValidationPlaygroundId(new org.bson.types.ObjectId().toHexString());
+            assertEquals("ERROR", action.fetchScriptValidation());
+            assertTrue(action.getActionErrors().iterator().next().contains("not enabled"));
+        }
+    }
+
+    @Test
     public void testCrudFlow() {
         ScriptAction add = addAction("a@akto.io", "sign", "PRE_REQUEST", "pre();");
         assertEquals("SUCCESS", add.addScript());

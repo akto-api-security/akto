@@ -47,12 +47,12 @@ function PhaseDiagnostics({ label, diagnostics }) {
 }
 
 // The outcome of one validation. Missing diagnostics read "unavailable", never "no errors".
-export default function ValidationResultView({ result, running }) {
+export default function ValidationResultView({ result, running, runningText }) {
     if (running) {
         return (
             <HorizontalStack gap="2" blockAlign="center">
                 <Spinner size="small" accessibilityLabel="Replay running" />
-                <Text as="p" color="subdued">Replaying… scripts that poll can take a few minutes.</Text>
+                <Text as="p" color="subdued">{runningText || "Replaying… scripts that poll can take a few minutes."}</Text>
             </HorizontalStack>
         )
     }
