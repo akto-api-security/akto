@@ -7,6 +7,7 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -19,15 +20,13 @@ import java.util.stream.Collectors;
 /** Builds the agent inventory page from its rows: the Summary and Analytics roll-up, and the table filtered, sorted and paged. */
 public class ArgusInventoryService {
 
-    private static final int DAY_SECONDS = 86400;
-    private static final int WEEK_SECONDS = 7 * DAY_SECONDS;
+    private static final int WEEK_SECONDS = 7 * 86400;
     private static final int WEEKS = 12;
     private static final int RECENT_LIMIT = 5;
     private static final int TOOLS_LIMIT = 8;
     private static final int TOP_TEAMS = 7;
     private static final int POINTS_LIMIT = 1000;
     private static final String NO_TEAM = "none";
-    private static final String NO_TEAM_LABEL = "No owning team";
 
     private final List<ArgusInventoryRow> rows;
     private final int now;
@@ -41,12 +40,16 @@ public class ArgusInventoryService {
     @Getter
     @Setter
     public static final class Query {
+        // One of the flags in ArgusInventoryRow.matchesFlag.
         private String flag;
         private String platform;
         private List<String> platforms;
+        // A team name, or "none" for agents with no owning team.
         private String team;
         private String type;
+        // One of ArgusInventoryRow.QUADRANTS.
         private String quad;
+        // One of ArgusInventoryRow.LAST_USED.
         private String used;
         private String tool;
         // Created this many weeks ago; null for any.
@@ -97,16 +100,13 @@ public class ArgusInventoryService {
     }
 
     private boolean matches(ArgusInventoryRow row, Query query, String text) {
-        if (StringUtils.isNotBlank(query.getFlag())) {
-            ArgusInventoryFlag flag = ArgusInventoryFlag.of(query.getFlag());
-            if (flag == null || !row.has(flag)) return false;
-        }
+        if (StringUtils.isNotBlank(query.getFlag()) && !row.matchesFlag(query.getFlag())) return false;
         if (StringUtils.isNotBlank(query.getPlatform()) && !row.getPlatform().equals(query.getPlatform())) return false;
         if (query.getPlatforms() != null && !query.getPlatforms().isEmpty() && !query.getPlatforms().contains(row.getPlatform())) return false;
         if (StringUtils.isNotBlank(query.getTeam()) && !hasTeam(row, query.getTeam())) return false;
         if (StringUtils.isNotBlank(query.getType()) && !row.getType().equals(query.getType())) return false;
-        if (StringUtils.isNotBlank(query.getQuad()) && !row.quadrant().getKey().equals(query.getQuad())) return false;
-        if (StringUtils.isNotBlank(query.getUsed()) && !row.use(now).getKey().equals(query.getUsed())) return false;
+        if (StringUtils.isNotBlank(query.getQuad()) && !row.quadrant().equals(query.getQuad())) return false;
+        if (StringUtils.isNotBlank(query.getUsed()) && !row.lastUsed(now).equals(query.getUsed())) return false;
         if (query.getWeek() != null && query.getWeek() != row.weeksAgo(now)) return false;
         if (StringUtils.isNotBlank(query.getTool()) && !row.getToolNames().contains(query.getTool())) return false;
         return text.isEmpty() || row.matchesText(text);
@@ -144,16 +144,17 @@ public class ArgusInventoryService {
         out.put("createdTs", row.getCreatedTs());
         out.put("seenTs", row.getSeenTs());
         out.put("reason", row.reason(now));
-        out.put("dormant", row.has(ArgusInventoryFlag.DORMANT));
+        out.put("dormant", row.isDormant());
         return out;
     }
 
-    private static long count(List<ArgusInventoryRow> list, ArgusInventoryFlag flag) {
-        return list.stream().filter(row -> row.has(flag)).count();
+    // How many of the rows have the flag.
+    private static long count(List<ArgusInventoryRow> list, String flag) {
+        return list.stream().filter(row -> row.matchesFlag(flag)).count();
     }
 
-    private List<ArgusInventoryRow> withFlag(ArgusInventoryFlag flag) {
-        return rows.stream().filter(row -> row.has(flag)).collect(Collectors.toList());
+    private List<ArgusInventoryRow> withFlag(String flag) {
+        return rows.stream().filter(row -> row.matchesFlag(flag)).collect(Collectors.toList());
     }
 
     private BasicDBObject counts() {
@@ -162,17 +163,17 @@ public class ArgusInventoryService {
         long sharedByThree = 0;
         for (ArgusInventoryRow row : rows) {
             if (Severity.CRITICAL.name().equals(ArgusPostureUtils.severityForScore(row.getRisk()))) critical++;
-            if (row.has(ArgusInventoryFlag.NO_TEAM) && row.has(ArgusInventoryFlag.HIGH)) noTeamHigh++;
+            if (row.getTeams().isEmpty() && row.isHigh()) noTeamHigh++;
             if (row.getTeams().size() >= 3) sharedByThree++;
         }
         BasicDBObject counts = new BasicDBObject();
         counts.put("total", rows.size());
-        counts.put("newThisWeek", count(rows, ArgusInventoryFlag.NEW));
-        counts.put("high", count(rows, ArgusInventoryFlag.HIGH));
+        counts.put("newThisWeek", count(rows, "new"));
+        counts.put("high", count(rows, "high"));
         counts.put("critical", critical);
-        counts.put("noPolicy", count(rows, ArgusInventoryFlag.NO_POLICY));
-        counts.put("dormant", count(rows, ArgusInventoryFlag.DORMANT));
-        counts.put("noTeam", count(rows, ArgusInventoryFlag.NO_TEAM));
+        counts.put("noPolicy", count(rows, "noPolicy"));
+        counts.put("dormant", count(rows, "dormant"));
+        counts.put("noTeam", count(rows, "noTeam"));
         counts.put("noTeamHigh", noTeamHigh);
         counts.put("sharedByThree", sharedByThree);
         return counts;
@@ -180,17 +181,17 @@ public class ArgusInventoryService {
 
     private List<BasicDBObject> postureGroups() {
         List<BasicDBObject> groups = new ArrayList<>();
-        groups.add(postureGroup(ArgusInventoryFlag.AT_RISK, "At risk"));
-        groups.add(postureGroup(ArgusInventoryFlag.ATTENTION, "Needs attention"));
-        groups.add(postureGroup(ArgusInventoryFlag.HEALTHY, "Healthy"));
+        groups.add(postureGroup(ArgusInventoryRow.AT_RISK, "At risk"));
+        groups.add(postureGroup(ArgusInventoryRow.ATTENTION, "Needs attention"));
+        groups.add(postureGroup(ArgusInventoryRow.HEALTHY, "Healthy"));
         return groups;
     }
 
-    private BasicDBObject postureGroup(ArgusInventoryFlag flag, String label) {
+    private BasicDBObject postureGroup(String key, String label) {
         BasicDBObject group = new BasicDBObject();
-        group.put("key", flag.getKey());
+        group.put("key", key);
         group.put("label", label);
-        group.put("count", count(rows, flag));
+        group.put("count", count(rows, key));
         return group;
     }
 
@@ -204,7 +205,7 @@ public class ArgusInventoryService {
             for (ArgusInventoryRow row : rows) {
                 if (row.getCreatedTs() > at) continue;
                 total++;
-                if (row.has(ArgusInventoryFlag.AT_RISK)) atRisk++;
+                if (row.matchesFlag(ArgusInventoryRow.AT_RISK)) atRisk++;
             }
             BasicDBObject point = new BasicDBObject();
             point.put("ts", at);
@@ -215,21 +216,32 @@ public class ArgusInventoryService {
         return points;
     }
 
+    // The risky combinations; each card's id is the flag that opens its assets.
     private List<BasicDBObject> combos() {
         List<BasicDBObject> combos = new ArrayList<>();
-        for (ArgusInventoryCombo combo : ArgusInventoryCombo.values()) {
-            List<ArgusInventoryRow> hits = withFlag(combo.getFlag());
-            if (hits.isEmpty()) continue;
-            BasicDBObject out = new BasicDBObject();
-            out.put("id", combo.getFlag().getKey());
-            out.put("tone", combo.getTone());
-            out.put("count", hits.size());
-            out.put("parts", combo.getChips());
-            out.put("why", combo.getWhy());
-            out.put("platforms", platformCounts(hits));
-            combos.add(out);
-        }
+        addCombo(combos, "comboExposed", "critical", "Anyone can reach it, and its tools can delete data or read credentials.",
+                "Exposed to the internet", "Dangerous tools");
+        addCombo(combos, "comboShadow", "critical", "Nobody reviewed it, and it handles sensitive data.",
+                "Shadow AI", "Sensitive data");
+        addCombo(combos, "comboUnreviewed", "caution", "Nobody approved it, and its tools go beyond read-only access.",
+                "Unreviewed", "Privileged tools");
+        addCombo(combos, "comboDormant", "caution", "Nobody uses it, but its tools can still act on your systems.",
+                "Dormant", "Privileged tools");
         return combos;
+    }
+
+    // Adds a card unless no asset has the flag.
+    private void addCombo(List<BasicDBObject> combos, String flag, String tone, String why, String... chips) {
+        List<ArgusInventoryRow> hits = withFlag(flag);
+        if (hits.isEmpty()) return;
+        BasicDBObject combo = new BasicDBObject();
+        combo.put("id", flag);
+        combo.put("tone", tone);
+        combo.put("count", hits.size());
+        combo.put("parts", Arrays.asList(chips));
+        combo.put("why", why);
+        combo.put("platforms", platformCounts(hits));
+        combos.add(combo);
     }
 
     // Platforms with how many of the given rows are on each, most first.
@@ -263,12 +275,12 @@ public class ArgusInventoryService {
             BasicDBObject platform = new BasicDBObject();
             platform.put("name", entry.getKey());
             platform.put("total", list.size());
-            platform.put("atRisk", count(list, ArgusInventoryFlag.AT_RISK));
-            platform.put("attention", count(list, ArgusInventoryFlag.ATTENTION));
-            platform.put("healthy", count(list, ArgusInventoryFlag.HEALTHY));
-            platform.put("high", count(list, ArgusInventoryFlag.HIGH));
-            platform.put("noPolicy", count(list, ArgusInventoryFlag.NO_POLICY));
-            platform.put("dormant", count(list, ArgusInventoryFlag.DORMANT));
+            platform.put("atRisk", count(list, ArgusInventoryRow.AT_RISK));
+            platform.put("attention", count(list, ArgusInventoryRow.ATTENTION));
+            platform.put("healthy", count(list, ArgusInventoryRow.HEALTHY));
+            platform.put("high", count(list, "high"));
+            platform.put("noPolicy", count(list, "noPolicy"));
+            platform.put("dormant", count(list, "dormant"));
             platform.put("types", typeCounts(list));
             platforms.add(platform);
         }
@@ -290,10 +302,10 @@ public class ArgusInventoryService {
             for (String team : row.getTeams()) byTeam.computeIfAbsent(team, key -> new ArrayList<>()).add(row);
         }
         List<Map.Entry<String, List<ArgusInventoryRow>>> entries = new ArrayList<>(byTeam.entrySet());
-        entries.sort(Comparator.comparingLong((Map.Entry<String, List<ArgusInventoryRow>> e) -> -count(e.getValue(), ArgusInventoryFlag.AT_RISK))
+        entries.sort(Comparator.comparingLong((Map.Entry<String, List<ArgusInventoryRow>> e) -> -count(e.getValue(), ArgusInventoryRow.AT_RISK))
                 .thenComparingInt(e -> -e.getValue().size()));
         List<BasicDBObject> teams = new ArrayList<>();
-        teams.add(teamStats(NO_TEAM_LABEL, true, withFlag(ArgusInventoryFlag.NO_TEAM)));
+        teams.add(teamStats("No owning team", true, withFlag("noTeam")));
         for (Map.Entry<String, List<ArgusInventoryRow>> entry : entries.subList(0, Math.min(TOP_TEAMS, entries.size()))) {
             teams.add(teamStats(entry.getKey(), false, entry.getValue()));
         }
@@ -305,10 +317,10 @@ public class ArgusInventoryService {
         team.put("name", name);
         team.put("none", none);
         team.put("total", list.size());
-        team.put("atRisk", count(list, ArgusInventoryFlag.AT_RISK));
-        team.put("attention", count(list, ArgusInventoryFlag.ATTENTION));
-        team.put("healthy", count(list, ArgusInventoryFlag.HEALTHY));
-        team.put("high", count(list, ArgusInventoryFlag.HIGH));
+        team.put("atRisk", count(list, ArgusInventoryRow.AT_RISK));
+        team.put("attention", count(list, ArgusInventoryRow.ATTENTION));
+        team.put("healthy", count(list, ArgusInventoryRow.HEALTHY));
+        team.put("high", count(list, "high"));
         return team;
     }
 
@@ -331,8 +343,8 @@ public class ArgusInventoryService {
 
     private BasicDBObject quadrants() {
         BasicDBObject quadrants = new BasicDBObject();
-        for (ArgusInventoryQuadrant quadrant : ArgusInventoryQuadrant.values()) {
-            quadrants.put(quadrant.getKey(), rows.stream().filter(row -> row.quadrant() == quadrant).count());
+        for (String quadrant : ArgusInventoryRow.QUADRANTS) {
+            quadrants.put(quadrant, rows.stream().filter(row -> row.quadrant().equals(quadrant)).count());
         }
         return quadrants;
     }
@@ -348,7 +360,7 @@ public class ArgusInventoryService {
             BasicDBObject tool = new BasicDBObject();
             tool.put("name", entry.getKey());
             tool.put("assets", entry.getValue().size());
-            tool.put("high", count(entry.getValue(), ArgusInventoryFlag.HIGH));
+            tool.put("high", count(entry.getValue(), "high"));
             tool.put("privileged", entry.getValue().stream().anyMatch(row -> row.getPrivilegedToolNames().contains(entry.getKey())));
             tools.add(tool);
         }
@@ -370,11 +382,10 @@ public class ArgusInventoryService {
 
     private List<BasicDBObject> lastUsed() {
         List<BasicDBObject> buckets = new ArrayList<>();
-        for (ArgusInventoryUse use : ArgusInventoryUse.values()) {
+        for (String key : ArgusInventoryRow.LAST_USED) {
             BasicDBObject bucket = new BasicDBObject();
-            bucket.put("key", use.getKey());
-            bucket.put("label", use.getLabel());
-            bucket.put("count", rows.stream().filter(row -> row.use(now) == use).count());
+            bucket.put("key", key);
+            bucket.put("count", rows.stream().filter(row -> row.lastUsed(now).equals(key)).count());
             buckets.add(bucket);
         }
         return buckets;

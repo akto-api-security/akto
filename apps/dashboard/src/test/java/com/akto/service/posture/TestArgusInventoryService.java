@@ -16,7 +16,6 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -202,23 +201,44 @@ public class TestArgusInventoryService {
         assertEquals(NOW - 60 * DAY, item.getInt("lastUsedTs"));
     }
 
-    @Test
-    public void lastUsedBucketsFollowTheDaysSinceTraffic() {
-        assertEquals(ArgusInventoryUse.NEVER, ArgusInventoryUse.of(0, NOW));
-        assertEquals(ArgusInventoryUse.TODAY, ArgusInventoryUse.of(NOW - 100, NOW));
-        assertEquals(ArgusInventoryUse.WEEK, ArgusInventoryUse.of(NOW - 7 * DAY, NOW));
-        assertEquals(ArgusInventoryUse.MONTH, ArgusInventoryUse.of(NOW - 8 * DAY, NOW));
-        assertEquals(ArgusInventoryUse.QUARTER, ArgusInventoryUse.of(NOW - 90 * DAY, NOW));
-        assertEquals(ArgusInventoryUse.OLDER, ArgusInventoryUse.of(NOW - 91 * DAY, NOW));
+    private static ArgusInventoryRow.ArgusInventoryRowBuilder row() {
+        return ArgusInventoryRow.builder().teams(Collections.emptyList()).toolNames(Collections.emptyList()).policies(1);
     }
 
     @Test
-    public void aCombinationNeedsEverySignalAndAnUnknownFlagMatchesNothing() {
-        assertTrue(!ArgusInventoryCombo.SHADOW.matches(EnumSet.of(ArgusInventoryFlag.SHADOW)));
-        assertTrue(ArgusInventoryCombo.SHADOW.matches(EnumSet.of(ArgusInventoryFlag.SHADOW, ArgusInventoryFlag.SENSITIVE)));
-        assertEquals(null, ArgusInventoryFlag.of("nope"));
-        assertEquals(ArgusInventoryFlag.COMBO_DORMANT, ArgusInventoryFlag.of("comboDormant"));
+    public void lastUsedBucketsFollowTheDaysSinceTraffic() {
+        assertEquals("never", row().seenTs(0).build().lastUsed(NOW));
+        assertEquals("today", row().seenTs(NOW - 100).build().lastUsed(NOW));
+        assertEquals("w", row().seenTs(NOW - 7 * DAY).build().lastUsed(NOW));
+        assertEquals("m", row().seenTs(NOW - 8 * DAY).build().lastUsed(NOW));
+        assertEquals("q", row().seenTs(NOW - 90 * DAY).build().lastUsed(NOW));
+        assertEquals("old", row().seenTs(NOW - 91 * DAY).build().lastUsed(NOW));
+    }
 
+    @Test
+    public void everyFlagIsOneRuleOverTheRowsFacts() {
+        ArgusInventoryRow shadowWithData = row().shadow(true).sensitive(true).build();
+        assertTrue(shadowWithData.matchesFlag("comboShadow"));
+        assertTrue("shadow alone is not the combination", !row().shadow(true).build().matchesFlag("comboShadow"));
+        assertTrue(row().exposed(true).dangerous(true).build().matchesFlag("comboExposed"));
+        assertTrue(row().dormant(true).privileged(2).build().matchesFlag("comboDormant"));
+        assertTrue(row().unreviewed(true).privileged(2).build().matchesFlag("comboUnreviewed"));
+        assertTrue(row().policies(0).build().matchesFlag("noPolicy"));
+        assertTrue(row().build().matchesFlag("noTeam"));
+        assertTrue("an unknown flag matches nothing", !row().build().matchesFlag("nope"));
+    }
+
+    @Test
+    public void postureIsAtRiskOnlyWithAHighScoreAndTraffic() {
+        assertEquals(ArgusInventoryRow.AT_RISK, row().risk(80).build().posture());
+        assertEquals("a high score with no traffic needs attention", ArgusInventoryRow.ATTENTION, row().risk(80).dormant(true).build().posture());
+        assertEquals("a warning sign needs attention", ArgusInventoryRow.ATTENTION, row().risk(10).exposed(true).build().posture());
+        assertEquals("no policy needs attention", ArgusInventoryRow.ATTENTION, row().risk(10).policies(0).build().posture());
+        assertEquals(ArgusInventoryRow.HEALTHY, row().risk(10).build().posture());
+    }
+
+    @Test
+    public void anUnknownFlagOnThePageMatchesNothing() {
         ArgusInventoryService inv = inventory(Collections.singletonList(agent(1, "a", 50, 90)), true, seenToday(1), new HashMap<>());
         ArgusInventoryService.Query unknown = query();
         unknown.setFlag("nope");
