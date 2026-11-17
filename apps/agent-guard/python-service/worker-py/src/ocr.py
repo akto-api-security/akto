@@ -1,7 +1,7 @@
 """Image OCR for POST /ocr: the image goes to the providers in OCR_MODEL_CONFIG_JSON, in order.
 
 A provider is configured, not coded. OCR_MODEL_CONFIG_JSON is a JSON list; each item is a built-in preset by name
-("gemma", "azure_vision") or an "http" entry describing one call, e.g.
+("gemma", "azure_vision"), "arbiter", or an "http" entry describing one call, e.g.
 
     {"provider": "http", "name": "google_vision",
      "url": "https://vision.googleapis.com/v1/images:annotate",
@@ -11,7 +11,12 @@ A provider is configured, not coded. OCR_MODEL_CONFIG_JSON is a JSON list; each 
      "timeoutMs": 30000}
 
 The first entry that answers wins; one that fails or times out falls through to the next. Unset, the list is
-["gemma"]. Only an HTTP 200 counts as an answer.
+["gemma"] when OCR_GEMMA_URL is set, else ["arbiter"]. Only an HTTP 200 counts as an answer.
+
+"arbiter" (or {"provider": "arbiter", "timeoutMs": ...}) reads the image with the FINAL_ARBITER model of the scan
+config (DEFAULT_MODEL_CONFIG_JSON, else the built-in default), with its FINAL_ARBITER_BACKUP as fallback, using that
+model's own credentials. Its provider must take image input (OpenAI-compatible, Foundry or Bedrock Mantle) and the
+model must read images; otherwise the entry is skipped.
 
 Placeholders, in the url, header values and body strings:
   ${image_bytes}  the raw image, as the whole body (the default body)
@@ -43,6 +48,9 @@ import httpx
 import alerts
 import http_client
 import metrics_push
+from constants import get_default_config
+from model_map import build_arbiter
+from providers import reads_images
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -57,13 +65,14 @@ _PLACEHOLDER = re.compile(r"\$\{([A-Za-z0-9_]+)\}")
 _PATH_TOKEN = re.compile(r"[^.\[\]]+|\[\d*\]")
 
 # Asked for nothing, Gemma 4 answers "nothing", "empty message" or invents a JSON box for an image with no text;
-# a fixed marker it gives reliably, mapped to empty text by "noText".
-_GEMMA_NO_TEXT = "NO_TEXT"
-_GEMMA_INSTRUCTION = (
+# a fixed marker it gives reliably, mapped to empty text by "noText". Used for every chat-model reader.
+_NO_TEXT = "NO_TEXT"
+_INSTRUCTION = (
     "Transcribe the text that appears in this image, exactly as written, one line per line. "
     "Reply with the transcribed text only: no commentary, labels, code fences, JSON or coordinates. "
-    f"If the image contains no text, reply with exactly {_GEMMA_NO_TEXT} and nothing else."
+    f"If the image contains no text, reply with exactly {_NO_TEXT} and nothing else."
 )
+_MAX_TEXT_TOKENS = 4096
 PRESETS: dict[str, dict[str, Any]] = {
     # Gemma on an OpenAI-compatible chat endpoint (vLLM / Foundry) that accepts image input.
     "gemma": {
@@ -74,18 +83,18 @@ PRESETS: dict[str, dict[str, Any]] = {
         "body": {
             "model": "${OCR_GEMMA_MODEL}",
             "temperature": 0,
-            "max_tokens": 4096,
+            "max_tokens": _MAX_TEXT_TOKENS,
             "messages": [
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": _GEMMA_INSTRUCTION},
+                        {"type": "text", "text": _INSTRUCTION},
                         {"type": "image_url", "image_url": {"url": "data:${image_mime};base64,${image_b64}"}},
                     ],
                 }
             ],
         },
-        "text": {"path": "choices[0].message.content", "noText": _GEMMA_NO_TEXT},
+        "text": {"path": "choices[0].message.content", "noText": _NO_TEXT},
     },
     # Azure Computer Vision OCR v3.2, the call guardrails-service makes directly today (azure_vision.go).
     "azure_vision": {
@@ -97,7 +106,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "text": {"path": "regions[].lines[]", "join": "\n", "each": {"path": "words[].text", "join": " "}},
     },
 }
-_DEFAULT_LIST: list[Any] = ["gemma"]
+_ARBITER = "arbiter"
 
 
 class NotConfigured(Exception):
@@ -256,10 +265,41 @@ class HttpOCR:
         return "" if text.strip() == self.text.get("noText") else text
 
 
+class ArbiterOCR:
+    """The scan config's FINAL_ARBITER model (and its backup) reading the image."""
+
+    def __init__(self, provider: Any):
+        self.provider = provider
+        self.name = f"{_ARBITER}:{provider.name}"
+
+    def redact(self, message: str) -> str:
+        return message  # the provider's keys are never in its errors (providers.py redacts its own logs)
+
+    async def extract_text(self, image: bytes) -> str:
+        text = await self.provider.complete_with_image(
+            _INSTRUCTION, base64.b64encode(image).decode(), image_mime(image), _MAX_TEXT_TOKENS
+        )
+        return "" if text.strip() == _NO_TEXT else text
+
+
+def _build_arbiter_ocr() -> ArbiterOCR | None:
+    provider = build_arbiter(get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)["modelConfigs"])
+    if provider is None:
+        logger.warning("[OCR] arbiter: no usable FINAL_ARBITER entry in the model config, skipped")
+        return None
+    if not reads_images(provider):
+        logger.warning(
+            f"[OCR] arbiter: {provider.name} can't take image input, skipped "
+            "(set OCR_MODEL_CONFIG_JSON to an OCR provider)"
+        )
+        return None
+    return ArbiterOCR(provider)
+
+
 def _entries() -> list[Any]:
     raw = settings.env_value("OCR_MODEL_CONFIG_JSON").strip()
     if not raw:
-        return _DEFAULT_LIST
+        return ["gemma"] if settings.env_value("OCR_GEMMA_URL") else [_ARBITER]
     try:
         entries = json.loads(raw)
     except ValueError:
@@ -270,7 +310,9 @@ def _entries() -> list[Any]:
     return []
 
 
-def build_ocr_provider(entry: Any) -> HttpOCR | None:
+def build_ocr_provider(entry: Any) -> HttpOCR | ArbiterOCR | None:
+    if entry == _ARBITER or (isinstance(entry, dict) and str(entry.get("provider") or "").strip().lower() == _ARBITER):
+        return _build_arbiter_ocr()
     if isinstance(entry, str):
         if entry not in PRESETS:
             logger.warning(f"[OCR] unknown preset {entry!r} (known: {sorted(PRESETS)}), skipped")
