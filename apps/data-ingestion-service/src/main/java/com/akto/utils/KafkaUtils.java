@@ -39,7 +39,13 @@ public class KafkaUtils {
         // Rewrite before publish so guardrail activity Actor is the identity, not the placeholder.
         BedrockIdentityActor.apply(payload);
         BasicDBObject obj = buildMessageObject(payload);
-        topicPublisher.publish(obj.toString(), API_LOGS_TOPIC, publishToGuardrails);
+        topicPublisher.publish(obj.toString(), primaryTopic(), publishToGuardrails);
+    }
+
+    /** This deployment's traffic topic, or the mapped account's topic for a rerouted token's request. */
+    static String primaryTopic() {
+        TokenReroutes.Route route = TokenReroutes.current();
+        return route != null ? route.kafkaTopic : API_LOGS_TOPIC;
     }
 
     /**
@@ -48,7 +54,7 @@ public class KafkaUtils {
      * @param payload The ingestion data batch
      * @return BasicDBObject containing all payload fields
      */
-    private static BasicDBObject buildMessageObject(IngestDataBatch payload) {
+    static BasicDBObject buildMessageObject(IngestDataBatch payload) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("path", payload.getPath());
         obj.put("requestHeaders", payload.getRequestHeaders());
@@ -62,7 +68,9 @@ public class KafkaUtils {
         obj.put("statusCode", payload.getStatusCode());
         obj.put("type", payload.getType());
         obj.put("status", payload.getStatus());
-        obj.put("akto_account_id", payload.getAkto_account_id());
+        // A rerouted token's traffic belongs to its mapped account, whatever account the caller sent.
+        TokenReroutes.Route route = TokenReroutes.current();
+        obj.put("akto_account_id", route != null ? String.valueOf(route.accountId) : payload.getAkto_account_id());
         obj.put("akto_vxlan_id", payload.getAkto_vxlan_id());
         obj.put("is_pending", payload.getIs_pending());
         obj.put("source", payload.getSource());
