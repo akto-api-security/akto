@@ -615,5 +615,6 @@ public class DaoInit {
         SmartTestingRunDao.instance.createIndicesIfAbsent();
         SmartTestingEventDao.instance.createIndicesIfAbsent();
         SmartTestingMessageDao.instance.createIndicesIfAbsent();
+        ApiTokensDao.instance.createIndicesIfAbsent();
     }
 }
