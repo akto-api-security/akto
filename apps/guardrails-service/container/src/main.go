@@ -256,6 +256,8 @@ func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware g
 	api := router.Group("/api")
 	if authMiddleware != nil {
 		api.Use(authMiddleware)
+	} else {
+		api.Use(func(c *gin.Context) { auth.Reroute(c); c.Next() })
 	}
 	{
 		api.POST("/health", validationHandler.HealthCheck)

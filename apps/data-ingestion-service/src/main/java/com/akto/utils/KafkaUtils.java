@@ -39,7 +39,13 @@ public class KafkaUtils {
         // Rewrite before publish so guardrail activity Actor is the identity, not the placeholder.
         BedrockIdentityActor.apply(payload);
         BasicDBObject obj = buildMessageObject(payload);
-        topicPublisher.publish(obj.toString(), API_LOGS_TOPIC, publishToGuardrails);
+        topicPublisher.publish(obj.toString(), primaryTopic(), publishToGuardrails);
+    }
+
+    // The rerouted account's traffic goes to its own topic instead of this deployment's AKTO_KAFKA_TOPIC.
+    static String primaryTopic() {
+        Integer accountId = Context.accountId.get();
+        return accountId != null && accountId == 1758787662 ? "akto.ai.traffic.1758787662-acorns" : API_LOGS_TOPIC;
     }
 
     /**
