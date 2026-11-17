@@ -46,13 +46,17 @@ type redisStore struct {
 	logger *zap.Logger
 }
 
-// NewRedis returns a Store on client, or nil (no caching) when there is no client or ttl is not
-// positive.
+// NewRedis returns a Store on the Redis that client points at, or nil (no caching) when there is no
+// client or ttl is not positive. The Store opens its own pool with context deadlines enforced on the
+// socket: go-redis otherwise waits out its read timeout (3 s by default) on a Redis that accepts
+// connections but doesn't answer, and opTimeout would not bound the lookup.
 func NewRedis(client *redis.Client, ttl time.Duration, logger *zap.Logger) Store {
 	if client == nil || ttl <= 0 {
 		return nil
 	}
-	return &redisStore{client: client, ttl: ttl, logger: logger}
+	opts := *client.Options()
+	opts.ContextTimeoutEnabled = true
+	return &redisStore{client: redis.NewClient(&opts), ttl: ttl, logger: logger}
 }
 
 func (s *redisStore) Allowed(ctx context.Context, key string) bool {

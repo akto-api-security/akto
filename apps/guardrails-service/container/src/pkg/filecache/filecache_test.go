@@ -2,6 +2,7 @@ package filecache
 
 import (
 	"context"
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -41,6 +42,37 @@ func TestUnreachableRedisIsAMiss(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Fatalf("lookup took %v; it must give up quickly", elapsed)
+	}
+}
+
+// A Redis that accepts connections but never answers (paused, overloaded) must still read as a
+// miss within opTimeout, not after go-redis's 3 s read timeout.
+func TestHangingRedisIsAFastMiss(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			defer conn.Close() // hold it open, say nothing
+		}
+	}()
+	client := redis.NewClient(&redis.Options{Addr: listener.Addr().String(), MaxRetries: -1})
+	defer client.Close()
+	store := NewRedis(client, time.Hour, zap.NewNop())
+
+	start := time.Now()
+	if store.Allowed(context.Background(), "k") {
+		t.Fatal("a hanging Redis must read as a miss")
+	}
+	store.Remember(context.Background(), "k")
+	if elapsed := time.Since(start); elapsed > 4*opTimeout {
+		t.Fatalf("lookup + write took %v against a hanging Redis; each must give up after %v", elapsed, opTimeout)
 	}
 }
 
