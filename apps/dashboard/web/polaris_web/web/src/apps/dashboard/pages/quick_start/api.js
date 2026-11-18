@@ -138,6 +138,14 @@ const api = {
         })
     },
 
+    createAuthToken(name, scope, expiryTimeInMonth) {
+        return request({
+            url: '/api/createAuthToken',
+            method: 'post',
+            data: {name, scope, expiryTimeInMonth}
+        })
+    },
+
     fetchModuleTypes() {
         return request({
             url: '/api/fetchModuleTypes',

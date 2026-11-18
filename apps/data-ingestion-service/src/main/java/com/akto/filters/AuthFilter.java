@@ -137,6 +137,14 @@ public class AuthFilter implements Filter {
                 writeUnauthorized(httpServletResponse, "The access token is not valid for this deployment");
                 return;
             }
+            RevokedTokenPoller revokedTokens = RevokedTokenPoller.getInstance();
+            revokedTokens.ensureStarted();
+            String tokenId = RevokedTokenPoller.tokenIdOf(claims.getBody(), accessTokenFromRequest);
+            if (revokedTokens.isRevoked(tokenId)) {
+                logger.warn("Blocked request using a token revoked from the dashboard: {}", tokenId);
+                writeUnauthorized(httpServletResponse, "The access token has been revoked");
+                return;
+            }
             Context.accountId.set(tokenAccountId);
         } catch (Exception e) {
             logger.error("Authentication failed: {}", e.getMessage());

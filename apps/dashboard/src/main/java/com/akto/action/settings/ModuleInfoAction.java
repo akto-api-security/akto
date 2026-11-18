@@ -4,11 +4,13 @@ import com.akto.utils.ArgusCollectionScope;
 import com.akto.action.AgenticObserveAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AgentUsersDao;
+import com.akto.dao.AuthTokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.AgenticUsers;
+import com.akto.dto.AuthToken;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.monitoring.InstalledAppVulnerability;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -306,6 +308,7 @@ public class ModuleInfoAction extends UserAction {
         int sk = Math.max(skip, 0);
 
         moduleInfos = aggregateEndpointShieldModules(filter, groupId, Context.now(), statuses, finalSort, sk, lim);
+        hideTokenIds(moduleInfos);
 
         filterEnvironmentVariables(moduleInfos);
         allowedEnvFields = computeAllowedEnvFields();
@@ -716,6 +719,7 @@ public class ModuleInfoAction extends UserAction {
             ad.put("mcpServerCollectionNames", collectionNames);
         }
 
+        hideTokenIds(infos);
         moduleInfos = infos;
         return SUCCESS.toUpperCase();
     }
@@ -797,6 +801,8 @@ public class ModuleInfoAction extends UserAction {
 
         Bson finalFilter = filters.isEmpty() ? Filters.empty() : Filters.and(filters);
         moduleInfos = ModuleInfoDao.instance.findAll(finalFilter);
+        markRevokedTokens(moduleInfos);
+        hideTokenIds(moduleInfos);
 
         // Filter environment variables to only expose whitelisted keys
         filterEnvironmentVariables(moduleInfos);
@@ -819,6 +825,40 @@ public class ModuleInfoAction extends UserAction {
 
     public List<Map<String, String>> getAllowedEnvFields() {
         return allowedEnvFields;
+    }
+
+    // Flags modules whose auth token is revoked, in memory only and without exposing token details.
+    private void markRevokedTokens(List<ModuleInfo> modules) {
+        if (modules == null) {
+            return;
+        }
+        try {
+            Set<String> tokenIds = modules.stream().map(ModuleInfo::getTokenId).filter(Objects::nonNull).collect(Collectors.toSet());
+            if (tokenIds.isEmpty()) {
+                return;
+            }
+            Set<String> revoked = AuthTokensDao.instance.findAll(
+                    Filters.and(Filters.in(AuthToken.ID, tokenIds), Filters.eq(AuthToken.STATUS, AuthToken.STATUS_REVOKED)),
+                    Projections.include(AuthToken.ID)).stream().map(AuthToken::getId).collect(Collectors.toSet());
+            for (ModuleInfo module : modules) {
+                if (module.getTokenId() == null || !revoked.contains(module.getTokenId())) {
+                    continue;
+                }
+                if (module.getAdditionalData() == null) {
+                    module.setAdditionalData(new HashMap<>());
+                }
+                module.getAdditionalData().put("tokenRevoked", true);
+            }
+        } catch (Exception e) {
+            statsLogger.errorAndAddToDb(e, "Failed to flag revoked module tokens: " + e.getMessage());
+        }
+    }
+
+    // The token id is only a server-side join key, so it never reaches the browser.
+    private static void hideTokenIds(List<ModuleInfo> modules) {
+        if (modules != null) {
+            modules.forEach(module -> module.setTokenId(null));
+        }
     }
 
     private List<Map<String, String>> computeAllowedEnvFields() {

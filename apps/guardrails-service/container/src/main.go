@@ -158,6 +158,7 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 	acc := metrics.NewAccumulator()
 	dbClient := dbabstractor.NewClient(logger)
 	go metricsFlushLoop(dbClient, logger, acc)
+	dbClient.StartHeartbeat(context.Background(), dbabstractor.HeartbeatInterval)
 
 	if cfg.NhiEnabled {
 		// One Publisher is shared by every Source. Adding new sources later
@@ -185,7 +186,8 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 
 	var authMiddleware gin.HandlerFunc
 	if cfg.AuthEnabled {
-		m, err := auth.NewMiddleware(cfg.RSAPublicKey, logger)
+		revoked := auth.StartRevocationPoller(context.Background(), logger, cfg.DatabaseAbstractorURL, auth.GetDatabaseAbstractorServiceToken)
+		m, err := auth.NewMiddlewareWithRevocation(cfg.RSAPublicKey, logger, revoked)
 		if err != nil {
 			logger.Fatal("Failed to initialize auth middleware", zap.Error(err))
 		}

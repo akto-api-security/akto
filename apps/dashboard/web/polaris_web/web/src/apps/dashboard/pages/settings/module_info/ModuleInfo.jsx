@@ -6,6 +6,7 @@ import func from "@/util/func";
 import ModuleEnvConfigComponent from "../health_logs/ModuleEnvConfig"
 import EmptyCard from "../../dashboard/new_components/EmptyCard"
 import { usePermissions, whenAllowed } from "@/util/permissions"
+import { maskedToken } from "./maskedToken"
 
 // A restart writes a new module_info row while the previous heartbeat stays inside the
 // 5-minute fetch window. Same module type + name is the same instance; keep the latest start.
@@ -42,6 +43,9 @@ const ModuleInfo = () => {
     const [ selectedModules, setSelectedModules ] = useState([])
     const [ modalActive, setModalActive ] = useState(false)
     const [ selectedModule, setSelectedModule ] = useState(null)
+    const [ tokenByModuleId, setTokenByModuleId ] = useState({})
+    // only admins can list tokens, so only they get the Token column
+    const canSeeTokens = canCall('api/fetchAuthTokens')
 
     const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'AKTO_AGENT_GATEWAY', 'THREAT_DETECTION', 'MINI_RUNTIME'];
     const VIEWABLE_MODULE_TYPES = [...CONFIGURABLE_MODULE_TYPES, 'MINI_TESTING'];
@@ -56,6 +60,22 @@ const ModuleInfo = () => {
     useEffect(() => {
         fetchModuleInfo()
     }, [])
+
+    const fetchTokens = async () => {
+        try {
+            const response = await settingRequests.fetchAuthTokens();
+            // each token lists the modules using it, so module rows never need to carry a token id
+            const byModule = {};
+            (response?.authTokens || []).forEach(token => (token.modules || []).forEach(module => { byModule[module.id] = token }));
+            setTokenByModuleId(byModule);
+        } catch (e) {
+            // the Token column just stays empty if the list can't be loaded
+        }
+    }
+
+    useEffect(() => {
+        if (canSeeTokens) fetchTokens()
+    }, [canSeeTokens])
 
     const handleRebootModules = async (deleteTopicAndReboot) => {
         if (selectedModules.length === 0) {
@@ -128,6 +148,13 @@ const ModuleInfo = () => {
     const sortedModuleInfos = latestModuleInstances(moduleInfos)
         .sort((a, b) => (b.lastHeartbeatReceived || 0) - (a.lastHeartbeatReceived || 0));
 
+    // token name and its last characters, so the module can be matched to a row in the Tokens tab
+    const tokenCell = (module) => {
+        const token = tokenByModuleId[module.id]
+        if (!token) return '-'
+        return token.hint ? `${token.name} (${maskedToken(token.hint)})` : token.name
+    }
+
     const moduleInfoRows = sortedModuleInfos.map(module => {
         const isEligible = canRebootModule(module);
         const isSelected = selectedModules.includes(module.id);
@@ -151,7 +178,15 @@ const ModuleInfo = () => {
                         <span>{module.name || '-'}</span>
                     </span>
                 </Tooltip>
+            ) : module.additionalData?.tokenRevoked ? (
+                <Tooltip content="Token revoked. Generate a new token and redeploy this module.">
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Icon source={AlertMinor} color="critical" />
+                        <span>{module.name || '-'}</span>
+                    </span>
+                </Tooltip>
             ) : (module.name || '-'),
+            ...(canSeeTokens ? [tokenCell(module)] : []),
             module.currentVersion || '-',
             func.epochToDateTime(module.startedTs),
             func.epochToDateTime(module.lastHeartbeatReceived),
@@ -189,6 +224,7 @@ const ModuleInfo = () => {
                         columnContentTypes={[
                             'text',
                             'text',
+                            ...(canSeeTokens ? ['text'] : []),
                             'text',
                             'text',
                             'text',
@@ -198,6 +234,7 @@ const ModuleInfo = () => {
                         headings={[
                             'Type',
                             'Name',
+                            ...(canSeeTokens ? ['Token'] : []),
                             'Version',
                             'Started At',
                             'Last Heartbeat',

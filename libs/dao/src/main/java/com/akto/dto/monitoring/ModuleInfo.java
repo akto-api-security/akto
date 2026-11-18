@@ -36,6 +36,11 @@ public class ModuleInfo {
     private boolean deleteTopicAndReboot;
     public static final String DELETE_TOPIC_AND_REBOOT = "deleteTopicAndReboot";
 
+    // id of the auth token the module heartbeats with, stamped by cyborg from the verified token
+    public static final String TOKEN_ID = "tokenId";
+    @Getter @Setter
+    private String tokenId;
+
     public static final String MINI_RUNTIME_NAME = "miniRuntimeName";
 
     @Getter @Setter
