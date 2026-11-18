@@ -8,6 +8,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.upload.FileUpload;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
@@ -200,10 +201,11 @@ public class AgentImportAction extends UserAction{
             ApiCollectionsDao.instance.getMCollection()
                 .findOneAndUpdate(
                     Filters.eq(ApiCollection.ID, collectionId), 
-                    Updates.addToSet(ApiCollection.TAGS_STRING, tagsList.get(0)), 
+                    Updates.addToSet(ApiCollection.TAGS_STRING, tagsList.get(0)),
                     updateOptions
                 );
-                
+            UsersCollectionsList.deleteContextCollectionsForAccount(Context.accountId.get());
+
             loggerMaker.info("Added Gen AI tag to collection ID: " + collectionId, LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.error("Error adding Gen AI tag to collection: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);

@@ -2,6 +2,7 @@ package com.akto.dto.rbac;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -129,6 +130,28 @@ public class TestContextCollectionsCache extends MongoBasedTest {
             UsersCollectionsList.deleteContextCollectionsForUser(otherAccount, CONTEXT_SOURCE.API);
             Context.accountId.set(ACCOUNT_ID);
         }
+    }
+
+    @Test
+    public void mismatchedAccountIsNeverCached() {
+        Set<Integer> first = UsersCollectionsList.getContextCollectionsForUser(ACCOUNT_ID + 1, CONTEXT_SOURCE.API);
+        seed(SECOND_ID, "payments-api", null);
+        Set<Integer> second = UsersCollectionsList.getContextCollectionsForUser(ACCOUNT_ID + 1, CONTEXT_SOURCE.API);
+
+        assertFalse(first.contains(SECOND_ID));
+        assertTrue(second.contains(SECOND_ID));
+    }
+
+    @Test
+    public void deletingForAnAccountClearsEverySource() {
+        seed(MCP_ID, "tools-mcp", Constants.AKTO_MCP_SERVER_TAG);
+        Set<Integer> api = UsersCollectionsList.getContextCollectionsForUser(ACCOUNT_ID, CONTEXT_SOURCE.API);
+        Set<Integer> mcp = UsersCollectionsList.getContextCollectionsForUser(ACCOUNT_ID, CONTEXT_SOURCE.MCP);
+
+        UsersCollectionsList.deleteContextCollectionsForAccount(ACCOUNT_ID);
+
+        assertNotSame(api, UsersCollectionsList.getContextCollectionsForUser(ACCOUNT_ID, CONTEXT_SOURCE.API));
+        assertNotSame(mcp, UsersCollectionsList.getContextCollectionsForUser(ACCOUNT_ID, CONTEXT_SOURCE.MCP));
     }
 
     @Test

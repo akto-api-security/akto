@@ -21,6 +21,7 @@ import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.testing.*;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -193,6 +194,7 @@ public class AktoJaxAction extends UserAction {
                         Updates.set(ApiCollection.TAGS_STRING, Collections.singletonList(
                                 new CollectionTags(Context.now(), Constants.AKTO_DAST_TAG, "DAST", TagSource.USER))),
                             new UpdateOptions().upsert(false));
+                UsersCollectionsList.deleteContextCollectionsForAccount(Context.accountId.get());
                 loggerMaker.infoAndAddToDb("Updated Collection with tag: " + collectionId);
             }
 

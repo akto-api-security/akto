@@ -16,6 +16,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -116,6 +117,7 @@ public class MCPScanAction extends UserAction {
             createdCollection = ApiCollectionsDao.instance.getMCollection()
                 .findOneAndUpdate(
                     Filters.eq(ApiCollection.ID, createdCollection.getId()), updates, updateOptions);
+            UsersCollectionsList.deleteContextCollectionsForAccount(Context.accountId.get());
 
 
             // Create APIConfig for MCP tools sync job
