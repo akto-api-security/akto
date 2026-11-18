@@ -41,7 +41,7 @@ COPY gzip.ini ${JETTY_BASE}/start.d/gzip.ini
 
 RUN useradd jetty && chown -R jetty:jetty ${JETTY_HOME} ${JETTY_BASE}
 
-ENV JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError"
+ENV JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError -XX:-UseBASE64Intrinsics"
 WORKDIR ${JETTY_BASE}
 EXPOSE 9000
 
