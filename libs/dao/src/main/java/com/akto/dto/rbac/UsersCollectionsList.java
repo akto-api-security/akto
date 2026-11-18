@@ -205,7 +205,8 @@ public class UsersCollectionsList {
         Set<Integer> collectionList = new HashSet<>();
 
         if (collectionIdEntry == null || (Context.now() - collectionIdEntry.getSecond() > CONTEXT_EXPIRY_TIME)) {
-            collectionList = getContextCollections(source);
+            collectionList = Collections.unmodifiableSet(getContextCollections(source));
+            contextCollectionsMap.put(key, new Pair<>(collectionList, Context.now()));
         } else {
             collectionList = collectionIdEntry.getFirst();
         }
