@@ -23,6 +23,9 @@ public class ModuleInfo {
     // set by the heartbeat writer in cyborg; module_info has a TTL index on it
     public static final String EXPIRES_AT = "expiresAt";
     private Map<String, Object> additionalData;
+    public static final String MINI_RUNTIME_NAME = "miniRuntimeName";
+    @Getter @Setter
+    private String miniRuntimeName;
 
     @Getter @Setter
     private boolean reboot;
