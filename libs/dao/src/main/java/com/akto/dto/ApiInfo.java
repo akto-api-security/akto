@@ -92,6 +92,9 @@ public class ApiInfo {
     public static final String IS_SKILL_BLOCKED = "isSkillBlocked";
     private boolean isSkillBlocked;
 
+    public static final String IS_CONNECTION_STRING = "isConnectionString";
+    private boolean isConnectionString;
+
     public static final String TAGS_LIST = "tagsList";
     // private List<ApiInfoTag> tagsList;
 
@@ -437,6 +440,8 @@ public class ApiInfo {
         // Merge rateLimitConfidence - take the maximum confidence
         this.rateLimitConfidence = Math.max(this.rateLimitConfidence, that.rateLimitConfidence);
 
+        this.isConnectionString = this.isConnectionString || that.isConnectionString;
+
         // Merge tagsList — union; compare on keyName+value only (ignore timestamp/source)
         if (that.tagsList != null && !that.tagsList.isEmpty()) {
             if (this.tagsList == null) {
@@ -778,6 +783,9 @@ public class ApiInfo {
 
     public boolean getIsSkillBlocked() { return isSkillBlocked; }
     public void setIsSkillBlocked(boolean isSkillBlocked) { this.isSkillBlocked = isSkillBlocked; }
+
+    public boolean getIsConnectionString() { return isConnectionString; }
+    public void setIsConnectionString(boolean isConnectionString) { this.isConnectionString = isConnectionString; }
 
     public GuardrailSchema getGuardrailSchema() { return guardrailSchema; }
     public void setGuardrailSchema(GuardrailSchema guardrailSchema) { this.guardrailSchema = guardrailSchema; }

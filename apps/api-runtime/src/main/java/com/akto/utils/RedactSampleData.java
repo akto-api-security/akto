@@ -356,7 +356,25 @@ public class RedactSampleData {
         m.put("direction", httpResponseParams.getDirection());
         m.put("is_pending", httpResponseParams.getIsPending() + "");
         m.put("source", httpResponseParams.getSource());
+        enrichWebSocketEventsFromOrig(m, httpResponseParams);
         return m;
+    }
+
+    // A WebSocket sample is shown from its "events" (the frame), which only the original message has; same as mini-runtime
+    private static void enrichWebSocketEventsFromOrig(Map<String, Object> m, HttpResponseParams httpResponseParams) {
+        if (!"WEBSOCKET".equalsIgnoreCase(httpResponseParams.getType())) return;
+
+        String orig = httpResponseParams.getOrig();
+        if (orig == null || orig.isEmpty()) return;
+
+        try {
+            JSONObject jsonObject = JSON.parseObject(orig);
+            if (jsonObject.containsKey("events")) {
+                m.put("events", jsonObject.get("events"));
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "unable to enrich WebSocket sample from orig");
+        }
     }
 
     public static String convertHttpRespToOriginalString(HttpResponseParams httpResponseParams) throws JsonProcessingException {
