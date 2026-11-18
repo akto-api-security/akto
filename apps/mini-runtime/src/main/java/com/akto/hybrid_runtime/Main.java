@@ -273,16 +273,15 @@ public class Main {
      * and the detection corrector creates its own candidate topic.
      */
     static List<String> localKafkaTopics() {
-        List<String> topics = new ArrayList<>(Arrays.asList(
+        // The threat topic is always included: collectors send threat traffic by default
+        // (AKTO_THREAT_ENABLED), whether or not this runtime forwards traffic to threat detection.
+        return Arrays.asList(
                 KafkaConfig.getTopicName(),    // traffic from the traffic collectors
                 getLogTopicName(),             // traffic collector logs
                 HEARTBEAT_TOPIC_NAME,          // traffic collector heartbeats
                 CONFIG_UPDATE_TOPIC_NAME,      // config updates for traffic collectors
-                Kafka.PING_TOPIC));            // local producer startup check
-        if (isProtoKafkaEnabled()) {
-            topics.add(THREAT_TOPIC_NAME);     // traffic for threat detection
-        }
-        return topics;
+                Kafka.PING_TOPIC,              // local producer startup check
+                THREAT_TOPIC_NAME);            // traffic for threat detection
     }
 
     /**
