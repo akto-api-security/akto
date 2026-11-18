@@ -6,6 +6,7 @@ both must produce the identical Authorization header. The role half covers
 EKS Pod Identity / ECS (container endpoint) and IRSA (STS web identity).
 """
 
+import asyncio
 import hashlib
 import time
 from datetime import UTC, datetime
@@ -152,10 +153,12 @@ class _FakeClient:
     get_payload: dict = {}
     get_status = 200
     get_text = ""
+    get_delay_s = 0.0
     post_text = ""
 
     async def get(self, url, headers=None, timeout=None):
         _FakeClient.calls.append({"method": "GET", "url": url, "headers": headers})
+        await asyncio.sleep(_FakeClient.get_delay_s)
         return _FakeResponse(
             payload=_FakeClient.get_payload, text=_FakeClient.get_text, status_code=_FakeClient.get_status
         )
@@ -172,6 +175,7 @@ def role_env(monkeypatch):
     _FakeClient.calls = []
     _FakeClient.get_status = 200
     _FakeClient.get_text = ""
+    _FakeClient.get_delay_s = 0.0
     _FakeClient.get_payload = {
         "AccessKeyId": "ASIAPOD",
         "SecretAccessKey": "pod-secret",
@@ -180,10 +184,17 @@ def role_env(monkeypatch):
     }
     _FakeClient.post_text = _STS_XML.format(expiration=_LATER)
     aws_auth._ROLE_CACHE.clear()
+    aws_auth._ROLE_FETCH.clear()
     monkeypatch.setattr(aws_auth.settings, "BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC", "")
-    monkeypatch.setattr(aws_auth.http_client, "get_client", lambda: _FakeClient())
+    monkeypatch.setattr(aws_auth.http_client, "get_credentials_client", lambda: _FakeClient())
+
+    def _shared_pool_forbidden():
+        raise AssertionError("credential fetches must not use the shared model-call pool")
+
+    monkeypatch.setattr(aws_auth.http_client, "get_client", _shared_pool_forbidden)
     yield monkeypatch
     aws_auth._ROLE_CACHE.clear()
+    aws_auth._ROLE_FETCH.clear()
 
 
 def test_role_source_detection(role_env):
@@ -224,6 +235,39 @@ async def test_refetches_once_refresh_time_passes(role_env):
     creds, _ = aws_auth._ROLE_CACHE[aws_auth._ROLE_CACHE_KEY]
     aws_auth._ROLE_CACHE[aws_auth._ROLE_CACHE_KEY] = (creds, time.time() - 1)  # refresh time reached
     await aws_auth.get_role_credentials("us-east-1")
+    assert len(_FakeClient.calls) == 2
+
+
+async def test_concurrent_callers_share_one_fetch(role_env):
+    role_env.setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://169.254.170.23/v1/credentials")
+    _FakeClient.get_delay_s = 0.05
+    results = await asyncio.gather(*(aws_auth.get_role_credentials("us-east-1") for _ in range(10)))
+    assert len(_FakeClient.calls) == 1
+    assert all(r == results[0] for r in results)
+
+
+async def test_caller_timeout_does_not_cancel_the_fetch(role_env):
+    # The cascade wraps each model call in wait_for(timeoutMs); a fetch slower
+    # than that must still land in the cache for the next caller.
+    role_env.setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://169.254.170.23/v1/credentials")
+    _FakeClient.get_delay_s = 0.2
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(aws_auth.get_role_credentials("us-east-1"), 0.05)
+    creds = await aws_auth.get_role_credentials("us-east-1")  # joins the same fetch
+    assert creds == aws_auth.AwsCredentials("ASIAPOD", "pod-secret", "pod-token")
+    assert len(_FakeClient.calls) == 1
+    assert aws_auth._ROLE_CACHE[aws_auth._ROLE_CACHE_KEY][0] == creds
+
+
+async def test_failed_fetch_is_retried_by_the_next_caller(role_env):
+    role_env.setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://169.254.170.23/v1/credentials")
+    _FakeClient.get_status = 500
+    with pytest.raises(RuntimeError, match="HTTP 500"):
+        await aws_auth.get_role_credentials("us-east-1")
+    _FakeClient.get_status = 200
+    assert await aws_auth.get_role_credentials("us-east-1") == aws_auth.AwsCredentials(
+        "ASIAPOD", "pod-secret", "pod-token"
+    )
     assert len(_FakeClient.calls) == 2
 
 
