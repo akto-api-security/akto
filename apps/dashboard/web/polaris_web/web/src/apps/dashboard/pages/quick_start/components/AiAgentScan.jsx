@@ -4,8 +4,11 @@ import { useState } from 'react'
 import api from '../api';
 import func from "@/util/func"
 import TestRoleDropdown from '../../../components/shared/TestRoleDropdown';
+import MiniTestingSelector from './MiniTestingSelector';
 
 const MAX_HEADERS = 5
+const IMPORT_POLL_INTERVAL_MS = 2000
+const IMPORT_MAX_POLLS = 300
 
 const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.", defaultRequestBody = { "model": "llama3.2", "prompt": "Why is the sky blue?" }, docsLink = "https://docs.akto.io/ai-security" }) => {
     const [loading, setLoading] = useState(false)
@@ -20,6 +23,8 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
     const [customResponseBody, setCustomResponseBody] = useState('')
     const [customResponseStatusCode, setCustomResponseStatusCode] = useState('200')
     const [responseHeaders, setResponseHeaders] = useState([])
+    const [useMiniTesting, setUseMiniTesting] = useState(false)
+    const [miniTestingName, setMiniTestingName] = useState('')
 
     function updateHeaderRow(setList, index, field, val) {
         setList(prev => {
@@ -49,6 +54,22 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
         return Object.keys(obj).length > 0 ? obj : null
     }
 
+    const waitForImport = async (uploadId) => {
+        for (let i = 0; i < IMPORT_MAX_POLLS; i++) {
+            await new Promise(resolve => setTimeout(resolve, IMPORT_POLL_INTERVAL_MS))
+            const res = await api.fetchAgentImportStatus(uploadId)
+            if (res.uploadStatus === 'SUCCEEDED') {
+                return true
+            }
+            if (res.uploadStatus === 'FAILED') {
+                func.setToast(true, true, res.errorMessage || "AI agent import failed.")
+                return false
+            }
+        }
+        func.setToast(true, true, "AI agent import is taking longer than expected. Please check again in a while.")
+        return false
+    }
+
     const handleImport = async () => {
         if (!url || url.length === 0) {
             func.setToast(true, true, "Please enter a valid URL.")
@@ -69,10 +90,16 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                 ? parseInt(customResponseStatusCode, 10)
                 : null
             const customResponseHeadersToSend = useCustomResponse ? headersArrayToObject(responseHeaders) : null
-            await api.importFromUrl(
+            const miniTestingNameToSend = useMiniTesting && !useCustomResponse ? (miniTestingName || null) : null
+            const started = await api.importFromUrl(
                 url, testRoleToSend, requestBodyToSend || null, customHeaders, collectionNameToSend,
-                customResponseBodyToSend, customResponseStatusCodeToSend, customResponseHeadersToSend
+                customResponseBodyToSend, customResponseStatusCodeToSend, customResponseHeadersToSend,
+                miniTestingNameToSend
             )
+            const succeeded = await waitForImport(started.uploadId)
+            if (!succeeded) {
+                return
+            }
             func.setToast(true, false, "AI agent imported successfully.")
             setUrl('')
             setCollectionName('')
@@ -85,6 +112,8 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
             setCustomResponseBody('')
             setCustomResponseStatusCode('200')
             setResponseHeaders([])
+            setUseMiniTesting(false)
+            setMiniTestingName('')
         } finally {
             setLoading(false)
         }
@@ -187,6 +216,16 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                         </Box>
                     )}
                 </VerticalStack>
+
+                {!useCustomResponse && (
+                    <MiniTestingSelector
+                        id="ai-agent-mini-testing"
+                        enabled={useMiniTesting}
+                        setEnabled={setUseMiniTesting}
+                        selected={miniTestingName}
+                        setSelected={setMiniTestingName}
+                    />
+                )}
 
                 <Checkbox
                     label="Use custom response (skip live call)"

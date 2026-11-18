@@ -3,7 +3,6 @@ import GithubServerTable from "@/apps/dashboard/components/tables/GithubServerTa
 import { EmptySearchResult } from "@shopify/polaris";
 import LocalStore from '@/apps/main/LocalStorageStore';
 import api from '../api';
-import { labelMap } from '../../../../main/labelHelperMap';
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import observeApi from '../../observe/api';
@@ -60,27 +59,27 @@ const ACTION_ITEM_TYPES = {
 const getIssueLabel = (actionItemType) => {
     switch (actionItemType) {
         case ACTION_ITEM_TYPES.HIGH_RISK_APIS:
-            return 'High Risk APIs';
+            return 'High Risk ' + mapLabel('APIs', getDashboardCategory());
         case ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS:
             return 'Sensitive Data';
         case ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS:
-            return 'Unauthenticated APIs';
+            return 'Unauthenticated ' + mapLabel('APIs', getDashboardCategory());
         case ACTION_ITEM_TYPES.THIRD_PARTY_APIS:
-            return 'Third-Party APIs';
+            return 'Third-Party ' + mapLabel('APIs', getDashboardCategory());
         case ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY:
             return 'High-Risk Third-Party';
         case ACTION_ITEM_TYPES.SHADOW_APIS:
-            return 'Shadow APIs';
+            return 'Shadow ' + mapLabel('APIs', getDashboardCategory());
         case ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH:
             return 'Sensitive, Unauthenticated';
         case ACTION_ITEM_TYPES.ENHANCE_TESTING_COVERAGE:
-            return 'Not Tested APIs';
+            return 'Not Tested ' + mapLabel('APIs', getDashboardCategory());
         case ACTION_ITEM_TYPES.ENABLE_CONTINUOUS_TESTING:
-            return 'Only Once Tested APIs';
+            return 'Only Once Tested ' + mapLabel('APIs', getDashboardCategory());
         case ACTION_ITEM_TYPES.ADDRESS_MISCONFIGURED_TESTS:
             return 'Misconfigured Tests';
         case ACTION_ITEM_TYPES.VULNERABLE_APIS:
-            return 'Vulnerable APIs';
+            return 'Vulnerable ' + mapLabel('APIs', getDashboardCategory());
         case ACTION_ITEM_TYPES.BROKEN_AUTHENTICATION_ISSUES:
             return 'Broken Authentication Issues';
         case ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS:
@@ -123,8 +122,8 @@ function FlyoutTable({ actionItemType, count }) {
     const collectionIdToName = useMemo(() => func.mapCollectionIdToName(allCollections || []), [allCollections]);
 
     const resourceName = {
-        singular: labelMap[dashboardCategory]["API endpoint"],
-        plural: labelMap[dashboardCategory]["API endpoints"],
+        singular: mapLabel("API endpoint", dashboardCategory),
+        plural: mapLabel("API endpoints", dashboardCategory),
     };
 
     // sensitive params of the endpoints of this page

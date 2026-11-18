@@ -207,7 +207,7 @@ const ThreatReportSummary = ({
                                 <GithubSimpleTable
                                     key="top-apis-table"
                                     data={generateApiTableData(topAttackedApis)}
-                                    resourceName={{ singular: 'API', plural: 'APIs' }}
+                                    resourceName={{ singular: mapLabel('API', getDashboardCategory()), plural: mapLabel('APIs', getDashboardCategory()) }}
                                     headers={[
                                         { title: `${mapLabel("API", getDashboardCategory())} Endpoint`, value: 'endpointComp', textValue: 'endpoint' },
                                         { title: 'Attacks', value: 'attacks', type: CellType.TEXT },

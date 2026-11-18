@@ -3712,6 +3712,22 @@ public class InitializerListener implements ServletContextListener {
     // ModuleInfoAction.fetchAgenticUsers, instead of once per process lifetime like the startup path.
     private static final Set<Integer> attemptedTeamTagsMigrationForAccount = Collections.synchronizedSet(new HashSet<>());
 
+    private static void safeMigrateTestScriptsToLibrary(BackwardCompatibility backwardCompatibility){
+        try {
+            if(backwardCompatibility.getMigrateTestScriptsToLibrary() == 0){
+                int copied = BackwardCompatibilityUtils.migrateTestScriptsToLibrary();
+                BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MIGRATE_TEST_SCRIPTS_TO_LIBRARY, Context.now())
+                );
+                logger.infoAndAddToDb("migrateTestScriptsToLibrary copied " + copied + " script(s)", LogDb.DASHBOARD);
+            }
+        } catch (Exception e) {
+            // flag stays unset, so the next startup retries; runs keep using the legacy fallback meanwhile
+            logger.errorAndAddToDb(e, "error in migrateTestScriptsToLibrary: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
     private static void safeMigrateTeamRoleToDeviceTags(BackwardCompatibility backwardCompatibility){
         try {
             if(backwardCompatibility.getMigrateTeamRoleToDeviceTags() == 0){
@@ -3763,12 +3779,32 @@ public class InitializerListener implements ServletContextListener {
     }
 
 
+    private static final Set<Integer> attemptedTestScriptsMigrationForAccount = Collections.synchronizedSet(new HashSet<>());
+
+    /**
+     * Lazy fallback for safeMigrateTestScriptsToLibrary, called when the Scripts page lists the library,
+     * so an account whose dashboard never ran the startup pass still sees its pre-library script.
+     * At most one attempt per account per process; the migration itself is idempotent.
+     */
+    public static void ensureTestScriptsMigrated(){
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || !attemptedTestScriptsMigrationForAccount.add(accountId)) return;
+        try {
+            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+            if (backwardCompatibility == null) return;
+            safeMigrateTestScriptsToLibrary(backwardCompatibility);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in ensureTestScriptsMigrated: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         // Run first and individually guarded — setBackwardCompatibilities has no per-call isolation,
         // so an unrelated hook throwing further down would otherwise silently prevent every hook
         // after it (including these two) from ever running, with no migration-specific error.
         safeMigrateTeamRoleToDeviceTags(backwardCompatibility);
         safeMigrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
+        safeMigrateTestScriptsToLibrary(backwardCompatibility);
 
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);

@@ -3,8 +3,10 @@ package com.akto.dto.testing.custom_groups;
 import java.util.List;
 import org.bson.conversions.Bson;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingEndpoints;
 import com.mongodb.client.model.Filters;
 
@@ -25,6 +27,11 @@ public class AllAPIsGroup extends TestingEndpoints {
     }
 
     public final static int ALL_APIS_GROUP_ID = 111_111_121;
+
+    public static Bson visibleOwnerFilter(String apiCollectionIdField) {
+        return Filters.in(apiCollectionIdField,
+            UsersCollectionsList.getContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get()));
+    }
 
     @Override
     public Bson createFilters(CollectionType type) {

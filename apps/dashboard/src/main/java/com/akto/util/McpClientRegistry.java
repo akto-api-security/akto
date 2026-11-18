@@ -1,8 +1,11 @@
 package com.akto.util;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -99,6 +102,33 @@ public final class McpClientRegistry {
         register("litellm", "LiteLLM", AI_AGENT);
         register("filesystem", "Filesystem", MCP_SERVER);
         register("universal", "Universal", MCP_SERVER);
+    }
+
+    // AI inventory only (server-side, no JS mirror): agents shown as IDE assistants rather than CLIs.
+    // Keyed by KNOWN_CLIENTS key. Follows the Connectors page's "Agentic IDEs & Apps" category
+    // (quick_start/transform.js agenticIdes), which includes desktop apps (Claude Desktop, Claude
+    // Cowork), plus IDEs it doesn't list yet.
+    private static final Set<String> IDE_ASSISTANT_KEYS = new HashSet<>(Arrays.asList(
+            "cursor", "windsurf", "codeium", "vscode", "vs", "githubcopilot", "vscopilot",
+            "kiroide", "antigravity", "cody", "tabnine", "claude1", "claude_cowork"));
+
+    private static final Pattern WORD_SPLIT_PATTERN = Pattern.compile("[-_.\\s]+");
+
+    // Whole-word match only, unlike findClientInfo's substring fallback ("devstral" isn't "vs").
+    // Takes an agent group key ("claude2", "cursor") or an LLM domain ("chatgpt.com").
+    private static String knownClientKey(String value) {
+        if (value == null || value.isEmpty()) return null;
+        String lower = value.toLowerCase(Locale.ROOT);
+        String resolved = resolveClientKey(lower);
+        if (KNOWN_CLIENTS.containsKey(resolved)) return resolved;
+        for (String part : WORD_SPLIT_PATTERN.split(lower)) {
+            if (KNOWN_CLIENTS.containsKey(part)) return part;
+        }
+        return null;
+    }
+
+    public static boolean isIdeAssistant(String value) {
+        return IDE_ASSISTANT_KEYS.contains(knownClientKey(value));
     }
 
     /** Canonical KNOWN_CLIENTS key for a raw wire-level tag value (identity if not an aliased variant). */

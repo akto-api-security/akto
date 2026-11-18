@@ -1,11 +1,12 @@
 import React from 'react';
 import { getBezierPath, Handle, Position } from 'react-flow-renderer';
 import GetPrettifyEndpoint from '../GetPrettifyEndpoint';
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 export const createCustomEdge = (markerId, strokeColor = 'grey', useColorVariation = false) => {
   return ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) => {
     const edgePath = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
-    const { label, order, param } = data || {};
+    const { label, order, param, width } = data || {};
 
     // Use light grey for swagger dependencies edge lines, grey for sequences
     let edgeColor = strokeColor;
@@ -35,7 +36,7 @@ export const createCustomEdge = (markerId, strokeColor = 'grey', useColorVariati
         </svg>
         <path
           id={id}
-          style={{ ...style, stroke: edgeColor, strokeWidth: useColorVariation ? 2 : 1 }}
+          style={{ ...style, stroke: edgeColor, strokeWidth: width || (useColorVariation ? 2 : 1) }}
           className="react-flow__edge-path"
           d={edgePath}
           markerEnd={`url(#${markerId}-${order || 0})`}
@@ -58,7 +59,7 @@ export const createCustomEdge = (markerId, strokeColor = 'grey', useColorVariati
   };
 };
 
-export const createCustomNode = (borderColor = '#ccc', borderWidth = '1px', handleColor = '#555', boxShadow = '0 1px 3px rgba(0,0,0,0.1)') => {
+export const createCustomNode = (borderColor = '#ccc', borderWidth = '1px', handleColor = '#555', boxShadow = '0 1px 3px rgba(0,0,0,0.1)', horizontal = false) => {
   return ({ data }) => {
     const { method, url, incomingCount, outgoingCount, showCounts, isSelected } = data;
 
@@ -77,7 +78,7 @@ export const createCustomNode = (borderColor = '#ccc', borderWidth = '1px', hand
         minWidth: '200px',
         boxShadow: nodeBoxShadow
       }}>
-        <Handle type="target" position={Position.Top} id="t" style={{ background: handleColor }} />
+        <Handle type="target" position={horizontal ? Position.Left : Position.Top} id="t" style={{ background: handleColor }} />
         {isSelected && (
           <div style={{
             fontSize: '10px',
@@ -87,7 +88,7 @@ export const createCustomNode = (borderColor = '#ccc', borderWidth = '1px', hand
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
           }}>
-            Selected API
+            Selected {mapLabel('API', getDashboardCategory())}
           </div>
         )}
         <GetPrettifyEndpoint
@@ -111,7 +112,7 @@ export const createCustomNode = (borderColor = '#ccc', borderWidth = '1px', hand
             {outgoingCount > 0 && <span>↑ {outgoingCount} out</span>}
           </div>
         )}
-        <Handle type="source" position={Position.Bottom} id="b" style={{ background: handleColor }} />
+        <Handle type="source" position={horizontal ? Position.Right : Position.Bottom} id="b" style={{ background: handleColor }} />
       </div>
     );
   };

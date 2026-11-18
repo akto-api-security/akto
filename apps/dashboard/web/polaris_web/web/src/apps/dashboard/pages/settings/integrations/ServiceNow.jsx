@@ -7,6 +7,7 @@ import DropdownSearch from '../../../components/shared/DropdownSearch'
 import func from "@/util/func"
 import { usePermissions, whenAllowed } from "@/util/permissions"
 import AllowedAction from "../../../components/shared/AllowedAction"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const ServiceNow = () => {
 
@@ -239,7 +240,7 @@ const ServiceNow = () => {
         </LegacyCard>
     )
 
-    let cardContent = "Seamlessly enhance your web application security with ServiceNow integration. Create ServiceNow incidents for API vulnerability issues and view them on the tap of a button"
+    let cardContent = "Seamlessly enhance your web application security with ServiceNow integration. Create ServiceNow incidents for " + mapLabel('API', getDashboardCategory()) + " vulnerability issues and view them on the tap of a button"
 
     return (
         <IntegrationsLayout

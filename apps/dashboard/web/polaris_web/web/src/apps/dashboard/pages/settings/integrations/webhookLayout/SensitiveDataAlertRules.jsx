@@ -2,6 +2,7 @@ import { Button, HorizontalGrid, HorizontalStack, Select, Text, TextField, Verti
 import { DeleteMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react"
 import observeApi from "../../../observe/api"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 // Mirrors SensitiveDataAlertRule.MAX_WINDOW_DAYS. The server rejects anything above it
 // in WebhookAction, so this only saves a round trip - but the two must be changed together.
@@ -70,7 +71,7 @@ function SensitiveDataAlertRules({ rules, setRules }) {
     return (
         <VerticalStack gap="3">
             <Text variant="bodyMd" fontWeight="semibold">
-                Alert when one API collection has more than N events of a data type within the window
+                Alert when one {mapLabel('API', getDashboardCategory())} collection has more than N events of a data type within the window
             </Text>
             {currentRules.map((rule, index) => (
                 <HorizontalGrid key={index} columns="minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto" gap="3" alignItems="end">

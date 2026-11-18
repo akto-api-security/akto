@@ -7,6 +7,8 @@ import { buildResults } from "../palette/resolveCommand"
 import { applyNavigationSideEffects } from "../palette/paletteHelpers"
 import { suggestedPrompts } from "../palette/commandRegistry"
 import useDashboardCategory from "../palette/useDashboardCategory"
+import { parseScriptBlocks } from "../script/scriptBlocks"
+import ScriptCard from "../script/ScriptCard"
 
 // One assistant turn — design_handoff_ask_akto_overlay/README.md, "4. Answer view". No
 // step-by-step trace: /api/chatAndStore returns only the final response, so a trace would have to
@@ -16,12 +18,31 @@ import useDashboardCategory from "../palette/useDashboardCategory"
 // response field, so the model's own confirmation question is the only signal of a pending write.
 const CONFIRM_PATTERN = /\b(confirm|would you like me to (proceed|continue|go ahead)|shall i (proceed|continue|go ahead))\b/i
 
-export default function ChatMessage({ message, userPrompt, skipStreaming, onStreamingComplete, actionState, onReviewAction, onCancelAction, onConfirmAction, onUndoAction, onOpenRoute, onAsk }) {
+export default function ChatMessage({ message, userPrompt, skipStreaming, onStreamingComplete, actionState, onReviewAction, onCancelAction, onConfirmAction, onUndoAction, onOpenRoute, onAsk, scriptMode, conversationScripts }) {
     const category = useDashboardCategory()
+    // Script-writing replies: each ```akto-script fence becomes a card, shown once the text has
+    // finished streaming so a card never renders a half-written script.
+    const parsed = useMemo(() => (scriptMode ? parseScriptBlocks(message) : null), [scriptMode, message])
     const navAction = useMemo(() => {
         if (!userPrompt) return null
         return buildResults(userPrompt, category).find((o) => o.kind === "PAGE") || null
     }, [userPrompt, category])
+
+    if (parsed) {
+        return (
+            <VerticalStack gap="4">
+                <AgenticStreamingResponse content={parsed.text} skipStreaming={skipStreaming} onStreamingComplete={onStreamingComplete} />
+                {skipStreaming ? parsed.blocks.map((block) => (
+                    <ScriptCard
+                        key={block.index}
+                        block={block}
+                        conversationScripts={conversationScripts}
+                        onAskToFix={onAsk}
+                    />
+                )) : null}
+            </VerticalStack>
+        )
+    }
 
     const actionRows = []
     if (CONFIRM_PATTERN.test(message || "")) {

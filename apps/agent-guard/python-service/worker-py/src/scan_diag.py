@@ -45,6 +45,14 @@ def configure_process_logging() -> None:
         stream=sys.stdout,
         force=True,
     )
+    quiet_http_client_logs()
+
+
+def quiet_http_client_logs() -> None:
+    """httpx logs every request's full URL at INFO, and a Tripwire blob upload URL carries a write SAS token.
+    Keep httpx (and httpcore) at WARNING in every runtime's logging setup."""
+    for name in ("httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
 def enabled() -> bool:

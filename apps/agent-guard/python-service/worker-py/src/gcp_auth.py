@@ -15,11 +15,9 @@ import base64
 import json
 import time
 
-import rsa
-from pyasn1.codec.der import decoder as der_decoder
-
 import http_client
 import metrics_push
+from jwt_sign import load_private_key, sign_rs256
 
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
@@ -35,19 +33,6 @@ def sa_info_from_b64(sa_key_b64: str) -> dict:
     return json.loads(base64.b64decode(sa_key_b64))
 
 
-def _b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
-
-
-def _load_private_key(pem: str) -> "rsa.PrivateKey":
-    body = "".join(line for line in pem.splitlines() if line and not line.startswith("-----"))
-    pkcs8_der = base64.b64decode(body)
-    decoded, _ = der_decoder.decode(pkcs8_der)
-    # PKCS#8 PrivateKeyInfo: [version, algorithm, privateKey OCTET STRING (PKCS#1)]
-    pkcs1_der = bytes(decoded[2])
-    return rsa.PrivateKey.load_pkcs1(pkcs1_der, format="DER")
-
-
 async def get_token(sa_info: dict) -> str:
     """Return a valid cloud-platform access token for this service account."""
     email = sa_info["client_email"]
@@ -58,23 +43,12 @@ async def get_token(sa_info: dict) -> str:
         return cached[0]
     metrics_push.COUNTS["cache_misses"].increment("gcp_token")
 
-    privkey = _load_private_key(sa_info["private_key"])
     iat = int(now)
-    header = _b64url(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
-    payload = _b64url(
-        json.dumps(
-            {
-                "iss": email,
-                "scope": _SCOPE,
-                "aud": _TOKEN_URL,
-                "iat": iat,
-                "exp": iat + 3600,
-            }
-        ).encode()
+    assertion = sign_rs256(
+        {"alg": "RS256", "typ": "JWT"},
+        {"iss": email, "scope": _SCOPE, "aud": _TOKEN_URL, "iat": iat, "exp": iat + 3600},
+        load_private_key(sa_info["private_key"]),
     )
-    signing_input = (header + "." + payload).encode()
-    signature = rsa.sign(signing_input, privkey, "SHA-256")
-    assertion = header + "." + payload + "." + _b64url(signature)
 
     client = http_client.get_client()
     resp = await client.post(

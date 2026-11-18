@@ -92,7 +92,7 @@ const headers = [
     type: CellType.TEXT,
   },
   {
-    text: 'Total Apis',
+    text: mapLabel('Total APIs', getDashboardCategory()),
     title: mapLabel("Total endpoints", getDashboardCategory()),
     value: 'total_apis',
     type: CellType.TEXT

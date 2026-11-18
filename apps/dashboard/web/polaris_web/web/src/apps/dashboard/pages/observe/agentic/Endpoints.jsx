@@ -24,6 +24,7 @@ import {
 } from "./constants";
 import { CLIENT_TYPES, ROW_TYPES } from "./mcpClientHelper";
 import MisconfiguredBadge from "./MisconfiguredBadge";
+import SkillTagBadges from "./SkillTagBadges";
 
 const definedTableTabs = ['All', 'AI Agents', 'SaaS Agents', 'MCP Servers', 'LLMs', 'Skills', 'Plugins'];
 
@@ -110,8 +111,10 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
     const showMisconfigured = row.hasMisconfiguredConfig && !isFanout;
     const showMalicious = isSkill && row.isMalicious;
     const owningPluginName = !isPlugin && row.owningPluginName;
+    // Every user's skill-tags for this skill, each once (server-merged)
+    const skillTags = isSkill ? (row.skillTags || []) : [];
 
-    const groupNameDisplay = (showPersonal || showLocalMcp || showMisconfigured || showMalicious || owningPluginName) ? (
+    const groupNameDisplay = (showPersonal || showLocalMcp || showMisconfigured || showMalicious || owningPluginName || skillTags.length) ? (
         <HorizontalStack gap="2" align="start" wrap={false}>
             <Text>{row.name}</Text>
             {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
@@ -119,6 +122,7 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
             {showMisconfigured && <MisconfiguredBadge deviceCount={row.misconfiguredDeviceCount} />}
             {showMalicious && <Badge size="small" status="critical">Malicious</Badge>}
             {owningPluginName && <Badge size="small" status="info">{`${owningPluginName} plugin`}</Badge>}
+            <SkillTagBadges tags={skillTags} />
         </HorizontalStack>
     ) : row.name;
 

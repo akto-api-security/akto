@@ -9,6 +9,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.threat.backend.cache.DashboardFilterCache;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.ThreatUtils;
+import com.akto.log.LoggerMaker;
+import com.mongodb.MongoExecutionTimeoutException;
 import com.mongodb.client.MongoCursor;
 
 
@@ -176,7 +178,7 @@ public class ThreatApiService {
     ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
 
     // 3. Collapse misconfiguration re-detections.
-    pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
+    pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
 
     // 4. Group by category and subCategory
     pipeline.add(new Document("$group",
@@ -250,16 +252,22 @@ public class ThreatApiService {
       List<Document> pipeline = new ArrayList<>();
       pipeline.add(new Document("$match", match));
       ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
-      pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
+      // The dedupe only collapses /config/ events; with those excluded it is a sort+group over every event for nothing.
+      if (!"exclude".equalsIgnoreCase(configEvalMode)) {
+          pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
+      }
       pipeline.add(new Document("$group", new Document("_id", "$severity")
           .append("count", new Document("$sum", 1))));
 
     Map<String, Integer> severityToCount = new HashMap<>();
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline)
+        .maxTime(evaluationModeConditions.isEmpty() ? 0 : ThreatUtils.REGEX_MAX_TIME_MS, java.util.concurrent.TimeUnit.MILLISECONDS).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         severityToCount.put(doc.getString("_id"), doc.getInteger("count", 0));
       }
+    } catch (MongoExecutionTimeoutException e) {
+      new LoggerMaker(ThreatApiService.class, LoggerMaker.LogDb.THREAT_DETECTION).errorAndAddToDb("Severity counts exceeded " + ThreatUtils.REGEX_MAX_TIME_MS + "ms, returning none: " + e.getMessage(), LoggerMaker.LogDb.THREAT_DETECTION);
     }
 
     for (String severity : severities) {

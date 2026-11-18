@@ -31,6 +31,8 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.login_flow.LoginFlowNodes;
+import com.akto.testing.login_flow.PlaceholderResolver;
 import com.akto.util.JSONUtils;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.google.gson.Gson;
@@ -204,8 +206,14 @@ public class Utils {
         return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, recordedLoginFlowInput, allowAllCombinations);
     }
 
+    // login-flow entry: API steps resolve placeholders in login-flow mode (stepK, ${cookies...})
     public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, AuthMechanism authMechanism) {
-        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, authMechanism.getRecordedLoginFlowInput(), false);
+        WorkflowNodeDetails.Type type = node.getWorkflowNodeDetails().getType();
+        if (type == WorkflowNodeDetails.Type.RECORDED || type == WorkflowNodeDetails.Type.OTP
+                || node.getWorkflowNodeDetails() instanceof YamlNodeDetails) {
+            return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, authMechanism.getRecordedLoginFlowInput(), false);
+        }
+        return new ApiNodeExecutor(false, true).processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
     }
 
     public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, RecordedLoginFlowInput recordedLoginFlowInput, boolean allowAllCombinations) {
@@ -262,8 +270,9 @@ public class Utils {
             boolean allowAllStatusCodes = false;
             WorkflowTestResult.NodeResult nodeResult;
             try {
-                if (authMechanism.getRequestData() != null && authMechanism.getRequestData().size() > 0 && authMechanism.getRequestData().get(index).getAllowAllStatusCodes()) {
-                    allowAllStatusCodes = authMechanism.getRequestData().get(0).getAllowAllStatusCodes();
+                List<RequestData> requestData = authMechanism.getRequestData();
+                if (requestData != null && index < requestData.size() && requestData.get(index) != null) {
+                    allowAllStatusCodes = requestData.get(index).getAllowAllStatusCodes();
                 }
                 nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null, authMechanism);
             } catch (Exception e) {
@@ -273,25 +282,13 @@ public class Utils {
                 nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
             }
 
-            JSONObject respString = new JSONObject();
-            Map<String, Map<String, Object>> json = gson.fromJson(nodeResult.getMessage(), Map.class);
+            responses.add(buildStepResponse(nodeResult.getMessage()));
 
-            if (json.get("response").get("headers") != null) {
-                respString.put("headers", json.get("response").get("headers"));
-            } else {
-                respString.put("headers", "{}");
-            }
-            if (json.get("response").get("body") != null) {
-                respString.put("body", json.get("response").get("body"));
-            } else {
-                respString.put("body", "{}");
-            }
-            // respString.put("body", json.get("response").get("body").toString());
-            responses.add(respString.toString());
-            
             if (nodeResult.getErrors().size() > 0) {
                 authMechanism.updateErrorCacheExpiryEpoch(errorExpiryTime);
-                return new LoginFlowResponse(responses, "Failed to process node " + node.getId(), false);
+                String error = "Failed to process node " + LoginFlowNodes.label(node.getId()) + ": "
+                        + String.join("; ", nodeResult.getErrors());
+                return new LoginFlowResponse(responses, error, false);
             } else {
                 if (loginFlowParams != null && loginFlowParams.getFetchValueMap()) {
                     saveValueMapData(loginFlowParams, valuesMap);
@@ -304,13 +301,16 @@ public class Utils {
         int newExpiryTime = Context.now() + 1800; // 30 mins
         List<AuthParam> calculatedAuthParams = new ArrayList<>();
         for (AuthParam param : authMechanism.getAuthParams()) {
+            String value;
             try {
-                String value = executeCode(param.getValue(), valuesMap, false);
-                if (!param.getValue().equals(value) && value == null) {
-                    authMechanism.updateErrorCacheExpiryEpoch(errorExpiryTime);
-                    return new LoginFlowResponse(responses, "auth param not found at specified path " + 
-                    param.getValue(), false);
-                }
+                // strict: an unresolved ${...} must fail the login, never become the token (B7)
+                value = com.akto.testing.Utils.resolvePlaceholders(param.getValue(), valuesMap,
+                        PlaceholderResolver.Options.loginFlow(null, null).withJsExpressionsRejected());
+            } catch (Exception e) {
+                authMechanism.updateErrorCacheExpiryEpoch(errorExpiryTime);
+                return new LoginFlowResponse(responses, "auth param " + param.getKey() + ": " + e.getMessage(), false);
+            }
+            try {
 
                 // checking on the value of if this is valid jwt token or valid cookie which has expiry time
                 String tempVal = new String(value);
@@ -351,6 +351,24 @@ public class Utils {
         return new LoginFlowResponse(responses, null, true);
     }
 
+    // headers/body of one step for the LoginForm; a step that failed before sending has no message
+    static String buildStepResponse(String message) {
+        JSONObject respString = new JSONObject();
+        Object headers = null;
+        Object body = null;
+        if (message != null) {
+            Map<String, Object> json = gson.fromJson(message, Map.class);
+            Object response = json == null ? null : json.get("response");
+            if (response instanceof Map) {
+                headers = ((Map<?, ?>) response).get("headers");
+                body = ((Map<?, ?>) response).get("body");
+            }
+        }
+        respString.put("headers", headers != null ? headers : "{}");
+        respString.put("body", body != null ? body : "{}");
+        return respString.toString();
+    }
+
     public static Map<String, Object> constructValueMap(LoginFlowParams loginFlowParams) {
         Map<String, Object> valuesMap = new HashMap<>();
         if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
@@ -369,7 +387,7 @@ public class Utils {
 
         Set<String> keysToRemove = new HashSet<String>();
         for(String key : valuesMap.keySet()){
-            if(key.startsWith(loginFlowParams.getNodeId())){
+            if(key.startsWith(loginFlowParams.getNodeId() + ".")){
                 keysToRemove.add(key);
             }
         }

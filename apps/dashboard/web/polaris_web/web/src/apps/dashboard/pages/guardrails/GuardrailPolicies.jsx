@@ -234,11 +234,14 @@ function GuardrailPolicies() {
 
     useEffect(() => {
         const prefill = location.state?.topicGuardrailPrefill;
-        if (!prefill) return;
-        setEditingPolicy({ ...prefill, deniedTopics: prefill.deniedTopics || [] });
-        setIsEditMode(false);
-        setIsPreset(true);
-        setCreateInitialStep(2);
+        // The Atlas discovery flyout opens the empty create page; Close goes back to where it came from.
+        if (!prefill && !location.state?.openCreateGuardrail) return;
+        if (prefill) {
+            setEditingPolicy({ ...prefill, deniedTopics: prefill.deniedTopics || [] });
+            setIsEditMode(false);
+            setIsPreset(true);
+            setCreateInitialStep(2);
+        }
         setShowCreateModal(true);
         setOpenedViaDeepLink(true);
         // Clear router state, keep existing query params (e.g. filters) intact.
@@ -812,7 +815,7 @@ function GuardrailPolicies() {
     // mount was pushing an extra history entry, breaking the Close button's
     // navigate(-1). Only spin while actively resolving; if a ?policy= name never
     // matches a policy, fall through to the table instead of spinning forever.
-    if ((policyName && (loading || pendingPolicyName)) || location.state?.topicGuardrailPrefill) {
+    if ((policyName && (loading || pendingPolicyName)) || location.state?.topicGuardrailPrefill || location.state?.openCreateGuardrail) {
         return <SpinnerCentered />;
     }
 

@@ -41,6 +41,11 @@ export function ownerOptionLabel(owner) {
     return owner.name && owner.name !== "-" && owner.name !== owner.login ? `${owner.name} (${owner.login})` : owner.login;
 }
 
+// "Assign to me" is offered to someone who can assign, is one of the listed owners, and isn't already the owner.
+export function canAssignToMe({ canAssign, me, owner, owners }) {
+    return !!canAssign && !!me && owner !== me && (owners || []).some((o) => o.login === me);
+}
+
 export function describeCaseActivity(entry, owners) {
     switch (entry?.activityType) {
         case ACTIVITY_TYPE.STATUS:

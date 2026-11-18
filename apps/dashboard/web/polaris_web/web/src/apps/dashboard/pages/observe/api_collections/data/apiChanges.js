@@ -12,7 +12,7 @@ const endpointHeadings = [
         text: "Risk score",
         title: "Risk score",
         value: "riskScoreComp",
-        tooltipContent: "Risk score is calculated based on the amount of sensitive information the API shares and its current status regarding security issues."
+        tooltipContent: "Risk score is calculated based on the amount of sensitive information the " + mapLabel('API', getDashboardCategory()) + " shares and its current status regarding security issues."
     },
     {
         text: "Hostname",

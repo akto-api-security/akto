@@ -13,7 +13,7 @@ import BarGraph from '../../components/charts/BarGraph';
 import InfoCard from '../dashboard/new_components/InfoCard';
 import api from './api';
 import { formatCategoryName, openThreatActivityPage } from './utils/threatDashboardUtils';
-import { getDashboardCategory, isEndpointSecurityCategory, CATEGORY_AGENTIC_SECURITY, CATEGORY_ENDPOINT_SECURITY } from '../../../main/labelHelper';
+import { CATEGORY_AGENTIC_SECURITY, CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, isEndpointSecurityCategory, mapLabel } from '../../../main/labelHelper';
 
 import ThreatDetectionOverTimeChart from './components/ThreatDetectionOverTimeChart';
 import ThreatTabbedSection from './components/ThreatTabbedSection';
@@ -50,7 +50,7 @@ function ThreatDashboardPage() {
                 return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
             }
         }
-        return values.ranges[2];
+        return func.getDefaultDateRange(values.ranges[2]);
     };
     const initialDateRange = getInitialDateRange();
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialDateRange);
@@ -138,7 +138,7 @@ function ThreatDashboardPage() {
                         data={categoryData}
                         backgroundColor="transparent"
                         // Endpoint Security violations aren't "APIs".
-                        yAxisTitle={isEndpointSecurityCategory() ? "" : "# of APIs"}
+                        yAxisTitle={isEndpointSecurityCategory() ? "" : "# of " + mapLabel('APIs', getDashboardCategory())}
                         showYAxis={true}
                         showGridLines={true}
                         barGap={0.1}

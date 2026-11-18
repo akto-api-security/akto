@@ -12,6 +12,8 @@ import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class RateLimitFilter implements Filter {
+    public static final int MCP_OAUTH_REQUESTS_PER_HOUR = 300;
+
     private final RateLimitCache cache = new RateLimitCache();
 
 
@@ -19,10 +21,10 @@ public class RateLimitFilter implements Filter {
         ConcurrentHashMap<String, RateLimitCache.IpInfo> val ;
         if (path.equals("/auth/login") || path.equals("/trigger-google-sso")) {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.SIGN_IN);
-        } else if (path.startsWith("/tools/")) {
-            val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.ANONYMOUS_LOGIN);
         } else if (path.equals("/auth/sendPasswordResetLink") || path.equals("/auth/resetPassword")) {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.PASSWORD_RESET);
+        } else if (path.startsWith("/oauth/")) {
+            val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.MCP_OAUTH);
         } else {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.SEND_EMAIL);
         }
@@ -53,9 +55,10 @@ public class RateLimitFilter implements Filter {
     private Bucket newBucket(String path) {
         Refill refill;
         Bandwidth limit;
-        if (path.startsWith("/tools/")) {
-            refill = Refill.intervally(1000, Duration.ofHours(1));
-            limit = Bandwidth.classic(1000, refill);
+        if (path.startsWith("/oauth/")) {
+            // Per IP, and MCP clients register from a few shared IPs, so keep it generous
+            refill = Refill.intervally(MCP_OAUTH_REQUESTS_PER_HOUR, Duration.ofHours(1));
+            limit = Bandwidth.classic(MCP_OAUTH_REQUESTS_PER_HOUR, refill);
         } else if (path.equals("/api/getCustomerStiggDetails")) {
             refill = Refill.intervally(100, Duration.ofHours(1));
             limit = Bandwidth.classic(100, refill);

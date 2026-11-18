@@ -7,6 +7,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.types.CappedSet;
 import com.mongodb.client.model.Filters;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockedStatic;
@@ -34,6 +35,13 @@ public class TestSingleTypeInfoDaoResponseSensitiveSubtypeApiCounts extends Mong
         Context.accountId.set(ACCOUNT_ID);
         Context.userId.set(1);
         SingleTypeInfoDao.instance.getMCollection().drop();
+    }
+
+    // Context is static and shared by every test class in the JVM; a user id left set here makes later
+    // classes' SingleTypeInfoDao queries RBAC-scoped, so they find nothing.
+    @After
+    public void tearDown() {
+        Context.userId.remove();
     }
 
     private void insertSti(int apiCollectionId, String url, String method, String param, SingleTypeInfo.SubType subType, int responseCode) {

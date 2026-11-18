@@ -126,6 +126,13 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             RBAC rbac = userToRBAC.get(userObj.getInt("id"));
             String status = (rbac == null || rbac.getRole() == null) ? Role.MEMBER.getName() : rbac.getRole();
             userObj.append("role", status);
+            // role in the product being viewed, custom roles resolved to their base role: what role checks use.
+            // Extra to the list: if it can't be worked out the members still load, without it.
+            try {
+                userObj.append("baseRole", RBACDao.getCurrentRoleForUser(userObj.getInt("id"), accountId).name());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in fetchTeamData baseRole " + e.getMessage());
+            }
 
             // Add scopeRoleMapping to the user object for n:n scope-role display
             if (rbac != null && rbac.getScopeRoleMapping() != null && !rbac.getScopeRoleMapping().isEmpty()) {

@@ -7,6 +7,7 @@ import DropdownSearch from '../../../components/shared/DropdownSearch'
 import func from "@/util/func"
 import { usePermissions, whenAllowed } from "@/util/permissions"
 import AllowedAction from "../../../components/shared/AllowedAction"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const DevRev = () => {
 
@@ -341,7 +342,7 @@ const DevRev = () => {
         </LegacyCard>
     )
 
-    let cardContent = "Seamlessly enhance your API security workflow with DevRev integration. Create DevRev issues for API vulnerability findings and manage them directly from your DevRev workspace"
+    let cardContent = "Seamlessly enhance your " + mapLabel('API', getDashboardCategory()) + " security workflow with DevRev integration. Create DevRev issues for " + mapLabel('API', getDashboardCategory()) + " vulnerability findings and manage them directly from your DevRev workspace"
 
     return (
         <IntegrationsLayout

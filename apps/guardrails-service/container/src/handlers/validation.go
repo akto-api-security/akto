@@ -11,6 +11,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/auth"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
+	"github.com/akto-api-security/guardrails-service/pkg/filecache"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/metrics"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
@@ -44,22 +45,34 @@ type ValidationHandler struct {
 	fileRegistry     *fileprocessor.Registry
 	metrics          *metrics.Accumulator
 	policyGate       policyGate
+	// fileCache remembers inspected, allowed files; nil turns it off. policyFingerprint scopes
+	// its entries to the policies that apply, so a policy change misses the cache.
+	fileCache         filecache.Store
+	policyFingerprint policyFingerprint
+	// validateFileChunk checks one chunk of a file's text (validator.Service.ValidateRequest).
+	validateFileChunk fileRequestValidator
 }
 
 // policyGate mirrors validator.Service.HasApplicablePolicies.
 type policyGate func(contextSource, requestHeaders, tag string) (bool, error)
 
+// policyFingerprint mirrors validator.Service.ApplicablePoliciesFingerprint.
+type policyFingerprint func(contextSource, requestHeaders, tag string) (string, error)
+
 // NewValidationHandler creates a new validation handler
-func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry, acc *metrics.Accumulator) *ValidationHandler {
+func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry, acc *metrics.Accumulator, fileCache filecache.Store) *ValidationHandler {
 	h := &ValidationHandler{
 		validatorService: validatorService,
 		logger:           logger,
 		cfg:              cfg,
 		fileRegistry:     fileRegistry,
 		metrics:          acc,
+		fileCache:        fileCache,
 	}
 	if validatorService != nil {
 		h.policyGate = validatorService.HasApplicablePolicies
+		h.policyFingerprint = validatorService.ApplicablePoliciesFingerprint
+		h.validateFileChunk = validatorService.ValidateRequest
 	}
 	return h
 }

@@ -1,11 +1,11 @@
 import request from "../../../../util/request"
 
 export default {
-    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections, filterCompliance) {
+    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections, filterCompliance, filterAiVerdict) {
         return request({
             url: 'api/fetchAllIssues',
             method: 'post',
-            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections, filterCompliance}
+            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections, filterCompliance, filterAiVerdict}
         })
     },
     fetchVulnerableTestingRunResultsFromIssues(filters, issuesIds , skip) {
@@ -152,6 +152,20 @@ export default {
             url: 'api/createDevRevTickets',
             method: 'post',
             data: {testingIssuesIdList, partId, workItemType, aktoDashboardHost}
+        })
+    },
+    createLinearTickets(testingIssuesIdList, teamId, aktoDashboardHost) {
+        return request({
+            url: 'api/createLinearTickets',
+            method: 'post',
+            data: {testingIssuesIdList, teamId, aktoDashboardHost}
+        })
+    },
+    createPortIOTickets(testingIssuesIdList, aktoDashboardHost) {
+        return request({
+            url: 'api/createPortIOTickets',
+            method: 'post',
+            data: {testingIssuesIdList, aktoDashboardHost}
         })
     },
     createWizFindings(testingIssuesIdList) {

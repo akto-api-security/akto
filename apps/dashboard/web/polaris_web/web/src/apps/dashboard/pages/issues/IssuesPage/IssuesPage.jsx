@@ -34,6 +34,7 @@ import IssuesByCollection from './IssuesByCollection.jsx';
 import CriticalUnresolvedApisByAge from './CriticalUnresolvedApisByAge.jsx';
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
+import LinearTicketCreationModal from "../../../components/shared/LinearTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
@@ -50,8 +51,11 @@ const sortOptions = [
     { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest', sortKey: 'severity', columnIndex: 2 },
     { label: 'Number of endpoints', value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 5 },
     { label: 'Number of endpoints', value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 5 },
-    { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 7 },
-    { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 7 },
+    { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 8 },
+    { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 8 },
+    // No column: these only appear in the Sort menu. Verify with AI's verdict and confidence are in the description.
+    { label: 'AI confidence', value: 'aiConfidence asc', directionLabel: 'High', sortKey: 'aiConfidence' },
+    { label: 'AI confidence', value: 'aiConfidence desc', directionLabel: 'Low', sortKey: 'aiConfidence' },
 ];
 
 let filtersOptions = [
@@ -110,6 +114,16 @@ let filtersOptions = [
         label: 'Tags',
         title: 'Tags',
         choices: [],
+    },
+    {
+        key: 'aiVerdict',
+        label: 'AI verdict',
+        title: 'AI verdict',
+        choices: [
+            { label: 'False positive', value: 'FALSE_POSITIVE' },
+            { label: 'True positive', value: 'TRUE_POSITIVE' },
+            { label: 'Not verified', value: 'NOT_VERIFIED' }
+        ],
     }
 ]
 
@@ -203,6 +217,9 @@ function IssuesPage() {
     const [devrevParts, setDevRevParts] = useState([])
     const [devrevPartId, setDevRevPartId] = useState('')
     const [devrevWorkItemType, setDevRevWorkItemType] = useState('issue')
+    const [linearModalActive, setLinearModalActive] = useState(false)
+    const [linearTeams, setLinearTeams] = useState([])
+    const [linearTeamId, setLinearTeamId] = useState('')
 
     // Compulsory description modal states
     const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
@@ -474,6 +491,35 @@ function IssuesPage() {
         })
     }
 
+    const handleSaveBulkLinearTicketsAction = () => {
+        setToast(true, false, "Please wait while we create your Linear tickets.")
+        setLinearModalActive(false)
+        api.createLinearTickets(selectedIssuesItems, linearTeamId, window.location.origin).then((res) => {
+            if (res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} Linear ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        }).catch((err) => {
+            setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating Linear tickets")
+        })
+    }
+
+    const handleSaveBulkPortTicketsAction = (selectedIssuesItems) => {
+        setToast(true, false, "Please wait while we create your Linear tickets through Port.io.")
+        api.createPortIOTickets(selectedIssuesItems, window.location.origin).then((res) => {
+            if (res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} Linear ticket${selectedIssuesItems.length === 1 ? "" : "s"} created through Port.io.`)
+            }
+            resetResourcesSelected()
+        }).catch((err) => {
+            setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating Linear tickets through Port.io")
+        })
+    }
+
     // Use keys directly for reasons and compulsorySettings
     const requiresDescription = (reasonKey) => {
         return compulsorySettings[reasonKey] || false;
@@ -571,11 +617,11 @@ function IssuesPage() {
 
         function verifyWithAiAction() {
             func.showConfirmationModal(
-                `AI will review the ${items.length} selected issue${items.length === 1 ? "" : "s"}. Issues it judges as false positives will be moved to Ignored. You can reopen them anytime.`,
+                `AI will review the ${items.length} selected issue${items.length === 1 ? "" : "s"} and add its verdict and confidence to each issue's description. Issue statuses won't change, so you can review the verdicts and mark false positives.`,
                 "Verify",
                 async () => {
                     await api.verifyIssuesWithAi(items).then(() => {
-                        setToast(true, false, "AI verification started. False positives will move to Ignored - refresh in a few minutes to see the results.")
+                        setToast(true, false, "AI verification started. Refresh in a few minutes to see the verdicts in the issue descriptions.")
                         resetResourcesSelected()
                     }).catch(() => {
                         // request() already shows the server's error as a toast
@@ -641,6 +687,18 @@ function IssuesPage() {
             })
         }
 
+        function createLinearTicketBulk() {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchLinearIntegration().then((linearIntegration) => {
+                const teamsArray = Object.entries(linearIntegration?.teamsMap || {}).map(([id, name]) => ({ id, name }))
+                if (teamsArray.length > 0) {
+                    setLinearTeams(teamsArray)
+                    setLinearTeamId(teamsArray[0].id)
+                }
+                setLinearModalActive(true)
+            })
+        }
+
         async function createWizFindings() {
             await api.createWizFindings(items).then((res) => {
                 setToast(true, false, `${items.length} Wiz finding${items.length === 1 ? "" : "s"} creation initiated.`)
@@ -681,11 +739,11 @@ function IssuesPage() {
                 onAction: () => { ignoreAction('noTimeToFix') },
                 requires: ignoreRequires('noTimeToFix')
             },
-            ...(func.checkForFeatureSaas('AKTO_GPT_AI') ? [{
+            {
                 content: 'Verify with AI',
                 onAction: () => { verifyWithAiAction() },
                 requires: 'api/verifyIssuesWithAi'
-            }] : []),
+            },
             {
                 content: 'Export selected Issues',
                 onAction: () => { openVulnerabilityReport(items, false) },
@@ -727,6 +785,18 @@ function IssuesPage() {
                 onAction: () => { createDevRevTicketBulk() },
                 disabled: (window.DEVREV_INTEGRATED === 'false'),
                 requires: ['api/fetchDevRevIntegration', 'api/createDevRevTickets']
+            },
+            {
+                content: 'Create Linear ticket',
+                onAction: () => { createLinearTicketBulk() },
+                disabled: (window.LINEAR_INTEGRATED === 'false'),
+                requires: ['api/fetchLinearIntegration', 'api/createLinearTickets']
+            },
+            {
+                content: 'Create Linear ticket via Port.io',
+                onAction: () => { handleSaveBulkPortTicketsAction(items) },
+                disabled: (window.PORT_IO_INTEGRATED === 'false'),
+                requires: ['api/fetchPortIOIntegration', 'api/createPortIOTickets']
             },
             {
                 content: 'Create Wiz finding(s)',
@@ -922,6 +992,7 @@ function IssuesPage() {
         let filterStatus = [selectedTab.toUpperCase()]
         let filterSeverity = filters.severity
         let filterCompliance = filters.compliance
+        let filterAiVerdict = filters.aiVerdict
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const filterCollectionsId = mergeFilterCollectionsId(filters, pageScopeApiCollectionIds)
         let filterSubCategory = []
@@ -939,7 +1010,8 @@ function IssuesPage() {
             filterSubCategory: filterSubCategory,
             startEpoch: [startTimestamp.toString()],
             endTimeStamp: [endTimestamp.toString()],
-            activeCollections: [activeCollections.toString()]
+            activeCollections: [activeCollections.toString()],
+            filterAiVerdict: filterAiVerdict
         }
         setIssuesFilters(obj)
 
@@ -948,7 +1020,7 @@ function IssuesPage() {
 
         let issueItem = []
 
-        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance, filterAiVerdict).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
                 const key = `${item?.id?.testSubCategory || ''}|${item?.severity || ''}|${item?.testRunIssueStatus || ''}`
@@ -976,6 +1048,7 @@ function IssuesPage() {
                             issueDescription: item?.description,
                             jiraIssueUrl: item?.jiraIssueUrl || "",
                             devrevWorkUrl: item?.devrevWorkUrl || "",
+                            linearIssueUrl: item?.linearIssueUrl || "",
                         }],
                         numberOfEndpoints: 1
                     })
@@ -993,7 +1066,8 @@ function IssuesPage() {
                         id: item?.id ? JSON.stringify(item.id) : '',
                         issueDescription: item?.description,
                         jiraIssueUrl: item?.jiraIssueUrl || "",
-                        devrevWorkUrl: item?.devrevWorkUrl || ""
+                        devrevWorkUrl: item?.devrevWorkUrl || "",
+                        linearIssueUrl: item?.linearIssueUrl || ""
                     })
                     existingIssue.numberOfEndpoints = (existingIssue.numberOfEndpoints || 1) + 1
                 }
@@ -1042,7 +1116,7 @@ function IssuesPage() {
         }
         let issueItems = []
 
-        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance, filters?.aiVerdict || []).then((issuesDataRes) => {
             issuesDataRes.issues.forEach((item) => {
                 if (!item || !item.id || !item.id.testSubCategory || !subCategoryMap[item.id.testSubCategory]) return;
                 const issue = {
@@ -1099,7 +1173,7 @@ function IssuesPage() {
         }
         let issueItems = []
 
-        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance, filters?.aiVerdict || []).then((issuesDataRes) => {
             issuesDataRes.issues.forEach((item) => {
                 if (!item || !item.id || !item.id.testSubCategory || !subCategoryMap[item.id.testSubCategory]) return;
                 const issue = {
@@ -1326,6 +1400,15 @@ function IssuesPage() {
                 projId={devrevPartId}
                 issueType={devrevWorkItemType}
                 isDevRevModal={true}
+            />
+
+            <LinearTicketCreationModal
+                modalActive={linearModalActive}
+                setModalActive={setLinearModalActive}
+                handleSaveAction={handleSaveBulkLinearTicketsAction}
+                teams={linearTeams}
+                teamId={linearTeamId}
+                setTeamId={setLinearTeamId}
             />
 
             <CompulsoryDescriptionModal

@@ -80,9 +80,18 @@ public class McpToolsSyncJobExecutor {
 
     private ServerCapabilities mcpServerCapabilities = null;
     private String mcpSessionId = null;
+    // when set, MCP requests are sent from this mini-testing instance instead of from here
+    private String miniTestingName = null;
+    // set once mini-testing fails to answer, so the remaining MCP calls don't each wait out the timeout
+    private boolean miniTestingFailed = false;
 
     public McpToolsSyncJobExecutor() {
         Json.mapper().registerModule(new SimpleModule().addSerializer(new JsonNodeExampleSerializer()));
+    }
+
+    public McpToolsSyncJobExecutor(String miniTestingName) {
+        this();
+        this.miniTestingName = miniTestingName;
     }
 
     public void runJob(APIConfig apiConfig) {
@@ -529,9 +538,18 @@ public class McpToolsSyncJobExecutor {
     private String sendRequest(OriginalHttpRequest request, ApiCollection apiCollection) throws Exception {
         try {
             String transportType = apiCollection.getMcpTransportType();
+            boolean viaMiniTesting = StringUtils.isNotBlank(miniTestingName);
 
-            // If transport type is not set, try to detect it
-            if (transportType == null || transportType.isEmpty()) {
+            if (viaMiniTesting) {
+                // the SSE flow opens and reads the stream in this process, so only streamable HTTP can go via mini-testing
+                if (TRANSPORT_SSE.equals(transportType)) {
+                    logger.info("SSE transport is not supported via mini-testing, using HTTP transport for MCP server: {}", apiCollection.getHostName());
+                } else if (transportType == null || transportType.isEmpty()) {
+                    ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_HTTP);
+                }
+                transportType = TRANSPORT_HTTP;
+            } else if (transportType == null || transportType.isEmpty()) {
+                // If transport type is not set, try to detect it
                 transportType = detectAndSetTransportType(request, apiCollection);
             }
 
@@ -551,7 +569,19 @@ public class McpToolsSyncJobExecutor {
                     HttpRequestResponseUtils.APPLICATION_JSON + ","
                         + HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE));
 
-                response = ApiExecutor.sendRequestSkipSse(request, true, null, false, new ArrayList<>(), false);
+                if (viaMiniTesting) {
+                    if (miniTestingFailed) {
+                        throw new Exception("Skipping MCP request, an earlier request via mini-testing " + miniTestingName + " got no response");
+                    }
+                    logger.info("Sending MCP request via mini-testing: {}", miniTestingName);
+                    response = com.akto.testing.Utils.runRequestOnHybridTesting(request, miniTestingName);
+                    if (response == null || response.getStatusCode() == 0) {
+                        miniTestingFailed = true;
+                        throw new Exception("No response from mini-testing " + miniTestingName + " for MCP server: " + apiCollection.getHostName());
+                    }
+                } else {
+                    response = ApiExecutor.sendRequestSkipSse(request, true, null, false, new ArrayList<>(), false);
+                }
 
                 // Extract session ID from response headers if present
                 String sessionId = HttpRequestResponseUtils.getHeaderValue(response.getHeaders(), "mcp-session-id");

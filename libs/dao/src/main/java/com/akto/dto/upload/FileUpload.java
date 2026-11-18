@@ -32,6 +32,7 @@ public class FileUpload {
         POSTMAN_FILE,
         POSTMAN_COLLECTION,
         SWAGGER_FILE,
+        AGENT_URL,
     }
 
     protected boolean ingestionComplete;

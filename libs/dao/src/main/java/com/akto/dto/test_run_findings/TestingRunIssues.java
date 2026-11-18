@@ -59,9 +59,26 @@ public class TestingRunIssues {
     @Getter @Setter
     private String wizFindingUrl;
 
+    public static final String LINEAR_ISSUE_URL = "linearIssueUrl";
+    @Getter @Setter
+    private String linearIssueUrl;
+
+    public static final String TICKET_CREATED_VIA = "ticketCreatedVia";
+    @Getter @Setter
+    private String ticketCreatedVia;
+
     public static final String WIZ_FINDING_CREATION_STATUS = "wizFindingCreationStatus";
     @Getter @Setter
     private String wizFindingCreationStatus;
+
+    // Verify with AI's verdict (FALSE_POSITIVE / TRUE_POSITIVE) and its confidence (0-100).
+    public static final String AI_VERDICT = "aiVerdict";
+    @Getter @Setter
+    private String aiVerdict;
+
+    public static final String AI_CONFIDENCE = "aiConfidence";
+    @Getter @Setter
+    private Integer aiConfidence;
 
     public static final String ID_API_COLLECTION_ID = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID;
     public static final String ID_URL = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL;

@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  */
 public class SkillEvaluationConcentrationProvider extends AbstractInsightProvider {
 
-    private static final String SKILLS_PREFIX = "/skills/";
+    public static final String SKILLS_PREFIX = "/skills/";
     private static final int EVENT_PAGE_LIMIT = 2000;
     private static final int EVIDENCE_ROW_CAP = 20;
 
@@ -281,7 +281,7 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
 
     /** Everything after "/skills/" — deliberately the whole remainder, matching ThreatActorService's
      *  own $substrCP extraction, not just the first path segment. */
-    private static String extractSkillName(String url) {
+    public static String extractSkillName(String url) {
         if (url == null || !url.startsWith(SKILLS_PREFIX)) {
             return null;
         }

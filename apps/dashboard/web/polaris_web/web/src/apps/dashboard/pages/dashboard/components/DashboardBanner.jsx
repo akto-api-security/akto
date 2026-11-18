@@ -26,21 +26,21 @@ function DashboardBanner() {
             title: "Add traffic",
             icon: AppsMinor,
             showRedirect: true,
-            description: "Akto Discovers API inventory by connecting to your API traffic source. Add a connector to get started.",
+            description: "Akto Discovers " + mapLabel('API', getDashboardCategory()) + " inventory by connecting to your " + mapLabel('API', getDashboardCategory()) + " traffic source. Add a connector to get started.",
             redirectUrl: "/dashboard/quick-start",
         },
         {
             title: "Start testing",
             icon: MarketingMinor,
             showRedirect: true,
-            description: defaultCount + "+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your API Security testing needs.",
+            description: defaultCount + "+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your " + mapLabel('API Security testing', getDashboardCategory()) + " needs.",
             redirectUrl: "/dashboard/testing",
         },
         {
             title: "Configure CI/CD",
             icon: ResetMinor,
             showRedirect: true,
-            description: "You can trigger Akto's API Security tests in your CI/CD pipelines. Generate your Akto token and send API requests to Akto dashboard to start running tests.",
+            description: "You can trigger Akto's " + mapLabel('API Security', getDashboardCategory()) + " tests in your CI/CD pipelines. Generate your Akto token and send API requests to Akto dashboard to start running tests.",
             redirectUrl: "https://docs.akto.io/testing/run-tests-in-cicd",
             newTab: true,
         },
@@ -55,7 +55,7 @@ function DashboardBanner() {
             title: "Write custom tests",
             icon: EditMinor,
             showRedirect: true,
-            description: "Akto Test Editor is the test playground for security teams and developers to write their custom tests to find vulnerabilities in APIs.",
+            description: "Akto Test Editor is the test playground for security teams and developers to write their custom tests to find vulnerabilities in " + mapLabel('APIs', getDashboardCategory()) + ".",
             redirectUrl: "/dashboard/test-editor",
         }
     ]
