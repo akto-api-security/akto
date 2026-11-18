@@ -3,6 +3,7 @@ package com.akto.testing;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,6 +51,29 @@ public class WebSocketExecutorHandshakeTest {
         assertTrue(agent.receivedFrames.isEmpty());
         assertEquals(CONNECTION_PATH, agent.handshakes.get(0).path);
         assertEquals("sid=abc", agent.handshakes.get(0).headers.get("cookie"));
+    }
+
+    @Test
+    public void importedEventReturnsEveryReplyFrameWithTheHandshakeHeaders() {
+        OriginalHttpRequest event = new OriginalHttpRequest(agent.url(CONNECTION_PATH), "", "GET",
+                "{\"event\":\"user_message\",\"data\":{\"session_id\":\"s1\",\"user_message\":\"hi\"}}", headers("sid=abc"), "WEBSOCKET");
+
+        OriginalHttpResponse response = WebSocketExecutor.sendImportEvent(event, agent.url(CONNECTION_PATH), event.getHeaders(), 5000, 1000);
+
+        assertEquals(200, response.getStatusCode());
+        // the whole streamed reply: ack, both chunks and the final frame
+        assertTrue(response.getBody().contains("\"ack\"") && response.getBody().contains("\"final\""), response.getBody());
+        assertEquals(4, response.getStreamingChunks().size());
+        // the handshake's response headers, for the connection string saved with the event
+        assertTrue(response.getHeaders().containsKey("sec-websocket-accept"), response.getHeaders().toString());
+    }
+
+    @Test
+    public void refusedImportedEventReturnsTheRefusalStatus() {
+        OriginalHttpRequest event = new OriginalHttpRequest(agent.url(CONNECTION_PATH), "", "GET",
+                "{\"event\":\"user_message\",\"data\":{\"session_id\":\"s1\"}}", headers(null), "WEBSOCKET");
+
+        assertEquals(401, WebSocketExecutor.sendImportEvent(event, agent.url(CONNECTION_PATH), event.getHeaders(), 5000, 1000).getStatusCode());
     }
 
     @Test

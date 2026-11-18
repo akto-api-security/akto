@@ -354,6 +354,48 @@ public class WebSocketExecutor {
         return sendMessageDirect(request, wsUrl, headers, timeoutMs, null);
     }
 
+
+    public static OriginalHttpResponse sendImportEvent(OriginalHttpRequest request, String wsUrl,
+            Map<String, List<String>> headers, long timeoutMs) {
+        return sendImportEvent(request, wsUrl, headers, timeoutMs, REPLY_QUIET_MS);
+    }
+
+    static OriginalHttpResponse sendImportEvent(OriginalHttpRequest request, String wsUrl,
+            Map<String, List<String>> headers, long timeoutMs, long quietMs) {
+        if (timeoutMs <= 0) timeoutMs = DEFAULT_TIMEOUT_MS;
+        Map<String, List<String>> filteredHeaders = filterWebSocketHeaders(headers);
+        WebSocketConnection conn = new WebSocketConnection(wsUrl, filteredHeaders, "import-event");
+        try {
+            WebSocketConnectionPool.createDirectConnection(wsUrl, filteredHeaders, conn);
+            conn.waitForConnection(timeoutMs);
+
+            String requestBody = request.getBody();
+            if (requestBody == null || requestBody.isEmpty()) {
+                throw new IllegalArgumentException("WebSocket message body cannot be empty");
+            }
+            // a greeting sent on connect is not part of the reply
+            conn.drainPendingMessages();
+            conn.sendMessage(requestBody);
+
+            OriginalHttpResponse response = repliesResponse(conn.collectReplies(timeoutMs, quietMs));
+            if (conn.getHandshakeHeaders() != null) {
+                response.setHeaders(new HashMap<>(conn.getHandshakeHeaders()));
+            }
+            return response;
+        } catch (WebSocketConnection.ClosedException e) {
+            loggerMaker.errorAndAddToDb("Import WS closed: " + e.getMessage(), LogDb.TESTING);
+            return closedResponse(conn, e.getMessage());
+        } catch (java.util.concurrent.TimeoutException e) {
+            loggerMaker.errorAndAddToDb("Import WS timeout: " + e.getMessage(), LogDb.TESTING);
+            return errorResponse("timeout", 504);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Import WS event failed: " + e.getMessage(), LogDb.TESTING);
+            return errorResponse(e.getMessage(), 500);
+        } finally {
+            conn.close();
+        }
+    }
+
     public static void closeConnections() {
         WebSocketConnectionPool.closeAllConnections();
     }

@@ -316,8 +316,9 @@ public class Main {
                     // connection string: only the handshake, 101 or the refusal
                     res = WebSocketExecutor.handshake(url, originalRequest.getHeaders(), 30000);
                 } else {
-                    // event: every reply frame until the agent goes quiet (a streamed answer is saved whole)
-                    res = WebSocketExecutor.sendMessageDirect(originalRequest, url, originalRequest.getHeaders(), 60000, null, true);
+                    // event: every reply frame until the agent goes quiet (a streamed answer is saved whole), with
+                    // the handshake's response headers, for the connection string the dashboard saves with it
+                    res = WebSocketExecutor.sendImportEvent(originalRequest, url, originalRequest.getHeaders(), 60000);
                 }
             } else {
                 res = ApiExecutor.sendRequest(originalRequest, true, testingRunConfig, false, new ArrayList<>());
