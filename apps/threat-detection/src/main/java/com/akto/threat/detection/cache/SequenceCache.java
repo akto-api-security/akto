@@ -10,6 +10,7 @@ import com.akto.threat.detection.utils.SessionIdentifier;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,7 +30,9 @@ public class SequenceCache {
     private static final int REFRESH_INTERVAL_SEC = 15 * 60;
     private static final long HISTORY_WINDOW_MILLIS = TimeUnit.MINUTES.toMillis(15);
     private static final int MAX_SESSIONS = 100_000;
+    // Alert when this many of a session's last RECENT_STEPS steps are ones users almost never take
     private static final int UNKNOWN_STEPS_TO_ALERT = 5;
+    private static final int RECENT_STEPS = 10;
 
     private final DataActor dataActor;
     private final SessionIdentifier sessionIdentifier = new SessionIdentifier();
@@ -46,8 +49,8 @@ public class SequenceCache {
     private volatile Map<String, String> knownApis = new HashMap<>();
     private int stepsUpdatedAt = 0;
 
-    // Session -> its last API, then the APIs of its current run of unknown steps (at most UNKNOWN_STEPS_TO_ALERT + 1)
-    private final Cache<String, List<String>> sessionPath = Caffeine.newBuilder()
+    // Session -> its recent calls and which of the steps between them were unknown
+    private final Cache<String, RecentCalls> sessionPath = Caffeine.newBuilder()
             .maximumSize(MAX_SESSIONS)
             .expireAfterAccess(HISTORY_WINDOW_MILLIS, TimeUnit.MILLISECONDS)
             .build();
@@ -86,8 +89,43 @@ public class SequenceCache {
         return anomalous;
     }
 
-    // Reason text once a session has taken UNKNOWN_STEPS_TO_ALERT unknown steps in a row, otherwise null.
-    // A known step resets the run, so a session's path is just its last API whenever it behaves normally.
+    // Last RECENT_STEPS + 1 calls of a session (so every recent step has both ends) and whether each step was unknown
+    private static final class RecentCalls {
+        private final ArrayDeque<String> calls = new ArrayDeque<>(RECENT_STEPS + 1);
+        private final ArrayDeque<Boolean> unknown = new ArrayDeque<>(RECENT_STEPS);
+        private int unknownCount = 0;
+
+        RecentCalls(String firstCall) {
+            calls.addLast(firstCall);
+        }
+
+        void add(String call, boolean isUnknown) {
+            calls.addLast(call);
+            if (calls.size() > RECENT_STEPS + 1) calls.removeFirst();
+            unknown.addLast(isUnknown);
+            if (isUnknown) unknownCount++;
+            if (unknown.size() > RECENT_STEPS && unknown.removeFirst()) unknownCount--;
+        }
+
+        // "METHOD /a → METHOD /b; ..." for each unknown step, oldest first
+        String describeUnknownSteps() {
+            List<String> callList = new ArrayList<>(calls);
+            int offset = callList.size() - 1 - unknown.size();
+            StringBuilder text = new StringBuilder();
+            int index = 0;
+            for (Boolean isUnknown : unknown) {
+                if (isUnknown) {
+                    if (text.length() > 0) text.append("; ");
+                    text.append(describe(callList.get(offset + index))).append(" → ").append(describe(callList.get(offset + index + 1)));
+                }
+                index++;
+            }
+            return text.toString();
+        }
+    }
+
+    // Reason text once UNKNOWN_STEPS_TO_ALERT of a session's last RECENT_STEPS steps are unknown, otherwise null.
+    // Only an unknown step can raise it; the window starts over after an alert.
     public String checkUnknownPath(HttpResponseParams responseParam, int apiCollectionId, String url, Method method) {
         refreshKnownSteps();
         if (knownApis.isEmpty()) return null;
@@ -96,39 +134,26 @@ public class SequenceCache {
         String apiKey = knownApis.get(apiCollectionId + " " + normalizeUrl(url) + " " + method);
         if (apiKey == null) return null;
 
-        List<String> path = sessionPath.getIfPresent(sessionId);
-        if (path == null) {
-            sessionPath.put(sessionId, newPath(apiKey));
+        RecentCalls recent = sessionPath.getIfPresent(sessionId);
+        if (recent == null) {
+            sessionPath.put(sessionId, new RecentCalls(apiKey));
             return null;
         }
-        String previous = path.get(path.size() - 1);
+        String previous = recent.calls.peekLast();
         if (previous.equals(apiKey)) return null;
-        if (knownSteps.contains(previous + "|" + apiKey)) {
-            sessionPath.put(sessionId, newPath(apiKey));
-            return null;
-        }
-        path.add(apiKey);
-        if (path.size() <= UNKNOWN_STEPS_TO_ALERT) return null;
-        sessionPath.put(sessionId, newPath(apiKey));
-        return UNKNOWN_STEPS_TO_ALERT + " steps in a row that users almost never take: " + describe(path);
+        boolean isUnknown = !knownSteps.contains(previous + "|" + apiKey);
+        recent.add(apiKey, isUnknown);
+        if (!isUnknown || recent.unknownCount < UNKNOWN_STEPS_TO_ALERT) return null;
+        String reason = recent.unknownCount + " of the last " + recent.unknown.size() + " steps were ones users almost never take: " + recent.describeUnknownSteps();
+        sessionPath.put(sessionId, new RecentCalls(apiKey));
+        return reason;
     }
 
-    private static List<String> newPath(String apiKey) {
-        List<String> path = new ArrayList<>(UNKNOWN_STEPS_TO_ALERT + 1);
-        path.add(apiKey);
-        return path;
-    }
-
-    // "METHOD /url → METHOD /url ..." from "<collectionId> <url> <method>" keys
-    private static String describe(List<String> path) {
-        StringBuilder text = new StringBuilder();
-        for (String apiKey : path) {
-            int first = apiKey.indexOf(' ');
-            int last = apiKey.lastIndexOf(' ');
-            if (text.length() > 0) text.append(" → ");
-            text.append(apiKey.substring(last + 1)).append(' ').append(apiKey.substring(first + 1, last));
-        }
-        return text.toString();
+    // "METHOD /url" from a "<collectionId> <url> <method>" key
+    private static String describe(String apiKey) {
+        int first = apiKey.indexOf(' ');
+        int last = apiKey.lastIndexOf(' ');
+        return apiKey.substring(last + 1) + " " + apiKey.substring(first + 1, last);
     }
 
     private void refreshKnownSteps() {

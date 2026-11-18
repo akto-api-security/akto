@@ -545,8 +545,8 @@ function SampleDetails(props) {
             );
             vulnerabilitySegments = buildEvidenceVulnerabilitySegments(result.evidenceLine || rowInfo?.evidenceLine, requestText, responseText);
         }
-        return { message: result.orig, highlightPaths: [], metadata: result.metadata, vulnerabilitySegments }
-    }), [data, rowInfo?.evidenceLine]); // eslint-disable-line react-hooks/exhaustive-deps
+        return { message: result.orig, highlightPaths: [], metadata: result.metadata, filterId: result.filterId || rowInfo?.templateId, vulnerabilitySegments }
+    }), [data, rowInfo?.evidenceLine, rowInfo?.templateId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const ValuesTab = data.length > 0 && {
         id: 'values',
