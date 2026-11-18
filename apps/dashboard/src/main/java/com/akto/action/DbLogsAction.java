@@ -1,10 +1,21 @@
 package com.akto.action;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
+import com.akto.dao.RBACDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.Log;
+import com.akto.dto.RBAC.Role;
+import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.DashboardMode;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -13,6 +24,19 @@ public class DbLogsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbLogsAction.class, LogDb.DASHBOARD);;
 
+    /**
+     * Log groups of modules that can be self-hosted in the customer environment
+     * (see ModuleInfo.ModuleType). Everything else (DASHBOARD, BILLING, ANALYSER, ...) is internal.
+     */
+    private static final Set<LogDb> CUSTOMER_VISIBLE_LOG_DBS = Collections.unmodifiableSet(EnumSet.of(
+        LogDb.RUNTIME, LogDb.TESTING, LogDb.THREAT_DETECTION, LogDb.DATA_INGESTION,
+        LogDb.AGENTIC_TESTING, LogDb.GUARDRAILS_SERVICE, LogDb.SMART_TESTING,
+        LogDb.MINI_TESTING_ORCHESTRATOR, LogDb.DAST
+    ));
+
+    private static final String INTERNAL_EMAIL_DOMAIN = "@akto.io";
+
+    private List<LogDb> allowedLogGroups;
     private List<Log> logs;
     private int startTime;
 
@@ -50,10 +74,45 @@ public class DbLogsAction extends UserAction {
     @Setter
     private String testingRunResultSummaryId;
 
+    private boolean isInternalUser() {
+        User user = getSUser();
+        return user != null && user.getLogin() != null
+            && user.getLogin().toLowerCase().endsWith(INTERNAL_EMAIL_DOMAIN);
+    }
+
+    /** Customers need the ADMIN role; roles are only enforced on metered dashboards with RBAC (same as roleAccessInterceptor). */
+    private boolean isAdminOrRbacNotEnforced() {
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || getSUser() == null || !DashboardMode.isMetered()
+                || !UsageMetricCalculator.isRbacFeatureAvailable(accountId)) {
+            return true;
+        }
+        return RBACDao.getCurrentRoleForUser(getSUser().getId(), accountId) == Role.ADMIN;
+    }
+
+    private List<LogDb> computeAllowedLogGroups() {
+        boolean internal = isInternalUser();
+        if (!internal && !isAdminOrRbacNotEnforced()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(LogDb.values())
+            .filter(db -> internal || CUSTOMER_VISIBLE_LOG_DBS.contains(db))
+            .collect(Collectors.toList());
+    }
+
+    public String fetchAllowedLogGroups() {
+        allowedLogGroups = computeAllowedLogGroups();
+        return SUCCESS.toUpperCase();
+    }
+
     public String fetchLogsFromDb() {
         if(logDb==null){
             addActionError("Invalid log collection");
             return ERROR.toUpperCase();
+        }
+        if (!computeAllowedLogGroups().contains(logDb)) {
+            addActionError("You do not have access to these logs");
+            return "FORBIDDEN";
         }
         logs = loggerMaker.fetchLogRecords(startTime, endTime, logDb, logKeys);
 
@@ -68,6 +127,9 @@ public class DbLogsAction extends UserAction {
         logs = loggerMaker.fetchTestingLogRecordsByActivity(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY, testingRunResultSummaryId, logKeys);
 
         return SUCCESS.toUpperCase();
+    }
+    public List<LogDb> getAllowedLogGroups() {
+        return allowedLogGroups;
     }
     public List<Log> getLogs() {
         return logs;
