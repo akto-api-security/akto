@@ -57,6 +57,7 @@ public class AuthenticationInterceptor implements Handler<RoutingContext> {
     }
   }
 
+  private static boolean isPublicKeyUsable(boolean forceReload, long now) {
     if (cachedPublicKey == null) {
       return false;
     }
