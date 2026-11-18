@@ -85,6 +85,12 @@ public class AgentImportAction extends UserAction{
 
     private int apiCollectionId;
 
+    // the agent's collection found by name when the import starts, or null to use the name's hash as its id
+    private Integer agentCollectionId;
+
+    // an event sent to the connection already imported under the agent name, rather than to a URL given with it
+    private boolean urlFromAgentName;
+
     // request headers of the agent's WebSocket connection, reused for an event sent to it by agent name
     private Map<String, List<String>> connectionHeaders = new HashMap<>();
 
@@ -119,16 +125,23 @@ public class AgentImportAction extends UserAction{
         try {
             // no URL with an event: send it to the WebSocket connection imported earlier under this agent name
             if (StringUtils.isEmpty(url) && !StringUtils.isEmpty(collectionName) && !StringUtils.isEmpty(requestBody)) {
-                url = loadConnectionUrl(collectionName.trim().hashCode());
+                agentCollectionId = findAgentCollectionId(collectionName.trim());
+                url = loadConnectionUrl(agentCollectionId != null ? agentCollectionId : collectionName.trim().hashCode());
                 if (url == null) {
                     addActionError("No WebSocket connection for this agent, import its WebSocket URL first");
                     return Action.ERROR.toUpperCase();
                 }
+                urlFromAgentName = true;
             }
 
             if (StringUtils.isEmpty(url)) {
                 addActionError("URL is required");
                 return Action.ERROR.toUpperCase();
+            }
+
+            // looked up here, where the request's dashboard and user scope the search as creating a collection does
+            if (agentCollectionId == null) {
+                agentCollectionId = findAgentCollectionId(importCollectionName());
             }
 
             if (isWebSocketUrl(url) && StringUtils.isEmpty(miniTestingName) && StringUtils.isEmpty(customResponseBody)) {
@@ -172,13 +185,35 @@ public class AgentImportAction extends UserAction{
         }
     }
 
+    // the agent name, else the target's host
+    private String importCollectionName() throws Exception {
+        return !StringUtils.isEmpty(collectionName)
+                ? collectionName.trim()
+                : HttpRequestResponseUtils.extractHostFromUrl(httpScheme(url));
+    }
+
+
+    Integer findAgentCollectionId(String name) {
+        try {
+            ApiCollection collection = ApiCollectionsDao.instance.findByName(name);
+            if (collection == null || collection.getTagsList() == null) {
+                return null;
+            }
+            boolean agentCollection = collection.getTagsList().stream()
+                    .anyMatch(tag -> Constants.AKTO_GEN_AI_TAG.equals(tag.getKeyName()));
+            return agentCollection ? collection.getId() : null;
+        } catch (Exception e) {
+            loggerMaker.error("Error finding agent collection " + name + ": " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            return null;
+        }
+    }
+
     private void createApiCollectionFromUrl() {
         try {
-            String name = !StringUtils.isEmpty(collectionName)
-                    ? collectionName.trim()
-                    : HttpRequestResponseUtils.extractHostFromUrl(httpScheme(url));
+            String name = importCollectionName();
 
-            int id = name.hashCode();
+            // an AI agent collection of this name, else one at the name's hash (also a host's traffic collection)
+            int id = agentCollectionId != null ? agentCollectionId : name.hashCode();
 
             // Check if collection already exists for this host
             ApiCollection existingCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, id));
@@ -282,6 +317,16 @@ public class AgentImportAction extends UserAction{
             }
         }
 
+        // an event's frames have no headers: the ones mini-testing sends back with them are the handshake's, so they
+        // go on the connection string
+        Map<String, List<String>> handshakeHeaders = new HashMap<>();
+        if (webSocket) {
+            if (response.getHeaders() != null) {
+                handshakeHeaders.putAll(response.getHeaders());
+            }
+            response = new OriginalHttpResponse(response.getBody(), new HashMap<>(), response.getStatusCode());
+        }
+
         try {
             // Remove x-akto-ignore header before converting to message
             headers.remove(Constants.AKTO_IGNORE_FLAG);
@@ -293,7 +338,15 @@ public class AgentImportAction extends UserAction{
                             webSocketEvents(requestBody, response))
                     : convertToMessage(url, headers, method, body, response, "HTTP/1.1", null);
             createApiCollectionFromUrl();
-            saveToDatabase(Arrays.asList(message));
+
+            List<String> messages = new ArrayList<>();
+            // an event sent to a URL given with it: the agent's connection string is saved too, if it has none yet,
+            // so its tests and later events (by agent name) find the connection
+            if (webSocket && !urlFromAgentName && !hasConnectionString(apiCollectionId)) {
+                messages.add(connectionMessage(headers, new OriginalHttpResponse("", handshakeHeaders, 101)));
+            }
+            messages.add(message);
+            saveToDatabase(messages);
         } catch (Exception e) {
             loggerMaker.error("Error during async API execution: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
@@ -427,11 +480,25 @@ public class AgentImportAction extends UserAction{
         }
 
         createApiCollectionFromUrl();
+        saveToDatabase(Arrays.asList(connectionMessage(headers, handshake)));
+    }
+
+    // the agent's connection string: its handshake with the headers it was sent with, and mini-testing's 101 with the
+    // server's response headers
+    private String connectionMessage(Map<String, List<String>> requestHeaders, OriginalHttpResponse handshake) throws Exception {
+        Map<String, List<String>> headers = new HashMap<>(requestHeaders);
+        // an event's, not the handshake's
+        headers.keySet().removeIf(name -> name.equalsIgnoreCase("content-type"));
         // a handshake's own headers, as a captured one has them: the inventory lists an endpoint by its params
         headers.put("host", Arrays.asList(new java.net.URI(httpScheme(url)).getRawAuthority()));
         headers.put("upgrade", Arrays.asList("websocket"));
         headers.put("connection", Arrays.asList("Upgrade"));
-        saveToDatabase(Arrays.asList(convertToMessage(httpScheme(url), headers, "GET", "", handshake, WEBSOCKET_TYPE, null)));
+        return convertToMessage(httpScheme(url), headers, "GET", "", handshake, WEBSOCKET_TYPE, null);
+    }
+
+    private static boolean hasConnectionString(int collectionId) {
+        return ApiInfoDao.instance.findOne(Filters.and(
+                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId), Filters.eq(ApiInfo.IS_CONNECTION_STRING, true))) != null;
     }
 
     // sent to mini-testing as the http(s) handshake URL marked WEBSOCKET; an empty body means only the handshake

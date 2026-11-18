@@ -9,7 +9,9 @@ import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.upload.FileUpload;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.testing.AuthMechanism;
@@ -31,6 +33,7 @@ import org.junit.Test;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -229,13 +232,95 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
     }
 
     private static void insertConnection(String url, String requestHeaders) {
-        ApiInfo apiInfo = new ApiInfo(COLLECTION_ID, url, Method.GET);
+        insertConnection(COLLECTION_ID, url, requestHeaders);
+    }
+
+    private static void insertConnection(int collectionId, String url, String requestHeaders) {
+        ApiInfo apiInfo = new ApiInfo(collectionId, url, Method.GET);
         apiInfo.setIsConnectionString(true);
         ApiInfoDao.instance.insertOne(apiInfo);
 
         String sample = "{\"method\":\"GET\",\"path\":\"" + url + "\",\"type\":\"WEBSOCKET\",\"statusCode\":\"101\"," +
                 "\"requestPayload\":\"{}\",\"responsePayload\":\"{}\",\"requestHeaders\":\"" + requestHeaders.replace("\"", "\\\"") + "\"}";
-        SampleDataDao.instance.insertOne(new SampleData(new Key(COLLECTION_ID, url, Method.GET, -1, 0, 0), Collections.singletonList(sample)));
+        SampleDataDao.instance.insertOne(new SampleData(new Key(collectionId, url, Method.GET, -1, 0, 0), Collections.singletonList(sample)));
+    }
+
+    // a collection created by hand: a timestamp id, not the name's hash
+    private static void insertCollection(int id, String name, String tagKey) {
+        ApiCollection collection = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, true);
+        if (tagKey != null) {
+            collection.setTagsList(Collections.singletonList(new CollectionTags(Context.now(), tagKey, "Gen AI", CollectionTags.TagSource.USER)));
+        }
+        ApiCollectionsDao.instance.insertOne(collection);
+    }
+
+    @Test
+    public void testEventFindsTheAgentCollectionCreatedByHand() throws Exception {
+        int createdByHand = 1795006716;
+        insertCollection(createdByHand, "Chat-Agent", Constants.AKTO_GEN_AI_TAG);
+        insertConnection(createdByHand, "https://agent.example.com/ws", "{\"cookie\":\"session=abc\"}");
+        AtomicReference<TestingRunPlayground> seen = new AtomicReference<>();
+        Thread miniTesting = fakeMiniTesting(new OriginalHttpResponse("{\"error\":\"timeout\"}", new HashMap<>(), 504), seen);
+
+        // the agent name matches the collection created by hand (case-insensitively), not its hash
+        AgentImportAction action = new AgentImportAction();
+        action.setCollectionName("chat-agent");
+        action.setMiniTestingName("mt-1");
+        action.setRequestBody("{\"event\":\"user_query\"}");
+        assertEquals("SUCCESS", action.importFromUrl());
+        miniTesting.join();
+        awaitImport(action);
+
+        // the event went over that collection's connection, with its headers
+        assertEquals("https://agent.example.com/ws", seen.get().getOriginalHttpRequest().getUrl());
+        assertEquals(Collections.singletonList("session=abc"), seen.get().getOriginalHttpRequest().getHeaders().get("cookie"));
+        assertEquals(Integer.valueOf(createdByHand), action.findAgentCollectionId("chat-agent"));
+    }
+
+    @Test
+    public void testEventWithItsUrlAlsoSavesTheConnection() throws Exception {
+        Map<String, List<String>> handshakeHeaders = new HashMap<>();
+        handshakeHeaders.put("sec-websocket-accept", Collections.singletonList("abc="));
+        AtomicReference<TestingRunPlayground> seen = new AtomicReference<>();
+        Thread miniTesting = fakeMiniTesting(new OriginalHttpResponse(
+                "[{\"event\":\"stats_data\",\"data\":{\"stats\":\"none failed\"}}]", handshakeHeaders, 200), seen);
+
+        AgentImportAction action = connectionImport("mt-1");
+        action.setRequestBody("{\"event\":\"user_query\",\"data\":{\"user_query\":\"hi\"}}");
+        assertEquals("SUCCESS", action.importFromUrl());
+        miniTesting.join();
+        AgentImportAction status = awaitImport(action);
+        assertEquals(status.getErrorMessage(), FileUpload.UploadStatus.SUCCEEDED, status.getUploadStatus());
+
+        // the connection string, from the same handshake: its URL, 101 and the server's response headers
+        ApiInfo connection = ApiInfoDao.instance.findOne(Filters.and(
+                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, COLLECTION_ID), Filters.eq(ApiInfo.IS_CONNECTION_STRING, true)));
+        assertNotNull(connection);
+        assertEquals("https://agent.example.com/ws", connection.getId().getUrl());
+        String handshake = SampleDataDao.instance.fetchSampleDataForApi(COLLECTION_ID, connection.getId().getUrl(),
+                connection.getId().getMethod()).getSamples().get(0);
+        assertTrue(handshake, handshake.contains("sec-websocket-accept") && handshake.contains("\"statusCode\":\"101\""));
+        assertFalse(handshake, handshake.contains("content-type") || handshake.contains("Content-Type"));
+
+        // and the event, whose reply has no headers of its own
+        String event = SampleDataDao.instance.fetchSampleDataForApi(COLLECTION_ID, "/user_query", Method.WS).getSamples().get(0);
+        assertTrue(event, event.contains("none failed"));
+        assertFalse(event, event.contains("sec-websocket-accept"));
+    }
+
+    @Test
+    public void testOnlyAnAgentCollectionIsReused() {
+        // an API collection of the same name is left alone: the agent's own collection is the name's hash
+        insertCollection(1795006716, "chat-agent", null);
+        insertConnection(1795006716, "https://agent.example.com/ws", "{}");
+
+        AgentImportAction action = new AgentImportAction();
+        assertNull(action.findAgentCollectionId("chat-agent"));
+        action.setCollectionName("chat-agent");
+        action.setMiniTestingName("mt-1");
+        action.setRequestBody("{\"event\":\"user_query\"}");
+        assertEquals("ERROR", action.importFromUrl());
+        assertTrue(action.getActionErrors().iterator().next().startsWith("No WebSocket connection for this agent"));
     }
 
     @Test
