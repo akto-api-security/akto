@@ -46,6 +46,9 @@ public class SensitiveDataThresholdAlertsIT {
     private static final int ACCOUNT = 1000000;
     private static final int OTHER_ACCOUNT = 1000002;
     private static final int DAY = 86400;
+
+    /** The caller these fixtures attribute every count to. */
+    private static final int UPSTREAM = 987001;
     private static final Gson gson = new Gson();
     private static String receiver;
     private static String receiverLog;
@@ -66,8 +69,8 @@ public class SensitiveDataThresholdAlertsIT {
             CustomWebhooksDao.instance.getMCollection().drop();
             CustomWebhooksResultDao.instance.getMCollection().drop();
             ApiCollectionsDao.instance.getMCollection().drop();
-            // Only service-tag collections are alerted on, so ids the tests seed counts for need
-            // one. 3 is left out: one test covers counts whose collection has no doc.
+            // An alert can only speak about a collection it can name, so ids the tests seed counts
+            // for need a document. 3 is left out: one test covers counts whose collection has none.
             collection(1, "svc-one");
             collection(2, "svc-two");
             for (int c = 100; c < 300; c++) collection(c, "svc-" + c);
@@ -89,8 +92,9 @@ public class SensitiveDataThresholdAlertsIT {
 
         Map<String, Document> counts = new HashMap<>();
         for (Document i : SensitiveDataCountDao.instance.getMCollection().listIndexes()) counts.put(i.getString("name"), i);
-        Document unique = counts.get("subType_hour_apiCollectionId");
-        assertEquals(new Document("subType", 1).append("hour", 1).append("apiCollectionId", 1), unique.get("key", Document.class));
+        Document unique = counts.get(SensitiveDataCountDao.UNIQUE_INDEX);
+        assertEquals(new Document("subType", 1).append("hour", 1).append("apiCollectionId", 1)
+                .append("senderCollectionId", 1), unique.get("key", Document.class));
         assertEquals(Boolean.TRUE, unique.getBoolean("unique"));
         assertEquals(0, ((Number) counts.get("expireAt_ttl").get("expireAfterSeconds")).longValue());
 
@@ -107,9 +111,17 @@ public class SensitiveDataThresholdAlertsIT {
         return Context.now();
     }
 
+    /**
+     * One caller's events into {@code collection}.
+     *
+     * The caller is part of the key now, and a count with no identifiable caller is not counted at
+     * all, so these fixtures name one. What each test is about - thresholds, windows, suppression,
+     * delivery - is unchanged by which caller it is, so they all share {@link #UPSTREAM}.
+     */
     private static void counts(int collection, String type, int hoursAgo, long count) {
         int hour = SensitiveDataCount.hourOf(now() - hoursAgo * 3600);
-        SensitiveDataCountDao.instance.bulkInc(Collections.singletonList(new SensitiveDataCount(collection, type, hour, count)));
+        SensitiveDataCountDao.instance.bulkInc(Collections.singletonList(
+                new SensitiveDataCount(collection, UPSTREAM, type, hour, count)));
     }
 
     /** A service-tag collection; its hostName is deliberately not the service name. */
@@ -154,6 +166,9 @@ public class SensitiveDataThresholdAlertsIT {
     private static Set<String> alertedPairs(Map<String, Object> request) {
         Set<String> pairs = new HashSet<>();
         for (Map<String, Object> a : (List<Map<String, Object>>) ((Map<String, Object>) request.get("json")).get("alerts")) {
+            // Only the receiving end: UPSTREAM breaches as a sender on the same traffic, and every
+            // expectation here is written in terms of the collection the events landed in.
+            if (!"RECEIVER".equals(a.get("role"))) continue;
             pairs.add(a.get("dataType") + "|" + ((Number) a.get("apiCollectionId")).intValue() + "|" + ((Number) a.get("count")).longValue());
         }
         return pairs;
@@ -208,10 +223,10 @@ public class SensitiveDataThresholdAlertsIT {
         assertEquals(1, received().size());
 
         // a day has passed since the last alert, and it is still breaching
-        CustomWebhooksDao.instance.updateOne(Filters.eq("_id", 14), Updates.set("sensitiveDataAlertedAt.T|1", now() - 2 * DAY));
+        CustomWebhooksDao.instance.updateOne(Filters.eq("_id", 14), Updates.set("sensitiveDataAlertedAt.T|RECEIVER|1", now() - 2 * DAY));
         SensitiveDataThresholdAlerts.run();
         assertEquals(2, received().size());
-        assertTrue(alertedAt(14).get("T|1") >= now() - 60);
+        assertTrue(alertedAt(14).get("T|RECEIVER|1") >= now() - 60);
     }
 
     @Test
@@ -275,7 +290,7 @@ public class SensitiveDataThresholdAlertsIT {
         SensitiveDataThresholdAlerts.run();
         SensitiveDataThresholdAlerts.run();
         assertEquals(1, received().size());
-        assertTrue(alertedAt(22).containsKey("A_B_C|1"));
+        assertTrue(alertedAt(22).containsKey("A_B_C|RECEIVER|1"));
     }
 
     @Test
@@ -319,26 +334,33 @@ public class SensitiveDataThresholdAlertsIT {
         List<Map<String, Object>> got = received();
         assertEquals(1, got.size());
         assertEquals(200, alertedPairs(got.get(0)).size());
+        // Just the 200 receivers: UPSTREAM breaches as their sender too, but has no collection and
+        // so no service tag, and this branch alerts only on tagged collections.
         assertEquals(200, alertedAt(26).size());
     }
 
     @Test
-    public void onlyServiceTagCollectionsAreAlertedOnAndAreNamedByTheTag() throws Exception {
+    public void collectionsAreNamedByTagThenHostAndUnnameableOnesAreDropped() throws Exception {
         collection(1, "payments");
         ApiCollectionsDao.instance.getMCollection().deleteMany(Filters.eq("_id", 2));
         ApiCollectionsDao.instance.insertOne(
                 new ApiCollection(2, null, now(), new HashSet<>(), "payments.example.com", 0, false, true));
         counts(1, "T", 1, 3067);
         counts(2, "T", 1, 1457);
+        counts(3, "T", 1, 2000);
         webhook(27, "", true, rule("T", 500, 7));
 
         SensitiveDataThresholdAlerts.run();
 
         List<Map<String, Object>> got = received();
         assertEquals(1, got.size());
-        assertEquals(Collections.singleton("T|1|3067"), alertedPairs(got.get(0)));
+        // 3 has no collection document, so there is nothing to call it and it is left out.
+        assertEquals(new HashSet<>(Arrays.asList("T|1|3067", "T|2|1457")), alertedPairs(got.get(0)));
         String body = (String) got.get(0).get("body");
         assertTrue(body, body.contains("\"apiCollectionName\":\"payments\""));
-        assertTrue("names the service, not its host: " + body, !body.contains("host-1.example.com"));
+        assertTrue("a collection routed by Host is named by its host: " + body,
+                body.contains("\"apiCollectionName\":\"payments.example.com\""));
+        assertTrue("a tagged collection is named by its tag, not its host: " + body,
+                !body.contains("host-1.example.com"));
     }
 }
