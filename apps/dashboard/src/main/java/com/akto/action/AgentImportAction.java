@@ -76,6 +76,9 @@ public class AgentImportAction extends UserAction{
     // request headers of the agent's WebSocket connection, reused for an event sent to it by agent name
     private Map<String, List<String>> connectionHeaders = new HashMap<>();
 
+    // why the last request got no response, e.g. its test role failed, for the user's error message
+    private String requestError;
+
     public String importFromUrl() {
         try {
             // no URL with an event: send it to the WebSocket connection imported earlier under this agent name
@@ -248,18 +251,29 @@ public class AgentImportAction extends UserAction{
 
     private OriginalHttpResponse sendRequest(OriginalHttpRequest request, int hybridTimeoutSeconds) {
         try {
-            if (!StringUtils.isEmpty(testRoleId)) {
-                // Auth goes on the request's own headers, so it's also in the saved sample: a test with the role
-                // replaces auth headers that are present in the sample
-                TestRoleAuthUtils.applyTestRoleAuth(request, testRoleId);
-            }
-
             OriginalHttpResponse response;
             if (!StringUtils.isEmpty(miniTestingName)) {
-                // Target is internal to the customer's network — have their mini-testing send it.
+                // Target is internal to the customer's network — have their mini-testing send it. The role is
+                // applied there too, as in tests, so its login reaches the customer's login servers: the dashboard
+                // only adds the role's auth header names, empty, so the saved sample has the headers a test with
+                // the role replaces
+                if (!StringUtils.isEmpty(testRoleId)) {
+                    TestRoleAuthUtils.addTestRoleHeaderNames(request, testRoleId);
+                    request.getHeaders().put(Constants.AKTO_TEST_ROLE_ID_HEADER, new ArrayList<>(Arrays.asList(testRoleId)));
+                }
                 loggerMaker.info("Sending request via mini-testing " + miniTestingName + " for URL: " + url, LoggerMaker.LogDb.DASHBOARD);
-                response = com.akto.testing.Utils.runRequestOnHybridTesting(request, miniTestingName, hybridTimeoutSeconds);
+                try {
+                    response = com.akto.testing.Utils.runRequestOnHybridTesting(request, miniTestingName, hybridTimeoutSeconds);
+                } finally {
+                    // the role id is for mini-testing only, never part of the saved sample
+                    request.getHeaders().remove(Constants.AKTO_TEST_ROLE_ID_HEADER);
+                }
             } else {
+                if (!StringUtils.isEmpty(testRoleId)) {
+                    // Auth goes on the request's own headers, so it's also in the saved sample: a test with the role
+                    // replaces auth headers that are present in the sample
+                    TestRoleAuthUtils.applyTestRoleAuth(request, testRoleId);
+                }
                 response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
             }
             if (response == null) {
@@ -271,6 +285,7 @@ public class AgentImportAction extends UserAction{
             // Request never reached the target (SSRF block, DNS/connection failure, timeout, etc).
             // Save a placeholder entry so the attempted call still shows up instead of vanishing silently.
             loggerMaker.error("Error calling URL: " + url + " - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            requestError = e.getMessage();
             return new OriginalHttpResponse("", new HashMap<>(), 0);
         }
     }
@@ -286,8 +301,9 @@ public class AgentImportAction extends UserAction{
     }
 
     private static final String WEBSOCKET_TYPE = "WEBSOCKET";
-    // how long the user waits for mini-testing to check a WebSocket connection
-    private static final int CONNECTION_CHECK_TIMEOUT_SECONDS = 60;
+    // how long the user waits for mini-testing to check a WebSocket connection: as long as an event import waits,
+    // since mini-testing may first run the test role's login (the UI's request allows 330s)
+    private static final int CONNECTION_CHECK_TIMEOUT_SECONDS = 5 * 60;
 
     /*
      * A WebSocket URL without an event is the agent's connection string, which its events and WebSocket tests
@@ -305,7 +321,7 @@ public class AgentImportAction extends UserAction{
             if (handshake.getStatusCode() != 101) {
                 addActionError(handshake.getStatusCode() > 0
                         ? "WebSocket handshake failed with HTTP " + handshake.getStatusCode()
-                        : "No response from mini-testing " + miniTestingName);
+                        : noResponseReason(handshake));
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -317,6 +333,23 @@ public class AgentImportAction extends UserAction{
         headers.put("connection", Arrays.asList("Upgrade"));
         saveToDatabase(Arrays.asList(convertToMessage(httpScheme(url), headers, "GET", "", handshake, WEBSOCKET_TYPE, null)));
         return Action.SUCCESS.toUpperCase();
+    }
+
+    // a request that got no response: failed here (e.g. its test role), mini-testing reported why (status 0 with
+    // an error, e.g. the role's login failed), or mini-testing never answered
+    private String noResponseReason(OriginalHttpResponse response) {
+        if (!StringUtils.isEmpty(requestError)) {
+            return requestError;
+        }
+        try {
+            String error = BasicDBObject.parse(response.getBody()).getString("error");
+            if (!StringUtils.isEmpty(error)) {
+                return "Mini-testing " + miniTestingName + ": " + error;
+            }
+        } catch (Exception e) {
+            // no error from mini-testing
+        }
+        return "No response from mini-testing " + miniTestingName;
     }
 
     // sent to mini-testing as the http(s) handshake URL marked WEBSOCKET; an empty body means only the handshake

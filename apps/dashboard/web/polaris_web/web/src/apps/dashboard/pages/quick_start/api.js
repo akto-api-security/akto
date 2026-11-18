@@ -220,7 +220,9 @@ const api = {
         return request({
             url: '/api/importFromUrl',
             method: 'post',
-            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName, method: httpMethod}
+            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName, method: httpMethod},
+            // a WebSocket connection import waits up to 300s for mini-testing (role login + handshake)
+            timeout: 330000
         })
     },
 

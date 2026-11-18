@@ -6,10 +6,18 @@ import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.test_editor.TestingRunPlayground;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.AuthParam;
+import com.akto.dto.testing.HardcodedAuthParam;
+import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.sources.AuthWithCond;
+import com.akto.util.enums.LoginFlowEnums;
+import org.bson.types.ObjectId;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods.Method;
@@ -21,6 +29,8 @@ import org.junit.Test;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
@@ -35,6 +45,7 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
         SampleDataDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         TestingRunPlaygroundDao.instance.getMCollection().drop();
+        TestRolesDao.instance.getMCollection().drop();
     }
 
     // plays mini-testing: picks up the scheduled request and answers it with the given response
@@ -97,6 +108,59 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
         assertEquals("mt-1", seen.get().getMiniTestingName());
         // nothing is created for a connection that was refused
         assertNull(ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, COLLECTION_ID)));
+    }
+
+    private static TestRoles insertCookieRole() {
+        AuthMechanism auth = new AuthMechanism(
+                Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.HEADER, "Cookie", "session=secret", true)),
+                null, LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString(), null);
+        TestRoles role = new TestRoles(new ObjectId(), "pdh-user", null,
+                Collections.singletonList(new AuthWithCond(auth, new HashMap<>(), null)), "test", 0, 0, null, "test");
+        TestRolesDao.instance.insertOne(role);
+        return role;
+    }
+
+    @Test
+    public void testMiniTestingAppliesTheTestRole() throws Exception {
+        TestRoles role = insertCookieRole();
+        AtomicReference<TestingRunPlayground> seen = new AtomicReference<>();
+        Thread miniTesting = fakeMiniTesting(new OriginalHttpResponse("", new HashMap<>(), 401), seen);
+
+        AgentImportAction action = connectionImport("mt-1");
+        action.setTestRoleId(role.getHexId());
+        assertEquals("ERROR", action.importFromUrl());
+        miniTesting.join();
+
+        Map<String, List<String>> sent = seen.get().getOriginalHttpRequest().getHeaders();
+        // mini-testing gets the role to apply, and the role's auth header without its value: not resolved here
+        assertEquals(Collections.singletonList(role.getHexId()), sent.get(Constants.AKTO_TEST_ROLE_ID_HEADER));
+        assertEquals(Collections.singletonList(""), sent.get("cookie"));
+    }
+
+    @Test
+    public void testMiniTestingRoleErrorIsShown() throws Exception {
+        TestRoles role = insertCookieRole();
+        AtomicReference<TestingRunPlayground> seen = new AtomicReference<>();
+        Thread miniTesting = fakeMiniTesting(new OriginalHttpResponse(
+                "{\"error\":\"Could not apply test role pdh-user: login failed\"}", new HashMap<>(), 0), seen);
+
+        AgentImportAction action = connectionImport("mt-1");
+        action.setTestRoleId(role.getHexId());
+        assertEquals("ERROR", action.importFromUrl());
+        miniTesting.join();
+
+        String error = action.getActionErrors().iterator().next();
+        assertEquals("Mini-testing mt-1: Could not apply test role pdh-user: login failed", error);
+    }
+
+    @Test
+    public void testUnknownTestRoleIsNotSent() {
+        AgentImportAction action = connectionImport("mt-1");
+        action.setTestRoleId(new ObjectId().toHexString());
+        assertEquals("ERROR", action.importFromUrl());
+
+        assertTrue(action.getActionErrors().iterator().next().startsWith("Test role not found"));
+        assertNull(TestingRunPlaygroundDao.instance.findOne(Filters.empty()));
     }
 
     private static void insertConnection(String url, String requestHeaders) {
