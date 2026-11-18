@@ -18,16 +18,6 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
     public static final ModuleInfoDao instance = new ModuleInfoDao();
     private ModuleInfoDao(){}
 
-    public void createIndicesIfAbsent() {
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { ModuleInfo.MODULE_TYPE, ModuleInfo._REBOOT, ModuleInfo.MINI_RUNTIME_NAME }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { ModuleInfo.LAST_HEARTBEAT_RECEIVED }, true);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { ModuleInfo.MODULE_TYPE, ModuleInfo.NAME }, true);
-        createTtlIndexIfAbsent();
-    }
-
     /** TTL index on expiresAt: docs are deleted once their expiresAt date passes. */
     public void createTtlIndexIfAbsent() {
         IndexOptions ttlOptions = new IndexOptions()

@@ -12,9 +12,9 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
- * Ensures the module_info indices (reboot poll, heartbeat delete, heartbeat upsert, expiresAt TTL) for
- * every active account. Runs once per process start on its own thread, so building the indices on a
- * large collection cannot hold up startup. Idempotent: once the indices exist, a restart is a no-op.
+ * Adds the expiresAt TTL index to module_info for every active account. Runs once per process start
+ * on its own thread, so building the index on a large collection cannot hold up startup. Idempotent:
+ * once the index exists, a restart is a no-op.
  */
 public class ModuleInfoCleanupJob {
 
@@ -28,14 +28,14 @@ public class ModuleInfoCleanupJob {
             public void accept(Account account) {
                 int accountId = Context.accountId.get();
                 try {
-                    loggerMaker.warnAndAddToDb("Module info indices start for account " + accountId);
-                    ModuleInfoDao.instance.createIndicesIfAbsent();
-                    loggerMaker.warnAndAddToDb("Module info indices ensured for account " + accountId);
+                    loggerMaker.warnAndAddToDb("Module info expiresAt TTL index start for account " + accountId);
+                    ModuleInfoDao.instance.createTtlIndexIfAbsent();
+                    loggerMaker.warnAndAddToDb("Module info expiresAt TTL index ensured for account " + accountId);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error creating module info indices for account " + accountId
+                    loggerMaker.errorAndAddToDb(e, "Error creating module info TTL index for account " + accountId
                             + ": " + e.getMessage());
                 }
             }
-        }, "module-info-indices"));
+        }, "module-info-ttl-index"));
     }
 }
