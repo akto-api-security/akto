@@ -5,6 +5,7 @@ import com.akto.dto.Config;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.SignatureException;
 import io.vertx.core.Handler;
 import io.vertx.ext.web.RoutingContext;
 import java.io.IOException;
@@ -14,7 +15,6 @@ import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
-import io.jsonwebtoken.security.SignatureException;
 import java.util.concurrent.TimeUnit;
 
 public class AuthenticationInterceptor implements Handler<RoutingContext> {
@@ -23,11 +23,9 @@ public class AuthenticationInterceptor implements Handler<RoutingContext> {
   private static final int SERVICE_TOKEN_ACCOUNT_ID = 1758787662;
 
   private static final long PUBLIC_KEY_TTL_MS = TimeUnit.MINUTES.toMillis(10);
-  private static final long PUBLIC_KEY_MIN_RELOAD_MS = TimeUnit.SECONDS.toMillis(30);
   private static final Object publicKeyLock = new Object();
   private static volatile PublicKey cachedPublicKey;
   private static volatile long publicKeyLoadedAt;
-  private static volatile long lastForcedReloadAt;
 
   private static PublicKey loadPublicKey()
       throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
@@ -57,39 +55,25 @@ public class AuthenticationInterceptor implements Handler<RoutingContext> {
     }
   }
 
-  private static boolean isPublicKeyUsable(boolean forceReload, long now) {
-    if (cachedPublicKey == null) {
-      return false;
-    }
-    return forceReload
-        ? now - lastForcedReloadAt < PUBLIC_KEY_MIN_RELOAD_MS
-        : now - publicKeyLoadedAt < PUBLIC_KEY_TTL_MS;
+  private static boolean isPublicKeyFresh() {
+    return cachedPublicKey != null
+        && System.currentTimeMillis() - publicKeyLoadedAt < PUBLIC_KEY_TTL_MS;
   }
 
   private static PublicKey getPublicKey(boolean forceReload)
       throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
-    long now = System.currentTimeMillis();
-    if (isPublicKeyUsable(forceReload, now)) {
+    if (!forceReload && isPublicKeyFresh()) {
       return cachedPublicKey;
     }
 
     synchronized (publicKeyLock) {
-      if (isPublicKeyUsable(forceReload, now)) {
+      if (!forceReload && isPublicKeyFresh()) {
         return cachedPublicKey;
       }
-      if (forceReload) {
-        lastForcedReloadAt = now;
-      }
-      PublicKey previous = cachedPublicKey;
-      try {
-        cachedPublicKey = loadPublicKey();
-      } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException | RuntimeException e) {
-        if (previous == null) {
-          throw e;
-        }
-      }
-      publicKeyLoadedAt = now;
-      return cachedPublicKey;
+      PublicKey loaded = loadPublicKey();
+      cachedPublicKey = loaded;
+      publicKeyLoadedAt = System.currentTimeMillis();
+      return loaded;
     }
   }
 
