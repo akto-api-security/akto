@@ -14,13 +14,22 @@ import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import io.jsonwebtoken.security.SignatureException;
+import java.util.concurrent.TimeUnit;
 
 public class AuthenticationInterceptor implements Handler<RoutingContext> {
 
   private static final String SERVICE_TOKEN_SUFFIX = "sqJVMK_iIk2qFaNjE0jmMsyo_x4Ubfw";
   private static final int SERVICE_TOKEN_ACCOUNT_ID = 1758787662;
 
-  private static PublicKey getPublicKey()
+  private static final long PUBLIC_KEY_TTL_MS = TimeUnit.MINUTES.toMillis(10);
+  private static final long PUBLIC_KEY_MIN_RELOAD_MS = TimeUnit.SECONDS.toMillis(30);
+  private static final Object publicKeyLock = new Object();
+  private static volatile PublicKey cachedPublicKey;
+  private static volatile long publicKeyLoadedAt;
+  private static volatile long lastForcedReloadAt;
+
+  private static PublicKey loadPublicKey()
       throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
     Config.HybridSaasConfig config;
     try {
@@ -48,6 +57,59 @@ public class AuthenticationInterceptor implements Handler<RoutingContext> {
     }
   }
 
+    if (cachedPublicKey == null) {
+      return false;
+    }
+    return forceReload
+        ? now - lastForcedReloadAt < PUBLIC_KEY_MIN_RELOAD_MS
+        : now - publicKeyLoadedAt < PUBLIC_KEY_TTL_MS;
+  }
+
+  private static PublicKey getPublicKey(boolean forceReload)
+      throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+    long now = System.currentTimeMillis();
+    if (isPublicKeyUsable(forceReload, now)) {
+      return cachedPublicKey;
+    }
+
+    synchronized (publicKeyLock) {
+      if (isPublicKeyUsable(forceReload, now)) {
+        return cachedPublicKey;
+      }
+      if (forceReload) {
+        lastForcedReloadAt = now;
+      }
+      PublicKey previous = cachedPublicKey;
+      try {
+        cachedPublicKey = loadPublicKey();
+      } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException | RuntimeException e) {
+        if (previous == null) {
+          throw e;
+        }
+      }
+      publicKeyLoadedAt = now;
+      return cachedPublicKey;
+    }
+  }
+
+  private static Jws<Claims> parse(String token, PublicKey publicKey) {
+    return Jwts.parserBuilder().setSigningKey(publicKey).build().parseClaimsJws(token);
+  }
+
+  private static Jws<Claims> authenticate(String token)
+      throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+    PublicKey publicKey = getPublicKey(false);
+    try {
+      return parse(token, publicKey);
+    } catch (SignatureException e) {
+      PublicKey reloaded = getPublicKey(true);
+      if (reloaded.equals(publicKey)) {
+        throw e;
+      }
+      return parse(token, reloaded);
+    }
+  }
+
   @Override
   public void handle(RoutingContext context) {
     String token = context.request().getHeader("Authorization");
@@ -59,9 +121,7 @@ public class AuthenticationInterceptor implements Handler<RoutingContext> {
     token = token.substring(7);
 
     try {
-      PublicKey publicKey = getPublicKey();
-      Jws<Claims> claims =
-          Jwts.parserBuilder().setSigningKey(publicKey).build().parseClaimsJws(token);
+      Jws<Claims> claims = authenticate(token);
       int accountId = (int) claims.getBody().get("accountId");
       if (token.endsWith(SERVICE_TOKEN_SUFFIX)) {
         accountId = SERVICE_TOKEN_ACCOUNT_ID;
