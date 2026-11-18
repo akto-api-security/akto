@@ -171,17 +171,8 @@ async def get_role_credentials(region: str) -> AwsCredentials:
 
     task = _ROLE_FETCH.get(_ROLE_CACHE_KEY)
     if task is None or task.done():
-        task = asyncio.ensure_future(_refresh_role_credentials(region))
-        task.add_done_callback(_retrieve_exception)
-        _ROLE_FETCH[_ROLE_CACHE_KEY] = task
+        task = _ROLE_FETCH[_ROLE_CACHE_KEY] = http_client.spawn_uncancellable(_refresh_role_credentials(region))
     return await asyncio.shield(task)
-
-
-def _retrieve_exception(task: asyncio.Task) -> None:
-    # A failed fetch whose callers all timed out has no awaiter left; read the
-    # exception so asyncio doesn't warn "never retrieved" (it is logged already).
-    if not task.cancelled():
-        task.exception()
 
 
 async def _refresh_role_credentials(region: str) -> AwsCredentials:
