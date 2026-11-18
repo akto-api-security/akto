@@ -7,6 +7,8 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.upload.FileUploadsDao;
+import com.akto.dto.upload.FileUpload;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.test_editor.TestingRunPlayground;
@@ -46,6 +48,23 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
         ApiCollectionsDao.instance.getMCollection().drop();
         TestingRunPlaygroundDao.instance.getMCollection().drop();
         TestRolesDao.instance.getMCollection().drop();
+        FileUploadsDao.instance.getMCollection().drop();
+    }
+
+    // the import runs in the background: its status, as the UI polls it, once it has finished
+    private static AgentImportAction awaitImport(AgentImportAction started) throws Exception {
+        assertNotNull(started.getUploadId());
+        AgentImportAction status = new AgentImportAction();
+        status.setUploadId(started.getUploadId());
+        for (int i = 0; i < 100; i++) {
+            assertEquals("SUCCESS", status.fetchAgentImportStatus());
+            if (status.getUploadStatus() != FileUpload.UploadStatus.IN_PROGRESS) {
+                return status;
+            }
+            Thread.sleep(100);
+        }
+        fail("import did not finish");
+        return status;
     }
 
     // plays mini-testing: picks up the scheduled request and answers it with the given response
@@ -96,11 +115,12 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
                 "{\"error\":\"Connection closed (HTTP 401)\"}", new HashMap<>(), 401), seen);
 
         AgentImportAction action = connectionImport("mt-1");
-        assertEquals("ERROR", action.importFromUrl());
+        assertEquals("SUCCESS", action.importFromUrl());
         miniTesting.join();
+        AgentImportAction status = awaitImport(action);
 
-        String error = action.getActionErrors().iterator().next();
-        assertTrue(error, error.contains("HTTP 401"));
+        assertEquals(FileUpload.UploadStatus.FAILED, status.getUploadStatus());
+        assertTrue(status.getErrorMessage(), status.getErrorMessage().startsWith("WebSocket handshake failed with HTTP 401"));
         // mini-testing was asked for the handshake only: the handshake URL marked WEBSOCKET, and no message
         assertEquals("https://agent.example.com/ws", seen.get().getOriginalHttpRequest().getUrl());
         assertEquals("WEBSOCKET", seen.get().getOriginalHttpRequest().getType());
@@ -128,8 +148,9 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
 
         AgentImportAction action = connectionImport("mt-1");
         action.setTestRoleId(role.getHexId());
-        assertEquals("ERROR", action.importFromUrl());
+        assertEquals("SUCCESS", action.importFromUrl());
         miniTesting.join();
+        awaitImport(action);
 
         Map<String, List<String>> sent = seen.get().getOriginalHttpRequest().getHeaders();
         // mini-testing gets the role to apply, and the role's auth header without its value: not resolved here
@@ -146,11 +167,30 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
 
         AgentImportAction action = connectionImport("mt-1");
         action.setTestRoleId(role.getHexId());
-        assertEquals("ERROR", action.importFromUrl());
+        assertEquals("SUCCESS", action.importFromUrl());
         miniTesting.join();
+        AgentImportAction status = awaitImport(action);
 
-        String error = action.getActionErrors().iterator().next();
-        assertEquals("Mini-testing mt-1: Could not apply test role pdh-user: login failed", error);
+        assertEquals(FileUpload.UploadStatus.FAILED, status.getUploadStatus());
+        assertEquals("Mini-testing mt-1: Could not apply test role pdh-user: login failed", status.getErrorMessage());
+    }
+
+    @Test
+    public void testFailedEventIsNotSaved() throws Exception {
+        AtomicReference<TestingRunPlayground> seen = new AtomicReference<>();
+        Thread miniTesting = fakeMiniTesting(new OriginalHttpResponse("{\"error\":\"timeout\"}", new HashMap<>(), 504), seen);
+
+        AgentImportAction action = connectionImport("mt-1");
+        action.setRequestBody("{\"event\":\"user_query\",\"data\":{\"user_query\":\"hi\"}}");
+        assertEquals("SUCCESS", action.importFromUrl());
+        miniTesting.join();
+        AgentImportAction status = awaitImport(action);
+
+        // the event went to mini-testing over the connection URL, and its timeout fails the import
+        assertEquals("{\"event\":\"user_query\",\"data\":{\"user_query\":\"hi\"}}", seen.get().getOriginalHttpRequest().getBody());
+        assertEquals(FileUpload.UploadStatus.FAILED, status.getUploadStatus());
+        assertEquals("WebSocket event failed with HTTP 504: timeout", status.getErrorMessage());
+        assertNull(ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, COLLECTION_ID)));
     }
 
     @Test
@@ -177,12 +217,14 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
     }
 
     @Test
-    public void testUnknownTestRoleIsNotSent() {
+    public void testUnknownTestRoleIsNotSent() throws Exception {
         AgentImportAction action = connectionImport("mt-1");
         action.setTestRoleId(new ObjectId().toHexString());
-        assertEquals("ERROR", action.importFromUrl());
+        assertEquals("SUCCESS", action.importFromUrl());
+        AgentImportAction status = awaitImport(action);
 
-        assertTrue(action.getActionErrors().iterator().next().startsWith("Test role not found"));
+        assertEquals(FileUpload.UploadStatus.FAILED, status.getUploadStatus());
+        assertTrue(status.getErrorMessage(), status.getErrorMessage().startsWith("Test role not found"));
         assertNull(TestingRunPlaygroundDao.instance.findOne(Filters.empty()));
     }
 

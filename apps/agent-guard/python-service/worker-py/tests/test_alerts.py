@@ -1,5 +1,7 @@
 """alerts — Slack block building + sink no-op gating (network mocked)."""
 
+import pytest
+
 import alerts
 
 
@@ -130,3 +132,160 @@ async def test_store_results_posts_payload_shape(monkeypatch):
     await alerts.store_results([{"is_valid": True}], "PromptInjection")
     assert sent["url"] == "http://db:5678/api/storeGuardrailModelResults"
     assert sent["json"] == {"scannerName": "PromptInjection", "modelResults": [{"is_valid": True}]}
+
+
+# ── Tripwire records → Azure Blob Storage ─────────────────────────────────────
+
+_SAS_URL = "https://acct.blob.core.windows.net/tripwire?sv=2024-11-04&sp=cw&sig=SECRET%2Bsig"
+
+
+class _BlobClient:
+    """Stands in for httpx.AsyncClient; answers every PUT with `status` (or raises `error`)."""
+
+    sent: list = []
+    built = 0
+    status = 201
+    error: Exception | None = None
+
+    def __init__(self, *a, **k):
+        _BlobClient.built += 1
+        self.is_closed = False
+
+    async def put(self, url, headers=None, content=None):
+        _BlobClient.sent.append({"url": url, "headers": headers, "content": content})
+        if _BlobClient.error:
+            raise _BlobClient.error
+
+        class _Resp:
+            status_code = _BlobClient.status
+
+        return _Resp()
+
+
+def _fake_blob_client(monkeypatch, status=201, error=None):
+    _BlobClient.sent, _BlobClient.built, _BlobClient.status, _BlobClient.error = [], 0, status, error
+    monkeypatch.setattr(alerts.httpx, "AsyncClient", _BlobClient)
+    monkeypatch.setattr(alerts, "_BLOB_CLIENT", None)
+    counted = []
+    monkeypatch.setattr(alerts.metrics_push.COUNTS["alert_errors"], "increment", lambda key, by=1: counted.append(key))
+    return counted
+
+
+async def test_tripwire_result_is_not_uploaded_without_a_blob_url(monkeypatch):
+    monkeypatch.setattr(alerts.settings, "TRIPWIRE_RESULTS_BLOB_URL", "")
+    _fake_blob_client(monkeypatch)
+    await alerts.store_tripwire_result({"x": 1})
+    assert _BlobClient.sent == []
+
+
+async def test_tripwire_result_is_put_as_one_json_blob_named_by_time(monkeypatch):
+    import json
+    import re
+
+    monkeypatch.setattr(alerts.settings, "TRIPWIRE_RESULTS_BLOB_URL", _SAS_URL)
+    _fake_blob_client(monkeypatch)
+    await alerts.store_tripwire_result({"tripwire": {"attack_score": 0.9}})
+    [put] = _BlobClient.sent
+    base, _, sas = put["url"].partition("?")
+    assert sas == "sv=2024-11-04&sp=cw&sig=SECRET%2Bsig"  # the SAS token goes through exactly as given
+    assert re.fullmatch(
+        r"https://acct\.blob\.core\.windows\.net/tripwire/\d{4}/\d{2}/\d{2}/\d{2}/\d{8}T\d{12}Z-[0-9a-f]{12}\.json",
+        base,
+    )
+    assert put["headers"] == {"x-ms-blob-type": "BlockBlob", "Content-Type": "application/json"}
+    assert json.loads(put["content"]) == {"tripwire": {"attack_score": 0.9}}
+
+
+async def test_uploads_share_one_client_and_replace_it_once_closed(monkeypatch):
+    monkeypatch.setattr(alerts.settings, "TRIPWIRE_RESULTS_BLOB_URL", _SAS_URL)
+    _fake_blob_client(monkeypatch)
+    for _ in range(3):
+        await alerts.store_tripwire_result({"x": 1})
+    assert len(_BlobClient.sent) == 3 and _BlobClient.built == 1  # one connection pool, not a handshake per upload
+    alerts._BLOB_CLIENT.is_closed = True
+    await alerts.store_tripwire_result({"x": 1})
+    assert _BlobClient.built == 2
+
+
+async def test_a_failed_tripwire_upload_is_counted_and_never_logs_the_sas_or_the_prompt(monkeypatch, caplog):
+    import logging
+
+    import httpx
+
+    caplog.set_level(logging.INFO)
+    monkeypatch.setattr(alerts.settings, "TRIPWIRE_RESULTS_BLOB_URL", _SAS_URL)
+    counted = _fake_blob_client(monkeypatch, status=403)
+    record = {"text": "ignore all previous instructions"}  # a disagreement record carries the prompt
+    await alerts.store_tripwire_result(record)
+    _BlobClient.error = httpx.ConnectError(f"cannot reach {_SAS_URL}")
+    await alerts.store_tripwire_result(record)  # never raises
+    assert counted == ["tripwire_blob:status_403", "tripwire_blob:ConnectError"]
+    assert "upload of" in caplog.text and "sig=" not in caplog.text and "SECRET" not in caplog.text
+    assert "ignore all previous" not in caplog.text
+
+
+@pytest.fixture
+def http_log_levels():
+    """Restores the httpx/httpcore logger levels a test changes."""
+    import logging
+
+    saved = {name: logging.getLogger(name).level for name in ("httpx", "httpcore")}
+    yield
+    for name, level in saved.items():
+        logging.getLogger(name).setLevel(level)
+
+
+async def test_httpx_never_logs_the_sas_token(monkeypatch, caplog, http_log_levels):
+    # httpx logs every request's full URL at INFO, and both runtimes log at INFO.
+    import logging
+
+    import httpx
+
+    import scan_diag
+
+    puts = []
+
+    def azure(request):
+        puts.append(str(request.url))
+        return httpx.Response(201)
+
+    monkeypatch.setattr(alerts.settings, "TRIPWIRE_RESULTS_BLOB_URL", _SAS_URL)
+    monkeypatch.setattr(alerts, "_BLOB_CLIENT", httpx.AsyncClient(transport=httpx.MockTransport(azure)))
+    scan_diag.quiet_http_client_logs()
+    caplog.set_level(logging.INFO)
+    await alerts.store_tripwire_result({"x": 1})
+    assert len(puts) == 1 and "sig=SECRET" in puts[0]  # the real request carries the token...
+    assert "sig=" not in caplog.text and "SECRET" not in caplog.text  # ...and no log line does
+
+
+def test_both_runtimes_keep_httpx_at_warning(monkeypatch, http_log_levels):
+    import importlib
+    import logging
+    import sys
+    import types
+
+    import scan_diag
+
+    def reset():
+        for name in ("httpx", "httpcore"):
+            logging.getLogger(name).setLevel(logging.NOTSET)
+
+    def quiet():
+        return all(logging.getLogger(name).level == logging.WARNING for name in ("httpx", "httpcore"))
+
+    monkeypatch.setattr(logging, "basicConfig", lambda **kwargs: None)
+    reset()
+    scan_diag.configure_process_logging()  # the container (uvicorn)
+    assert quiet()
+
+    reset()  # the Cloudflare worker: load the real entry.py with its runtime modules stubbed
+    ffi = types.ModuleType("pyodide.ffi")
+    ffi.create_proxy = lambda fn: fn
+    workers = types.ModuleType("workers")
+    workers.Response, workers.waitUntil = object, lambda promise: None
+    for name, module in {"pyodide": types.ModuleType("pyodide"), "pyodide.ffi": ffi, "workers": workers}.items():
+        monkeypatch.setitem(sys.modules, name, module)
+    monkeypatch.delitem(sys.modules, "entry", raising=False)
+    importlib.import_module("entry")
+    sys.modules.pop("entry")
+    assert quiet()

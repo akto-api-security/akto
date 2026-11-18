@@ -1,5 +1,11 @@
 package com.akto.action;
 
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.service.scripts.validation.ScriptValidationFeedback;
+import com.akto.service.scripts.validation.TestScriptValidationContextBuilder;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.akto.agent.AgentClient;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
@@ -42,6 +48,8 @@ public class McpAgentAction extends UserAction {
     private static final Logger logger = LoggerFactory.getLogger(McpAgentAction.class);
     /** Guardrail: very large context breaks MCP /chat or gateway limits and yields 422 (ERROR). */
     private static final int MAX_TEST_RESULT_CONTEXT_CHARS = 120_000;
+    static final String TEST_SCRIPT_COLLECTION = "test_script_collection";
+    static final String TEST_SCRIPT_VALIDATION = "test_script_validation";
     // Earlier turns sent with a follow-up so the agent can rebuild the chat if it lost its saved history
     private static final int HISTORY_TURNS_FOR_AGENT = 5;
     private static final int HISTORY_TEXT_MAX_CHARS = 4000;
@@ -105,10 +113,11 @@ public class McpAgentAction extends UserAction {
 
             if(metaData != null) {
                 String type = (String) metaData.get("type");
-                if(StringUtils.isNotEmpty(type) && type.equals("sample_request")) {
+                Object data = metaData.get("data");
+                switch (StringUtils.defaultString(type)) {
+                case "sample_request": {
                     // get sample data from metaData
                     // it will be data -> apiCollectionId, url, method
-                    Object data = metaData.get("data");
                     if(data != null && data instanceof Map) {
                         Map<String, Object> dataMap = (Map<String, Object>) data;
                         Integer apiCollectionId = (Integer) dataMap.get("apiCollectionId");
@@ -119,9 +128,10 @@ public class McpAgentAction extends UserAction {
                             contextString = "Current context: " + latestSampleData;
                         }
                     }
-                } else if(StringUtils.isNotEmpty(type) && type.equals("dashboard_collections")) {
+                    break;
+                }
+                case "dashboard_collections": {
                     // Dashboard collections data sent from UI
-                    Object data = metaData.get("data");
                     if(data != null && data instanceof List) {
                         List<Map<String, Object>> collections = (List<Map<String, Object>>) data;
                         contextString = "Dashboard API Collections Data:\n" +
@@ -131,8 +141,9 @@ public class McpAgentAction extends UserAction {
                         // Increase timeout for large data
                         tokensLimit = 60000; // 60 seconds
                     }
-                } else if(StringUtils.isNotEmpty(type) && type.equals("test_execution_result")) {
-                    Object data = metaData.get("data");
+                    break;
+                }
+                case "test_execution_result": {
                     if(data != null && data instanceof Map) {
                         Map<String, Object> dataMap = (Map<String, Object>) data;
                         StringBuilder sb = new StringBuilder("Test Execution Result Context:\n");
@@ -163,33 +174,55 @@ public class McpAgentAction extends UserAction {
                         }
                         tokensLimit = 40000;
                     }
-                } else if (StringUtils.isNotEmpty(type) && type.equals("agentic_observe")) {
+                    break;
+                }
+                case "agentic_observe": {
                     // Pass only the minimal asset/device identity (assetName/assetType/collectionIds
                     // or deviceId). The MCP agent fetches what it needs on demand via the focused
                     // akto_agentic_* tools (collections_search / users_search / skills / audit_data)
                     // — see the agentic_observe system prompt in test-editor-services.
-                    Object data = metaData.get("data");
                     if (data != null && data instanceof Map) {
-                        Map<String, Object> dataMap = (Map<String, Object>) data;
-                        String scope = (String) dataMap.getOrDefault("scope", "");
-                        String scopeLabel = "device".equals(scope) ? "Single device" : "asset".equals(scope) ? "Single agentic asset" : "Agentic context";
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            contextString = "CONTEXT SCOPE: " + scopeLabel
-                                + ". This is only the asset/device identity — use the akto_agentic_* tools "
-                                + "(with the collectionIds, assetName, or deviceId below) to fetch its data before answering.\n\n"
-                                + mapper.writeValueAsString(dataMap);
-                        } catch (Exception e) {
-                            contextString = "Agentic Observe Context: " + dataMap.toString();
-                        }
+                        contextString = agenticObserveContext((Map<String, Object>) data);
                         tokensLimit = 20000;
                     }
-                } else if (StringUtils.isNotEmpty(type) && type.equals("insight_result")) {
+                    break;
+                }
+                case TEST_SCRIPT_COLLECTION: {
+                    // Collection picked in the Ask Akto script-writing mode; access is checked here, not trusted from the client.
+                    Integer apiCollectionId = data instanceof Map ? asInteger(((Map<String, Object>) data).get("apiCollectionId")) : null;
+                    if (apiCollectionId == null) {
+                        addActionError("apiCollectionId is required");
+                        return ERROR.toUpperCase();
+                    }
+                    List<Integer> allowed = UsersCollectionsList.getCollectionsIdForUser(getSUser().getId(), Context.accountId.get());
+                    ApiCollection collection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+                    if (collection == null || (allowed != null && !allowed.contains(apiCollectionId))) {
+                        addActionError("Collection not found");
+                        return ERROR.toUpperCase();
+                    }
+                    String name = collection.getDisplayName() != null ? collection.getDisplayName() : collection.getName();
+                    contextString = "The user picked this collection for the script: '" + name + "' (apiCollectionId "
+                        + apiCollectionId + "). Use this id with the collection tools.";
+                    break;
+                }
+                case TEST_SCRIPT_VALIDATION: {
+                    // "Ask Akto to fix": the user's own validation outcome, capped, redacted and fenced by the builder.
+                    if (!(data instanceof Map)) {
+                        addActionError("Validation result is required");
+                        return ERROR.toUpperCase();
+                    }
+                    ScriptValidationFeedback feedback = new ObjectMapper()
+                        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                        .convertValue(data, ScriptValidationFeedback.class);
+                    contextString = TestScriptValidationContextBuilder.build(feedback);
+                    tokensLimit = 60000;
+                    break;
+                }
+                case "insight_result": {
                     // Insights detail view's Ask Akto chat. The frontend sends the exact
                     // InsightResult fields it's already rendering on screen (not just an id to
                     // re-fetch) so the AI is grounded in precisely what the user is looking at,
                     // never a possibly-drifted server-side recompute.
-                    Object data = metaData.get("data");
                     if (data != null && data instanceof Map) {
                         Map<String, Object> dataMap = (Map<String, Object>) data;
                         StringBuilder sb = new StringBuilder("Insight Context:\n");
@@ -257,6 +290,10 @@ public class McpAgentAction extends UserAction {
                         }
                         tokensLimit = 40000;
                     }
+                    break;
+                }
+                default:
+                    break;
                 }
             }
 
@@ -467,6 +504,27 @@ public class McpAgentAction extends UserAction {
         }
     }
 
+    // Same value as ARGUS_CHAT_SCOPE in the Agent discovery page.
+    static final String SCOPE_AGENT_DISCOVERY = "argus_agent_discovery";
+
+    // An asset or device goes in as identity only, and the agent fetches the rest with its tools. The discovery
+    // overview goes in whole instead: the user is looking at it, so the answer has to match it.
+    static String agenticObserveContext(Map<String, Object> dataMap) {
+        String scope = (String) dataMap.getOrDefault("scope", "");
+        boolean overview = SCOPE_AGENT_DISCOVERY.equals(scope);
+        String scopeLabel = overview ? "Agent discovery overview" : "device".equals(scope) ? "Single device" : "asset".equals(scope) ? "Single agentic asset" : "Agentic context";
+        String guidance = overview
+            ? "This is the Agent discovery page the user is looking at: counts, findings and the ranked to-do list. "
+                + "Answer from it, and use the akto_agentic_* tools (with the asset ids in it) for anything it does not show."
+            : "This is only the asset/device identity — use the akto_agentic_* tools "
+                + "(with the collectionIds, assetName, or deviceId below) to fetch its data before answering.";
+        try {
+            return "CONTEXT SCOPE: " + scopeLabel + ". " + guidance + "\n\n" + new ObjectMapper().writeValueAsString(dataMap);
+        } catch (Exception e) {
+            return "Agentic Observe Context: " + dataMap.toString();
+        }
+    }
+
     private static void appendIfPresent(StringBuilder sb, String label, Object value) {
         if (value == null) {
             return;
@@ -520,6 +578,18 @@ public class McpAgentAction extends UserAction {
     public Map<String, Object> getMetaData() { return metaData; }
     public void setMetaData(Map<String, Object> metaData) {
         this.metaData = metaData;
+    }
+
+
+    private static Integer asInteger(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        try {
+            return value == null ? null : Integer.valueOf(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
 }

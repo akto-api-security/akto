@@ -220,9 +220,15 @@ const api = {
         return request({
             url: '/api/importFromUrl',
             method: 'post',
-            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName, method: httpMethod},
-            // a WebSocket connection import waits up to 300s for mini-testing (role login + handshake)
-            timeout: 330000
+            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName, method: httpMethod}
+        })
+    },
+
+    fetchAgentImportStatus(uploadId) {
+        return request({
+            url: '/api/fetchAgentImportStatus',
+            method: 'post',
+            data: {uploadId}
         })
     },
 
@@ -371,6 +377,30 @@ const api = {
     removeSentinelOneIntegration() {
         return request({
             url: '/api/removeSentinelOneIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchAtlasS3ExportIntegration() {
+        return request({
+            url: '/api/fetchAtlasS3ExportIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAtlasS3ExportIntegration(bucketName, region, prefix, authType, roleArn, accessKeyId, secretAccessKey) {
+        return request({
+            url: '/api/addAtlasS3ExportIntegration',
+            method: 'post',
+            data: { bucketName, region, prefix, authType, roleArn, accessKeyId, secretAccessKey }
+        })
+    },
+
+    removeAtlasS3ExportIntegration() {
+        return request({
+            url: '/api/removeAtlasS3ExportIntegration',
             method: 'post',
             data: {}
         })

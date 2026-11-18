@@ -24,7 +24,7 @@ const UndoDemergedApis = () => {
             setMergedApis(res || [])
             setLoading(false)
         }).catch((err) => {
-            func.setToast(true, true, 'Something went wrong while fetching de-merged APIs')
+            func.setToast(true, true, 'Something went wrong while fetching de-merged ' + mapLabel('APIs', getDashboardCategory()))
             setLoading(false)
         })
     }
@@ -41,10 +41,10 @@ const UndoDemergedApis = () => {
         setLoading(true)
         await settingRequests.undoDemergedApis(mergedApis).then((res) => {
             setLoading(false)
-            func.setToast(true, false, 'Successfully undone de-merged APIs')
+            func.setToast(true, false, 'Successfully undone de-merged ' + mapLabel('APIs', getDashboardCategory()))
             fetchMergedApis()
         }).catch((err) => {
-            func.setToast(true, true, 'Something went wrong while undoing de-merged APIs')
+            func.setToast(true, true, 'Something went wrong while undoing de-merged ' + mapLabel('APIs', getDashboardCategory()))
             setLoading(false)
         })
     }
@@ -82,10 +82,10 @@ const UndoDemergedApis = () => {
             {
                 mergedApis && mergedApis?.length > 0 ?
                 <ResourceList
-                    resourceName={{ singular: 'merged api', plural: 'merged apis' }}
+                    resourceName={{ singular: 'merged ' + mapLabel('API', getDashboardCategory()), plural: 'merged ' + mapLabel('APIs', getDashboardCategory()) }}
                     items={mergedApis}
                     renderItem={resourceListRenderItems}
-                    headerContent={`Showing ${mergedApis.length} merged api${mergedApis.length > 1 ? 's': ''}`}
+                    headerContent={`Showing ${mergedApis.length} merged ${mergedApis.length > 1 ? mapLabel('APIs', getDashboardCategory()) : mapLabel('API', getDashboardCategory())}`}
                     showHeader
                     loading={loading}
                 /> : 
@@ -108,8 +108,8 @@ const UndoDemergedApis = () => {
         <PageWithMultipleCards
             title={
                 <TitleWithInfo
-                    tooltipContent={"Undo a de-merged API"}
-                    titleText={"Undo De-merged APIs"} 
+                    tooltipContent={"Undo a de-merged " + mapLabel('API', getDashboardCategory())}
+                    titleText={"Undo De-merged " + mapLabel('APIs', getDashboardCategory())} 
                     docsUrl={"https://docs.akto.io/api-inventory/how-to/de-merge-api"}
                 />
             }

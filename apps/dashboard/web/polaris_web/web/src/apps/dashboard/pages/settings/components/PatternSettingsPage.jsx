@@ -45,6 +45,8 @@ function PatternSettingsPage({
     headers,
     buildRow,
     additionalCards = [],
+    leadingCards = [],
+    refreshKey,
     onRowClick,
     getRowActions,
     secondaryActions,
@@ -73,7 +75,7 @@ function PatternSettingsPage({
         }
     }
 
-    useEffect(() => { fetchData() }, [])
+    useEffect(() => { fetchData() }, [refreshKey])
     useEffect(() => {
         if (initialValue?.value) {
             setValue(initialValue.value)
@@ -194,7 +196,7 @@ function PatternSettingsPage({
                 isFirstPage={true}
                 primaryAction={{ content: `Add ${resourceName.singular}`, onAction: () => setAddModalOpen(true), requires: addRequires }}
                 secondaryActions={secondaryActions}
-                components={[addModal, tableCard, ...(additionalCards || [])]}
+                components={[addModal, ...(leadingCards || []), tableCard, ...(additionalCards || [])]}
             />
         </>
     )

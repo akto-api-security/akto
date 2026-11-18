@@ -29,6 +29,7 @@ import {
   aktoStatusForJira,
   aktoSeverities
 } from './reducers/useJiraReducer';
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function Jira() {
     const { state, actions } = useJiraReducer();
@@ -1186,7 +1187,7 @@ function Jira() {
         </LegacyCard>
     )
 
-    let cardContent = "Seamlessly enhance your web application security with Jira integration. Create jira tickets for api vulnerability issues and view them on the tap of a button"
+    let cardContent = "Seamlessly enhance your web application security with Jira integration. Create jira tickets for " + mapLabel('API', getDashboardCategory()) + " vulnerability issues and view them on the tap of a button"
     return (
         <IntegrationsLayout title="Jira" cardContent={cardContent} component={JCard} docsUrl="https://docs.akto.io/traffic-connections/postman" readOnly={!canCall('api/jira/add')} />
     )

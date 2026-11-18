@@ -186,9 +186,11 @@ export default function ViolationsPage() {
     const [labelsText, setLabelsText] = useState("");
     const [jiraProjectMap, setJiraProjectMap] = useState({});
 
+    const initialDateValue = func.isDemoAccount() ? 4 : 2;
+
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        func.getDefaultDateRange(values.ranges[2])
+        func.getDefaultDateRange(values.ranges[initialDateValue])
     );
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime() / 1000);

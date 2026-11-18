@@ -1,5 +1,19 @@
 export const ATLAS_CHAT_SCOPE = "atlas_devices_employees";
 
+export const ATLAS_DEVICE_QUESTIONS = [
+    "What changed on {name} this week?",
+    "Is guardrail enforcement working on {name}?",
+    "Who else has the same AI setup as {name}?",
+];
+
+export const ATLAS_EMPLOYEE_QUESTIONS = [
+    "What did {name}'s agents do this week?",
+    "Which of {name}'s tools need a decision?",
+    "How does {name} compare to their team?",
+];
+
+export const ATLAS_INVENTORY_CHAT_SCOPE = "atlas_ai_inventory";
+
 export const ASK_ATLAS_PLACEHOLDER = "Ask about AI agents, MCP servers, skills, models or browser AI on your devices";
 
 export const ASK_ATLAS_SUGGESTIONS = [

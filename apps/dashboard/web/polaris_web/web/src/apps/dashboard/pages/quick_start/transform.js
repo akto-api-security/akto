@@ -90,6 +90,7 @@ import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefender
 import SentinelOneConnector from "./components/SentinelOneConnector"
 import WizSource from "./components/WizSource"
 import CrowdStrikeConnector from "./components/CrowdStrikeConnector"
+import AtlasS3ExportConnector from "./components/AtlasS3ExportConnector"
 import CopilotStudioMultiEnvImport from "./components/CopilotStudioMultiEnvImport"
 import {
     CONNECTOR_NAME_COPILOT_STUDIO_MULTI_ENV,
@@ -661,6 +662,15 @@ const crowdStrikeObj = {
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-crowdstrike',
     key: "CROWDSTRIKE",
     component: <CrowdStrikeConnector/>
+}
+
+const atlasS3ExportObj = {
+    icon: '/public/aws.svg',
+    label: "Atlas Log Export to S3",
+    text: "Export Atlas traces (guardrail hits, models, token usage) in OpenTelemetry format to your S3 bucket.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/ai-agent-activity',
+    key: "ATLAS_S3_EXPORT",
+    component: <AtlasS3ExportConnector/>
 }
 
 const microsoftDefenderRunQueriesObj = {
@@ -2539,6 +2549,8 @@ const quickStartFunc = {
                 "Browser Extension": browserExtensions,
                 "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,
+                // SaaS only, behind the ATLAS_S3_LOG_EXPORT feature flag.
+                ...((!func.checkOnPrem() && func.checkForFeatureSaas("ATLAS_S3_LOG_EXPORT")) ? { "Log Export": [atlasS3ExportObj] } : {}),
                 "": hiddenConnectors, // Hidden category for connector lookup
             };
         } else {

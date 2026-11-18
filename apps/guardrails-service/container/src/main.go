@@ -18,6 +18,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/auth"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
+	"github.com/akto-api-security/guardrails-service/pkg/filecache"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/kafka"
 	"github.com/akto-api-security/guardrails-service/pkg/logsink"
@@ -47,7 +48,7 @@ func main() {
 	logger.Info("Starting guardrails-service",
 		zap.Int("port", cfg.ServerPort),
 		zap.String("database_abstractor_url", cfg.DatabaseAbstractorURL),
-		zap.String("agent_guard_engine_url", cfg.AgentGuardEngineURL),
+		zap.String("scanner_api_url", scannerAPIURL()),
 		zap.Bool("kafka_enabled", cfg.KafkaEnabled))
 
 	if os.Getenv("GUARDRAILS_SKIP_PII_REDACTION") == "true" {
@@ -57,9 +58,6 @@ func main() {
 		logger.Warn("GUARDRAILS_SKIP_PII_SYNC=true: synchronous PII rules disabled — load-test only, never use in production")
 	}
 
-	if cfg.AgentGuardEngineURL != "" {
-		os.Setenv("AGENT_GUARD_ENGINE_URL", cfg.AgentGuardEngineURL)
-	}
 	if cfg.DatabaseAbstractorToken != "" {
 		os.Setenv("AKTO_API_TOKEN", cfg.DatabaseAbstractorToken)
 	}
@@ -174,7 +172,13 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 		logger.Info("NHI sources disabled (NHI_ENABLED=false)")
 	}
 
-	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc)
+	fileCache := filecache.NewRedis(guardcache.GetRedisClient(), time.Duration(cfg.File.CacheTTLSec)*time.Second, logger)
+	if fileCache == nil {
+		logger.Info("File verdict cache off (needs REDIS_URL and FILE_VALIDATE_CACHE_TTL_SEC > 0)")
+	} else {
+		logger.Info("File verdict cache on", zap.Int("ttlSec", cfg.File.CacheTTLSec))
+	}
+	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc, fileCache)
 
 	var authMiddleware gin.HandlerFunc
 	if cfg.AuthEnabled {
@@ -305,11 +309,11 @@ func parseLogLevel(logLevel string) zapcore.Level {
 
 func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Config, logger *zap.Logger) {
 	mc := cfg.File.Media
-	if mc.Provider == "" {
+	if mc.Provider == "none" {
 		return
 	}
 
-	ocr, transcriber := newMediaProviders(mc, logger)
+	ocr, transcriber := newMediaProviders(mc, scannerAPIURL(), logger)
 
 	if ocr != nil {
 		registry.RegisterWithLimit(fileprocessor.NewImageProcessor(ocr, mc.MaxImageBytes), mc.MaxImageBytes)
@@ -330,28 +334,42 @@ func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Confi
 	}
 }
 
-func newMediaProviders(mc config.MediaConfig, logger *zap.Logger) (mediaprovider.OCRProvider, mediaprovider.TranscriptionProvider) {
+// scannerAPIURL is agent-guard's base URL, resolved the way the scanner client resolves it
+// (mcp.NewScannerClient): SCANNER_API_URL, else the library default. Image OCR (/ocr) goes to
+// the same agent-guard as the text scans (/scan), so the two can't point at different ones.
+func scannerAPIURL() string {
+	if u := os.Getenv(utils.ScannerAPIURLEnv); u != "" {
+		return u
+	}
+	return utils.DefaultScannerAPIURL
+}
+
+func newMediaProviders(mc config.MediaConfig, agentGuardURL string, logger *zap.Logger) (mediaprovider.OCRProvider, mediaprovider.TranscriptionProvider) {
 	var ocr mediaprovider.OCRProvider
 	var transcriber mediaprovider.TranscriptionProvider
 
-	visionReady := mc.VisionAPIKey != "" && mc.VisionBaseURL != ""
-	speechReady := mc.SpeechAPIKey != "" && mc.SpeechBaseURL != ""
-
-	if mc.VisionAPIKey == "" || mc.VisionBaseURL == "" {
-		logger.Warn("Image OCR disabled (missing MEDIA_VISION_API_KEY or MEDIA_VISION_BASE_URL)")
-	}
-	if mc.SpeechAPIKey == "" || mc.SpeechBaseURL == "" {
-		logger.Warn("Audio/video transcription disabled (missing MEDIA_SPEECH_API_KEY or MEDIA_SPEECH_BASE_URL)")
-	}
-
 	switch mc.Provider {
 	case "azure":
-		if visionReady {
+		if mc.VisionAPIKey != "" && mc.VisionBaseURL != "" {
 			ocr = mediaprovider.NewAzureVision(mc.VisionAPIKey, mc.VisionBaseURL)
+		} else {
+			logger.Warn("Image OCR disabled (missing MEDIA_VISION_API_KEY or MEDIA_VISION_BASE_URL)")
 		}
-		if speechReady {
+		if mc.SpeechAPIKey != "" && mc.SpeechBaseURL != "" {
 			transcriber = mediaprovider.NewAzureSpeech(mc.SpeechAPIKey, mc.SpeechBaseURL)
+		} else {
+			logger.Warn("Audio/video transcription disabled (missing MEDIA_SPEECH_API_KEY or MEDIA_SPEECH_BASE_URL)")
 		}
+	case "agent_guard":
+		// Images go to agent-guard's /ocr (Gemma by default). agent-guard has no
+		// transcription, so audio and video stay uninspected.
+		if agentGuardURL != "" {
+			ocr = mediaprovider.NewAgentGuardOCR(agentGuardURL)
+		} else {
+			logger.Warn("Image OCR disabled (no agent-guard URL: SCANNER_API_URL)")
+		}
+	default:
+		logger.Warn("Media processing disabled (unknown MEDIA_PROVIDER)", zap.String("provider", mc.Provider))
 	}
 	return ocr, transcriber
 }

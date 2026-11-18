@@ -5,6 +5,20 @@ import SkillIcon from "@/assets/Skill.svg";
 import PluginIcon from "@/assets/Plugin.svg";
 import { getDomainForFavicon } from "./mcpClientHelper";
 
+const faviconSrc = (assetTagValue) => {
+    const domain = getDomainForFavicon(assetTagValue);
+    return domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
+};
+
+// Image src for an asset where only a src can be passed (e.g. topology graph nodes) — same choice
+// as <AssetIcon>; null when there's no specific icon.
+export function assetIconSrc(type, assetTagValue) {
+    if (type === "MCP Server") return MCPIcon;
+    if (type === "Skill") return SkillIcon;
+    if (type === "Plugin") return PluginIcon;
+    return faviconSrc(assetTagValue);
+}
+
 export default function AssetIcon({ type, assetTagValue, size = 20 }) {
     if (type === "MCP Server")
         return <img src={MCPIcon} width={size} height={size} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
@@ -19,8 +33,8 @@ export default function AssetIcon({ type, assetTagValue, size = 20 }) {
         if (assetTagValue === "linux")   return <img src="/public/os-linux.svg"   width={size} height={size} alt="Linux"   style={{ flexShrink: 0 }} />;
         return <img src={LaptopIcon} width={size} height={size} alt="Device" style={{ flexShrink: 0, opacity: 0.7 }} />;
     }
-    const domain = getDomainForFavicon(assetTagValue);
-    if (domain)
-        return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={size} height={size} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
+    const favicon = faviconSrc(assetTagValue);
+    if (favicon)
+        return <img src={favicon} width={size} height={size} alt="" style={{ flexShrink: 0, borderRadius: 3 }} />;
     return <img src={LaptopIcon} width={size} height={size} alt="" style={{ flexShrink: 0, opacity: 0.7 }} />;
 }

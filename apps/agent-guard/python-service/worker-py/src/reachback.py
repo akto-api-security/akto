@@ -1,4 +1,4 @@
-"""Chat completions against models behind Morgan Stanley's reach-back gateway.
+"""Chat completions against models behind a client's reach-back gateway.
 
 Two layers of auth on every call:
   1. Azure AD app token (azure_ad_auth) — sent as `Authorization: Bearer`.
@@ -18,6 +18,7 @@ from typing import Any
 import httpx
 
 import azure_ad_auth
+import http_client
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,7 @@ def _mtls_client() -> httpx.AsyncClient:
     if client is None or client.is_closed:
         ctx = ssl.create_default_context(cafile=settings.REACHBACK_CA_FILE)
         ctx.load_cert_chain(settings.REACHBACK_MTLS_CERT_FILE, settings.REACHBACK_MTLS_KEY_FILE)
-        client = httpx.AsyncClient(verify=ctx, timeout=_TIMEOUT_S)
+        client = http_client.UncancellableAsyncClient(verify=ctx, timeout=_TIMEOUT_S)
         _mtls_clients[key] = client
     return client
 

@@ -16,6 +16,9 @@ tools) and the insights engine (`InsightService`, provider registry, 60s-cached 
 `apps/dashboard/src/main/java/com/akto/service/insights/CLAUDE.md` if one exists for that engine's
 own internals — this doc covers the overlay layered on top of it.
 
+The overlay's script-writing mode (`ConversationType.TEST_SCRIPT`, the `akto-script` card, Validate / Ask Akto to fix)
+is documented in `apps/dashboard/src/main/java/com/akto/service/scripts/validation/CLAUDE.md`.
+
 ## How it works
 
 ```

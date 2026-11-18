@@ -151,7 +151,7 @@ function AuthTypes() {
                 ]}
             >
                 <Modal.Section>
-                    Please mark the auth types you wish to reset as inactive, before resetting. Are you sure you want to reset all custom auth types in your API inventory?
+                    Please mark the auth types you wish to reset as inactive, before resetting. Are you sure you want to reset all custom auth types in your {mapLabel('API', getDashboardCategory())} inventory?
                 </Modal.Section>
             </Modal>
         </Box>

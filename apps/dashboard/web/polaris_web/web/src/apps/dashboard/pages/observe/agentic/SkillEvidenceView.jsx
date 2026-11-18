@@ -4,7 +4,7 @@ import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import { evidenceRanges, rehypeSkillEvidence } from "../../../components/shared/skillEvidenceHighlight";
 
 // Skill content as the reader sees it, with each line of evidence cyborg kept highlighted in place
-// and explained on hover: which tag it backs, the criterion and severity, and why. Evidence from
+// and explained on hover: which tag it backs, the criterion and risk level, and why. Evidence from
 // the scripts the skill runs is listed below the content, since only SKILL.md is ingested.
 //
 // evidence: { annotations, verdict, contentOffset } from the ingested sample (see
@@ -13,11 +13,25 @@ import { evidenceRanges, rehypeSkillEvidence } from "../../../components/shared/
 const SKILL_FILE = "SKILL.md";
 const FLASH_MS = 1600;
 
-// Red for the lines behind the malicious verdict, orange for behaviour the skill's purpose does
-// not explain, yellow for behaviour it does.
+// The band of cyborg's risk score (0-5) a line puts the skill in, so the level shown on hover agrees
+// with the skill's score rather than the category's fixed severity: a CRITICAL category the skill's
+// purpose explains only scores 1.0-1.9. Red for the lines behind the malicious verdict, orange for
+// a HIGH/CRITICAL behaviour the purpose does not explain, yellow for the rest.
+const RISK_LEVELS = {
+    critical: { tone: "critical", label: "Critical risk", range: "4.0-5.0" },
+    high: { tone: "warning", label: "High risk", range: "2.0-3.9" },
+    low: { tone: "attention", label: "Low risk", range: "1.0-1.9" },
+};
+const SEVERE_CATEGORIES = ["HIGH", "CRITICAL"];
+
+function riskLevelOf(annotation) {
+    if (annotation.malicious) return RISK_LEVELS.critical;
+    const severe = SEVERE_CATEGORIES.includes(String(annotation.severity || "").toUpperCase());
+    return annotation.purposeAligned === false && severe ? RISK_LEVELS.high : RISK_LEVELS.low;
+}
+
 function toneOf(annotation) {
-    if (annotation.malicious) return "critical";
-    return annotation.purposeAligned === false ? "warning" : "attention";
+    return riskLevelOf(annotation).tone;
 }
 
 const TONE_RANK = { critical: 0, warning: 1, attention: 2 };
@@ -37,11 +51,12 @@ function whyText(annotation) {
 }
 
 function EvidenceTooltip({ annotation }) {
+    const risk = riskLevelOf(annotation);
     return (
         <VerticalStack gap="1">
             <Text variant="bodyMd" fontWeight="semibold">{annotation.tag}</Text>
             <Text variant="bodySm" color="subdued">
-                {[annotation.criterion, annotation.severity].filter(Boolean).join(" · ")}
+                {[annotation.criterion, risk.label, `score ${risk.range}`].filter(Boolean).join(" · ")}
             </Text>
             {annotation.reason && <Text variant="bodySm">{annotation.reason}</Text>}
             <Text variant="bodySm" color="subdued">{whyText(annotation)}</Text>

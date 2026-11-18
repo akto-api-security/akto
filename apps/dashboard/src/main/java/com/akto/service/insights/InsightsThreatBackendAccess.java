@@ -7,6 +7,7 @@ import com.akto.action.threat_detection.SkillSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 
 import java.util.HashMap;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -22,8 +23,9 @@ import java.util.Map;
  */
 public class InsightsThreatBackendAccess extends AbstractThreatDetectionAction {
 
-    List<HostSeverityCount> hostSeverityCounts(int startTs, int endTs) {
-        return fetchHostSeverityCounts(startTs, endTs);
+    // Throws on a threat-backend failure (not an empty list), so InsightDataLoader marks the bundle's violations unavailable.
+    public List<HostSeverityCount> hostSeverityCounts(int startTs, int endTs) throws IOException {
+        return fetchHostSeverityCountsOrThrow(startTs, endTs);
     }
 
     List<ThreatCategoryCount> subcategoryWiseCounts(int startTs, int endTs) {

@@ -328,7 +328,7 @@ function DependencyTable() {
                 </Popover.Section>
                 <Popover.Section>
                     <Button plain monochrome onClick={() => invokeDependencyTable(true, setInvokeLoadingSecond)} removeUnderline>
-                        {invokeLoadingSecond ? <Spinner size="small" /> : "Invoke for source code APIs"}
+                        {invokeLoadingSecond ? <Spinner size="small" /> : "Invoke for source code " + mapLabel('APIs', getDashboardCategory())}
                     </Button>
                 </Popover.Section>
             </Popover.Pane>

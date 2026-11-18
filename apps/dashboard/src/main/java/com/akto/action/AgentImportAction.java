@@ -4,6 +4,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
@@ -11,6 +12,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.upload.FileUpload;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.HostValidator;
@@ -29,6 +31,7 @@ import com.opensymphony.xwork2.Action;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -36,16 +39,16 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class AgentImportAction extends UserAction{
-    
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentImportAction.class, LoggerMaker.LogDb.DASHBOARD);
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    
+
     @Getter @Setter
     private String url;
-    
+
     @Getter @Setter
     private String testRoleId;
-    
+
     @Getter @Setter
     private String requestBody;
 
@@ -71,13 +74,46 @@ public class AgentImportAction extends UserAction{
     @Getter @Setter
     private String method;
 
+    @Getter @Setter
+    private String uploadId;
+
+    @Getter
+    private FileUpload.UploadStatus uploadStatus;
+
+    @Getter
+    private String errorMessage;
+
     private int apiCollectionId;
 
     // request headers of the agent's WebSocket connection, reused for an event sent to it by agent name
     private Map<String, List<String>> connectionHeaders = new HashMap<>();
 
-    // why the last request got no response, e.g. its test role failed, for the user's error message
-    private String requestError;
+    private void updateUpload(ObjectId id, FileUpload.UploadStatus status, String error) {
+        try {
+            FileUploadsDao.instance.updateOne(
+                Filters.eq(Constants.ID, id),
+                Updates.combine(Updates.set("uploadStatus", status.name()), Updates.set("fatalError", error))
+            );
+        } catch (Exception e) {
+            loggerMaker.error("Error updating agent import upload " + id + ": " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+        }
+    }
+
+    public String fetchAgentImportStatus() {
+        try {
+            FileUpload upload = FileUploadsDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(uploadId)));
+            if (upload == null) {
+                addActionError("Invalid upload id");
+                return Action.ERROR.toUpperCase();
+            }
+            uploadStatus = upload.getUploadStatus();
+            errorMessage = upload.getFatalError();
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Invalid upload id");
+            return Action.ERROR.toUpperCase();
+        }
+    }
 
     public String importFromUrl() {
         try {
@@ -102,19 +138,28 @@ public class AgentImportAction extends UserAction{
 
             loggerMaker.info("Starting URL import for: " + url, LoggerMaker.LogDb.DASHBOARD);
 
-            if (isWebSocketUrl(url) && StringUtils.isEmpty(requestBody)) {
-                return importWebSocketConnection();
-            }
+            // a WebSocket URL without an event imports only the agent's connection
+            boolean connectionOnly = isWebSocketUrl(url) && StringUtils.isEmpty(requestBody);
 
-            // Create API collection based on host name
-            createApiCollectionFromUrl();
+            FileUpload upload = new FileUpload(FileUpload.UploadType.AGENT_URL, FileUpload.UploadStatus.IN_PROGRESS);
+            ObjectId id = FileUploadsDao.instance.insertOne(upload).getInsertedId().asObjectId().getValue();
+            uploadId = id.toString();
 
-            // Execute API call in separate thread
+            // Execute API call in separate thread; the UI polls fetchAgentImportStatus, which reports a failure
             int accountId = Context.accountId.get();
             executorService.schedule(new Runnable() {
                 public void run() {
                     Context.accountId.set(accountId);
-                    executeApiCall();
+                    try {
+                        if (connectionOnly) {
+                            importWebSocketConnection();
+                        } else {
+                            executeApiCall();
+                        }
+                        updateUpload(id, FileUpload.UploadStatus.SUCCEEDED, null);
+                    } catch (Exception e) {
+                        updateUpload(id, FileUpload.UploadStatus.FAILED, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                    }
                 }
             }, 0, TimeUnit.SECONDS);
 
@@ -126,7 +171,7 @@ public class AgentImportAction extends UserAction{
             return Action.ERROR.toUpperCase();
         }
     }
-    
+
     private void createApiCollectionFromUrl() {
         try {
             String name = !StringUtils.isEmpty(collectionName)
@@ -144,31 +189,31 @@ public class AgentImportAction extends UserAction{
                 addGenAiTagIfNeeded(existingCollection);
                 return;
             }
-            
+
             // Create new collection using DAO
             ApiCollection newCollection = ApiCollection.createManualCollection(id, name);
 
             // Insert the new collection
             ApiCollectionsDao.instance.insertOne(newCollection);
             apiCollectionId = newCollection.getId();
-            
+
             // Add Gen AI tag to the new collection
             addGenAiTagToCollection(apiCollectionId);
             loggerMaker.info("Created new API collection with ID: " + apiCollectionId + " for name: " + name, LoggerMaker.LogDb.DASHBOARD);
-            
+
         } catch (Exception e) {
             loggerMaker.error("Error creating API collection from URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             throw new RuntimeException("Failed to create API collection", e);
         }
     }
-    
+
     private void addGenAiTagIfNeeded(ApiCollection collection) {
         try {
             // Check if Gen AI tag already exists
             List<CollectionTags> existingTags = collection.getTagsList();
             boolean hasGenAiTag = existingTags != null && existingTags.stream()
                 .anyMatch(tag -> Constants.AKTO_GEN_AI_TAG.equals(tag.getKeyName()));
-                
+
             if (!hasGenAiTag) {
                 addGenAiTagToCollection(collection.getId());
             }
@@ -176,30 +221,30 @@ public class AgentImportAction extends UserAction{
             loggerMaker.error("Error checking/adding Gen AI tag: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
     }
-    
+
     private void addGenAiTagToCollection(int collectionId) {
         try {
             List<CollectionTags> tagsList = Collections.singletonList(
                 new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, "Gen AI Import", CollectionTags.TagSource.USER)
             );
-            
+
             FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
             updateOptions.returnDocument(ReturnDocument.AFTER);
-            
+
             ApiCollectionsDao.instance.getMCollection()
                 .findOneAndUpdate(
-                    Filters.eq(ApiCollection.ID, collectionId), 
-                    Updates.addToSet(ApiCollection.TAGS_STRING, tagsList.get(0)), 
+                    Filters.eq(ApiCollection.ID, collectionId),
+                    Updates.addToSet(ApiCollection.TAGS_STRING, tagsList.get(0)),
                     updateOptions
                 );
-                
+
             loggerMaker.info("Added Gen AI tag to collection ID: " + collectionId, LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.error("Error adding Gen AI tag to collection: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
     }
-    
-    private void executeApiCall() {
+
+    private void executeApiCall() throws Exception {
         boolean webSocket = isWebSocketUrl(url);
         Map<String, List<String>> headers = new HashMap<>(connectionHeaders);
         headers.put("Content-Type", Arrays.asList("application/json"));
@@ -230,6 +275,11 @@ public class AgentImportAction extends UserAction{
             response = new OriginalHttpResponse(customResponseBody, customRespHeaders, statusCode);
         } else {
             response = sendRequest(request, 5 * 60);
+            // mini-testing answers an event with its reply frames (200) or why it got none (a refused or closed
+            // connection, a timeout): that is a failed import, not the agent's reply
+            if (webSocket && response.getStatusCode() != 200) {
+                throw new Exception(webSocketFailure("WebSocket event", response));
+            }
         }
 
         try {
@@ -242,14 +292,17 @@ public class AgentImportAction extends UserAction{
                     ? convertToMessage("/" + messageType(requestBody), headers, "WS", requestBody, response, WEBSOCKET_TYPE,
                             webSocketEvents(requestBody, response))
                     : convertToMessage(url, headers, method, body, response, "HTTP/1.1", null);
+            createApiCollectionFromUrl();
             saveToDatabase(Arrays.asList(message));
         } catch (Exception e) {
             loggerMaker.error("Error during async API execution: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
+            throw e;
         }
     }
 
-    private OriginalHttpResponse sendRequest(OriginalHttpRequest request, int hybridTimeoutSeconds) {
+    // throws when the request got no response: its test role failed, mini-testing said why, or nothing answered
+    private OriginalHttpResponse sendRequest(OriginalHttpRequest request, int hybridTimeoutSeconds) throws Exception {
         try {
             OriginalHttpResponse response;
             if (!StringUtils.isEmpty(miniTestingName)) {
@@ -277,17 +330,44 @@ public class AgentImportAction extends UserAction{
                 }
                 response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
             }
-            if (response == null) {
-                throw new Exception("No response received from URL: " + url);
+            if (response == null || response.getStatusCode() <= 0) {
+                throw new Exception(noResponseReason(response));
             }
             loggerMaker.info("Successfully received response from URL", LoggerMaker.LogDb.DASHBOARD);
             return response;
         } catch (Exception e) {
-            // Request never reached the target (SSRF block, DNS/connection failure, timeout, etc).
-            // Save a placeholder entry so the attempted call still shows up instead of vanishing silently.
             loggerMaker.error("Error calling URL: " + url + " - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-            requestError = e.getMessage();
-            return new OriginalHttpResponse("", new HashMap<>(), 0);
+            throw e;
+        }
+    }
+
+    // a request that got no response: mini-testing said why (status 0 with an error, e.g. the role's login
+    // failed), mini-testing never answered, or the target didn't
+    private String noResponseReason(OriginalHttpResponse response) {
+        String error = errorOf(response);
+        if (StringUtils.isEmpty(miniTestingName)) {
+            return "No response received from URL: " + url;
+        }
+        return error != null ? "Mini-testing " + miniTestingName + ": " + error : "No response from mini-testing " + miniTestingName;
+    }
+
+    // a WebSocket handshake or event that mini-testing answered with an error status, with its reason if it gave one
+    private static String webSocketFailure(String what, OriginalHttpResponse response) {
+        String failure = what + " failed with HTTP " + response.getStatusCode();
+        String error = errorOf(response);
+        return error != null ? failure + ": " + error : failure;
+    }
+
+    // the "error" mini-testing puts in the body of a response it could not get, if any
+    private static String errorOf(OriginalHttpResponse response) {
+        if (response == null || StringUtils.isEmpty(response.getBody())) {
+            return null;
+        }
+        try {
+            String error = BasicDBObject.parse(response.getBody()).getString("error");
+            return StringUtils.isEmpty(error) ? null : error;
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -324,16 +404,16 @@ public class AgentImportAction extends UserAction{
     }
 
     private static final String WEBSOCKET_TYPE = "WEBSOCKET";
-    // how long the user waits for mini-testing to check a WebSocket connection: as long as an event import waits,
-    // since mini-testing may first run the test role's login (the UI's request allows 330s)
+    // how long a connection import waits for mini-testing to check the connection (in the background, the UI polls
+    // fetchAgentImportStatus), as long as an event import waits, since mini-testing may first run the role's login
     private static final int CONNECTION_CHECK_TIMEOUT_SECONDS = 5 * 60;
 
     /*
      * A WebSocket URL without an event is the agent's connection string, which its events and WebSocket tests
      * connect to. Mini-testing does the handshake first and it is saved only if accepted (101), so a wrong URL
-     * or an expired session shows up here.
+     * or an expired session fails the import.
      */
-    private String importWebSocketConnection() throws Exception {
+    private void importWebSocketConnection() throws Exception {
         Map<String, List<String>> headers = new HashMap<>();
         addCustomHeaders(headers);
         // with a custom response there's no live call, so an accepted handshake without headers is saved
@@ -342,10 +422,7 @@ public class AgentImportAction extends UserAction{
             // saved as mini-testing returned it: 101 with the server's headers and no body, as a connection string's must be
             handshake = sendRequest(webSocketRequest(url, "", headers), CONNECTION_CHECK_TIMEOUT_SECONDS);
             if (handshake.getStatusCode() != 101) {
-                addActionError(handshake.getStatusCode() > 0
-                        ? "WebSocket handshake failed with HTTP " + handshake.getStatusCode()
-                        : noResponseReason(handshake));
-                return Action.ERROR.toUpperCase();
+                throw new Exception(webSocketFailure("WebSocket handshake", handshake));
             }
         }
 
@@ -355,24 +432,6 @@ public class AgentImportAction extends UserAction{
         headers.put("upgrade", Arrays.asList("websocket"));
         headers.put("connection", Arrays.asList("Upgrade"));
         saveToDatabase(Arrays.asList(convertToMessage(httpScheme(url), headers, "GET", "", handshake, WEBSOCKET_TYPE, null)));
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    // a request that got no response: failed here (e.g. its test role), mini-testing reported why (status 0 with
-    // an error, e.g. the role's login failed), or mini-testing never answered
-    private String noResponseReason(OriginalHttpResponse response) {
-        if (!StringUtils.isEmpty(requestError)) {
-            return requestError;
-        }
-        try {
-            String error = BasicDBObject.parse(response.getBody()).getString("error");
-            if (!StringUtils.isEmpty(error)) {
-                return "Mini-testing " + miniTestingName + ": " + error;
-            }
-        } catch (Exception e) {
-            // no error from mini-testing
-        }
-        return "No response from mini-testing " + miniTestingName;
     }
 
     // sent to mini-testing as the http(s) handshake URL marked WEBSOCKET; an empty body means only the handshake
@@ -463,10 +522,10 @@ public class AgentImportAction extends UserAction{
 
     private String convertToMessage(String url, Map<String, List<String>> requestHeaders, String method, String requestBody, OriginalHttpResponse response, String type, String events) throws Exception {
         Map<String, String> result = new HashMap<>();
-        
+
         Map<String, String> requestHeadersFlat = flattenHeaders(requestHeaders);
         Map<String, String> responseHeadersFlat = flattenHeaders(response.getHeaders());
-        
+
         result.put("akto_account_id", Context.accountId.get() + "");
         result.put("path", url);
         result.put("requestHeaders", mapper.writeValueAsString(requestHeadersFlat));
@@ -490,12 +549,12 @@ public class AgentImportAction extends UserAction{
         result.put("status", isNoResponse ? "ERROR" : "OK");
         result.put("contentType", getContentTypeFromHeaders(response.getHeaders()));
         result.put("source", (isNoResponse ? HttpResponseParams.Source.POSTMAN : HttpResponseParams.Source.HAR).name());
-        
+
         result.put("responseHeaders", mapper.writeValueAsString(responseHeadersFlat));
-        
+
         return mapper.writeValueAsString(result);
     }
-    
+
     private Map<String, String> flattenHeaders(Map<String, List<String>> headers) {
         Map<String, String> flattened = new HashMap<>();
         if (headers != null) {
@@ -507,7 +566,7 @@ public class AgentImportAction extends UserAction{
         }
         return flattened;
     }
-    
+
     private String getContentTypeFromHeaders(Map<String, List<String>> headers) {
         if (headers != null) {
             for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
@@ -518,15 +577,15 @@ public class AgentImportAction extends UserAction{
         }
         return "application/json";
     }
-    
+
     private void saveToDatabase(List<String> messages) throws Exception {
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         if (topic == null) topic = "akto.api.logs";
-        
+
         loggerMaker.info("Saving imported data to database for collection: " + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
-        
+
         Utils.pushDataToKafka(apiCollectionId, topic, messages, new ArrayList<>(), true, true, true);
-        
+
         loggerMaker.info("Successfully saved imported data to database", LoggerMaker.LogDb.DASHBOARD);
     }
 }

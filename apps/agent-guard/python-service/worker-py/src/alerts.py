@@ -3,14 +3,18 @@
 Async sinks, all no-ops when their target isn't configured:
   - post_slack(...)         → Slack incoming webhook (SLACK_WEBHOOK_URL)
   - store_results(...)      → DB abstractor /api/storeGuardrailModelResults
+  - store_tripwire_result() → one JSON blob per Tripwire answer (TRIPWIRE_RESULTS_BLOB_URL)
 
 All are scheduled via the runtime's fire-and-forget hook (waitUntil on
 Cloudflare, asyncio.create_task on the container) so they never block the scan
 response. None ever raises into the caller.
 """
 
+import json
 import logging
 import time
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -24,6 +28,16 @@ _IDENTITY = {"Accept-Encoding": "identity"}
 _SLACK_TIMEOUT_S = 5.0
 _STORE_TIMEOUT_S = 10.0
 _TEXT_PREVIEW_CHARS = 1500
+_BLOB_CLIENT: httpx.AsyncClient | None = None
+
+
+def _blob_client() -> httpx.AsyncClient:
+    # One client for every Tripwire upload, so each answer reuses a connection to Blob Storage instead of paying
+    # a new TCP + TLS handshake.
+    global _BLOB_CLIENT
+    if _BLOB_CLIENT is None or _BLOB_CLIENT.is_closed:
+        _BLOB_CLIENT = httpx.AsyncClient(timeout=_STORE_TIMEOUT_S, limits=httpx.Limits(max_connections=20))
+    return _BLOB_CLIENT
 
 
 def _fmt_num(v: Any) -> str:
@@ -123,6 +137,34 @@ async def store_results(completed: list[dict[str, Any]], scanner_name: str) -> N
         logger.warning(f"[Store] failed for scanner={scanner_name}: {exc}")
 
 
+async def store_tripwire_result(record: dict[str, Any]) -> None:
+    """Upload one Tripwire record as its own JSON blob (Azure Put Blob, authorised by the SAS token in
+    TRIPWIRE_RESULTS_BLOB_URL). Blobs are named <yyyy>/<mm>/<dd>/<hh>/<time>-<id>.json, so an hour or a day
+    lists together. The URL carries the SAS token, so it is never logged: not here, and not by httpx, which
+    every runtime keeps at WARNING (scan_diag.quiet_http_client_logs)."""
+    container = (settings.TRIPWIRE_RESULTS_BLOB_URL or "").strip()
+    if not container:
+        return
+    now = datetime.now(UTC)
+    name = f"{now:%Y/%m/%d/%H}/{now:%Y%m%dT%H%M%S%f}Z-{uuid.uuid4().hex[:12]}.json"
+    base, _, sas = container.partition("?")
+    url = f"{base.rstrip('/')}/{name}" + (f"?{sas}" if sas else "")
+    started = time.perf_counter()
+    try:
+        resp = await _blob_client().put(
+            url,
+            headers={"x-ms-blob-type": "BlockBlob", "Content-Type": "application/json"},
+            content=json.dumps(record),
+        )
+        metrics_push.SAMPLES["alert"].record("tripwire_blob", (time.perf_counter() - started) * 1000.0)
+        if resp.status_code >= 400:
+            metrics_push.COUNTS["alert_errors"].increment(f"tripwire_blob:status_{resp.status_code}")
+            logger.warning(f"[TripwireBlob] upload of {name} returned {resp.status_code}")
+    except Exception as exc:
+        metrics_push.COUNTS["alert_errors"].increment(f"tripwire_blob:{type(exc).__name__}")
+        logger.warning(f"[TripwireBlob] upload of {name} failed: {type(exc).__name__}")  # not exc: it may hold the URL
+
+
 # ── Model-fallback alerts (FALLBACK_SLACK_WEBHOOK_URL) ────────────────────────
 # Providers only *record* a fallback (synchronous, no I/O on the scan path);
 # scan_handler flushes the records through the runtime's fire-and-forget hook.
@@ -158,13 +200,14 @@ def note_fallback(primary: str, backup: str, reason: str) -> None:
     entry["reasons"][reason] = entry["reasons"].get(reason, 0) + 1
 
 
-def note_availability(target: str, available: bool) -> None:
-    """The health check changed a primary's state (called only on a change)."""
+def note_availability(target: str, available: bool, reasons: str = "") -> None:
+    """The health check changed a primary's state (called only on a change); `reasons` are the failed probes' causes."""
     if _fallback_webhook():
+        cause = f" ({reasons})" if reasons else ""
         _transitions.append(
             f"✅ primary `{target}` is AVAILABLE again"
             if available
-            else f"🔴 primary `{target}` is DOWN, requests go to its backup"
+            else f"🔴 primary `{target}` is DOWN{cause}, requests go to its backup"
         )
 
 

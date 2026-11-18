@@ -4,46 +4,50 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
 import javax.script.SimpleScriptContext;
 
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.config.TestScript;
+import com.akto.dto.testing.config.TestScriptDraft;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.scripts.ScriptDiagnosticsCollector;
+import com.akto.testing.scripts.ScriptEngines;
+import com.akto.testing.scripts.TestScriptProviders;
+import com.akto.testing.scripts.TestScriptResolver;
 
 public class ApiExecutorUtil {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutorUtil.class, LogDb.TESTING);
 
-    private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
-    private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
-    private static Map<Integer, Integer> lastFetchedMapPostRequest = new HashMap<>();
-    private static Map<Integer, TestScript> testScriptMapPostRequest = new HashMap<>();
+    private static TestScriptResolver resolver = new TestScriptResolver(TestScriptProviders.cachedDatabase());
 
-    private static TestScript getTestScriptWithCache(int accountId, TestScript.Type type,
-            Map<Integer, Integer> lastFetched, Map<Integer, TestScript> scriptMap) {
-        TestScript testScript = scriptMap.getOrDefault(accountId, null);
-        int lastFetchedTime = lastFetched.getOrDefault(accountId, 0);
-        if (Context.now() - lastFetchedTime > 5 * 60) {
-            testScript = TestScriptsDao.instance.fetchTestScript(type);
-            scriptMap.put(accountId, testScript);
-            lastFetched.put(accountId, Context.now());
-        }
-        return testScript;
+    static void setResolverForTest(TestScriptResolver testResolver) {
+        resolver = testResolver;
     }
 
-    private static ScriptEngine createEngineAndContext() {
-        ScriptEngineManager manager = new ScriptEngineManager();
-        return manager.getEngineByName("nashorn");
+    static void resetResolverForTest() {
+        resolver = new TestScriptResolver(TestScriptProviders.cachedDatabase());
+    }
+
+    /** The script this run selected for this phase, or null. Read failures propagate to the caller's catch. */
+    private static TestScript resolveScript(TestingRunConfig testingRunConfig, TestScript.Type type) {
+        Optional<TestScript> testScript = resolver.resolve(testingRunConfig, type);
+        return testScript.filter(s -> s.getJavascript() != null).orElse(null);
+    }
+
+    /** Validation drafts run sandboxed; library scripts run exactly as before. */
+    private static ScriptEngine createEngineAndContext(TestScript script) {
+        return ScriptEngines.create(TestScriptDraft.isDraftId(script.getId()));
     }
 
     private static SimpleScriptContext getScriptContext(ScriptEngine engine) {
@@ -83,10 +87,11 @@ public class ApiExecutorUtil {
         return hs;
     }
 
-    public static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
-        if (!executeScript) {
+    public static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, TestingRunConfig testingRunConfig) {
+        if (testingRunConfig == null) {
             return;
         }
+        ScriptDiagnosticsCollector diagnostics = ScriptDiagnosticsCollector.current();
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "TEST_PRE_SCRIPT");
@@ -94,19 +99,19 @@ public class ApiExecutorUtil {
                 return;
             }
 
-            String script;
-            TestScript testScript = getTestScriptWithCache(accountId, TestScript.Type.PRE_REQUEST, lastFetchedMap, testScriptMap);
-            if (testScript != null && testScript.getJavascript() != null) {
-                script = testScript.getJavascript();
-            } else {
+            TestScript script = resolveScript(testingRunConfig, TestScript.Type.PRE_REQUEST);
+            if (script == null) {
                 return;
             }
             loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
 
-            ScriptEngine engine = createEngineAndContext();
+            ScriptEngine engine = createEngineAndContext(script);
             SimpleScriptContext sctx = getScriptContext(engine);
             setRequestAttributes(sctx, originalHttpRequest);
-            engine.eval(script);
+            if (diagnostics != null) {
+                diagnostics.beforeRun(TestScript.Type.PRE_REQUEST, sctx, ScriptDiagnosticsCollector.describeRequest(originalHttpRequest));
+            }
+            engine.eval(script.getJavascript());
 
             String method = (String) sctx.getAttribute("method");
             Map<String, Object> headers = (Map) sctx.getAttribute("headers");
@@ -119,18 +124,25 @@ public class ApiExecutorUtil {
             originalHttpRequest.setUrl(url);
             originalHttpRequest.setHeaders(convertHeadersFromScript(headers));
             originalHttpRequest.setQueryParams(queryParams);
+            if (diagnostics != null) {
+                diagnostics.afterRun(TestScript.Type.PRE_REQUEST, ScriptDiagnosticsCollector.describeRequest(originalHttpRequest));
+            }
 
         } catch (Exception e) {
+            if (diagnostics != null) {
+                diagnostics.failRun(TestScript.Type.PRE_REQUEST, e);
+            }
             loggerMaker.errorAndAddToDb("error in calculateHashAndAddAuth " + e.getMessage() + " url " + originalHttpRequest.getUrl());
             e.printStackTrace();
             return;
         }
     }
 
-    public static void applyPostRequestScript(OriginalHttpRequest originalHttpRequest, OriginalHttpResponse originalHttpResponse, boolean executeScript) {
-        if (!executeScript || originalHttpResponse == null) {
+    public static void applyPostRequestScript(OriginalHttpRequest originalHttpRequest, OriginalHttpResponse originalHttpResponse, TestingRunConfig testingRunConfig) {
+        if (testingRunConfig == null || originalHttpResponse == null) {
             return;
         }
+        ScriptDiagnosticsCollector diagnostics = ScriptDiagnosticsCollector.current();
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "TEST_PRE_SCRIPT");
@@ -138,16 +150,13 @@ public class ApiExecutorUtil {
                 return;
             }
 
-            TestScript testScript = getTestScriptWithCache(accountId, TestScript.Type.POST_REQUEST, lastFetchedMapPostRequest, testScriptMapPostRequest);
-            String script;
-            if (testScript != null && testScript.getJavascript() != null) {
-                script = testScript.getJavascript();
-            } else {
+            TestScript script = resolveScript(testingRunConfig, TestScript.Type.POST_REQUEST);
+            if (script == null) {
                 return;
             }
             loggerMaker.infoAndAddToDb("Starting applyPostRequestScript");
 
-            ScriptEngine engine = createEngineAndContext();
+            ScriptEngine engine = createEngineAndContext(script);
             SimpleScriptContext sctx = getScriptContext(engine);
             if (originalHttpRequest != null) {
                 setRequestAttributes(sctx, originalHttpRequest);
@@ -155,7 +164,10 @@ public class ApiExecutorUtil {
             sctx.setAttribute("body", originalHttpResponse.getBody(), ScriptContext.ENGINE_SCOPE);
             sctx.setAttribute("responseHeaders", originalHttpResponse.getHeaders(), ScriptContext.ENGINE_SCOPE);
             sctx.setAttribute("statusCode", originalHttpResponse.getStatusCode(), ScriptContext.ENGINE_SCOPE);
-            engine.eval(script);
+            if (diagnostics != null) {
+                diagnostics.beforeRun(TestScript.Type.POST_REQUEST, sctx, ScriptDiagnosticsCollector.describeResponse(originalHttpResponse));
+            }
+            engine.eval(script.getJavascript());
 
             String body = (String) sctx.getAttribute("body");
             Map<String, Object> headers = (Map) sctx.getAttribute("responseHeaders");
@@ -171,7 +183,13 @@ public class ApiExecutorUtil {
             if (headers != null) {
                 originalHttpResponse.setHeaders(convertHeadersFromScript(headers));
             }
+            if (diagnostics != null) {
+                diagnostics.afterRun(TestScript.Type.POST_REQUEST, ScriptDiagnosticsCollector.describeResponse(originalHttpResponse));
+            }
         } catch (Exception e) {
+            if (diagnostics != null) {
+                diagnostics.failRun(TestScript.Type.POST_REQUEST, e);
+            }
             loggerMaker.errorAndAddToDb("error in applyPostRequestScript " + e.getMessage());
             e.printStackTrace();
         }

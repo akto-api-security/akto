@@ -11,6 +11,8 @@ const AGENT_TYPES = [{ label: 'HTTP', value: 'HTTP' }, { label: 'WebSocket', val
 const METHODS = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'].map(m => ({ label: m, value: m }))
 // a WebSocket handshake is an http(s) request (e.g. copied from Burp), so http(s) maps to ws(s) on the same endpoint
 const toWebSocketUrl = (value) => (value || '').trim().replace(/^http(s?):\/\//i, 'ws$1://')
+const IMPORT_POLL_INTERVAL_MS = 2000
+const IMPORT_MAX_POLLS = 300
 
 const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.", defaultRequestBody = { "model": "llama3.2", "prompt": "Why is the sky blue?" }, docsLink = "https://docs.akto.io/ai-security" }) => {
     const [loading, setLoading] = useState(false)
@@ -63,6 +65,22 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
         return Object.keys(obj).length > 0 ? obj : null
     }
 
+    const waitForImport = async (uploadId) => {
+        for (let i = 0; i < IMPORT_MAX_POLLS; i++) {
+            await new Promise(resolve => setTimeout(resolve, IMPORT_POLL_INTERVAL_MS))
+            const res = await api.fetchAgentImportStatus(uploadId)
+            if (res.uploadStatus === 'SUCCEEDED') {
+                return true
+            }
+            if (res.uploadStatus === 'FAILED') {
+                func.setToast(true, true, res.errorMessage || "AI agent import failed.")
+                return false
+            }
+        }
+        func.setToast(true, true, "AI agent import is taking longer than expected. Please check again in a while.")
+        return false
+    }
+
     const handleImport = async () => {
         if (!canImport) {
             func.setToast(true, true, "Please enter a valid URL.")
@@ -98,11 +116,15 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                 : null
             const customResponseHeadersToSend = useCustomResponse ? headersArrayToObject(responseHeaders) : null
             const miniTestingNameToSend = useMiniTesting && !useCustomResponse ? (miniTestingName || null) : null
-            await api.importFromUrl(
+            const started = await api.importFromUrl(
                 urlToSend, testRoleToSend, requestBodyToSend || null, customHeaders, collectionNameToSend,
                 customResponseBodyToSend, customResponseStatusCodeToSend, customResponseHeadersToSend,
                 miniTestingNameToSend, isWebSocket ? null : method
             )
+            const succeeded = await waitForImport(started.uploadId)
+            if (!succeeded) {
+                return
+            }
             func.setToast(true, false, "AI agent imported successfully.")
             setUrl('')
             setCollectionName('')

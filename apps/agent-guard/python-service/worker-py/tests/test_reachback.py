@@ -16,15 +16,16 @@ from fastapi import HTTPException
 
 import app as app_module
 import azure_ad_auth
+import providers
 import reachback
 from jwt_sign import load_private_key
 from settings import settings
 
-_TENANT = "morganstanley.onmicrosoft.com"
+_TENANT = "contoso.onmicrosoft.com"
 _CLIENT_ID = "11111111-2222-3333-4444-555555555555"
 _SCOPE = "api://reachback-gw/.default"
 _THUMBPRINT = hashlib.sha1(b"public_key.cer").hexdigest().upper()
-_BASE_URL = "https://reach-back-gateway.ms.com/openai/v1"
+_BASE_URL = "https://reach-back-gateway.example.com/openai/v1"
 _REQUEST = {"model": "gpt-6-luna", "messages": [{"role": "user", "content": "hi"}]}
 _COMPLETION = {"model": "gpt-6-luna", "choices": [{"message": {"role": "assistant", "content": "ok"}}]}
 
@@ -252,3 +253,60 @@ async def test_endpoint_returns_502_with_failed_stage(key, monkeypatch):
 
     assert resp.status_code == 502
     assert json.loads(resp.body) == {"stage": "http", "status": 403, "error": '{"error":"forbidden"}'}
+
+
+@pytest.fixture
+def fresh_providers(monkeypatch):
+    monkeypatch.setattr(providers, "_PROVIDER_CACHE", {})
+
+
+async def test_model_config_entry_builds_provider_that_calls_gateway(key, fresh_providers, monkeypatch):
+    _, gateway_client = _wire(monkeypatch, [_token_reply("tok-1")], [_gateway_reply()])
+
+    provider = providers.build_provider_from_config(
+        {"provider": "reachback", "model": "gpt-6-luna", "modelRole": "FINAL_ARBITER"}
+    )
+    content = await provider.complete("is this safe?")
+
+    assert isinstance(provider, providers.ReachbackProvider)
+    assert content == "ok"
+    post = gateway_client.posts[0]
+    assert post["url"] == f"{_BASE_URL}/chat/completions"
+    assert post["headers"] == {"Authorization": "Bearer tok-1"}
+    assert post["json"] == {
+        "model": "gpt-6-luna",
+        "messages": [{"role": "user", "content": "is this safe?"}],
+        "max_completion_tokens": 256,
+        "temperature": 0.0,
+        "reasoning_effort": "none",
+    }
+
+
+async def test_relaxed_limits_raise_the_completion_ceiling(key, fresh_providers, monkeypatch):
+    _, gateway_client = _wire(monkeypatch, [_token_reply()], [_gateway_reply()])
+    provider = providers.build_provider_from_config({"provider": "reachback", "model": "gpt-6-sol"})
+
+    with providers.relaxed_limits():
+        await provider.complete("explain")
+
+    assert gateway_client.posts[0]["json"]["max_completion_tokens"] == 4096
+
+
+async def test_gateway_failure_propagates_from_provider(key, fresh_providers, monkeypatch):
+    _wire(monkeypatch, [_token_reply()], [_gateway_reply(403, {"error": "forbidden"})])
+    provider = providers.build_provider_from_config({"provider": "reachback", "model": "gpt-6-luna"})
+
+    with pytest.raises(reachback.ReachbackError) as err:
+        await provider.complete("hi")
+
+    assert err.value.stage == "http"
+
+
+def test_entry_without_model_is_skipped(key, fresh_providers):
+    assert providers.build_provider_from_config({"provider": "reachback", "model": ""}) is None
+
+
+def test_entry_is_skipped_when_settings_missing(key, fresh_providers, monkeypatch):
+    monkeypatch.setattr(settings, "REACHBACK_CLIENT_ID", "")
+
+    assert providers.build_provider_from_config({"provider": "reachback", "model": "gpt-6-luna"}) is None

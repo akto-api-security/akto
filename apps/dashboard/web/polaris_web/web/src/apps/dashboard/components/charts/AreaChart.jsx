@@ -28,7 +28,7 @@ function AreaChart({ data, height = 280, color = '#6D3BEF', yAxisTitle = `${mapL
       min: 0
     },
     tooltip: {
-      formatter: tooltipFormatter || function () { return `${this.y} APIs`; }
+      formatter: tooltipFormatter || function () { return `${this.y} ${mapLabel('APIs', getDashboardCategory())}`; }
     },
     plotOptions: {
       area: {

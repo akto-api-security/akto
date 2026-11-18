@@ -14,6 +14,9 @@ import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.WorkflowNodeDetails;
+import com.akto.dto.testing.WorkflowTestResult.NodeResult;
+import com.akto.dto.testing.YamlNodeDetails;
 import com.akto.gpt.handlers.gpt_prompts.FalsePositiveVerifierPromptHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -38,7 +41,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.regex.Pattern;
 
 /**
  * "Verify with AI" on the test run and issues pages: asks the LLM about every vulnerable result and
@@ -58,16 +60,13 @@ public class AiVerificationAction extends UserAction {
     public static final String AI_VERDICT_FILTER = "aiVerdict";
     private static final String VERDICT_NOT_VERIFIED = "NOT_VERIFIED";
     // Passive tests (e.g. sensitive data exposure) send no attack: the finding is in the captured
-    // traffic itself, so they are recorded as true positives without asking the AI.
-    private static final Pattern PASSIVE_TEST = Pattern.compile("(?m)^\\s*type:\\s*passive\\s*$");
+    // traffic itself, so they are recorded as true positives without asking the AI. Every other test
+    // is sent to the AI, which answers TRUE_POSITIVE only when the stored evidence proves the finding.
     private static final int PASSIVE_CONFIDENCE = 90;
+    // A TRUE_POSITIVE label says the finding is confirmed, so one the AI is unsure of is recorded as not proven.
+    static final int MIN_TRUE_POSITIVE_CONFIDENCE = 70;
     private static final String PASSIVE_REASON = "Passive test: the finding comes from the captured traffic itself and "
         + "no attack was sent, so it is kept as reported.";
-    // Tests the AI cannot judge from the stored request/response, so they are never sent to it:
-    // multi-step tests are judged across steps the stored attempts do not fully show, and some tests
-    // prove the finding through an out-of-band callback (ssrf_url_hit) or response timing, which are not stored.
-    private static final Pattern NOT_VERIFIABLE_TEST = Pattern.compile(
-        "(?m)^\\s*type:\\s*(multiple|graph)\\s*$|ssrf_url_hit|response_time|median_response|compare_greater|\\.stats\\.");
 
     // One background job per test run at a time; jobs run here, LLM calls in a separate pool so a
     // job waiting on its calls cannot starve them.
@@ -288,13 +287,9 @@ public class AiVerificationAction extends UserAction {
         int passive = 0;
         for (Target target : targets) {
             String template = templates.get(target.result.getTestSubType());
-            if (template != null && PASSIVE_TEST.matcher(template).find()) {
+            if (FalsePositiveVerifierPromptHandler.isPassiveTest(template)) {
                 writeVerdict(target.issue, false, PASSIVE_CONFIDENCE, PASSIVE_REASON);
                 passive++;
-                continue;
-            }
-            if (template != null && NOT_VERIFIABLE_TEST.matcher(template).find()) {
-                notVerifiable++;
                 continue;
             }
             calls.add(LLM_EXECUTOR.submit(() -> {
@@ -345,27 +340,34 @@ public class AiVerificationAction extends UserAction {
         return templates;
     }
 
-    /** Asks the LLM about one result and writes its verdict into the issue's description. */
+    /**
+     * Asks the LLM about one result, in one call, and writes its verdict into the issue's description.
+     * A TRUE_POSITIVE below MIN_TRUE_POSITIVE_CONFIDENCE is recorded as a false positive that is not proven.
+     */
     private Outcome verifyResult(TestingRunIssues issue, TestingRunResult result, String template) {
-        List<TestResult> attempts = attemptsToJudge(result);
-        if (attempts.isEmpty()) return Outcome.SKIPPED;
+        String prompt = buildPrompt(result, template);
+        if (prompt == null) return Outcome.SKIPPED;
 
-        List<String> attemptMessages = new ArrayList<>();
-        for (TestResult attempt : attempts) attemptMessages.add(attempt.getMessage());
-        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(result.getTestSubType(), template,
-            attempts.get(0).getOriginalMessage(), attemptMessages);
         BasicDBObject verdict = new FalsePositiveVerifierPromptHandler().handle(new BasicDBObject("prompt", prompt));
         if (verdict.containsField("error")) {
             loggerMaker.infoAndAddToDb("AI verification skipped result " + result.getHexId() + ": " + verdict.get("error"));
             return Outcome.ERROR;
         }
-        boolean falsePositive = FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(
-            verdict.getString(FalsePositiveVerifierPromptHandler.VERDICT));
-        Outcome outcome = falsePositive ? Outcome.FALSE_POSITIVE : Outcome.TRUE_POSITIVE;
+        String answer = verdict.getString(FalsePositiveVerifierPromptHandler.VERDICT);
+        int confidence = verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE);
+        String reason = verdict.getString(FalsePositiveVerifierPromptHandler.REASON);
+        boolean truePositive = isConfirmed(answer, confidence);
+        if (!truePositive && FalsePositiveVerifierPromptHandler.TRUE_POSITIVE.equals(answer)) {
+            reason = "Not proven, the AI was only " + confidence + "% sure it is real: " + reason;
+            confidence = 100 - confidence;
+        }
+        writeVerdict(issue, !truePositive, confidence, reason);
+        return truePositive ? Outcome.TRUE_POSITIVE : Outcome.FALSE_POSITIVE;
+    }
 
-        writeVerdict(issue, falsePositive, verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE),
-            verdict.getString(FalsePositiveVerifierPromptHandler.REASON));
-        return outcome;
+    /** Whether an answer confirms the finding: a TRUE_POSITIVE the AI is sure enough of. */
+    static boolean isConfirmed(String answer, int confidence) {
+        return FalsePositiveVerifierPromptHandler.TRUE_POSITIVE.equals(answer) && confidence >= MIN_TRUE_POSITIVE_CONFIDENCE;
     }
 
     /**
@@ -395,16 +397,54 @@ public class AiVerificationAction extends UserAction {
     }
 
     /**
+     * The prompt for one result: every step of a multi-step test, otherwise its flagged attempts. Null
+     * when nothing was stored to judge.
+     */
+    private static String buildPrompt(TestingRunResult result, String template) {
+        List<GenericTestResult> testResults = result.getTestResults();
+        if (testResults == null || testResults.isEmpty()) return null;
+        if (testResults.get(0) instanceof MultiExecTestResult) {
+            List<FalsePositiveVerifierPromptHandler.Step> steps = stepsToJudge(result, (MultiExecTestResult) testResults.get(0));
+            return steps.isEmpty() ? null : FalsePositiveVerifierPromptHandler.buildStepsPrompt(result.getTestSubType(), template, steps);
+        }
+        List<TestResult> attempts = attemptsToJudge(testResults);
+        if (attempts.isEmpty()) return null;
+        List<String> attemptMessages = new ArrayList<>();
+        for (TestResult attempt : attempts) attemptMessages.add(attempt.getMessage());
+        return FalsePositiveVerifierPromptHandler.buildPrompt(result.getTestSubType(), template,
+            attempts.get(0).getOriginalMessage(), attemptMessages);
+    }
+
+    /**
+     * Every step of a multi-step result, in execution order, with the requests it sent and its baseline.
+     * Empty when no step stored a request.
+     */
+    static List<FalsePositiveVerifierPromptHandler.Step> stepsToJudge(TestingRunResult result, MultiExecTestResult multi) {
+        List<FalsePositiveVerifierPromptHandler.Step> steps = new ArrayList<>();
+        Map<String, NodeResult> nodes = multi.getNodeResultMap();
+        if (nodes == null) return steps;
+        Map<String, WorkflowNodeDetails> details = result.getWorkflowTest() == null ? null
+            : result.getWorkflowTest().getMapNodeIdToWorkflowNodeDetails();
+        boolean anyRequest = false;
+        for (String nodeId : multi.getExecutionOrder()) {
+            NodeResult node = nodes.get(nodeId);
+            if (node == null) continue;
+            WorkflowNodeDetails nodeDetails = details == null ? null : details.get(nodeId);
+            String originalMessage = nodeDetails instanceof YamlNodeDetails ? ((YamlNodeDetails) nodeDetails).getOriginalMessage() : null;
+            List<String> messages = MultiExecTestResult.stepMessages(node);
+            anyRequest |= !messages.isEmpty();
+            steps.add(new FalsePositiveVerifierPromptHandler.Step(nodeId, originalMessage, messages,
+                node.isVulnerable(), node.getValidationReason()));
+        }
+        return anyRequest ? steps : new ArrayList<>();
+    }
+
+    /**
      * The attempts the scanner flagged vulnerable (up to MAX_ATTEMPTS_PER_RESULT), since those are what
      * the verdict is about. Falls back to the last attempt if none carries the vulnerable flag.
      */
-    private static List<TestResult> attemptsToJudge(TestingRunResult result) {
-        List<GenericTestResult> testResults = result.getTestResults();
+    private static List<TestResult> attemptsToJudge(List<GenericTestResult> testResults) {
         List<TestResult> picked = new ArrayList<>();
-        if (testResults == null || testResults.isEmpty()) return picked;
-        if (testResults.get(0) instanceof MultiExecTestResult) {
-            testResults = ((MultiExecTestResult) testResults.get(0)).convertToExistingTestResult(result);
-        }
         TestResult last = null;
         for (GenericTestResult attempt : testResults) {
             if (!(attempt instanceof TestResult)) continue;

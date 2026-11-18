@@ -11,7 +11,7 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
-import { categoryToShortName, getDashboardCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isMCPSecurityCategory } from '../apps/main/labelHelper';
+import { categoryToShortName, getDashboardCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isMCPSecurityCategory, mapLabel } from '../apps/main/labelHelper';
 
 import { circle_cancel, circle_tick_minor, car_icon } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
@@ -19,6 +19,7 @@ import { Box } from '@shopify/polaris';
 import TooltipText from '../apps/dashboard/components/shared/TooltipText';
 import { getMethod } from "../apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import observeFunc from '../apps/dashboard/pages/observe/transform';
+import values from './values';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -109,11 +110,13 @@ const IPV6_REGEX = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:
 const func = {
   categoryMapping: categoryMapping,
   agenticCategoryMapping: agenticCategoryMapping,
-  setToast (isActive, isError, message) {
+  // `action` is optional: { content, onAction } adds a button to the toast (e.g. Undo).
+  setToast (isActive, isError, message, action) {
     Store.getState().setToastConfig({
           isActive: isActive,
           isError: isError,
-          message: message
+          message: message,
+          action: action
       })
   },
   formatJsonForEditor(data){
@@ -1738,7 +1741,7 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
             message: responses[0].curl.trim()
           }
         }else{
-          const message = responses[0].error ? responses[0].error : `It seems that this API is not vulnerable to ${responses[0].test_type.toUpperCase()} vulnerability.`
+          const message = responses[0].error ? responses[0].error : `It seems that this ${mapLabel('API', getDashboardCategory())} is not vulnerable to ${responses[0].test_type.toUpperCase()} vulnerability.`
           return{
             message: message
           }
@@ -1756,10 +1759,10 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
           if(arr.length === 0){
             return {
-              message: "No tests available for the api."
+              message: "No tests available for the " + mapLabel('API', getDashboardCategory()) + "."
             }
           }else{
-            let tests = [{functionality: "This api is vulnerable to the following vulnerabilities", apis: arr}]
+            let tests = [{functionality: "This " + mapLabel('API', getDashboardCategory()) + " is vulnerable to the following vulnerabilities", apis: arr}]
             return{
               responses: tests
             }
@@ -2623,10 +2626,18 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     const since = new Date(new Date(new Date().setDate(until.getDate() - 30)).setHours(0, 0, 0, 0));
     return { title: "Last 30 days", alias: "last30days", period: { since, until } };
   },
+  // Selected accounts default to "All time" in Atlas and Argus; undefined for everyone else.
+  getAllTimeRangeForAccounts(){
+    const allTimeAccs = [1669322524, 1784850613];
+    if (!(isAgenticSecurityCategory() || isEndpointSecurityCategory()) || !allTimeAccs.includes(Number(window.ACTIVE_ACCOUNT))) return undefined;
+    return values.ranges.find((r) => r.alias === "allTime");
+  },
   // Atlas (Endpoint Security) and Argus (Agentic Security) default to 30 days; every other product keeps `fallback`.
   // Heavy accounts keep `fallback` too (their data volume makes a 30-day default slow).
   getDefaultDateRange(fallback){
-    const accs = [1745303931, 1768175789];
+    const allTime = this.getAllTimeRangeForAccounts();
+    if (allTime) return allTime;
+    const accs = [1745303931, 1768175789, 1758787662];
     if (accs.includes(Number(window.ACTIVE_ACCOUNT))) return fallback;
     return (isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? this.getLast30DaysRange() : fallback;
   },
@@ -2784,6 +2795,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
     isAktoUser(){
       return !!window?.USER_NAME && window.USER_NAME.toLowerCase().indexOf("@akto.io") > 0;
+    },
+
+    isDastAllowedUser(){
+      const email = (window?.USER_NAME || "").toLowerCase();
+      return ["umesh@akto.io", "ankush@akto.io"].includes(email) || ["@tapestry.com", "@mongodb.com"].some(domain => email.endsWith(domain));
     },
 
     isTempAccount(){

@@ -10,15 +10,18 @@ import io.micrometer.core.instrument.binder.okhttp3.OkHttpMetricsEventListener;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import okhttp3.MediaType;
+import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -36,8 +39,15 @@ public class GuardrailsClient {
 
     private static final OkHttpClient HTTP_CLIENT = buildHttpClient(TIMEOUT_MS);
 
+    public static final String VALIDATE_FILE_ENDPOINT = "/api/validate/file";
+
+    // File validation extracts text and runs guardrails over every chunk, so it takes seconds
+    // to minutes, not the inline 3s. Matches the browser extension's 150s wait by default.
+    private static final int FILE_TIMEOUT_MS = resolveTimeoutMs("GUARDRAILS_FILE_CLIENT_TIMEOUT_MS", 150_000);
+
     private final String guardrailsServiceUrl;
     private final OkHttpClient httpClient;
+    private final OkHttpClient fileHttpClient;
     private final BiConsumer<String, String> alerts;
 
     public GuardrailsClient() {
@@ -52,18 +62,29 @@ public class GuardrailsClient {
     GuardrailsClient(String serviceUrl, OkHttpClient httpClient, BiConsumer<String, String> alerts) {
         this.guardrailsServiceUrl = serviceUrl;
         this.httpClient = httpClient;
+        // Derived, not separately built: shares the dispatcher, pool, metrics listener and any
+        // test interceptors, and only widens the timeouts.
+        this.fileHttpClient = httpClient.newBuilder()
+                .readTimeout(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .writeTimeout(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .callTimeout(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .build();
         this.alerts = alerts;
     }
 
     private static int resolveTimeoutMs() {
-        String raw = System.getenv("GUARDRAILS_CLIENT_TIMEOUT_MS");
+        return resolveTimeoutMs("GUARDRAILS_CLIENT_TIMEOUT_MS", 3_000);
+    }
+
+    private static int resolveTimeoutMs(String envKey, int defaultMs) {
+        String raw = System.getenv(envKey);
         if (raw == null || raw.trim().isEmpty()) {
-            return 3_000;
+            return defaultMs;
         }
         try {
             return Math.max(500, Integer.parseInt(raw.trim()));
         } catch (NumberFormatException e) {
-            return 3_000;
+            return defaultMs;
         }
     }
 
@@ -127,22 +148,71 @@ public class GuardrailsClient {
         return false;
     }
 
-    @SuppressWarnings("unchecked")
     public Map<String, Object> callValidate(Map<String, Object> request, String endpoint) {
+        return execute(endpoint, request, httpClient,
+                () -> RequestBody.create(objectMapper.writeValueAsString(request), JSON));
+    }
+
+    /**
+     * Multipart call to guardrails-service {@code /api/validate/file}. Each file goes as a
+     * {@code file} part, each URL as a {@code url} field, and every non-null entry of
+     * {@code fields} as a text field. Uses the longer file timeout (extraction plus a
+     * guardrail pass per chunk) and the same fail-open handling as the JSON validators.
+     */
+    public Map<String, Object> callValidateFile(Map<String, String> fields, List<FilePart> files, List<String> urls) {
+        return execute(VALIDATE_FILE_ENDPOINT, fields, fileHttpClient,
+                () -> buildFileBody(fields, files, urls));
+    }
+
+    private static RequestBody buildFileBody(Map<String, String> fields, List<FilePart> files, List<String> urls) {
+        MultipartBody.Builder builder = new MultipartBody.Builder().setType(MultipartBody.FORM);
+        for (Map.Entry<String, String> field : fields.entrySet()) {
+            if (field.getValue() != null) {
+                builder.addFormDataPart(field.getKey(), field.getValue());
+            }
+        }
+        for (FilePart part : files) {
+            MediaType type = part.contentType == null ? null : MediaType.parse(part.contentType);
+            builder.addFormDataPart("file", part.fileName, RequestBody.create(part.file, type));
+        }
+        for (String url : urls) {
+            builder.addFormDataPart("url", url);
+        }
+        return builder.build();
+    }
+
+    /** One uploaded file to forward: its bytes on disk plus the name/type the caller sent. */
+    public static final class FilePart {
+        private final File file;
+        private final String fileName;
+        private final String contentType;
+
+        public FilePart(File file, String fileName, String contentType) {
+            this.file = file;
+            this.fileName = fileName;
+            this.contentType = contentType;
+        }
+    }
+
+    @FunctionalInterface
+    private interface BodySupplier {
+        RequestBody get() throws Exception;
+    }
+
+    /** {@code context} is the caller's request data, read only for path/method/account in logs. */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> execute(String endpoint, Map<String, ?> context, OkHttpClient client, BodySupplier bodySupplier) {
         // Single result reference assigned on every return path, so the decision counter is
         // recorded exactly once (in finally) regardless of which branch we exit through.
         Map<String, Object> result = null;
         try {
-            String jsonRequest = objectMapper.writeValueAsString(request);
             String url = guardrailsServiceUrl + endpoint;
 
             loggerMaker.infoAndAddToDb("Calling guardrails service at: {}", url);
 
-            RequestBody body = RequestBody.create(jsonRequest, JSON);
             Request.Builder requestBuilder = new Request.Builder()
                     .url(url)
-                    .post(body)
-                    .addHeader("Content-Type", "application/json");
+                    .post(bodySupplier.get());
 
             String authToken = loadGuardrailsAuthToken();
             if (authToken == null || authToken.trim().isEmpty()) {
@@ -153,7 +223,7 @@ public class GuardrailsClient {
 
             Request httpRequest = requestBuilder.build();
 
-            try (Response response = httpClient.newCall(httpRequest).execute()) {
+            try (Response response = client.newCall(httpRequest).execute()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
 
                 loggerMaker.infoAndAddToDb("Guardrails response (status {}): {}", response.code(), responseBody);
@@ -165,14 +235,14 @@ public class GuardrailsClient {
                     } catch (Exception parseEx) {
                         loggerMaker.warnAndAddToDb(
                             "Guardrails response not parseable, failing open - path: {}, error: {}",
-                            request.get("path"), parseEx.getMessage());
+                            context.get("path"), parseEx.getMessage());
                         result = buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
                         return result;
                     }
                 }
                 loggerMaker.warnAndAddToDb(
                     "Guardrails service returned error status {}, failing open - path: {}",
-                    response.code(), request.get("path"));
+                    response.code(), context.get("path"));
                 result = buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
                 return result;
             }
@@ -182,7 +252,7 @@ public class GuardrailsClient {
                 // Preserve fail-open behavior; notifications are asynchronous and rate limited.
                 loggerMaker.warnAndAddToDb(
                     "Guardrails unavailable ({}), failing open - path: {}, method: {}, account: {}",
-                    e.getMessage(), request.get("path"), request.get("method"), request.get("akto_account_id"));
+                    e.getMessage(), context.get("path"), context.get("method"), context.get("akto_account_id"));
             } else {
                 loggerMaker.errorAndAddToDb(e, "Unexpected error calling guardrails service: {}", e.getMessage());
             }

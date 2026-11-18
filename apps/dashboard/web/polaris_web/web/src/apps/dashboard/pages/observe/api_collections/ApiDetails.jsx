@@ -207,7 +207,7 @@ function ApiDetails(props) {
             ]);
     
             const boxPlotSeries = [{
-                name: "API Call Distribution",
+                name: mapLabel('API', getDashboardCategory()) + " Call Distribution",
                 type: "boxplot",
                 data,
                 color: "#1E90FF",
@@ -805,7 +805,7 @@ function ApiDetails(props) {
                             areaFillHex='true'
                             height='330'
                             title={mapLabel('Api', getDashboardCategory()) + ' Call Count'}
-                            subtitle='Number of API calls over time'
+                            subtitle={'Number of ' + mapLabel('API', getDashboardCategory()) + ' calls over time'}
                             defaultChartOptions={defaultChartOptions(false)}
                             backgroundColor='#ffffff'
                             text='true'

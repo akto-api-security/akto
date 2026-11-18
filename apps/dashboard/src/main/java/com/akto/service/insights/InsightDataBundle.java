@@ -211,10 +211,14 @@ public class InsightDataBundle {
     /** Events inside the page's date range (ctx start..end), from the same cache; null when the threat
      *  backend is unavailable. */
     public List<DashboardMaliciousEvent> windowEvents() {
-        List<DashboardMaliciousEvent> events = cachedEventsSince(ctx.getStartTs());
+        return eventsBetween(ctx.getStartTs(), ctx.getEndTs());
+    }
+
+    public List<DashboardMaliciousEvent> eventsBetween(int startTs, int endTs) {
+        List<DashboardMaliciousEvent> events = cachedEventsSince(startTs);
         if (events == null) return null;
-        long start = ctx.getStartTs();
-        long end = ctx.getEndTs() > 0 ? ctx.getEndTs() : Long.MAX_VALUE;
+        long start = startTs;
+        long end = endTs > 0 ? endTs : Long.MAX_VALUE;
         return events.stream().filter(e -> e != null && e.getTimestamp() >= start && e.getTimestamp() <= end)
                 .collect(Collectors.toList());
     }

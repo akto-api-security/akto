@@ -316,14 +316,14 @@ function SwaggerDependenciesFlow({ apiCollectionId, preSelectedApi }) {
       )}
       <FlowGraphLayout
         loading={loading}
-        loadingMessage="Loading API dependencies..."
+        loadingMessage={"Loading " + mapLabel('API', getDashboardCategory()) + " dependencies..."}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeType="swaggerEdge"
-        emptyMessage="No API dependencies found for this collection"
-        bannerTitle="API Dependencies Overview"
+        emptyMessage={"No " + mapLabel('API', getDashboardCategory()) + " dependencies found for this collection"}
+        bannerTitle={mapLabel('API', getDashboardCategory()) + " Dependencies Overview"}
         bannerStats={bannerStats}
         showData={dependencies.length > 0}
         miniMapNodeColor="#5c6ac4"
