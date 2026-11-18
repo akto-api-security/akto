@@ -4,6 +4,7 @@
 # (MongoDB POJO codec, etc.). Single-token "=" form.
 exec java \
   -XX:+ExitOnOutOfMemoryError \
+  -XX:-UseBASE64Intrinsics \
   --add-opens=java.base/java.lang=ALL-UNNAMED \
   --add-opens=java.base/java.util=ALL-UNNAMED \
   --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
