@@ -1060,7 +1060,7 @@ class TripwireProvider(LLMProvider):
 
     def _client(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
-            self._http = http_client.UncancellableAsyncClient(
+            self._http = http_client.AbortSafeAsyncClient(
                 timeout=10.0, limits=httpx.Limits(max_connections=self._MAX_CONNECTIONS)
             )
         return self._http
@@ -1282,7 +1282,7 @@ def _health_client() -> httpx.AsyncClient:
     # marked DOWN.
     global _HEALTH_CLIENT
     if _HEALTH_CLIENT is None or _HEALTH_CLIENT.is_closed:
-        _HEALTH_CLIENT = http_client.UncancellableAsyncClient(
+        _HEALTH_CLIENT = http_client.AbortSafeAsyncClient(
             timeout=_HEALTH_PROBE_TIMEOUT_S, limits=httpx.Limits(max_connections=4)
         )
     return _HEALTH_CLIENT
