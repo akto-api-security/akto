@@ -281,8 +281,8 @@ public class WebSocketExecutor {
     // agents can pause for a tool call or retrieval mid-answer, so the default is generous
     static final long DEFAULT_REPLY_QUIET_MS = 15000;
     static final long REPLY_QUIET_MS = replyQuietMs(System.getenv("AKTO_WS_REPLY_QUIET_MS"), DEFAULT_REPLY_QUIET_MS);
-    // normal tests: a reply (an ack, an error, a few frames) normally completes well within this
-    static final long DEFAULT_TEST_REPLY_QUIET_MS = 1000;
+    // normal tests: as long as for agents for now, so a streamed answer isn't cut short; every test message waits
+    static final long DEFAULT_TEST_REPLY_QUIET_MS = 15000;
     static final long TEST_REPLY_QUIET_MS = replyQuietMs(System.getenv("AKTO_WS_TEST_REPLY_QUIET_MS"), DEFAULT_TEST_REPLY_QUIET_MS);
 
     static long replyQuietMs(String value, long defaultMs) {

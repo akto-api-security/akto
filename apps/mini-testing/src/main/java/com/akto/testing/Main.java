@@ -11,6 +11,7 @@ import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -301,9 +302,15 @@ public class Main {
         loggerMaker.infoAndAddToDb("Running requests for testingRunPlayground, found req: " + testingRunPlayground.getId());
         OriginalHttpResponse res;
         TestingRunConfig testingRunConfig = new TestingRunConfig();
+        Map<String, String> appliedAuth = new HashMap<>();
         try {
-            // a WebSocket agent import comes as its http(s) handshake URL marked WEBSOCKET
-            if (OriginalHttpRequest.WEBSOCKET_TYPE.equalsIgnoreCase(originalRequest.getType())) {
+            String roleError = applyImportTestRole(originalRequest, appliedAuth);
+            if (roleError != null) {
+                // not sent without its auth: the dashboard shows why
+                loggerMaker.errorAndAddToDb(roleError, LogDb.TESTING);
+                res = new OriginalHttpResponse(new BasicDBObject("error", roleError).toJson(), new HashMap<>(), 0);
+            } else if (OriginalHttpRequest.WEBSOCKET_TYPE.equalsIgnoreCase(originalRequest.getType())) {
+                // a WebSocket agent import comes as its http(s) handshake URL marked WEBSOCKET
                 String url = originalRequest.getUrl().trim().replaceFirst("(?i)^http(s?)://", "ws$1://");
                 if (originalRequest.getBody() == null || originalRequest.getBody().trim().isEmpty()) {
                     // connection string: only the handshake, 101 or the refusal
@@ -318,10 +325,59 @@ public class Main {
         } catch (Exception e) {
             res = new OriginalHttpResponse();
         }
+        attachAppliedAuth(res, appliedAuth);
         testingRunPlayground.setOriginalHttpResponse(res);
         loggerMaker.infoAndAddToDb("Running requests for testingRunPlayground, updating res: " + testingRunPlayground.getId());
         // update testingRunPlayground in DB
         dataActor.updateTestingRunPlayground(testingRunPlayground);
+    }
+
+
+    static String applyImportTestRole(OriginalHttpRequest request, Map<String, String> appliedAuth) {
+        Map<String, List<String>> headers = request.getHeaders();
+        List<String> roleIds = headers == null ? null : headers.remove(Constants.AKTO_TEST_ROLE_ID_HEADER);
+        if (roleIds == null || roleIds.isEmpty() || roleIds.get(0) == null || roleIds.get(0).trim().isEmpty()) {
+            return null;
+        }
+        String roleId = roleIds.get(0).trim();
+        TestRoles role = Executor.fetchOrFindTestRole(roleId, true);
+        if (role == null) {
+            return "Test role not found: " + roleId;
+        }
+        RawApi rawApi = new RawApi(request, new OriginalHttpResponse(), "");
+        AuthMechanism authMechanism = role.findMatchingAuthMechanism(rawApi);
+        if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().isEmpty()) {
+            return "No auth mechanism configured for test role " + role.getName();
+        }
+        for (AuthParam authParam : authMechanism.getAuthParams()) {
+            if (authParam.getKey() != null && authParam.getWhere() == AuthParam.Location.HEADER) {
+                headers.putIfAbsent(authParam.getKey().toLowerCase().trim(), new ArrayList<>(Arrays.asList("")));
+            }
+        }
+        ExecutorSingleOperationResp applied = Executor.modifyAuthTokenInRawApi(role, rawApi);
+        if (applied == null || !Boolean.TRUE.equals(applied.getSuccess())) {
+            String reason = applied != null && applied.getErrMsg() != null ? ": " + applied.getErrMsg() : "";
+            return "Could not apply test role " + role.getName() + reason;
+        }
+        for (AuthParam authParam : authMechanism.getAuthParams()) {
+            if (authParam.getKey() == null || authParam.getWhere() != AuthParam.Location.HEADER) continue;
+            String name = authParam.getKey().toLowerCase().trim();
+            List<String> value = headers.get(name);
+            if (value != null && !value.isEmpty() && value.get(0) != null) {
+                appliedAuth.put(name, value.get(0));
+            }
+        }
+        return null;
+    }
+
+
+    static void attachAppliedAuth(OriginalHttpResponse response, Map<String, String> appliedAuth) {
+        if (response == null || appliedAuth.isEmpty()) {
+            return;
+        }
+        Map<String, List<String>> headers = response.getHeaders() == null ? new HashMap<>() : new HashMap<>(response.getHeaders());
+        headers.put(Constants.AKTO_APPLIED_AUTH_HEADER, new ArrayList<>(Arrays.asList(new BasicDBObject(appliedAuth).toJson())));
+        response.setHeaders(headers);
     }
 
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
