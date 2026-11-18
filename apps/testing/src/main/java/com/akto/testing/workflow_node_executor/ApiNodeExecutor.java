@@ -24,8 +24,16 @@ public class ApiNodeExecutor extends NodeExecutor {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiNodeExecutor.class);
 
+    // login-flow steps resolve placeholders in login mode: stepK aliases, ${cookies...}, strict (libs/utils .../login_flow/CLAUDE.md)
+    private final boolean loginFlow;
+
     public ApiNodeExecutor(boolean allowAllCombinations) {
+        this(allowAllCombinations, false);
+    }
+
+    public ApiNodeExecutor(boolean allowAllCombinations, boolean loginFlow) {
         super(allowAllCombinations);
+        this.loginFlow = loginFlow;
     }
 
     public NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
@@ -40,11 +48,12 @@ public class ApiNodeExecutor extends NodeExecutor {
 
         OriginalHttpRequest request;
         try {
-            request =  Utils.buildHttpRequest(updatedSampleData, valuesMap);
-            if (request == null) throw new Exception();
+            request = Utils.buildHttpRequest(updatedSampleData, valuesMap, loginFlow ? nodeId : null);
+            if (request == null) throw new Exception("request could not be built");
         } catch (Exception e) {
-            ;
-            return new WorkflowTestResult.NodeResult(null, false, Collections.singletonList("Failed building request body"));
+            // keep the cause (e.g. "Couldn't find x3.response.body.forward"); callers add the node/step label
+            return new WorkflowTestResult.NodeResult(null, false,
+                    Collections.singletonList("Failed building request: " + e.getMessage()));
         }
 
         String url = request.getUrl();
@@ -90,8 +99,7 @@ public class ApiNodeExecutor extends NodeExecutor {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
-                testErrors.add("API request failed");
-                ;
+                testErrors.add("API request failed: " + e.getMessage());
             }
         }
 

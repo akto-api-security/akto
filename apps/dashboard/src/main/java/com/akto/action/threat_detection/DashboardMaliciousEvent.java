@@ -98,6 +98,8 @@ public class DashboardMaliciousEvent {
   private String caseOwner;
   private String caseNotes;
   private List<CaseActivity> caseTimeline;
+  private String behaviour;
+  private long firstTriagedAt;
   // Grouped activity row (repeated Bedrock prompt from one caller): how many events are behind it, the
   // first one's time, their ids, and the policies they tripped.
   private int groupCount;
@@ -435,6 +437,22 @@ public class DashboardMaliciousEvent {
 
   public void setCaseTimeline(List<CaseActivity> caseTimeline) {
     this.caseTimeline = caseTimeline;
+  }
+
+  public String getBehaviour() {
+    return behaviour;
+  }
+
+  public void setBehaviour(String behaviour) {
+    this.behaviour = behaviour;
+  }
+
+  public long getFirstTriagedAt() {
+    return firstTriagedAt;
+  }
+
+  public void setFirstTriagedAt(long firstTriagedAt) {
+    this.firstTriagedAt = firstTriagedAt;
   }
 
 }

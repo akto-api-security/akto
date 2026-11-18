@@ -195,11 +195,11 @@ const api = {
         })
     },
 
-    initiateMCPScan(serverUrl, authKey, authValue, dashboardUrl, testRoleHexId) {
+    initiateMCPScan(serverUrl, authKey, authValue, dashboardUrl, testRoleHexId, miniTestingName) {
         return request({
             url: '/api/initiateMCPScan',
             method: 'post',
-            data: {serverUrl, authKey, authValue, dashboardUrl, testRoleHexId}
+            data: {serverUrl, authKey, authValue, dashboardUrl, testRoleHexId, miniTestingName}
         })
     },
 
@@ -216,11 +216,19 @@ const api = {
         })
     },
 
-    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders) {
+    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName) {
         return request({
             url: '/api/importFromUrl',
             method: 'post',
-            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders}
+            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName}
+        })
+    },
+
+    fetchAgentImportStatus(uploadId) {
+        return request({
+            url: '/api/fetchAgentImportStatus',
+            method: 'post',
+            data: {uploadId}
         })
     },
 
@@ -369,6 +377,30 @@ const api = {
     removeSentinelOneIntegration() {
         return request({
             url: '/api/removeSentinelOneIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchAtlasS3ExportIntegration() {
+        return request({
+            url: '/api/fetchAtlasS3ExportIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAtlasS3ExportIntegration(bucketName, region, prefix, authType, roleArn, accessKeyId, secretAccessKey) {
+        return request({
+            url: '/api/addAtlasS3ExportIntegration',
+            method: 'post',
+            data: { bucketName, region, prefix, authType, roleArn, accessKeyId, secretAccessKey }
+        })
+    },
+
+    removeAtlasS3ExportIntegration() {
+        return request({
+            url: '/api/removeAtlasS3ExportIntegration',
             method: 'post',
             data: {}
         })

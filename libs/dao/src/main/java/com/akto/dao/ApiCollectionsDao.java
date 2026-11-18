@@ -94,7 +94,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             ApiCollection.VXLAN_ID, ApiCollection.USER_ENV_TYPE);
 
     /** What the collections table and the app wide id lookups read of each collection. */
-    public static final Bson LIST_PROJECTION = Projections.exclude(withServiceTag(false));
+    public static final Bson LIST_PROJECTION = Projections.exclude(withServiceTag(true));
 
     /** The same, keeping serviceTag, which the display name of a service collection is built from. */
     public static final Bson LIST_PROJECTION_WITH_SERVICE_TAG = Projections.exclude(withServiceTag(true));

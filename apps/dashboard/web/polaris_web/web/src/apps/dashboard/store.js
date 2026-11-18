@@ -20,7 +20,8 @@ let store = (set)=>({
             toastConfig: {
                 isActive: updateToastConfig.isActive,
                 isError: updateToastConfig.isError,
-                message: updateToastConfig.message
+                message: updateToastConfig.message,
+                action: updateToastConfig.action
             }
         })
     },

@@ -315,6 +315,9 @@ public class ApiExecutor {
             TestingRunConfig runConfig = new TestingRunConfig();
             runConfig.setOverriddenTestAppUrl("");
             runConfig.setConfigsAdvancedSettings(testingRunConfig.getConfigsAdvancedSettings());
+            // without these the run's chosen scripts would silently fall back to the default ones
+            runConfig.setPreRequestScriptId(testingRunConfig.getPreRequestScriptId());
+            runConfig.setPostRequestScriptId(testingRunConfig.getPostRequestScriptId());
             return sendRequest(request, followRedirects, runConfig, debug, testLogs, skipSSRFCheck);
         }
     }
@@ -350,8 +353,7 @@ public class ApiExecutor {
 
 
     public static Request buildRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
-        boolean executeScript = testingRunConfig != null;
-        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+        ApiExecutorUtil.calculateHashAndAddAuth(request, testingRunConfig);
         String url = prepareUrl(request, testingRunConfig);
         request.setUrl(url);
         Request.Builder builder = new Request.Builder();
@@ -407,8 +409,7 @@ public class ApiExecutor {
             calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
         }
 
-        boolean executeScript = testingRunConfig != null;
-        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+        ApiExecutorUtil.calculateHashAndAddAuth(request, testingRunConfig);
 
         String url = prepareUrl(request, testingRunConfig);
 
@@ -451,7 +452,7 @@ public class ApiExecutor {
         }
 
         if (response != null) {
-            ApiExecutorUtil.applyPostRequestScript(request, response, executeScript);
+            ApiExecutorUtil.applyPostRequestScript(request, response, testingRunConfig);
         }
         return response;
     }
@@ -1014,7 +1015,7 @@ public class ApiExecutor {
         JsonNode sseJson = objectMapper.readTree(sseMsg);
         String jsonBody = objectMapper.writeValueAsString(sseJson);
         OriginalHttpResponse sseResponse = new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
-        ApiExecutorUtil.applyPostRequestScript(request, sseResponse, testingRunConfig != null);
+        ApiExecutorUtil.applyPostRequestScript(request, sseResponse, testingRunConfig);
         return sseResponse;
     }
 

@@ -5,6 +5,18 @@
          version="3.0">
     <display-name>data-ingestion-service</display-name>
 
+    <!-- First: requests with the rerouted token are forwarded to acorns' data-ingestion service, which
+         authenticates and handles them; see RerouteProxyFilter. -->
+    <filter>
+        <filter-name>RerouteProxyFilter</filter-name>
+        <filter-class>com.akto.filters.RerouteProxyFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>RerouteProxyFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
     <filter>
         <filter-name>AuthFilter</filter-name>
         <filter-class>com.akto.filters.AuthFilter</filter-class>

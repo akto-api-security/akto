@@ -35,7 +35,7 @@ const ApisTestedOverTimeGraph = ({ showOnlyTable = false, apiCollectionIds }) =>
 
   const emptyCardComponent = (
     <Text alignment='center' color='subdued'>
-      No API testing data found for the selected time period.
+      No {mapLabel('API', getDashboardCategory())} {mapLabel('testing', getDashboardCategory())} data found for the selected time period.
     </Text>
   );
 

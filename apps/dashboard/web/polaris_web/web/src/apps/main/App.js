@@ -50,6 +50,8 @@ import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
+import SmartAgentsPage from "../dashboard/pages/testing/SmartAgents/SmartAgentsPage";
+import SmartAgentDetails from "../dashboard/pages/testing/SmartAgents/SmartAgentDetails";
 import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import DefaultPayloads from "../dashboard/pages/settings/default_payloads/DefaultPayloads";
@@ -95,12 +97,14 @@ import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
 import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
 import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
+import McpClients from "../dashboard/pages/settings/mcp_clients/McpClients";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
 import ConfigureExploitsPage from "../dashboard/pages/threat_detection/ConfigureExploitsPage";
 import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/ConfigureIgnoredEventsPage";
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
+import ScriptsPage from "../dashboard/pages/testing/scripts/ScriptsPage";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
 import Datadog from "../dashboard/pages/settings/integrations/Datadog";
@@ -111,8 +115,9 @@ import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDataExplorer";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
+import Linear from "../dashboard/pages/settings/integrations/Linear";
+import PortIO from "../dashboard/pages/settings/integrations/PortIO";
 import Wiz from "@/apps/dashboard/pages/settings/integrations/Wiz.jsx";
-import Imperva from "@/apps/dashboard/pages/settings/integrations/Imperva.jsx";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
@@ -122,11 +127,14 @@ import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
 import EndpointShieldMetadata from "../dashboard/pages/observe/atlas/EndpointShieldMetadata";
+import DevicesEmployeesPage from "../dashboard/pages/observe/atlas/devices_employees/DevicesEmployeesPage";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 import GuardrailViolations from "../dashboard/pages/guardrails/violations/ViolationsPage";
+import GuardrailOverview from "../dashboard/pages/guardrails/overview/GuardrailOverview";
 import Misconfigurations from "../dashboard/pages/guardrails/Misconfigurations";
+import AtlasGuardrailsOverview from "../dashboard/pages/guardrails/atlasOverview/AtlasGuardrailsOverview";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 import ThreatProtectedLayout from "../dashboard/pages/threat_detection/ThreatProtectedLayout";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
@@ -136,8 +144,9 @@ import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import AgenticAssetDevicesPage from "../dashboard/pages/observe/agentic/AgenticAssetDevicesPage.jsx";
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
-import DeviceEndpoints from "../dashboard/pages/observe/agentic/DeviceEndpoints.jsx";
 import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
+import AgenticDiscoveryOverview from "../dashboard/pages/observe/atlas/discovery/AgenticDiscoveryOverview.jsx";
+import AgentDiscovery from "../dashboard/pages/observe/agent_discovery/AgentDiscovery.jsx";
 import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
@@ -153,6 +162,7 @@ import RemoteCommands from "../dashboard/pages/settings/remote_commands/RemoteCo
 import RemoteCommandDetail from "../dashboard/pages/settings/remote_commands/RemoteCommandDetail.jsx";
 import NewRelic from "../dashboard/pages/settings/integrations/NewRelic.jsx";
 import OpenTelemetry from "../dashboard/pages/settings/integrations/OpenTelemetry.jsx";
+import McpOAuthConsent from "../dashboard/pages/mcp_oauth/McpOAuthConsent";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -216,6 +226,14 @@ const router = createBrowserRouter([
                                 element: <TestRoleSettings/>
                             },
                             {
+                                path: "smart-agents",
+                                element: <SmartAgentsPage/>
+                            },
+                            {
+                                path: "smart-agents/details",
+                                element: <SmartAgentDetails/>
+                            },
+                            {
                                 path: "roles/access-matrix",
                                 element: <TestRoleAccessMatrix/>
                             },
@@ -230,6 +248,10 @@ const router = createBrowserRouter([
                             {
                               path:"test-suite",
                               element:<TestSuite/>
+                            },
+                            {
+                              path:"scripts",
+                              element:<ScriptsPage/>
                             }
                         ]
                     },
@@ -258,12 +280,20 @@ const router = createBrowserRouter([
                                 element: <AgenticAssetsPage/>
                             },
                             {
+                                path: "agentic-discovery",
+                                element: <AgenticDiscoveryOverview/>
+                            },
+                            {
+                                path: "agent-discovery",
+                                element: <AgentDiscovery/>
+                            },
+                            {
                                 path: "users-and-devices",
                                 element: <UsersAndDevices/>
                             },
                             {
                                 path: "endpoints",
-                                element: <DeviceEndpoints/>
+                                element: <DevicesEmployeesPage/>
                             },
                             {
                                 path: "llm-observability",
@@ -403,6 +433,14 @@ const router = createBrowserRouter([
                     {
                         path: "guardrails",
                         children: [
+                            {
+                                path: "overview",
+                                element: <GuardrailOverview/>
+                            },
+                            {
+                                path: "atlas-overview",
+                                element: <AtlasGuardrailsOverview/>
+                            },
                             {
                                 path: "activity",
                                 element: func.isDemoAccount() ? <GuardrailDetectionDemo/> : <GuardrailDetection/>
@@ -553,12 +591,16 @@ const router = createBrowserRouter([
                         element: <DevRev/>,
                     },
                     {
-                        path: "integrations/wiz",
-                        element: <Wiz/>,
+                        path: "integrations/linear",
+                        element: <Linear/>,
                     },
                     {
-                        path: "integrations/imperva",
-                        element: <Imperva/>,
+                        path: "integrations/port",
+                        element: <PortIO/>,
+                    },
+                    {
+                        path: "integrations/wiz",
+                        element: <Wiz/>,
                     },
                     {
                         path: "integrations/akto_apis",
@@ -709,6 +751,10 @@ const router = createBrowserRouter([
                         element: <AuditLogs/>
                     },
                     {
+                        path: 'mcp-clients',
+                        element: <McpClients/>
+                    },
+                    {
                         path: 'undo-demerge-apis',
                         element: <UndoDemergedApis/>
                     },
@@ -752,6 +798,10 @@ const router = createBrowserRouter([
             {
                 path: "threat-detection/report/:reportId",
                 element: <ThreatReport/>
+            },
+            {
+                path: "mcp-oauth/consent",
+                element: <McpOAuthConsent/>
             }
         ],
         errorElement: <ErrorComponent/>

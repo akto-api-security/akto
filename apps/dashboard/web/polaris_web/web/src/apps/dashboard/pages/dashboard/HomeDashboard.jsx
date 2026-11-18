@@ -156,7 +156,7 @@ function HomeDashboard() {
         navigate('/dashboard/observe/audit');
     }, [navigate])
 
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[4]);
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), func.getAllTimeRangeForAccounts() || values.ranges[4]);
 
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
@@ -594,7 +594,6 @@ function HomeDashboard() {
             totalAPIs = apiStats.totalAPIs
         }
         const apisTestedInLookBackPeriod = apiStats.apisTestedInLookBackPeriod
-        const apisInScopeForTesting = apiStats?.totalInScopeForTestingApis || apisTestedInLookBackPeriod
 
         if (totalAPIs && totalAPIs > 0 && totalRiskScore) {
             const tempRiskScore = totalRiskScore / totalAPIs
@@ -901,7 +900,7 @@ function HomeDashboard() {
         <InfoCard
             component={<TestSummaryCardsList summaryItems={testSummaryInfo} />}
             title={"Recent " + mapLabel("Tests", getDashboardCategory())}
-            titleToolTip={"View details of recent" + mapLabel("API security tests", getDashboardCategory()) + ", APIs tested and number of issues found of last 7 days."}
+            titleToolTip={"View details of recent " + mapLabel("API security tests", getDashboardCategory()) + ", " + mapLabel('APIs', getDashboardCategory()) + " tested and number of issues found of last 7 days."}
             linkText={"Increase " + mapLabel("test coverage", getDashboardCategory())}
             linkUrl="/dashboard/testing"
         />
@@ -1024,7 +1023,7 @@ function HomeDashboard() {
                 </div>
             }
             title={`${mapLabel("APIs", getDashboardCategory())} by Authentication`}
-            titleToolTip={`Breakdown of ${mapLabel("APIs", getDashboardCategory())} by the authentication methods they use, including unauthenticated APIs which may pose security risks.`}
+            titleToolTip={`Breakdown of ${mapLabel("APIs", getDashboardCategory())} by the authentication methods they use, including unauthenticated ${mapLabel('APIs', getDashboardCategory())} which may pose security risks.`}
             linkText="Check out"
             linkUrl={EXPLORE_MODE_QUERY_PATH}
         />
@@ -1360,7 +1359,7 @@ function HomeDashboard() {
             </Scrollable>
         }
         title="New Domains"
-        titleToolTip="Recently discovered or added domains containing APIs. Shows test coverage for each new domain."
+        titleToolTip={"Recently discovered or added domains containing " + mapLabel('APIs', getDashboardCategory()) + ". Shows test coverage for each new domain."}
         linkText="Increase test coverage"
         linkUrl="/dashboard/observe/inventory"
         minHeight="344px"
@@ -1461,7 +1460,7 @@ function HomeDashboard() {
                 </Box>
             }
             title="Top Threat Categories"
-            titleToolTip="Most common types of security threats detected across your APIs"
+            titleToolTip={"Most common types of security threats detected across your " + mapLabel('APIs', getDashboardCategory())}
             linkText="View all categories"
             linkUrl="/dashboard/protection/threat-dashboard"
         />
@@ -1545,31 +1544,6 @@ function HomeDashboard() {
 
     const dashboardComp = (
         <VerticalStack gap={4}>
-            {postureNotice.pending && (
-                <Banner status="info">
-                    <VerticalStack gap="2">
-                        {pendingPolls < MAX_PENDING_POLLS ? (
-                            <HorizontalStack gap="2" blockAlign="center">
-                                <Spinner size="small" accessibilityLabel="Counting" />
-                                <Text>
-                                    Counting the APIs of your collections{postureNotice.collections > 0 ? ` (${postureNotice.counted} of ${postureNotice.collections})` : ''}.
-                                    The numbers below are partial and fill in as it goes.
-                                </Text>
-                            </HorizontalStack>
-                        ) : (
-                            <Text>Still counting the {mapLabel('APIs', getDashboardCategory())} of your collections: the numbers below are partial. Reload in a while to see them complete.</Text>
-                        )}
-                        {postureNotice.collections > 0 && (
-                            <ProgressBar size="small" progress={Math.round(100 * postureNotice.counted / postureNotice.collections)} />
-                        )}
-                    </VerticalStack>
-                </Banner>
-            )}
-            {postureNotice.endApproximate && (
-                <Banner status="warning">
-                    Too many APIs were discovered after the end of this range to take them out of the numbers, so they are today's.
-                </Banner>
-            )}
             {components.map(({id, component}) => (
                 <div key={id}>{component}</div>
             ))}

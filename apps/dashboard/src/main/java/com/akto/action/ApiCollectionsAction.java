@@ -47,6 +47,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
+import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.model.Accumulators;
@@ -295,6 +296,7 @@ public class ApiCollectionsAction extends UserAction {
         Bson collectionFilter = regexFilters.isEmpty() ? Filters.empty() : Filters.and(regexFilters);
 
         this.apiCollections = ApiCollectionsDao.instance.findAll(collectionFilter);
+        AgenticObserveUtil.retainSkillsWithApiInfo(this.apiCollections);
         for (ApiCollection c : this.apiCollections) {
             ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
         }
@@ -441,6 +443,7 @@ public class ApiCollectionsAction extends UserAction {
         stepStart = System.currentTimeMillis();
 
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), ApiCollectionsDao.LIST_PROJECTION);
+        AgenticObserveUtil.retainSkillsWithApiInfo(this.apiCollections);
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size()+ ", loggedInUser=" + loggedInUser);
         stepStart = System.currentTimeMillis();
 
@@ -515,6 +518,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(ApiCollection.HOST_NAME, deviceHostNames), ApiCollectionsDao.LIST_PROJECTION);
+        AgenticObserveUtil.retainSkillsWithApiInfo(this.apiCollections);
 
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
@@ -549,6 +553,7 @@ public class ApiCollectionsAction extends UserAction {
         if (c != null) {
             ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
             this.apiCollections.add(c);
+            AgenticObserveUtil.retainSkillsWithApiInfo(this.apiCollections);
         }
         return Action.SUCCESS.toUpperCase();
     }

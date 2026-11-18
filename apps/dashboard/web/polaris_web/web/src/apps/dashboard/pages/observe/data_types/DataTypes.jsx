@@ -13,6 +13,7 @@ import InformationBannerComponent from '../../quick_start/components/shared/Info
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
 import { usePermissions } from '@/util/permissions'
 import { EmailMajor, CreditCardMajor, IdentityCardFilledMajor, PhoneMajor, CalendarMajor, LocationMajor, KeyMajor } from "@shopify/polaris-icons"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const severitiesArr = func.getAktoSeverities()
 
@@ -381,7 +382,7 @@ function DataTypes() {
           />}
       >
         <div className='card-items'>
-          <InformationBannerComponent docsUrl={""} content="When enabled, existing sample payload values will be deleted, and this data type will be redacted in future payloads. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.">
+          <InformationBannerComponent docsUrl={""} content={"When enabled, existing sample payload values will be deleted, and this data type will be redacted in future payloads. Please note that your " + mapLabel('API', getDashboardCategory()) + " Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values."}>
           </InformationBannerComponent>
         </div>
         <LegacyCard.Section>

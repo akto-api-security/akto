@@ -1,5 +1,7 @@
 export const labelMap = {
   "API Security": {
+    "API inventory": "API inventory",
+    "Unauthenticated APIs": "Unauthenticated APIs",
     "API Groups": "API Groups",
     "API Group": "API Group",
     "Select API collection": "Select API collection",
@@ -81,6 +83,8 @@ export const labelMap = {
     "Latest attack sub-category": "Latest attack sub-category",
   },
   "DAST": {
+    "API inventory": "API inventory",
+    "Unauthenticated APIs": "Unauthenticated APIs",
     "API Groups": "API Groups",
     "API Group": "API Group",
     "Select API collection": "Select API collection",
@@ -162,6 +166,8 @@ export const labelMap = {
     "Latest attack sub-category": "Latest attack sub-category"
   },
   "MCP Security": {
+    "API inventory": "MCP component inventory",
+    "Unauthenticated APIs": "Unauthenticated MCP components",
     "API Groups": "MCP component Groups",
     "API Group": "MCP component Group",
     "API group": "MCP component group",
@@ -243,6 +249,8 @@ export const labelMap = {
     "Endpoints": "Tools",
   },
   "Gen AI": {
+    "API inventory": "AI Agent component inventory",
+    "Unauthenticated APIs": "Unauthenticated AI Agent components",
     "API Groups": "AI Agent component Groups",
     "API Group": "AI Agent component Group",
     "API group": "AI Agent component group",
@@ -320,6 +328,8 @@ export const labelMap = {
     "Endpoints": "Components",
   },
   "Agentic Security": {
+    "API inventory": "Agentic Component inventory",
+    "Unauthenticated APIs": "Unauthenticated Agentic Components",
     "API Groups": "Agentic Component Groups",
     "API Group": "Agentic Component Group",
     "Select API collection": "Select Agentic collection",
@@ -411,6 +421,8 @@ export const labelMap = {
     "Threat Category": "Guardrail Trigger"
   },
   "Endpoint Security": {
+    "API inventory": "Agentic Component inventory",
+    "Unauthenticated APIs": "Unauthenticated Agentic Components",
     "API Groups": "Agentic Component Groups",
     "API Group": "Agentic Component Group",
     "Select API collection": "Select Agentic collection",

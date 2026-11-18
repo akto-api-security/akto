@@ -634,7 +634,7 @@ public class AuditDataAction extends UserAction {
         this.auditData = rows;
     }
 
-    private static boolean isConditionalApprovalExpired(Object cond, long nowEpochSeconds) {
+    static boolean isConditionalApprovalExpired(Object cond, long nowEpochSeconds) {
         if (!(cond instanceof Map)) return false;
         Object expiresAt = ((Map<?, ?>) cond).get("expiresAt");
         if (!(expiresAt instanceof Number)) return false;
@@ -642,17 +642,19 @@ public class AuditDataAction extends UserAction {
         return exp > 0 && nowEpochSeconds > exp;
     }
 
-    // Priority: Rejected=0, ActiveConditional=1, Approved=2, ExpiredConditional=3, Pending=4
+    // Priority: Rejected=0, ActiveConditional=1, Approved=2, ExpiredConditional=3, UnderReview=4, Pending=5
     // Expired conditional loses to both Rejected and Approved - reverts to null (Pending in UI).
     // Only "Conditionally Approved" entries are checked for expiry; McpAuditInfo.REMARKS_APPROVED with stale
     // approvalConditions in DB is still treated as Approved.
-    private static int remarksPriority(String r, Object cond, long nowEpochSeconds) {
+    // Also used by AgenticObserveAction for the AI inventory's Status column.
+    static int remarksPriority(String r, Object cond, long nowEpochSeconds) {
         if (McpAuditInfo.REMARKS_REJECTED.equals(r)) return 0;
         if ("Conditionally Approved".equals(r)) {
             return isConditionalApprovalExpired(cond, nowEpochSeconds) ? 3 : 1;
         }
         if (McpAuditInfo.REMARKS_APPROVED.equals(r)) return 2;
-        return 4;
+        if (McpAuditInfo.REMARKS_UNDER_REVIEW.equals(r)) return 4;
+        return 5;
     }
 
     @SuppressWarnings("unchecked")
@@ -793,6 +795,9 @@ public class AuditDataAction extends UserAction {
     // "cursor.akto-docs", and "<device>.cursor.akto-docs" alike.
     @Setter
     String mcpServerForAllAgents;
+    private boolean isUnderReview() {
+        return McpAuditInfo.REMARKS_UNDER_REVIEW.equals(remarks);
+    }
 
     public String updateAuditData() {
         User user = getSUser();
@@ -856,6 +861,12 @@ public class AuditDataAction extends UserAction {
             if (targetIds.isEmpty()) {
                 addActionError("No record id provided");
                 return ERROR.toUpperCase();
+            }
+
+            // Server-level only: no blockAll stamping and no cascade, tools keep their own decisions.
+            if (isUnderReview()) {
+                markUnderReview(Filters.in(Constants.ID, targetIds), markedBy);
+                return SUCCESS.toUpperCase();
             }
 
             int currentTime = Context.now();
@@ -1006,12 +1017,19 @@ public class AuditDataAction extends UserAction {
                 ));
             }
 
-            // Remarks filter: Rejected = blocked; Approved also covers not-yet-audited rows, which the UI shows as Approved.
+            // Remarks filter: Rejected = blocked, Under review as stored; Approved also covers
+            // not-yet-audited rows, which the UI shows as Approved.
             List<String> remarksChoices = popListFilter(filters, McpAuditInfo.REMARKS);
-            if (remarksChoices != null && remarksChoices.size() == 1) {
-                filter = Filters.and(filter, McpAuditInfo.REMARKS_REJECTED.equals(remarksChoices.get(0))
-                    ? Filters.eq(McpAuditInfo.REMARKS, McpAuditInfo.REMARKS_REJECTED)
-                    : Filters.ne(McpAuditInfo.REMARKS, McpAuditInfo.REMARKS_REJECTED));
+            if (remarksChoices != null && !remarksChoices.isEmpty()) {
+                List<Bson> byChoice = new ArrayList<>();
+                for (String choice : remarksChoices) {
+                    if (McpAuditInfo.REMARKS_REJECTED.equals(choice) || McpAuditInfo.REMARKS_UNDER_REVIEW.equals(choice)) {
+                        byChoice.add(Filters.eq(McpAuditInfo.REMARKS, choice));
+                    } else {
+                        byChoice.add(Filters.nin(McpAuditInfo.REMARKS, Arrays.asList(McpAuditInfo.REMARKS_REJECTED, McpAuditInfo.REMARKS_UNDER_REVIEW)));
+                    }
+                }
+                filter = Filters.and(filter, Filters.or(byChoice));
             }
 
             List<Bson> additionalFilters = prepareFilters(filters);
@@ -1043,8 +1061,8 @@ public class AuditDataAction extends UserAction {
         String markedBy = user.getLogin();
 
         try {
-            // Only Allow / Block; guardrails enforces Rejected rows.
-            if (!McpAuditInfo.REMARKS_APPROVED.equals(remarks) && !McpAuditInfo.REMARKS_REJECTED.equals(remarks)) {
+            // Only Allow / Block / Mark under review; guardrails enforces Rejected rows.
+            if (!isUnderReview() && !McpAuditInfo.REMARKS_APPROVED.equals(remarks) && !McpAuditInfo.REMARKS_REJECTED.equals(remarks)) {
                 addActionError("Invalid status");
                 return ERROR.toUpperCase();
             }
@@ -1072,10 +1090,12 @@ public class AuditDataAction extends UserAction {
                 return ERROR.toUpperCase();
             }
 
-            McpAuditInfoDao.instance.updateMany(
-                Filters.and(Filters.in(Constants.ID, targetIds), Filters.eq(McpAuditInfo.TYPE, resolveAuditType())),
-                Updates.combine(decisionUpdates(markedBy))
-            );
+            Bson match = Filters.and(Filters.in(Constants.ID, targetIds), Filters.eq(McpAuditInfo.TYPE, resolveAuditType()));
+            if (isUnderReview()) {
+                markUnderReview(match, markedBy);
+            } else {
+                McpAuditInfoDao.instance.updateMany(match, Updates.combine(decisionUpdates(markedBy)));
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error updating LLM audit data: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
@@ -1097,6 +1117,24 @@ public class AuditDataAction extends UserAction {
         updates.add(Updates.unset(McpAuditInfo.APPROVAL_CONDITIONS));
         updates.addAll(scopeUpdates());
         return updates;
+    }
+
+    // Mark under review replaces an approval (never a block) with remarks "Under review".
+    private List<Bson> underReviewUpdates(String markedBy) {
+        List<Bson> updates = new ArrayList<>();
+        updates.add(Updates.set(McpAuditInfo.REMARKS, McpAuditInfo.REMARKS_UNDER_REVIEW));
+        updates.add(Updates.unset(McpAuditInfo.APPROVAL_CONDITIONS));
+        updates.add(Updates.set(McpAuditInfo.MARKED_BY, markedBy));
+        updates.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, Context.now()));
+        updates.addAll(scopeUpdates());
+        return updates;
+    }
+
+    // Blocked records are skipped, so marking under review can never unblock anything.
+    private void markUnderReview(Bson match, String markedBy) {
+        McpAuditInfoDao.instance.updateMany(
+            Filters.and(match, Filters.ne(McpAuditInfo.REMARKS, McpAuditInfo.REMARKS_REJECTED)),
+            Updates.combine(underReviewUpdates(markedBy)));
     }
 
     // A block keeps its scope; allowing clears it, so the row applies to everyone again.
@@ -1182,9 +1220,16 @@ public class AuditDataAction extends UserAction {
     private String updateAiAgentAuditData(String markedBy) {
         Set<String> selected = resourceNames == null ? Collections.emptySet() : new HashSet<>(resourceNames);
         List<WriteModel<McpAuditInfo>> writes = new ArrayList<>();
-        List<Bson> decision = decisionUpdates(markedBy);
+        List<Bson> decision = isUnderReview() ? underReviewUpdates(markedBy) : decisionUpdates(markedBy);
+        // Under review never touches a blocked agent (same rule as markUnderReview).
+        Set<String> blocked = isUnderReview()
+            ? McpAuditInfoDao.instance.getMCollection().distinct(McpAuditInfo.RESOURCE_NAME, Filters.and(
+                Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_AI_AGENT_TAG),
+                Filters.eq(McpAuditInfo.REMARKS, McpAuditInfo.REMARKS_REJECTED),
+                Filters.in(McpAuditInfo.RESOURCE_NAME, selected)), String.class).into(new HashSet<>())
+            : Collections.emptySet();
         for (McpAuditInfo agent : new AgenticObserveAction().fetchAiAgentAuditRows()) {
-            if (!selected.contains(agent.getResourceName())) continue;
+            if (!selected.contains(agent.getResourceName()) || blocked.contains(agent.getResourceName())) continue;
             List<Bson> updates = new ArrayList<>(decision);
             updates.add(Updates.max(McpAuditInfo.LAST_DETECTED, agent.getLastDetected()));
             updates.add(Updates.addEachToSet(McpAuditInfo.RAW_VALUES, agent.getRawValues()));

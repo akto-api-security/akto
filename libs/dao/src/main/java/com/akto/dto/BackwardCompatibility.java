@@ -141,6 +141,11 @@ public class BackwardCompatibility {
     public static final String MIGRATE_GUARDRAIL_TARGET_TEAMS_ROLES_TO_TAGS = "migrateGuardrailTargetTeamsRolesToTags";
     private int migrateGuardrailTargetTeamsRolesToTags;
 
+    // One-time copy of the legacy one-script-per-type documents into the test_scripts library as
+    // default-test-pre / default-test-post. See BackwardCompatibilityUtils.migrateTestScriptsToLibrary.
+    public static final String MIGRATE_TEST_SCRIPTS_TO_LIBRARY = "migrateTestScriptsToLibrary";
+    private int migrateTestScriptsToLibrary;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,

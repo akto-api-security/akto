@@ -1,10 +1,16 @@
 package handlers
 
 import (
+	"encoding/json"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 func handlerWithBlockOnRedaction(v bool) *ValidationHandler {
@@ -159,4 +165,69 @@ func TestChunkStopsFileRedactionOutranksPassiveBehaviour(t *testing.T) {
 	if handlerWithBlockOnRedaction(false).chunkStopsFile(masked) {
 		t.Fatal("opting out of BlockOnRedaction must still allow a masked chunk")
 	}
+}
+
+// What the caller of /api/validate/file sees when a policy redacts a file's content, end to
+// end through the chunk results and the response: a file can't come back redacted (the
+// endpoint returns a verdict, never content), so a redaction blocks the upload whether the
+// policy is in block or alert mode, the redacted text never leaks, and the block is a real
+// verdict (not marked uninspected). The same path serves documents and OCR'd images: both
+// reach the policy engine as text chunks.
+func TestRedactedFileUploadIsBlocked(t *testing.T) {
+	clean := &chunkResult{Result: &mcp.ValidationResult{Allowed: true}}
+	// The engine answers a redaction rule Allowed+Modified with a hardcoded "alert" behaviour
+	// (see TestChunkStopsFilePolicyMatrix), whatever the policy's own mode.
+	redacted := &chunkResult{Result: &mcp.ValidationResult{
+		Allowed: true, Modified: true, Behaviour: "alert",
+		ModifiedPayload: `{"prompt":"Contact: [EMAIL_REDACTED]"}`,
+		Metadata:        types.ThreatMetadata{PolicyName: "PII policy", RuleViolated: "PII-email"},
+	}}
+	for _, tc := range []struct {
+		name   string
+		chunks []*chunkResult
+	}{
+		{"redacted only chunk", []*chunkResult{redacted}},
+		{"redacted chunk after clean ones", []*chunkResult{clean, clean, redacted}},
+		{"redacted chunk before clean ones", []*chunkResult{redacted, clean}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := &ValidationHandler{logger: zap.NewNop(), cfg: &config.Config{File: config.FileConfig{BlockOnRedaction: true}}}
+			fr := h.applyFileChunkResults(&fileResult{Filename: "escalation.png", Allowed: true}, tc.chunks)
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			h.writeMultiFileResponse(c, []*fileResult{fr}, false)
+
+			var resp struct {
+				Allowed         bool                 `json:"allowed"`
+				ModifiedPayload string               `json:"modifiedPayload"`
+				Reason          string               `json:"reason"`
+				Metadata        types.ThreatMetadata `json:"metadata"`
+			}
+			if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+			if resp.Allowed {
+				t.Fatalf("a redacted file must be blocked: %s", recorder.Body.String())
+			}
+			if !strings.Contains(resp.Reason, "redacted by guardrail policy") {
+				t.Fatalf("reason must say the file was blocked for redacted content, got %q", resp.Reason)
+			}
+			if resp.ModifiedPayload != "" {
+				t.Fatalf("the redacted text must not be returned, got %q", resp.ModifiedPayload)
+			}
+			if resp.Metadata.PolicyName != "PII policy" || resp.Metadata.RuleViolated != "PII-email" {
+				t.Fatalf("metadata must name the redacting policy and rule, got %+v", resp.Metadata)
+			}
+			assertUninspected(t, recorder, false)
+		})
+	}
+
+	t.Run("opting out lets the redacted file through", func(t *testing.T) {
+		h := &ValidationHandler{logger: zap.NewNop(), cfg: &config.Config{File: config.FileConfig{BlockOnRedaction: false}}}
+		fr := h.applyFileChunkResults(&fileResult{Filename: "escalation.png", Allowed: true}, []*chunkResult{clean, redacted})
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		h.writeMultiFileResponse(c, []*fileResult{fr}, false)
+		assertFileAllowed(t, recorder, true)
+	})
 }

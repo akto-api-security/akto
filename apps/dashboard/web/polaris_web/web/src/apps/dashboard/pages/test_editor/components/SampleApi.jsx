@@ -476,9 +476,9 @@ const SampleApi = () => {
                 <Box minHeight="84.4vh">
                     <EmptySampleApi
                         iconSrc={"/public/file_plus.svg"}
-                        headingText={"Discover APIs to get started"}
+                        headingText={"Discover " + mapLabel('APIs', getDashboardCategory()) + " to get started"}
                         description={"You have an inactive " + mapLabel('API', getDashboardCategory()) + " collection or one with no data. Create or populate a collection now to get started."}
-                        buttonText={"Create new a API collection"}
+                        buttonText={"Create a new " + mapLabel('API', getDashboardCategory()) + " collection"}
                         redirectUrl={"/dashboard/observe/inventory"}
                     />
                 </Box> :

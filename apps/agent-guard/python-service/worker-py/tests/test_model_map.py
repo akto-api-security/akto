@@ -406,13 +406,13 @@ async def test_health_probe_sets_the_flag_back_to_available(monkeypatch):
     monkeypatch.setattr(providers, "_PRIMARY_AVAILABLE", {"u": False})
 
     class Client:
-        async def get(self, url, timeout=None):
+        async def get(self, url):
             return type("R", (), {"status_code": 200})()
 
     async def stop(_):
         raise asyncio.CancelledError
 
-    monkeypatch.setattr(providers.http_client, "get_client", lambda: Client())
+    monkeypatch.setattr(providers, "_health_client", lambda: Client())
     monkeypatch.setattr(providers.asyncio, "sleep", stop)
     try:
         await providers._health_loop("u")
@@ -434,7 +434,7 @@ async def test_health_probe_marks_down_only_after_consecutive_failures(monkeypat
     seen: list[bool | None] = []
 
     class Client:
-        async def get(self, url, timeout=None):
+        async def get(self, url):
             status = next(statuses)
             if status is None:
                 raise ConnectionError("refused")
@@ -445,13 +445,22 @@ async def test_health_probe_marks_down_only_after_consecutive_failures(monkeypat
         if len(seen) == 6:
             raise asyncio.CancelledError
 
-    monkeypatch.setattr(providers.http_client, "get_client", lambda: Client())
+    monkeypatch.setattr(providers, "_health_client", lambda: Client())
     monkeypatch.setattr(providers.asyncio, "sleep", record)
     try:
         await providers._health_loop("u")
     except asyncio.CancelledError:
         pass
     assert seen == [None, None, True, True, True, False]
+
+
+async def test_health_probe_does_not_queue_behind_scan_traffic(monkeypatch):
+    # A probe sharing the scan pool waited for a free connection under load, hit PoolTimeout, and a
+    # healthy primary was marked DOWN.
+    import providers
+
+    monkeypatch.setattr(providers, "_HEALTH_CLIENT", None)
+    assert providers._health_client() is not providers.http_client.get_client()
 
 
 async def test_other_errors_are_raised_without_backup_or_flagging_down(monkeypatch):

@@ -222,6 +222,34 @@
     border-radius: 2px;
     padding: 0 2px;
 }
+/* Skill evidence highlighted in place in the skill content (SkillEvidenceView). Tone follows the
+   tag: critical = behind the malicious verdict, warning = not explained by the skill's purpose,
+   attention = explained by it. */
+.skill-evidence {
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+    cursor: help;
+    border-bottom: 2px solid transparent;
+}
+.skill-evidence--critical {
+    background-color: #FCE4E2;
+    border-bottom-color: #D72C0D;
+}
+.skill-evidence--warning {
+    background-color: #FFE8D6;
+    border-bottom-color: #C05717;
+}
+.skill-evidence--attention {
+    background-color: #FFF5CC;
+    border-bottom-color: #B98900;
+}
+.skill-evidence--flash {
+    animation: skill-evidence-flash 0.8s ease-in-out 2;
+}
+@keyframes skill-evidence-flash {
+    50% { box-shadow: 0 0 0 3px rgba(150, 66, 252, 0.45); }
+}
 /* Monospace preformatted evidence excerpt — preserve whitespace/newlines. */
 .violation-evidence-pre {
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;

@@ -98,6 +98,16 @@ function Integrations() {
       name:'DevRev',
       source: '/public/devrev-ai.svg'
     }
+    let linearObj={
+      id: 'linear',
+      name:'Linear',
+      source: '/public/linear.svg'
+    }
+    let portIOObj={
+      id: 'port',
+      name:'Port.io',
+      source: '/public/portio.svg'
+    }
     let jenkinsObj={
       id: `jenkins`,
       name: "Jenkins",
@@ -188,12 +198,6 @@ function Integrations() {
       source: '/public/cloudflareWaf.png'
     }
 
-    let impervaObj = {
-        id: 'imperva',
-        name:'Imperva',
-        source: '/public/imperva.svg'
-    }
-
     let wizObj = {
         id: 'wiz',
         name:'Wiz',
@@ -279,12 +283,12 @@ function Integrations() {
 
   function allTabItems(tabId) {
     const emptyItem = [];
-    const trafficItems = func.checkForFeatureSaas('IMPERVA_API_IMPORT') ? [burpSuiteObj, postmanObj, impervaObj] : [burpSuiteObj, postmanObj];
+    const trafficItems = [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [/* aktoGptObj, */ agentConfigObj, mcpRegistryObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
-    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, wizObj];
+    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, linearObj, portIOObj, wizObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj, datadogObj];
     const monitoringItems = [newRelicObj, openTelemetryObj]
@@ -334,7 +338,7 @@ function Integrations() {
         }
         return monitoringItems;
       default:
-        let allItems = [...trafficItems, ...aiItems]
+        let allItems = [...aiItems]
         if (!func.checkLocal()){
           allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems, ...wafItems, ...siemItems, ...monitoringItems]
         }
@@ -344,7 +348,7 @@ function Integrations() {
         if (func.isDemoAccount()) {
           allItems = [...allItems, ...wafItems, ...siemItems]
         }
-        return allItems;
+        return [...allItems, ...trafficItems];
     }
   }
 

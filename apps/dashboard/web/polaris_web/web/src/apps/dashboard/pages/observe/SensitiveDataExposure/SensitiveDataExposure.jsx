@@ -296,7 +296,7 @@ const primaryActions = (
                 active={modal}
                 setActive={setModal}
                 createNewCollection={handleCreateCollection}
-                initialCollectionName={'APIs with ' + subType}
+                initialCollectionName={mapLabel('APIs', getDashboardCategory()) + ' with ' + subType}
                 loading={loading}
             />
         ]}

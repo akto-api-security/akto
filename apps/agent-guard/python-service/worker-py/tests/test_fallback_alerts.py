@@ -86,6 +86,34 @@ async def test_health_flips_post_at_once(slack):
     assert not alerts.has_pending_fallback_alerts()
 
 
+async def test_down_alert_names_the_failed_probes_causes(slack, monkeypatch):
+    # A 503 before a good probe is not part of the streak that marks the primary down.
+    probes = iter([503, 200, providers.httpx.PoolTimeout(""), 503, providers.httpx.PoolTimeout("")])
+
+    class _Probe:
+        async def get(self, url):
+            p = next(probes)
+            if isinstance(p, Exception):
+                raise p
+            return type("R", (), {"status_code": p})()
+
+    async def stop_once_down(_):
+        if alerts._transitions:
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(providers, "_PRIMARY_AVAILABLE", {})
+    monkeypatch.setattr(providers, "_HEALTH_FAILURES", {})
+    monkeypatch.setattr(providers, "_HEALTH_FAILURE_REASONS", {})
+    monkeypatch.setattr(providers, "_HEALTH_FAILURES_TO_DOWN", 3)
+    monkeypatch.setattr(providers, "_health_client", lambda: _Probe())
+    monkeypatch.setattr(providers.asyncio, "sleep", stop_once_down)
+    with pytest.raises(asyncio.CancelledError):
+        await providers._health_loop("http://vllm:80/health")
+    assert alerts._transitions == [
+        "🔴 primary `vllm:80` is DOWN (PoolTimeout x2, HTTP 503 x1), requests go to its backup"
+    ]
+
+
 async def test_concurrent_flushes_post_once(slack):
     alerts.note_fallback("gemma_fast", "gemma_foundry", "timeout")
     await asyncio.gather(alerts.flush_fallback_alerts(), alerts.flush_fallback_alerts())

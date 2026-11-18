@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors McpAuditInfoDao.createIndicesIfAbsent: lets Atlas discovery read decisions in _id order within a type.
+        Name matches the DAO, so this is a no-op where the DAO already built it.
+    -->
+
+    <changeSet id="037-account-mcp-audit-info-type-id-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="mcp_audit_info"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="mcp_audit_info">
+            <mongodb:keys>{ "type": -1, "_id": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "type-_id_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="mcp_audit_info">
+                <mongodb:keys>{ "type": -1, "_id": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -50,7 +50,13 @@ public class JobUtils {
     public static void removeVersionedAPIs(){
         // here for all hosts collections, we are removing the versioned APIs
         logger.info("Starting to remove versioned APIs");
-        List<ApiCollection> apiCollections = ApiCollectionsDao.fetchAllActiveHosts();
+        List<ApiCollection> apiCollections =  ApiCollectionsDao.instance.findAll(
+            Filters.and(
+                Filters.ne(ApiCollection._DEACTIVATED, true),
+                Filters.exists(ApiCollection.NAME)
+            ),
+            Projections.include(Constants.ID, ApiCollection.NAME)
+        );
         List<SampleData> sampleDataList = new ArrayList<>();
         logger.info("Total APICollections: " + apiCollections.size()); 
         List<Key> toMove = new ArrayList<>();
