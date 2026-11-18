@@ -105,11 +105,16 @@ async def test_password_runs_on_deployment_model_not_caller_models(monkeypatch):
     assert r["is_valid"] is False
 
 
-async def test_cascade_exception_still_schedules_slack_alert(monkeypatch):
-    # A hard exception escaping scan_with_model_map (bad config, unexpected
-    # bug — not the graceful "arbiter unreachable" _error_result path) must
-    # still reach alerts.post_slack. Before this fix, only the success path
-    # scheduled it, so a genuinely broken cascade was invisible outside logs.
+def _slack_posts(scheduled):
+    """The per-prompt Slack alerts among the scheduled coroutines (closed, so none is left un-awaited)."""
+    posts = [c for c in scheduled if c.cr_code.co_name == "post_slack"]
+    for c in scheduled:
+        c.close()
+    return posts
+
+
+async def test_a_cascade_exception_fails_open_without_a_prompt_alert(monkeypatch):
+    # Per-prompt Slack alerts are only for prompts that timed out; a crash is in the error log and metrics.
     async def _boom(*_a, **_kw):
         raise RuntimeError("boom: unexpected cascade failure")
 
@@ -123,8 +128,33 @@ async def test_cascade_exception_still_schedules_slack_alert(monkeypatch):
 
     assert result["is_valid"] is True
     assert "cascade failed" in result["details"]["error"]
-    assert len(scheduled) == 1
-    await scheduled[0]  # SLACK_WEBHOOK_URL unset in tests -> no-op, just avoids "never awaited"
+    assert _slack_posts(scheduled) == []
+
+
+TIMED_OUT = [{"provider": "gemma_fast_arbiter", "role": "FINAL_ARBITER", "timeout_ms": 15000}]
+
+
+@pytest.mark.parametrize(
+    "details,alerted",
+    [
+        ({}, False),  # an ordinary verdict, allowed or blocked
+        ({"error": "all arbiters failed"}, False),  # failed open, but not on a timeout
+        ({"error": "all arbiters failed", "timed_out": TIMED_OUT}, True),  # timed out: let through unscanned
+    ],
+)
+@pytest.mark.parametrize("is_valid", [True, False])
+async def test_only_a_timed_out_prompt_gets_a_slack_alert(monkeypatch, details, alerted, is_valid):
+    async def _cascade(*_a, **_kw):
+        return {"is_valid": is_valid, "risk_score": 0.0, "details": dict(details), "execution_time_ms": 5}
+
+    monkeypatch.setattr(scan_handler, "scan_with_model_map", _cascade)
+    scheduled = []
+    result = await scan_handler.scan_payload(
+        {"scanner_name": "PromptInjection", "scanner_type": "prompt", "text": "hi", "config": HOSTILE_CONFIG},
+        schedule_fn=scheduled.append,
+    )
+    assert len(_slack_posts(scheduled)) == (1 if alerted else 0)
+    assert result["details"].get("timed_out") == details.get("timed_out")
 
 
 # ── SCANNER_RESPONSE_FORMAT reaches the scanner ──────────────────────────────

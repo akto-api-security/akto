@@ -46,6 +46,8 @@ class FakeScanner:
         entry = FakeScanner.script[self.provider.name]
         if isinstance(entry, Exception):
             raise entry
+        if callable(entry):  # a slow model: an async function that eventually answers
+            entry = await entry()
         r = {k: v for k, v in entry.items()}
         r["details"] = dict(r.get("details", {}), llm_provider=self.provider.name)
         return r
@@ -523,3 +525,42 @@ async def test_primary_without_health_path_falls_back_on_a_failed_request(monkey
             raise ValueError("bad reply")
 
     assert await _fallback(monkeypatch, Plain()).complete("hi") == "from backup"
+
+
+# ── timed-out prompts: reported only when the timeout left the prompt unscanned ──
+
+
+def _slow(seconds, result):
+    async def answer():
+        import asyncio
+
+        await asyncio.sleep(seconds)
+        return result
+
+    return answer
+
+
+async def test_an_arbiter_timeout_that_leaves_the_prompt_unscanned_is_reported():
+    r = await _run(
+        [_entry("qwen", "FAST_THREAT_FILTER"), _entry("gemma", "FINAL_ARBITER", timeoutMs=50)],
+        {"qwen": UNSAFE, "gemma": _slow(5, SAFE)},
+    )
+    assert r["is_valid"] is True and r["details"]["error"] == "all arbiters failed"  # failed open
+    assert r["details"]["timed_out"] == [{"provider": "gemma", "role": "FINAL_ARBITER", "timeout_ms": 50}]
+
+
+async def test_a_timeout_another_model_covered_is_not_reported():
+    # Qwen times out (counted as unsafe), so the arbiter decides: the prompt was scanned.
+    r = await _run(
+        [_entry("qwen", "FAST_THREAT_FILTER", timeoutMs=50), _entry("gemma", "FINAL_ARBITER")],
+        {"qwen": _slow(5, SAFE), "gemma": SAFE},
+    )
+    assert r["is_valid"] is True and "error" not in r["details"] and "timed_out" not in r["details"]
+
+
+async def test_a_failure_that_is_not_a_timeout_is_not_reported_as_one():
+    r = await _run(
+        [_entry("qwen", "FAST_THREAT_FILTER"), _entry("gemma", "FINAL_ARBITER")],
+        {"qwen": UNSAFE, "gemma": RuntimeError("HTTP 500")},
+    )
+    assert r["details"]["error"] == "all arbiters failed" and "timed_out" not in r["details"]

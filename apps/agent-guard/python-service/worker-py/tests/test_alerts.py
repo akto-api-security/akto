@@ -289,3 +289,19 @@ def test_both_runtimes_keep_httpx_at_warning(monkeypatch, http_log_levels):
     importlib.import_module("entry")
     sys.modules.pop("entry")
     assert quiet()
+
+
+def test_slack_blocks_for_a_timed_out_prompt():
+    result = {
+        "is_valid": True,
+        "risk_score": 0.0,
+        "details": {
+            "error": "all arbiters failed",
+            "cascade_decision": "no_authority",
+            "timed_out": [{"provider": "gemma_fast_arbiter", "role": "FINAL_ARBITER", "timeout_ms": 15000}],
+        },
+    }
+    flat = str(alerts._build_blocks("PromptInjection", "prompt", "some prompt", result))
+    assert "⏱️ TIMED OUT — let through unscanned" in flat and "DEGRADED" not in flat and "✅ ALLOWED" not in flat
+    assert "`gemma_fast_arbiter` (FINAL_ARBITER) after 15000 ms" in flat
+    assert "some prompt" in flat

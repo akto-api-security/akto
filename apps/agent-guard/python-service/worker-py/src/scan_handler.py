@@ -173,7 +173,10 @@ async def scan_payload(
             elapsed = result.get("execution_time_ms")
             if isinstance(elapsed, (int, float)) and elapsed > 0:
                 cascade_backpressure.record_cascade_latency(float(elapsed))
-            schedule(alerts.post_slack(scanner_name, scanner_type, text, result))
+            if (result.get("details") or {}).get("timed_out"):
+                # The only per-prompt Slack alert: models timed out, so this prompt was let through unscanned.
+                # Timeouts a backup covered are reported by the fallback alerts below, not per prompt.
+                schedule(alerts.post_slack(scanner_name, scanner_type, text, result))
             if alerts.has_pending_fallback_alerts():
                 schedule(alerts.flush_fallback_alerts())
             scan_diag.log_scan_outcome(
@@ -215,13 +218,8 @@ async def scan_payload(
                 text,
                 {"scanner_type": scanner_type, "error": f"cascade failed: {exc}"},
             )
-            # Unlike the graceful _error_result path (arbiter unreachable),
-            # a hard exception here previously had NO visibility outside raw
-            # container logs — post_slack was only ever scheduled on the
-            # success path above. Schedule it here too so a broken cascade
-            # (bad config, unexpected bug, not just "arbiter timed out") shows
-            # up in the same channel people actually watch, not just logs.
-            schedule(alerts.post_slack(scanner_name, scanner_type, text, error_result))
+            # No per-prompt Slack alert: those are for prompts that timed out only. A crash is in the error log
+            # above and the "error" scan metric.
             if alerts.has_pending_fallback_alerts():
                 schedule(alerts.flush_fallback_alerts())
             return error_result
