@@ -255,8 +255,8 @@ public class AgentImportAction extends UserAction{
             if (!StringUtils.isEmpty(miniTestingName)) {
                 // Target is internal to the customer's network — have their mini-testing send it. The role is
                 // applied there too, as in tests, so its login reaches the customer's login servers: the dashboard
-                // only adds the role's auth header names, empty, so the saved sample has the headers a test with
-                // the role replaces
+                // only adds the role's auth header names, and mini-testing sends back the values it put in them, so
+                // the saved sample has the auth headers a test with the role replaces
                 if (!StringUtils.isEmpty(testRoleId)) {
                     TestRoleAuthUtils.addTestRoleHeaderNames(request, testRoleId);
                     request.getHeaders().put(Constants.AKTO_TEST_ROLE_ID_HEADER, new ArrayList<>(Arrays.asList(testRoleId)));
@@ -268,6 +268,7 @@ public class AgentImportAction extends UserAction{
                     // the role id is for mini-testing only, never part of the saved sample
                     request.getHeaders().remove(Constants.AKTO_TEST_ROLE_ID_HEADER);
                 }
+                takeAppliedAuth(response, request.getHeaders());
             } else {
                 if (!StringUtils.isEmpty(testRoleId)) {
                     // Auth goes on the request's own headers, so it's also in the saved sample: a test with the role
@@ -287,6 +288,28 @@ public class AgentImportAction extends UserAction{
             loggerMaker.error("Error calling URL: " + url + " - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             requestError = e.getMessage();
             return new OriginalHttpResponse("", new HashMap<>(), 0);
+        }
+    }
+
+    // the auth headers mini-testing applied for the test role come back on the response as an internal header: they
+    // go on the request, so into the saved sample, and the internal header is dropped from the response
+    static void takeAppliedAuth(OriginalHttpResponse response, Map<String, List<String>> requestHeaders) {
+        if (response == null || response.getHeaders() == null || !response.getHeaders().containsKey(Constants.AKTO_APPLIED_AUTH_HEADER)) {
+            return;
+        }
+        Map<String, List<String>> responseHeaders = new HashMap<>(response.getHeaders());
+        List<String> applied = responseHeaders.remove(Constants.AKTO_APPLIED_AUTH_HEADER);
+        response.setHeaders(responseHeaders);
+        if (applied == null || applied.isEmpty() || StringUtils.isEmpty(applied.get(0))) {
+            return;
+        }
+        try {
+            BasicDBObject auth = BasicDBObject.parse(applied.get(0));
+            for (String name : auth.keySet()) {
+                requestHeaders.put(name, new ArrayList<>(Arrays.asList(auth.getString(name))));
+            }
+        } catch (Exception e) {
+            loggerMaker.error("Could not read the auth mini-testing applied: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
     }
 

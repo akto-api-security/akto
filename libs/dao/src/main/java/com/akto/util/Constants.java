@@ -51,6 +51,8 @@ public class Constants {
     public static final String AKTO_DECRYPT_HEADER= "x-akto-decode";
     // test role of a request mini-testing sends for the dashboard; mini-testing applies the role and removes the header
     public static final String AKTO_TEST_ROLE_ID_HEADER = "x-akto-test-role-id";
+    // response header carrying the auth headers mini-testing applied for that role back to the dashboard
+    public static final String AKTO_APPLIED_AUTH_HEADER = "x-akto-applied-auth";
 
     public static final String LOCAL_KAFKA_BROKER_URL = System.getenv("KAFKA_BROKER_URL") != null ? System.getenv("KAFKA_BROKER_URL") : "localhost:29092"; // run kafka process with name kafka1 in docker
     public static final String TEST_RESULTS_TOPIC_NAME = "akto.test.messages";

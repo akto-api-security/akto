@@ -154,6 +154,29 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
     }
 
     @Test
+    public void testAuthAppliedByMiniTestingGoesInTheSample() {
+        Map<String, List<String>> responseHeaders = new HashMap<>();
+        responseHeaders.put("upgrade", Collections.singletonList("websocket"));
+        responseHeaders.put(Constants.AKTO_APPLIED_AUTH_HEADER, Collections.singletonList("{\"cookie\": \"session=secret\"}"));
+        OriginalHttpResponse response = new OriginalHttpResponse("", Collections.unmodifiableMap(responseHeaders), 101);
+        Map<String, List<String>> requestHeaders = new HashMap<>();
+        requestHeaders.put("cookie", Collections.singletonList(""));
+
+        AgentImportAction.takeAppliedAuth(response, requestHeaders);
+        // the request (so the saved sample) gets the value; the internal header is not kept on the response
+        assertEquals(Collections.singletonList("session=secret"), requestHeaders.get("cookie"));
+        assertFalse(response.getHeaders().containsKey(Constants.AKTO_APPLIED_AUTH_HEADER));
+        assertEquals(Collections.singletonList("websocket"), response.getHeaders().get("upgrade"));
+
+        // an older mini-testing sends nothing back: the request keeps its placeholder
+        Map<String, List<String>> placeholder = new HashMap<>();
+        placeholder.put("cookie", Collections.singletonList(""));
+        AgentImportAction.takeAppliedAuth(new OriginalHttpResponse("", new HashMap<>(), 101), placeholder);
+        assertEquals(Collections.singletonList(""), placeholder.get("cookie"));
+        AgentImportAction.takeAppliedAuth(null, placeholder);
+    }
+
+    @Test
     public void testUnknownTestRoleIsNotSent() {
         AgentImportAction action = connectionImport("mt-1");
         action.setTestRoleId(new ObjectId().toHexString());
