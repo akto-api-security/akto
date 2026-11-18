@@ -23,6 +23,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.parser.core.models.ParseOptions;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.SmartTestingEventDao;
@@ -680,8 +681,23 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private static final Set<Integer> moduleInfoIndicesReady = ConcurrentHashMap.newKeySet();
+
+    private void ensureModuleInfoIndices() {
+        int accountId = Context.accountId.get();
+        if (moduleInfoIndicesReady.add(accountId)) {
+            try {
+                ModuleInfoDao.instance.createIndicesIfAbsent();
+            } catch (Exception e) {
+                moduleInfoIndicesReady.remove(accountId);
+                loggerMaker.errorAndAddToDb(e, "Error ensuring module_info indices for accountId=" + accountId);
+            }
+        }
+    }
+
     public String updateModuleInfo() {
         try {
+            ensureModuleInfoIndices();
             // Dashboard rows come from this heartbeat (lastHeartbeat + username), not from install logs.
             logEndpointShieldModuleIngest("updateModuleInfoForHeartbeat", moduleInfo);
             moduleInfo = DbLayer.updateModuleInfo(moduleInfo);
@@ -696,6 +712,7 @@ public class DbAction extends ActionSupport {
 
     public String bulkUpdateModuleInfo() {
         try {
+            ensureModuleInfoIndices();
             DbLayer.bulkUpdateModuleInfo(moduleInfoList);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in bulkUpdateModuleInfo " + e.toString());
@@ -708,6 +725,7 @@ public class DbAction extends ActionSupport {
 
     public String fetchAndUpdateModuleForReboot() {
         try {
+            ensureModuleInfoIndices();
             moduleInfoList = DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, moduleId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchAndUpdateModuleForReboot " + e.toString());
@@ -728,6 +746,7 @@ public class DbAction extends ActionSupport {
     
     public String updateModuleInfoForHeartbeatV2() {
         try {
+            ensureModuleInfoIndices();
             logEndpointShieldModuleIngest("updateModuleInfoForHeartbeatV2", moduleInfo);
             moduleInfo = DbLayer.updateModuleInfoForHeartbeatV2(moduleInfo);
             StiCountAlert.checkStiCount();

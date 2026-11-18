@@ -14,7 +14,6 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.BrowserExtensionConfigCommonDao;
 import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.merging.Cron;
 import com.akto.metrics.AllMetrics;
 import com.akto.metrics.CyborgMetricsConfig;
@@ -66,7 +65,6 @@ public class InitializerListener implements ServletContextListener {
                                 DaoInit.init(new ConnectionString(mongoURI));
                             }
                             TestingRunWebhookDao.instance.createIndicesIfAbsent();
-                            ModuleInfoDao.instance.createIndicesIfAbsent();
                             BrowserExtensionConfigCommonDao.instance.createIndicesIfAbsent();
                             calledOnce = true;
                         }
