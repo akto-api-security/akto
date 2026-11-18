@@ -218,6 +218,9 @@ public class RedactSampleData {
             httpResponseParams.setSourceIP(redactValue);
         }
 
+        // a WebSocket sample's frames are copied from the original message: they get the payloads' redaction first
+        redactWebSocketEventsInOrig(httpResponseParams, redactAll);
+
         if(!finalOrigReqPayload.isEmpty() || !finalOrigResPayload.isEmpty()){
             return convertHttpRespToOriginalString(httpResponseParams, finalOrigReqPayload, finalOrigResPayload);
         }else{
@@ -374,6 +377,70 @@ public class RedactSampleData {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "unable to enrich WebSocket sample from orig");
+        }
+    }
+
+    // Redacts the frames in a WebSocket sample's original message, which the sample's events are copied from, as the
+    // request and response payloads are redacted; drops them if they can't be, so raw frames are never stored
+    private static void redactWebSocketEventsInOrig(HttpResponseParams httpResponseParams, boolean redactAll) {
+        if (!"WEBSOCKET".equalsIgnoreCase(httpResponseParams.getType())) return;
+
+        String orig = httpResponseParams.getOrig();
+        if (orig == null || orig.isEmpty()) return;
+
+        JSONObject jsonObject;
+        try {
+            jsonObject = JSON.parseObject(orig);
+        } catch (Exception e) {
+            return; // nothing can be copied from an unreadable original message either
+        }
+        if (jsonObject == null || !jsonObject.containsKey("events")) return;
+        try {
+            jsonObject.put("events", redactWebSocketEvents(jsonObject.get("events"), redactAll));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "unable to redact WebSocket events, leaving them out of the sample");
+            jsonObject.remove("events");
+        }
+        httpResponseParams.setOrig(jsonObject.toJSONString());
+    }
+
+    // the events as stored (a JSON string, or an array): each event's payload redacted, the rest kept
+    static Object redactWebSocketEvents(Object events, boolean redactAll) throws Exception {
+        if (events == null) return null;
+        boolean asString = events instanceof String;
+        String text = asString ? (String) events : JSON.toJSONString(events);
+        if (text.trim().isEmpty()) return events;
+
+        JsonNode node = mapper.readTree(text);
+        if (node == null) return events;
+        List<JsonNode> list = new ArrayList<>();
+        if (node.isArray()) {
+            node.forEach(list::add);
+        } else {
+            list.add(node);
+        }
+        for (JsonNode event : list) {
+            if (!event.isObject() || !event.has("payload")) continue;
+            JsonNode payload = event.get("payload");
+            if (payload.isTextual()) {
+                ((ObjectNode) event).put("payload", redactPayload(payload.asText(), redactAll));
+            } else {
+                change(null, payload, redactValue, redactAll, false);
+            }
+        }
+        return asString ? node.toString() : JSON.parse(node.toString());
+    }
+
+    // a payload as the request and response payloads are redacted: a JSON one by its values (all of them when
+    // redactAll), one that only looks like JSON replaced by {}, other text kept
+    private static String redactPayload(String payload, boolean redactAll) {
+        try {
+            JsonNode node = mapper.readTree(factory.createParser(payload));
+            if (node == null) return payload;
+            change(null, node, redactValue, redactAll, false);
+            return node.toString();
+        } catch (Exception e) {
+            return Utils.isJsonPayload(payload) ? "{}" : payload;
         }
     }
 
