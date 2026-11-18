@@ -43,6 +43,11 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { ModuleInfo.MODULE_TYPE, ModuleInfo._REBOOT, ModuleInfo.MINI_RUNTIME_NAME }, false);
         
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ModuleInfo.LAST_HEARTBEAT_RECEIVED }, true);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ModuleInfo.MODULE_TYPE, ModuleInfo.NAME }, true);
+
         Bson ttlIndex = Indexes.ascending(ModuleInfo.EXPIRES_AT);
         IndexOptions ttlOptions = new IndexOptions()
                 .name("expiresAt_ttl")
