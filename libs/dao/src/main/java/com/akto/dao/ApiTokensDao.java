@@ -20,4 +20,9 @@ public class ApiTokensDao extends CommonContextDao<ApiToken>{
     public ApiToken findByKey(String key) {
         return instance.findOne(Filters.eq(ApiToken.KEY, key));
     }
+
+    // findByKey runs on every API-key request
+    public void createIndicesIfAbsent() {
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{ApiToken.KEY}, true);
+    }
 }
