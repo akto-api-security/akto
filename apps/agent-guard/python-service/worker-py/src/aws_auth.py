@@ -15,9 +15,11 @@ credentials endpoint, IRSA via STS AssumeRoleWithWebIdentity. Both are driven
 by the standard AWS_* env vars EKS injects into the pod, read from os.environ
 like every AWS SDK does (not settings — these aren't ours to name). Resolved
 credentials are cached and refreshed BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC
-(default 30 min) before they expire.
+(default 30 min) before they expire. A refresh is single-flight: concurrent
+callers share one fetch, and a caller's own timeout never cancels it.
 """
 
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -47,6 +49,8 @@ _DEFAULT_REFRESH_MARGIN_S = 1800.0
 # One role per pod, so a single cache slot: (credentials, refresh_at_epoch).
 _ROLE_CACHE: dict[str, tuple["AwsCredentials", float]] = {}
 _ROLE_CACHE_KEY = "role"
+# The in-flight refresh, shared by every caller that misses the cache meanwhile.
+_ROLE_FETCH: dict[str, asyncio.Task] = {}
 
 
 @dataclass(frozen=True)
@@ -96,7 +100,7 @@ async def _fetch_container_credentials() -> tuple[AwsCredentials, float]:
     token = _read_file(token_file) if token_file else os.environ.get("AWS_CONTAINER_AUTHORIZATION_TOKEN", "")
     if token:
         headers["Authorization"] = token
-    resp = await http_client.get_client().get(url, headers=headers, timeout=10)
+    resp = await http_client.get_credentials_client().get(url, headers=headers, timeout=10)
     _raise_for_status(resp, "container credentials endpoint")
     body = resp.json()
     creds = AwsCredentials(body["AccessKeyId"], body["SecretAccessKey"], body.get("Token", ""))
@@ -107,7 +111,7 @@ async def _fetch_web_identity_credentials(region: str) -> tuple[AwsCredentials, 
     """IRSA: exchange the projected service-account token at STS. The call is
     unsigned — the web-identity token is the proof of identity."""
     sts_region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or region
-    resp = await http_client.get_client().post(
+    resp = await http_client.get_credentials_client().post(
         f"https://sts.{sts_region}.amazonaws.com/",
         headers=_IDENTITY,
         data={
@@ -153,6 +157,11 @@ async def get_role_credentials(region: str) -> AwsCredentials:
 
     `region` is the fallback STS region for IRSA when EKS didn't inject
     AWS_REGION. Raises if no role mechanism is configured or the fetch fails.
+
+    Single-flight: callers that miss while a refresh is running await that
+    same fetch instead of starting their own, and await it shielded — the
+    cascade's per-model timeout cancelling a caller must not cancel the fetch,
+    or a fetch slower than that timeout would never land in the cache.
     """
     cached = _ROLE_CACHE.get(_ROLE_CACHE_KEY)
     if cached and cached[1] > time.time():
@@ -160,6 +169,13 @@ async def get_role_credentials(region: str) -> AwsCredentials:
         return cached[0]
     metrics_push.COUNTS["cache_misses"].increment("aws_role_creds")
 
+    task = _ROLE_FETCH.get(_ROLE_CACHE_KEY)
+    if task is None or task.done():
+        task = _ROLE_FETCH[_ROLE_CACHE_KEY] = http_client.spawn_uncancellable(_refresh_role_credentials(region))
+    return await asyncio.shield(task)
+
+
+async def _refresh_role_credentials(region: str) -> AwsCredentials:
     source = role_credentials_source()
     try:
         if source == "container":

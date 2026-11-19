@@ -330,4 +330,69 @@ public class TestRedactSampleData {
         String redactedValue = RedactSampleData.redact(httpResponseParams, true);
         assertEquals(true, redactedValue.contains("<?xml version='1.0' Encoding='UTF-8' ?>"));
     }
+
+    private static Map<String, Object> webSocketEvent(String direction, String payload) {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("direction", direction);
+        event.put("opcode", 1);
+        event.put("payload", payload);
+        event.put("fin", true);
+        event.put("timestamp", 1);
+        return event;
+    }
+
+    private static final String QUERY = "{\"event\":\"user_query\",\"data\":{\"user_query\":\"my card is 4111111111111111\"}}";
+    private static final String REPLY = "{\"event\":\"stats_data\",\"data\":{\"stats\":\"secret answer\"}}";
+
+    // every frame payload in a sample's events, as the sample stores them
+    private static List<String> framePayloads(String events) throws Exception {
+        List<String> payloads = new ArrayList<>();
+        for (JsonNode event : mapper.readTree(events)) {
+            payloads.add(event.get("direction").asText() + " " + event.get("payload").asText());
+        }
+        return payloads;
+    }
+
+    @Test
+    public void testWebSocketFramesAreRedactedLikePayloads() throws Exception {
+        String events = mapper.writeValueAsString(Arrays.asList(webSocketEvent("incoming", QUERY), webSocketEvent("outgoing", REPLY)));
+        Map<String, Object> sample = new HashMap<>();
+        sample.put("method", "WS");
+        sample.put("path", "/user_query");
+        sample.put("type", "WEBSOCKET");
+        sample.put("requestHeaders", "{}");
+        sample.put("responseHeaders", "{}");
+        sample.put("requestPayload", QUERY);
+        sample.put("responsePayload", "[" + REPLY + "]");
+        sample.put("statusCode", "200");
+        sample.put("status", "OK");
+        sample.put("time", "1");
+        sample.put("akto_account_id", "1000000");
+        sample.put("ip", "null");
+        sample.put("source", "MIRRORING");
+        sample.put("events", events);
+
+        String redacted = RedactSampleData.redact(HttpCallParser.parseKafkaMessage(mapper.writeValueAsString(sample)), true);
+
+        // the frames get what the payloads get: every value redacted, keys and the event metadata kept
+        List<String> frames = framePayloads(mapper.readTree(redacted).get("events").asText());
+        assertEquals(Arrays.asList(
+                "incoming {\"event\":\"****\",\"data\":{\"user_query\":\"****\"}}",
+                "outgoing {\"event\":\"****\",\"data\":{\"stats\":\"****\"}}"), frames);
+        assertEquals(false, redacted.contains("4111111111111111"));
+        assertEquals(false, redacted.contains("secret answer"));
+    }
+
+    @Test
+    public void testWebSocketEventsStoredAsAnArrayAreRedacted() throws Exception {
+        Object events = com.alibaba.fastjson2.JSON.parseArray(mapper.writeValueAsString(
+                Arrays.asList(webSocketEvent("incoming", QUERY), webSocketEvent("outgoing", "plain text frame"))));
+
+        Object redacted = RedactSampleData.redactWebSocketEvents(events, true);
+
+        // a JSON frame is redacted by its values; a text frame is kept, as a text payload is
+        assertEquals(Arrays.asList(
+                "incoming {\"event\":\"****\",\"data\":{\"user_query\":\"****\"}}",
+                "outgoing plain text frame"), framePayloads(mapper.writeValueAsString(redacted)));
+    }
 }

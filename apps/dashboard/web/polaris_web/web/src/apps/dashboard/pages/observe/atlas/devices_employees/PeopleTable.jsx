@@ -10,7 +10,7 @@ import {
     LastSeenCellRenderer, OsCellRenderer, OwnerCellRenderer, RiskCellRenderer, FlagsCellRenderer, TagsCellRenderer, TeamsCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
 } from "./PeopleCellRenderers";
 import {
-    CATEGORY_LABELS, DEVICE_CHIPS, INFERENCE_HOOKS_LABEL, INFERENCE_HOOKS_OPTION, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel, PEOPLE_TABLE_CHROME_HEIGHT, PEOPLE_TABLE_HEIGHT, PEOPLE_TABLE_MIN_HEIGHT, RISK_MAX, SEARCH_HINTS,
+    CATEGORY_LABELS, DEVICE_CHIPS, INFERENCE_HOOKS_LABEL, INFERENCE_HOOKS_OPTION, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel, PEOPLE_TABLE_CHROME_HEIGHT, PEOPLE_TABLE_HEIGHT, PEOPLE_TABLE_MIN_HEIGHT, RISK_MAX, SEARCH_HINTS, UNTAGGED_TEAM,
 } from "./peopleConstants";
 import EditDeviceTagsModal from "../../agentic/EditDeviceTagsModal";
 import transform from "./transform";
@@ -21,7 +21,7 @@ const tagOwner = (row) => row.username || row.owner;
 
 const employeeColumns = (dataOptions) => [
     { field: "username", headerName: "Employee", flex: 2, minWidth: 200, cellRenderer: EmployeeCellRenderer, checkboxSelection: true, headerCheckboxSelection: true },
-    { field: "teams", headerName: "Team", flex: 1, minWidth: 140, sortable: false, cellRenderer: TeamsCellRenderer, ...setFilter(dataOptions.teams, (value) => value), filterValueGetter: (params) => params.data?.teams || [] },
+    { field: "teams", headerName: "Team", flex: 1, minWidth: 140, sortable: false, cellRenderer: TeamsCellRenderer, ...setFilter(dataOptions.teams, (value) => value), filterValueGetter: (params) => (params.data?.teams?.length ? params.data.teams : [UNTAGGED_TEAM]) },
     { field: "deviceCount", headerName: "Devices", width: 100, cellRenderer: CountCellRenderer },
     { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
     { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },

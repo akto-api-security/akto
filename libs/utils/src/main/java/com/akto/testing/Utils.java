@@ -786,6 +786,11 @@ public class Utils {
 
     // miniTestingName targets a specific mini-testing instance; when empty, any instance may pick the request up
     public static OriginalHttpResponse runRequestOnHybridTesting(OriginalHttpRequest originalHttpRequest, String miniTestingName){
+        return runRequestOnHybridTesting(originalHttpRequest, miniTestingName, 5 * 60);
+    }
+
+    // timeoutSeconds: how long to wait for mini-testing to answer, e.g. shorter when a user waits on the result
+    public static OriginalHttpResponse runRequestOnHybridTesting(OriginalHttpRequest originalHttpRequest, String miniTestingName, int timeoutSeconds){
         OriginalHttpResponse res = null;
         TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
         testingRunPlayground.setState(TestingRun.State.SCHEDULED);
@@ -799,8 +804,8 @@ public class Utils {
         if (insertOne.wasAcknowledged()) {
             String testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
             int startTime = Context.now();
-            int timeout = 5 * 60; // 5 minutes
-            
+            int timeout = timeoutSeconds;
+
             TestingRunPlayground currentState = null;
             while (Context.now() - startTime <= timeout) {
                 currentState = TestingRunPlaygroundDao.instance.findOne(

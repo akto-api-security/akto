@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { sendQuery } from "@/apps/dashboard/pages/agentic/services/agenticService"
 
-const CONVERSATION_TYPE = "COMMAND_PALETTE"
+export const COMMAND_PALETTE = "COMMAND_PALETTE"
+// Script-writing conversations (service/scripts/validation/CLAUDE.md): own prompt, read-only tools.
+export const TEST_SCRIPT = "TEST_SCRIPT"
 const CONFIRM_MESSAGE = "Yes, go ahead — please proceed."
 const UNDO_MESSAGE = "Please undo the change you just made."
 
@@ -17,6 +19,9 @@ export default function useAskChat() {
     const [loading, setLoading] = useState(false)
     const [acts, setActs] = useState({})
     const conversationIdRef = useRef(null)
+    // Fixed for a conversation: chosen by reset(), so every turn of one conversation has the same type.
+    const [conversationType, setConversationType] = useState(COMMAND_PALETTE)
+    const conversationTypeRef = useRef(COMMAND_PALETTE)
     const mountedRef = useRef(true)
     // Bumped on reset(), so a reply that lands after "New question" is dropped instead of
     // appearing in the fresh conversation.
@@ -26,13 +31,15 @@ export default function useAskChat() {
 
     const isStale = (generation) => !mountedRef.current || generation !== generationRef.current
 
-    const send = useCallback(async (text) => {
-        const res = await sendQuery(text, conversationIdRef.current, CONVERSATION_TYPE)
+    const send = useCallback(async (text, metaData) => {
+        const res = await sendQuery(text, conversationIdRef.current, conversationTypeRef.current, metaData)
         conversationIdRef.current = res?.conversationId || conversationIdRef.current
         return res
     }, [])
 
-    const ask = useCallback(async (text) => {
+    // metaData rides along with this one turn only (e.g. the picked collection, or a validation result
+    // the dashboard loads by id and passes to the agent).
+    const ask = useCallback(async (text, metaData) => {
         const trimmed = (text || "").trim()
         if (!trimmed) return
         const generation = generationRef.current
@@ -40,7 +47,7 @@ export default function useAskChat() {
         setLoading(true)
         let reply
         try {
-            const res = await send(trimmed)
+            const res = await send(trimmed, metaData)
             reply = res?.response || "I couldn't get an answer just now — please try again."
         } catch (e) {
             reply = "Something went wrong reaching Ask Akto. Please try again."
@@ -77,13 +84,15 @@ export default function useAskChat() {
     const confirmAction = useCallback((id) => runAction(id, CONFIRM_MESSAGE, { state: "confirm", doneText: null }), [runAction])
     const undoAction = useCallback((id) => runAction(id, UNDO_MESSAGE, { state: "done" }), [runAction])
 
-    const reset = useCallback(() => {
+    const reset = useCallback((type = COMMAND_PALETTE) => {
         generationRef.current += 1
         conversationIdRef.current = null
+        conversationTypeRef.current = type
+        setConversationType(type)
         setMessages([])
         setActs({})
         setLoading(false)
     }, [])
 
-    return { messages, loading, acts, ask, markStreamed, reviewAction, cancelAction, confirmAction, undoAction, reset }
+    return { messages, loading, acts, conversationType, ask, markStreamed, reviewAction, cancelAction, confirmAction, undoAction, reset }
 }

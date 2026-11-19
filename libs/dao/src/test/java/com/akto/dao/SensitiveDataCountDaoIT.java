@@ -6,6 +6,8 @@ import com.akto.dto.traffic.SensitiveDataCount;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.IndexOptions;
 import org.bson.Document;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -153,6 +155,7 @@ public class SensitiveDataCountDaoIT {
     public void failedApplyReleasesTheKeySoARetryCounts() {
         // A bucket whose count is not a number makes $inc fail.
         dao.getMCollection().withDocumentClass(Document.class).insertOne(new Document("apiCollectionId", 3)
+                .append("senderCollectionId", SensitiveDataCount.UNKNOWN_COLLECTION_ID)
                 .append("subType", "BROKEN").append("hour", H).append("count", "not-a-number"));
         List<SensitiveDataCount> batch = Collections.singletonList(inc(3, "BROKEN", H, 4));
         try {
@@ -201,7 +204,8 @@ public class SensitiveDataCountDaoIT {
     @Test
     public void indexesAreDefinedAsExpected() {
         List<Document> counts = dao.getMCollection().listIndexes().into(new ArrayList<>());
-        Document unique = counts.stream().filter(i -> "subType_hour_apiCollectionId".equals(i.getString("name"))).findFirst().orElse(null);
+        Document unique = counts.stream()
+                .filter(i -> SensitiveDataCountDao.UNIQUE_INDEX.equals(i.getString("name"))).findFirst().orElse(null);
         assertTrue(unique != null && Boolean.TRUE.equals(unique.getBoolean("unique")));
         Document ttl = counts.stream().filter(i -> "expireAt_ttl".equals(i.getString("name"))).findFirst().orElse(null);
         assertTrue(ttl != null && ((Number) ttl.get("expireAfterSeconds")).longValue() == 0L);
