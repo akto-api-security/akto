@@ -28,9 +28,11 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,14 +46,31 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
 
     private static final int COLLECTION_ID = "chat-agent".hashCode();
 
+    // fake mini-testing threads still polling: a test that fails before joining its own must not let it
+    // answer the next test's request
+    private static final List<Thread> miniTestingThreads = new ArrayList<>();
+
     @Before
     public void clean() {
+        // test classes run before this one on the same thread can leave a user or dashboard context set, which
+        // limits these DAOs to that user's collections and hides the rows each test inserts
+        Context.userId.remove();
+        Context.contextSource.remove();
         ApiInfoDao.instance.getMCollection().drop();
         SampleDataDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         TestingRunPlaygroundDao.instance.getMCollection().drop();
         TestRolesDao.instance.getMCollection().drop();
         FileUploadsDao.instance.getMCollection().drop();
+    }
+
+    @After
+    public void stopMiniTesting() throws InterruptedException {
+        for (Thread t : miniTestingThreads) {
+            t.interrupt();
+            t.join();
+        }
+        miniTestingThreads.clear();
     }
 
     // the import runs in the background: its status, as the UI polls it, once it has finished
@@ -92,6 +111,7 @@ public class TestAgentImportActionWebSocket extends MongoBasedTest {
                 }
             }
         });
+        miniTestingThreads.add(t);
         t.start();
         return t;
     }
