@@ -223,7 +223,7 @@ public class TestAuthTokenAction extends MongoBasedTest {
         ModuleInfoDao.instance.insertOne(ModuleInfo.builder().id("m-live").name("runtime-1")
                 .moduleType(ModuleInfo.ModuleType.MINI_RUNTIME).lastHeartbeatReceived(now).tokenId("new").build());
         ModuleInfoDao.instance.insertOne(ModuleInfo.builder().id("m-stale").name("runtime-2")
-                .moduleType(ModuleInfo.ModuleType.GUARDRAIL).lastHeartbeatReceived(now - 1000).tokenId("new").build());
+                .moduleType(ModuleInfo.ModuleType.MINI_TESTING).lastHeartbeatReceived(now - 1000).tokenId("new").build());
         ModuleInfoDao.instance.insertOne(ModuleInfo.builder().id("m-other").name("other")
                 .moduleType(ModuleInfo.ModuleType.MINI_TESTING).lastHeartbeatReceived(now).tokenId("unknown-token").build());
         ModuleInfoDao.instance.insertOne(ModuleInfo.builder().id("m-none").name("none")
@@ -266,6 +266,31 @@ public class TestAuthTokenAction extends MongoBasedTest {
         assertEquals(20, modules.size());
         assertEquals("m-24", modules.get(0).get("id"));
         assertEquals("m-5", modules.get(19).get("id"));
+    }
+
+    @Test
+    public void testAktoHostedModulesAreHiddenFromModuleInfoButShownGenericallyInTheTokenList() {
+        insertToken("shared", AuthToken.STATUS_ACTIVE, AuthToken.SOURCE_GENERATED, 100);
+        int now = Context.now();
+        ModuleInfoDao.instance.insertOne(ModuleInfo.builder().id("m-runtime").name("my-runtime")
+                .moduleType(ModuleInfo.ModuleType.MINI_RUNTIME).lastHeartbeatReceived(now).tokenId("shared").build());
+        ModuleInfoDao.instance.insertOne(ModuleInfo.builder().id("m-guardrail").name("guardrails-service:ip-10-0-0-7")
+                .moduleType(ModuleInfo.ModuleType.GUARDRAIL).lastHeartbeatReceived(now).tokenId("shared").build());
+
+        ModuleInfoAction moduleInfo = new ModuleInfoAction();
+        assertEquals(Action.SUCCESS.toUpperCase(), moduleInfo.fetchModuleInfo());
+        assertEquals(1, moduleInfo.getModuleInfos().size());
+        assertEquals("m-runtime", moduleInfo.getModuleInfos().get(0).getId());
+
+        AuthTokenAction tokens = action();
+        assertEquals(Action.SUCCESS.toUpperCase(), tokens.fetchAuthTokens());
+        Map<String, Object> row = tokens.getAuthTokens().get(0);
+        assertEquals(2, row.get("moduleCount"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> modules = (List<Map<String, Object>>) row.get("modules");
+        for (Map<String, Object> module : modules) {
+            assertEquals("m-guardrail".equals(module.get("id")) ? "Akto-hosted guardrail" : "my-runtime", module.get("name"));
+        }
     }
 
     @Test

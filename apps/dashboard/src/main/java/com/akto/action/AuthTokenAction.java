@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.action.settings.ModuleInfoAction;
 import com.akto.dao.AuthTokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
@@ -94,13 +95,20 @@ public class AuthTokenAction extends UserAction {
         for (ModuleInfo module : modules) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", module.getId());
-            row.put("name", module.getName());
+            row.put("name", displayName(module));
             row.put("moduleType", module.getModuleType());
             row.put("lastHeartbeatReceived", module.getLastHeartbeatReceived());
             row.put("active", module.getLastHeartbeatReceived() >= activeAfter);
             byToken.computeIfAbsent(module.getTokenId(), k -> new ArrayList<>()).add(row);
         }
         return byToken;
+    }
+
+    // Akto-hosted modules get a generic name so a customer never sees Akto's container hostnames.
+    private static String displayName(ModuleInfo module) {
+        ModuleInfo.ModuleType type = module.getModuleType();
+        return type != null && ModuleInfoAction.AKTO_HOSTED_MODULE_TYPES.contains(type.name())
+                ? "Akto-hosted " + type.name().toLowerCase() : module.getName();
     }
 
     public String revokeAuthToken() {

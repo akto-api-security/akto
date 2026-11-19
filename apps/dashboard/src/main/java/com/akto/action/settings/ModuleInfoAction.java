@@ -106,6 +106,8 @@ public class ModuleInfoAction extends UserAction {
     @Getter private Map<String, Object> deviceStats;
     @Setter private String deviceScope;
     private static final LoggerMaker statsLogger = new LoggerMaker(ModuleInfoAction.class, LogDb.DASHBOARD);
+    // Modules Akto runs itself: customers don't see them in Module Info, and the Tokens tab shows them under a generic name.
+    public static final Set<String> AKTO_HOSTED_MODULE_TYPES = Collections.singleton(ModuleType.GUARDRAIL.name());
     private final InsightService insightService = new InsightService();
     // Builds and caches the Atlas Devices & Employees snapshot; every fetchAtlas* action delegates to it.
     private final AtlasPeopleService atlasPeopleService = new AtlasPeopleService();
@@ -798,6 +800,7 @@ public class ModuleInfoAction extends UserAction {
             int deltaTime = Context.now() - heartbeatThresholdSeconds;
             filters.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTime));
         }
+        filters.add(Filters.nin(ModuleInfo.MODULE_TYPE, new ArrayList<>(AKTO_HOSTED_MODULE_TYPES)));
 
         Bson finalFilter = filters.isEmpty() ? Filters.empty() : Filters.and(filters);
         moduleInfos = ModuleInfoDao.instance.findAll(finalFilter);
