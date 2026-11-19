@@ -309,6 +309,88 @@ public class BedrockAgentTraceParserTest {
             edges.get("asl-gateway-demo").getMetadata().get("role"), "Falls back to the older tag");
     }
 
+    // ==================== Orchestrator hop ====================
+
+    /** awsMetadata for a direct model call: a role, a model, no agent harness behind it. */
+    private String directModelMetadata() {
+        return "{\n" +
+            "  \"bedrock-execution-role\": \"sm-role-acorns-agents\",\n" +
+            "  \"bedrock-role-policies\": \"BedrockAccessPolicy\",\n" +
+            "  \"model\": \"anthropic.claude-sonnet-5\",\n" +
+            "  \"traceData\": {}\n" +
+            "}";
+    }
+
+    private Map<String, String> acornsTags(String orchestrator) {
+        Map<String, String> tags = new HashMap<>();
+        tags.put("source", "AWS_BEDROCK");
+        if (orchestrator != null) {
+            tags.put("request-metadata-orchestrator_name", orchestrator);
+        }
+        return tags;
+    }
+
+    /**
+     * One application runs several agents under one orchestrator. Naming only the agent that
+     * made the call loses who was driving it, so the orchestrator becomes its own hop.
+     */
+    @Test
+    public void testOrchestratorHopSitsBetweenUserAndAgent() throws Exception {
+        Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance()
+            .extractServiceGraph(directModelMetadata(), "deeplink_agent",
+                acornsTags("chatbot_orchestrator_agent"));
+
+        assertEdge(edges, "chatbot_orchestrator_agent", "User", "agent", 1);
+        assertEdge(edges, "deeplink_agent", "chatbot_orchestrator_agent", "agent", 2);
+        assertEquals("deeplink_agent",
+            edges.get("anthropic.claude-sonnet-5").getSourceService(),
+            "the agent that made the call is what reached the model");
+    }
+
+    /**
+     * The orchestrator reports itself on its own calls. Adding the hop then would make the
+     * node its own parent, which draws as a self-loop and breaks the depth ordering.
+     */
+    @Test
+    public void testOrchestratorEqualToAgentAddsNoHop() throws Exception {
+        Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance()
+            .extractServiceGraph(directModelMetadata(), "chatbot_orchestrator_agent",
+                acornsTags("chatbot_orchestrator_agent"));
+
+        assertEdge(edges, "chatbot_orchestrator_agent", "User", "agent", 1);
+        assertEquals(1, edges.values().stream()
+            .filter(e -> "agent".equals(e.getMetadata().get("type"))).count(),
+            "one agent node, parented by User");
+    }
+
+    /** No orchestrator named: the chain is exactly what it was before this hop existed. */
+    @Test
+    public void testNoOrchestratorKeepsUserToAgent() throws Exception {
+        Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance()
+            .extractServiceGraph(directModelMetadata(), "deeplink_agent", acornsTags(null));
+
+        assertEdge(edges, "deeplink_agent", "User", "agent", 1);
+        assertFalse(edges.containsKey("chatbot_orchestrator_agent"));
+    }
+
+    /** With a gateway in front, the orchestrator slots in after it, not before. */
+    @Test
+    public void testOrchestratorSitsAfterTheGateway() throws Exception {
+        Map<String, String> tags = gatewayTags();
+        tags.remove("mcp-server");
+        tags.remove("mcp-server-host");
+        tags.put("agent-name", "deeplink_agent");
+        tags.put("request-metadata-orchestrator_name", "chatbot_orchestrator_agent");
+
+        Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance()
+            .extractServiceGraph(gatewayInterceptorMetadata(GATEWAY_ROLE, GATEWAY_POLICIES),
+                "deeplink_agent", tags);
+
+        assertEdge(edges, "asl-gateway-demo", "User", "gateway", 1);
+        assertEdge(edges, "chatbot_orchestrator_agent", "asl-gateway-demo", "agent", 2);
+        assertEdge(edges, "deeplink_agent", "chatbot_orchestrator_agent", "agent", 3);
+    }
+
     // ==================== Mock Data Generators ====================
 
     /**

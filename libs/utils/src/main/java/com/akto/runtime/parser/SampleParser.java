@@ -17,6 +17,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.TrafficProducerLog;
 import com.akto.runtime.utils.Utils;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.utils.GzipUtils;
@@ -26,6 +27,84 @@ import com.google.gson.Gson;
 public class SampleParser {
     
     private static final Gson gson = new Gson();
+
+    /**
+     * Rewrites bot-name to the calling agent for Bedrock traffic that names one.
+     *
+     * Applications that invoke a model directly own no Bedrock Agent resource, so the pipeline
+     * falls back to naming them after the IAM role they assumed. A role is shared by every
+     * agent an application runs, which collapses all of them into one collection and one graph
+     * node. requestMetadata.agent_name is the application telling us which agent made this
+     * particular call, so it is the better identity whenever it is present.
+     *
+     * Done here rather than at each reader because bot-name has several consumers (collection
+     * naming, the service graph) and the tag string this returns is the same one that becomes
+     * both the record's tags and its injected headers - so they cannot disagree.
+     *
+     * Returns the original string unchanged for every other source, and whenever the tag is
+     * absent, empty, or the JSON cannot be parsed.
+     */
+    static String normalizeAgenticTags(String tagsJson) {
+        if (tagsJson == null || tagsJson.isEmpty()) {
+            return tagsJson;
+        }
+        try {
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return tagsJson;
+            }
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            boolean isBedrock = Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(source)
+                    || Constants.AI_AGENT_SOURCE_AWS_QUICK.equals(source);
+            if (!isBedrock) {
+                return tagsJson;
+            }
+            String agentName = tagsMap.get(Constants.AI_AGENT_TAG_REQUEST_METADATA_AGENT_NAME);
+            if (agentName == null || agentName.trim().isEmpty()) {
+                return tagsJson;
+            }
+            tagsMap.put(Constants.AI_AGENT_TAG_BOT_NAME, agentName.trim());
+            return gson.toJson(tagsMap);
+        } catch (Exception e) {
+            return tagsJson;
+        }
+    }
+
+    /**
+     * Carries a tag-delivered session into the header AgentQueryRecord reads, so Traces groups
+     * this traffic by conversation like every other agentic source.
+     *
+     * Sources installed on a machine (Claude CLI hooks, Copilot, the MCP shields) set
+     * x-akto-installer-akto_session_id themselves. A log-processing pipeline has no request to
+     * attach headers to, so it delivers the session as a tag instead; this bridges the two
+     * without teaching AgentQueryRecord a second source-specific lookup.
+     *
+     * Never overwrites a header that is already present - a real one always wins.
+     */
+    private static void injectSessionHeader(HttpRequestParams httpRequestParams, String tagsJson) {
+        if (tagsJson == null || tagsJson.isEmpty() || httpRequestParams == null) {
+            return;
+        }
+        try {
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return;
+            }
+            String sessionId = tagsMap.get(Constants.AI_AGENT_TAG_SESSION_ID);
+            if (sessionId == null || sessionId.trim().isEmpty()) {
+                return;
+            }
+            Map<String, List<String>> headers = httpRequestParams.getHeaders();
+            if (headers == null || headers.containsKey(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID)) {
+                return;
+            }
+            List<String> values = new ArrayList<>();
+            values.add(sessionId.trim());
+            headers.put(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID, values);
+        } catch (Exception e) {
+            // A session we cannot read is not worth failing an otherwise good record for.
+        }
+    }
 
     private static void injectTagsInHeaders(HttpRequestParams httpRequestParams, String tagsJson){
         if(tagsJson == null || tagsJson.isEmpty()){
@@ -114,7 +193,9 @@ public class SampleParser {
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
 
         // JSON string of K8 POD tags
-        String tags = (String) json.getOrDefault("tag", "");
+        // Before anything reads it: this one string becomes the record's tags AND the
+        // x-akto-k8s-* headers below, so normalising here keeps every consumer in agreement.
+        String tags = normalizeAgenticTags((String) json.getOrDefault("tag", ""));
         List<String> parentMcpToolNames;
         try {
             parentMcpToolNames = (List<String>) json.get("parentMcpToolNames");
@@ -142,6 +223,7 @@ public class SampleParser {
                 printUrlDebugLog(tagLog);
             }
             injectTagsInHeaders(requestParams, tags);
+            injectSessionHeader(requestParams, tags);
         }
 
         return httpResponseParams;

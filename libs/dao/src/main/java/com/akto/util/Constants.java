@@ -161,6 +161,26 @@ public class Constants {
     // list is empty exactly when the inline one is worth showing.
     public static final String AI_AGENT_TAG_GATEWAY_INLINE_POLICIES = "gateway-role-inline-policies";
     public static final String AI_AGENT_TAG_GATEWAY_POLICIES = "gateway-role-policies";
+    /**
+     * Caller-supplied requestMetadata, forwarded by the Bedrock log processor under a fixed
+     * prefix so an application's own keys can never collide with a tag the pipeline sets.
+     * agent_name is the agent that made this particular call; orchestrator_name is the
+     * top-level agent that owns the conversation (often, but not always, the same one).
+     */
+    public static final String AI_AGENT_TAG_REQUEST_METADATA_AGENT_NAME = "request-metadata-agent_name";
+    public static final String AI_AGENT_TAG_REQUEST_METADATA_ORCHESTRATOR_NAME = "request-metadata-orchestrator_name";
+    /**
+     * The conversation identifier, already normalised by the log processor from whichever
+     * spelling the caller used (session_id, sessionId, conversationId, ...). Prefer this over
+     * any single request-metadata- spelling so a caller renaming their field changes nothing here.
+     */
+    public static final String AI_AGENT_TAG_SESSION_ID = "session-id";
+    /**
+     * The header every other agentic source sets to carry a session, and the only one
+     * AgentQueryRecord reads. Sources that deliver the session as a tag instead have it
+     * injected under this name so the Traces UI groups their traffic like everyone else's.
+     */
+    public static final String AI_AGENT_HEADER_INSTALLER_SESSION_ID = "x-akto-installer-akto_session_id";
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";

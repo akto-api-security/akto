@@ -303,6 +303,9 @@ public class BedrockAgentTraceParser implements TraceParser {
      *        <li>"agent-name" — the agent that actually made this call. One gateway serves many
      *        agents, so only the per-request principal separates them; this is the sole source
      *        for the AI Agent hop once an MCP target has claimed "bot-name".</li>
+     *        <li>"request-metadata-orchestrator_name" — the agent that owns the conversation,
+     *        added as its own hop ahead of the calling agent. Ignored when it names that same
+     *        agent, which is what an application reports on the orchestrator's own calls.</li>
      *        <li>AKTO_MCP_SERVER_TAG ("mcp-server") + "mcp-server-host" — the MCP target the
      *        call reached, added as the hop after the agent and named after its real host,
      *        since a Gateway-fronted target has no "bot" of its own.</li>
@@ -320,6 +323,8 @@ public class BedrockAgentTraceParser implements TraceParser {
             String gatewayName = tagValue(tagsMap, Constants.AI_AGENT_TAG_GATEWAY_NAME);
             String agentName = tagValue(tagsMap, Constants.AI_AGENT_TAG_AGENT_NAME);
             String mcpServerHost = tagValue(tagsMap, Constants.AKTO_MCP_SERVER_HOST_TAG);
+            String orchestratorName = tagValue(tagsMap,
+                Constants.AI_AGENT_TAG_REQUEST_METADATA_ORCHESTRATOR_NAME);
             boolean isMcpServer = tagsMap != null && tagsMap.containsKey(Constants.AKTO_MCP_SERVER_TAG);
 
             String agentType = resolveAgentType(awsMetadata);
@@ -358,6 +363,18 @@ public class BedrockAgentTraceParser implements TraceParser {
                 chain.add(gatewayName);
                 metadataByNode.put(gatewayName, nodeMetadata(TracingConstants.SpanKind.GATEWAY,
                     "Gateway", gatewayRole, gatewayPolicies, ""));
+            }
+            // The agent that owns the conversation, when the caller names one and it is not
+            // simply this same agent - an application reports the orchestrator on every call,
+            // including the calls the orchestrator makes itself, and a node must not parent itself.
+            boolean hasOrchestrator = !orchestratorName.isEmpty()
+                && !orchestratorName.equals(agentNode);
+            if (hasOrchestrator) {
+                chain.add(orchestratorName);
+                // Typed as an agent deliberately: the dashboard maps node types by substring and
+                // has no orchestrator category, so anything else renders as "Internal Service".
+                metadataByNode.put(orchestratorName, nodeMetadata(TracingConstants.SpanKind.AGENT,
+                    "AI Agent", executionRole, rolePolicies, ""));
             }
             if (!agentNode.isEmpty()) {
                 chain.add(agentNode);
