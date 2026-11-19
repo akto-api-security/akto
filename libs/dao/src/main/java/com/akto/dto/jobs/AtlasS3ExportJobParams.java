@@ -16,8 +16,10 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 @ToString
 public class AtlasS3ExportJobParams extends JobParams {
 
-    // Epoch ms up to which (exclusive) Atlas traces have been exported.
+    // Epoch ms up to which (exclusive) traces have been exported.
     private long lastExportedTs;
+    // AtlasS3ExportIntegration.source this job exports: ENDPOINT (Atlas) or AGENTIC (Argus).
+    private String source;
 
     @Override
     public JobType getJobType() {
