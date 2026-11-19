@@ -277,9 +277,12 @@ public class TestAtlasDiscoveryService {
                 "teamCategoryMatrix");
         List<Map<String, Object>> teams = (List<Map<String, Object>>) matrix.get("rows");
 
-        assertEquals(1, teams.size());
+        // user.two (d2) has no team tag, so it forms the Untagged row, listed last.
+        assertEquals(2, teams.size());
         assertEquals("Platform", teams.get(0).get("name"));
         assertEquals(Long.valueOf(100L), ((List<Long>) teams.get(0).get("percents")).get(0));
+        assertEquals(AtlasPeople.UNTAGGED_TEAM, teams.get(1).get("name"));
+        assertEquals(Long.valueOf(0L), ((List<Long>) teams.get(1).get("percents")).get(0));
     }
 
     @Test
@@ -441,37 +444,64 @@ public class TestAtlasDiscoveryService {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void supplyChainLeavesOutNodesWithNoIncomingLink() {
+    public void supplyChainRoutesDevicesWithNoTeamThroughUntagged() {
         AtlasToolRow connected = tool("agent", "agent-a", 1, NOW, "d1");
         connected.getMcpDevices().put("Server-A", new HashSet<>(Collections.singletonList("d1")));
-        // d9 belongs to no team, so no team reaches this tool, and the server only it uses is unreachable too.
+        // d9 has no known user, so its tool and server are reached through the Untagged team.
         AtlasToolRow loose = tool("agent", "agent-b", 1, NOW, "d9");
         loose.getMcpDevices().put("Server-B", new HashSet<>(Collections.singletonList("d9")));
         List<AtlasToolRow> rows = Arrays.asList(connected, loose, tool("service", "server-a", 1, NOW, "d1"), tool("service", "server-b", 1, NOW, "d9"));
         Map<String, Object> chain = section(service(rows, new HashMap<>(), Collections.emptySet()).buildOverview(), "supplyChain");
 
         List<List<Map<String, Object>>> columns = (List<List<Map<String, Object>>>) chain.get("columns");
-        assertEquals(1, columns.get(1).size());
-        assertEquals("agent-a", columns.get(1).get(0).get("label"));
-        assertEquals(1, columns.get(2).size());
-        assertEquals("server-a", columns.get(2).get(0).get("label"));
+        assertEquals(2, columns.get(0).size());
+        assertEquals("Platform", columns.get(0).get(0).get("label"));
+        assertEquals(AtlasPeople.UNTAGGED_TEAM, columns.get(0).get(1).get("label"));
+        assertEquals(2, columns.get(1).size());
+        assertEquals(2, columns.get(2).size());
         List<Map<String, Object>> edges = (List<Map<String, Object>>) chain.get("edges");
-        assertEquals(2, edges.size());
-        assertTrue(edges.stream().noneMatch(edge -> String.valueOf(edge.get("source")).contains("agent-b") || String.valueOf(edge.get("target")).contains("server-b")));
+        assertEquals(4, edges.size());
+        assertTrue(edges.stream().anyMatch(edge -> ("team:" + AtlasPeople.UNTAGGED_TEAM).equals(edge.get("source")) && String.valueOf(edge.get("target")).contains("agent-b")));
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    public void supplyChainCountsEachDeviceOncePerTeamAndSkipsUntaggedDevices() {
-        // Both tools run on the same two devices: d1 belongs to a team, d2 has none and is left out.
+    public void supplyChainCountsEachDeviceOncePerTeam() {
+        // Both tools run on the same two devices: d1 belongs to a team, d2 has none and goes under Untagged.
         AtlasToolRow first = tool("agent", "agent-a", 1, NOW, "d1", "d2");
         AtlasToolRow second = tool("agent", "agent-b", 1, NOW, "d1", "d2");
         Map<String, Object> chain = section(service(Arrays.asList(first, second), new HashMap<>(), Collections.emptySet()).buildOverview(), "supplyChain");
 
         List<Map<String, Object>> teamNodes = ((List<List<Map<String, Object>>>) chain.get("columns")).get(0);
-        assertEquals(1, teamNodes.size());
+        assertEquals(2, teamNodes.size());
         assertEquals(1, teamNodes.get(0).get("devices"));
         assertFalse("".equals(teamNodes.get(0).get("label")));
+        assertEquals(AtlasPeople.UNTAGGED_TEAM, teamNodes.get(1).get("label"));
+        assertEquals(1, teamNodes.get(1).get("devices"));
+        assertEquals(1, teamNodes.get(1).get("employees"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void agentMatrixColumnsComeFromTheShownAgentsOnly() {
+        List<AtlasToolRow> rows = new ArrayList<>();
+        // Five busy agents (two devices each) use server-a; a sixth, quieter agent is the only one on server-b.
+        for (int i = 0; i < 5; i++) {
+            AtlasToolRow agent = tool("agent", "agent-" + i, 1, NOW, "d1", "d2");
+            agent.getMcpDevices().put("server-a", new HashSet<>(Arrays.asList("d1", "d2")));
+            rows.add(agent);
+        }
+        AtlasToolRow quiet = tool("agent", "agent-quiet", 1, NOW, "d3");
+        quiet.getMcpDevices().put("server-b", new HashSet<>(Arrays.asList("d3", "d4", "d5")));
+        rows.add(quiet);
+        rows.add(tool("service", "server-a", 1, NOW, "d1", "d2"));
+        rows.add(tool("service", "server-b", 1, NOW, "d3"));
+        Map<String, Object> matrix = section(service(rows, new HashMap<>(), Collections.emptySet()).buildOverview(), "agentMcpMatrix");
+
+        assertEquals(5, ((List<Map<String, Object>>) matrix.get("rows")).size());
+        List<Map<String, Object>> columns = (List<Map<String, Object>>) matrix.get("servers");
+        assertEquals(1, columns.size());
+        assertEquals("server-a", columns.get(0).get("name"));
     }
 
     @Test

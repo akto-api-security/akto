@@ -13,6 +13,8 @@ import java.util.Set;
 public class AtlasPeople {
 
     private static final String USERNAME_KEY = "username";
+    /** The bucket for users and devices with no team tag; a real team tag spelled "Untagged" joins it. */
+    public static final String UNTAGGED_TEAM = "Untagged";
 
     private final Map<String, String> usernameByDevice;
     private final Map<String, String> teamByUser;
@@ -56,16 +58,24 @@ public class AtlasPeople {
         return teamByUser.get(username);
     }
 
-    /** Null when the device's user has no team tag. */
-    public String teamOfDevice(String deviceId) {
-        return teamByUser.get(usernameByDevice.get(deviceId));
+    /** Untagged when the user has no team tag. */
+    public String teamOrUntagged(String username) {
+        return teamByUser.getOrDefault(username, UNTAGGED_TEAM);
     }
 
-    /** Team -> its tagged users. */
+    /** Untagged when the device has no user or its user has no team tag. */
+    public String teamOfDevice(String deviceId) {
+        return teamOrUntagged(usernameByDevice.get(deviceId));
+    }
+
+    /** Team -> its tagged users; known device users with no tag go under Untagged. */
     public Map<String, Set<String>> membersByTeam() {
         Map<String, Set<String>> members = new HashMap<>();
         for (Map.Entry<String, String> e : teamByUser.entrySet()) {
             members.computeIfAbsent(e.getValue(), k -> new HashSet<>()).add(e.getKey());
+        }
+        for (String username : usernameByDevice.values()) {
+            if (AtlasPeopleService.isRealUsername(username) && !teamByUser.containsKey(username)) members.computeIfAbsent(UNTAGGED_TEAM, k -> new HashSet<>()).add(username);
         }
         return members;
     }
