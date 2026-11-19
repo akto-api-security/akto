@@ -402,5 +402,6 @@ public abstract class DataActor {
 
     public abstract Map<String, String> fetchDeviceUserMap();
 
+    public abstract String fetchWebSocketConnectionUrl(int collectionId) throws Exception;
     public abstract Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap();
 }

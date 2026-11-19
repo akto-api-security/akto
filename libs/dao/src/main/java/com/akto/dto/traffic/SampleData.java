@@ -12,6 +12,8 @@ public class SampleData {
     List<String> samples;
     public static final String SAMPLE_IDS = "sampleIds";
     List<String> sampleIds;
+    public static final String EVENTS = "events";
+    List<String> events;
     List<String> traces;
 
     List<Integer> collectionIds;
@@ -60,6 +62,14 @@ public class SampleData {
 
     public void setSampleIds(List<String> sampleIds) {
         this.sampleIds = sampleIds;
+    }
+
+    public List<String> getEvents() {
+        return events;
+    }
+
+    public void setEvents(List<String> events) {
+        this.events = events;
     }
 
     @Override

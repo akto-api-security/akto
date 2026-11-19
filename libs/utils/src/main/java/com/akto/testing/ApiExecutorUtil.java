@@ -194,6 +194,8 @@ public class ApiExecutorUtil {
             }
 
             Map<String, Object> bindings = new HashMap<>();
+            // defined for HTTP too, so one script can check protocol === "websocket" without a ReferenceError
+            bindings.put("protocol", "http");
             bindings.put("method", originalHttpRequest.getMethod());
             bindings.put("headers", originalHttpRequest.getHeaders());
             bindings.put("url", originalHttpRequest.getUrl());
@@ -313,6 +315,129 @@ public class ApiExecutorUtil {
         }
     }
 
+    /** What one WebSocket attempt connects to and sends, after the PRE_REQUEST script. */
+    public static final class WebSocketAttempt {
+        /** Full connection URL, query included; null when none was captured and the script set none. */
+        public final String connectionUrl;
+        /** Handshake headers: a WebSocket frame carries none. */
+        public final Map<String, List<String>> headers;
+        /** The frame to send; empty for a connection-string test. */
+        public final String payload;
+
+        WebSocketAttempt(String connectionUrl, Map<String, List<String>> headers, String payload) {
+            this.connectionUrl = connectionUrl;
+            this.headers = headers;
+            this.payload = payload;
+        }
+    }
+
+    private static final String WS_CONVERSATION_CACHE_SUFFIX = "|ws";
+
+    /**
+     * Runs the PRE_REQUEST script once for a WebSocket attempt. The script sees protocol "websocket",
+     * phase "connect", the message path (url), isConnectionString, connectionUrl (null when none was
+     * captured) with its query as queryParams, the handshake headers and the frame as payload. What it
+     * sets for connectionUrl / queryParams / headers shapes the handshake, payload the frame.
+     * executeOncePerConversation reuses cachedConnectionUrl / cachedQueryParams / cachedHeaders /
+     * cachedPayload / cachedPayloadPatch. Without a script, or if it fails, the attempt goes out as captured.
+     */
+    public static WebSocketAttempt prepareWebSocketAttempt(OriginalHttpRequest request, String connectionUrl,
+            TestingRunConfig testingRunConfig) {
+        Map<String, List<String>> headers = request.getHeaders() != null ? new HashMap<>(request.getHeaders()) : new HashMap<>();
+        WebSocketAttempt asCaptured = new WebSocketAttempt(connectionUrl, headers, request.getBody());
+        if (testingRunConfig == null) {
+            return asCaptured;
+        }
+        try {
+            String script = getCachedScript(Context.getActualAccountId(), TestScript.Type.PRE_REQUEST);
+            if (script == null) {
+                return asCaptured;
+            }
+            String[] urlAndQuery = splitQuery(connectionUrl);
+            String capturedQuery = urlAndQuery[1];
+
+            String conversationId = testingRunConfig.getConversationId();
+            boolean useConversationCache = conversationId != null && hasExecuteOncePerConversationMarker(script);
+            String cacheKey = conversationId + WS_CONVERSATION_CACHE_SUFFIX;
+            ScriptResultCache cached = useConversationCache ? conversationScriptCache.get(cacheKey) : null;
+            if (cached != null) {
+                String payload = request.getBody();
+                if (cached.cachedPayloadPatch != null) {
+                    payload = applyPayloadPatch(payload, cached.cachedPayloadPatch);
+                } else if (cached.cachedPayload != null) {
+                    payload = cached.cachedPayload;
+                }
+                return new WebSocketAttempt(
+                        buildConnectionUrl(cached.cachedUrl != null ? cached.cachedUrl : connectionUrl,
+                                cached.cachedQueryParams != null ? cached.cachedQueryParams : capturedQuery, capturedQuery),
+                        cached.cachedHeaders != null && !cached.cachedHeaders.isEmpty() ? cached.cachedHeaders : headers,
+                        payload);
+            }
+
+            Map<String, Object> bindings = new HashMap<>();
+            bindings.put("protocol", "websocket");
+            bindings.put("phase", "connect");
+            bindings.put("method", "WS");
+            bindings.put("url", request.getUrl());
+            bindings.put("isConnectionString", request.isConnectionString());
+            bindings.put("connectionUrl", urlAndQuery[0]);
+            bindings.put("queryParams", capturedQuery);
+            bindings.put("headers", headers);
+            bindings.put("payload", request.getBody());
+            bindings.put(CONVERSATION_STATE, getConversationState(conversationId));
+
+            Map<String, Object> out = runScript(script, bindings,
+                    "connectionUrl", "queryParams", "headers", "payload",
+                    "cachedConnectionUrl", "cachedQueryParams", "cachedHeaders", "cachedPayload", "cachedPayloadPatch");
+
+            if (useConversationCache) {
+                conversationScriptCache.put(cacheKey, new ScriptResultCache(null,
+                        convertHeadersFromScript((Map) out.get("cachedHeaders")), stringOrNull(out.get("cachedConnectionUrl")),
+                        stringOrNull(out.get("cachedPayload")), stringOrNull(out.get("cachedPayloadPatch")),
+                        stringOrNull(out.get("cachedQueryParams")), null));
+            }
+
+            return new WebSocketAttempt(
+                    buildConnectionUrl(stringOrNull(out.get("connectionUrl")), stringOrNull(out.get("queryParams")), capturedQuery),
+                    convertHeadersFromScript((Map) out.get("headers")),
+                    stringOrNull(out.get("payload")));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in WebSocket pre-request script " + e.getMessage() + " url " + request.getUrl());
+            return asCaptured;
+        }
+    }
+
+    /** {url without query, query or null}; {null, null} for a null url. */
+    static String[] splitQuery(String url) {
+        if (url == null) {
+            return new String[]{null, null};
+        }
+        int idx = url.indexOf('?');
+        return idx < 0 ? new String[]{url, null} : new String[]{url.substring(0, idx), url.substring(idx + 1)};
+    }
+
+    /**
+     * The connection URL the script asked for: queryParams it changed win, else a query in the URL it
+     * returned, else the captured query. null when there is no URL.
+     */
+    static String buildConnectionUrl(String url, String queryParams, String capturedQuery) {
+        if (url == null || url.isEmpty()) {
+            return null;
+        }
+        String[] urlAndQuery = splitQuery(url);
+        String query;
+        if (!java.util.Objects.equals(queryParams, capturedQuery)) {
+            query = queryParams;
+        } else {
+            query = urlAndQuery[1] != null ? urlAndQuery[1] : capturedQuery;
+        }
+        return OriginalHttpRequest.getFullUrlWithParams(urlAndQuery[0], query);
+    }
+
+    private static String stringOrNull(Object value) {
+        return value != null ? value.toString() : null;
+    }
+
     private static String applyPayloadPatch(String body, String patch) {
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -403,7 +528,10 @@ public class ApiExecutorUtil {
                 body = response.getBody();
             }
 
-            return new OriginalHttpResponse(body, responseHeaders, statusCode);
+            OriginalHttpResponse scripted = new OriginalHttpResponse(body, responseHeaders, statusCode);
+            // the received chunks / frames stay with the response the script returns
+            scripted.setStreamingChunks(response.getStreamingChunks());
+            return scripted;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in runPostRequestScript " + e.getMessage());
             e.printStackTrace();
