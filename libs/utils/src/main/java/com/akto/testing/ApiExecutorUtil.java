@@ -349,7 +349,7 @@ public class ApiExecutorUtil {
             return asCaptured;
         }
         try {
-            String script = getCachedScript(Context.getActualAccountId(), TestScript.Type.PRE_REQUEST);
+            String script = getCachedScript(testingRunConfig, Context.getActualAccountId(), TestScript.Type.PRE_REQUEST);
             if (script == null) {
                 return asCaptured;
             }

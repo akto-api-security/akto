@@ -13,10 +13,13 @@ import com.akto.dto.testing.SmartAgentConfig;
 import com.akto.dto.testing.SmartAgentKnowledgeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.net.httpserver.HttpServer;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,35 +36,69 @@ class AutomatedAgenticTestExecutorTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private HttpServer server;
-    private String receivedBody;
-    private String reply;
+    private ServerSocket server;
+    private volatile String receivedBody;
+    private volatile String reply;
 
+    // a plain socket server (Java 8, no com.sun.net.httpserver): answers every request with reply
     @BeforeEach
     void startService() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        com.sun.net.httpserver.HttpHandler handler = exchange -> {
-            receivedBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-            byte[] out = reply.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
-            exchange.sendResponseHeaders(200, out.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(out);
-            }
-        };
-        server.createContext("/pentest", handler);
-        server.createContext("/verify", handler);
-        server.start();
         reply = "{\"attempts\": [], \"aiSummaryTraces\": [], \"skipped\": false}";
+        server = new ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"));
+        Thread serverThread = new Thread(() -> {
+            while (!server.isClosed()) {
+                try (Socket socket = server.accept()) {
+                    receivedBody = readBody(socket.getInputStream());
+                    byte[] out = reply.getBytes(StandardCharsets.UTF_8);
+                    OutputStream os = socket.getOutputStream();
+                    os.write(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + out.length
+                            + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+                    os.write(out);
+                    os.flush();
+                } catch (IOException e) {
+                    // server closed by stopService
+                }
+            }
+        });
+        serverThread.setDaemon(true);
+        serverThread.start();
     }
 
     @AfterEach
-    void stopService() {
-        server.stop(0);
+    void stopService() throws IOException {
+        server.close();
+    }
+
+    // the request body; the client always sends Content-Length
+    private static String readBody(InputStream in) throws IOException {
+        int contentLength = 0;
+        String line;
+        while (!(line = readLine(in)).isEmpty()) {
+            if (line.toLowerCase().startsWith("content-length:")) {
+                contentLength = Integer.parseInt(line.substring("content-length:".length()).trim());
+            }
+        }
+        byte[] body = new byte[contentLength];
+        int read = 0;
+        while (read < contentLength) {
+            int n = in.read(body, read, contentLength - read);
+            if (n < 0) break;
+            read += n;
+        }
+        return new String(body, 0, read, StandardCharsets.UTF_8);
+    }
+
+    private static String readLine(InputStream in) throws IOException {
+        StringBuilder line = new StringBuilder();
+        int c;
+        while ((c = in.read()) != -1 && c != '\n') {
+            if (c != '\r') line.append((char) c);
+        }
+        return line.toString();
     }
 
     private AutomatedAgenticTestExecutor executor() {
-        return new AutomatedAgenticTestExecutor("http://127.0.0.1:" + server.getAddress().getPort());
+        return new AutomatedAgenticTestExecutor("http://127.0.0.1:" + server.getLocalPort());
     }
 
     private static RawApi captured() {
