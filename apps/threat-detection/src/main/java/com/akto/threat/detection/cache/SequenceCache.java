@@ -4,8 +4,11 @@ import com.akto.data_actor.DataActor;
 import com.akto.dto.ApiSequences;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.RuntimeUtil;
+import com.akto.threat.detection.utils.DataReuse;
 import com.akto.threat.detection.utils.SessionIdentifier;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -33,6 +36,8 @@ public class SequenceCache {
     // Alert when this many of a session's last RECENT_STEPS steps are ones users almost never take
     private static final int UNKNOWN_STEPS_TO_ALERT = 5;
     private static final int RECENT_STEPS = 10;
+    // Check whether unusual steps reuse values from the previous response (reads response bodies of sessions with unusual steps)
+    private static final boolean DATA_REUSE_ENABLED = Boolean.parseBoolean(System.getenv("THREAT_DATA_REUSE_ENABLED"));
 
     private final DataActor dataActor;
     private final SessionIdentifier sessionIdentifier = new SessionIdentifier();
@@ -70,6 +75,35 @@ public class SequenceCache {
         this.dataActor = dataActor;
     }
 
+    // Reason text when this call is a sequence anomaly, otherwise null. url is the raw request URL; it is matched to the
+    // catalog the same way the catalog does (exact URL, then template), falling back to fallbackUrl.
+    public String evaluate(HttpResponseParams responseParam, int apiCollectionId, String url, Method method,
+                           AccountConfig accountConfig, String fallbackUrl) {
+        if (apiCollectionId == 0) return null;
+        Map<String, Set<Method>> catalogUrls = accountConfig != null ? accountConfig.getApiInfoUrlToMethods() : null;
+        List<URLTemplate> catalogTemplates = accountConfig != null && accountConfig.getApiCollectionUrlTemplates() != null
+                ? accountConfig.getApiCollectionUrlTemplates().get(apiCollectionId) : null;
+        String sequenceUrl = RuntimeUtil.findCatalogUrl(url, method, catalogUrl -> {
+            Set<Method> methods = catalogUrls == null ? null : catalogUrls.get(apiCollectionId + ":" + catalogUrl);
+            return methods != null && methods.contains(method);
+        }, catalogTemplates);
+        if (sequenceUrl == null) sequenceUrl = fallbackUrl;
+
+        boolean skippedRequiredStep = checkSequenceAnomaly(responseParam, apiCollectionId, sequenceUrl, method);
+        String unknownPath = checkUnknownPath(responseParam, apiCollectionId, sequenceUrl, method);
+        if (unknownPath != null) return unknownPath;
+        return skippedRequiredStep ? skippedStepReason(resolve(apiCollectionId, sequenceUrl, method)) : null;
+    }
+
+    // "<B> was called without <A> first", from the first rule for B
+    private String skippedStepReason(String apiKey) {
+        List<List<String>> contexts = apiKey == null ? null : requiredBefore.get(apiKey);
+        if (contexts == null || contexts.isEmpty()) return "Called without the step users always take before it";
+        List<String> required = new ArrayList<>();
+        for (String api : contexts.get(0)) required.add(describe(api));
+        return describe(apiKey) + " was called without " + String.join(" → ", required) + " first";
+    }
+
     public boolean checkSequenceAnomaly(HttpResponseParams responseParam, int apiCollectionId, String url, Method method) {
         refresh();
         if (requiredBefore.isEmpty()) return false;
@@ -93,23 +127,32 @@ public class SequenceCache {
     private static final class RecentCalls {
         private final ArrayDeque<String> calls = new ArrayDeque<>(RECENT_STEPS + 1);
         private final ArrayDeque<Boolean> unknown = new ArrayDeque<>(RECENT_STEPS);
+        // Per step: request parameters that reused the previous response's values, "" when none (ArrayDeque rejects null)
+        private final ArrayDeque<String> reused = new ArrayDeque<>(RECENT_STEPS);
         private int unknownCount = 0;
+        // Hashes of the last response's values; kept only while the window has an unknown step
+        private long[] lastResponse;
 
         RecentCalls(String firstCall) {
             calls.addLast(firstCall);
         }
 
-        void add(String call, boolean isUnknown) {
+        void add(String call, boolean isUnknown, String reusedParams) {
             calls.addLast(call);
             if (calls.size() > RECENT_STEPS + 1) calls.removeFirst();
             unknown.addLast(isUnknown);
+            reused.addLast(reusedParams);
             if (isUnknown) unknownCount++;
-            if (unknown.size() > RECENT_STEPS && unknown.removeFirst()) unknownCount--;
+            if (unknown.size() > RECENT_STEPS) {
+                reused.removeFirst();
+                if (unknown.removeFirst()) unknownCount--;
+            }
         }
 
-        // "METHOD /a → METHOD /b; ..." for each unknown step, oldest first
+        // "METHOD /a → METHOD /b (reused: id); ..." for each unknown step, oldest first
         String describeUnknownSteps() {
             List<String> callList = new ArrayList<>(calls);
+            List<String> reusedList = new ArrayList<>(reused);
             int offset = callList.size() - 1 - unknown.size();
             StringBuilder text = new StringBuilder();
             int index = 0;
@@ -117,6 +160,7 @@ public class SequenceCache {
                 if (isUnknown) {
                     if (text.length() > 0) text.append("; ");
                     text.append(describe(callList.get(offset + index))).append(" → ").append(describe(callList.get(offset + index + 1)));
+                    if (!reusedList.get(index).isEmpty()) text.append(" (reused: ").append(reusedList.get(index)).append(")");
                 }
                 index++;
             }
@@ -142,7 +186,9 @@ public class SequenceCache {
         String previous = recent.calls.peekLast();
         if (previous.equals(apiKey)) return null;
         boolean isUnknown = !knownSteps.contains(previous + "|" + apiKey);
-        recent.add(apiKey, isUnknown);
+        List<String> reusedParams = DATA_REUSE_ENABLED && isUnknown ? DataReuse.findReuse(recent.lastResponse, responseParam) : null;
+        recent.add(apiKey, isUnknown, reusedParams == null ? "" : String.join(", ", reusedParams));
+        recent.lastResponse = DATA_REUSE_ENABLED && recent.unknownCount > 0 ? DataReuse.fingerprint(responseParam) : null;
         if (!isUnknown || recent.unknownCount < UNKNOWN_STEPS_TO_ALERT) return null;
         String reason = recent.unknownCount + " of the last " + recent.unknown.size() + " steps were ones users almost never take: " + recent.describeUnknownSteps();
         sessionPath.put(sessionId, new RecentCalls(apiKey));

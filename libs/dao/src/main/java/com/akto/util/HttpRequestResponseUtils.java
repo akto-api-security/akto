@@ -91,6 +91,15 @@ public class HttpRequestResponseUtils {
     public static final String SOAP = "soap";
     public static final String XML = "xml";
 
+    // Values worth tracking from one call to the next: skips nulls, booleans, short strings and small numbers.
+    // Same rule as the dependency analysis in api-runtime / mini-runtime.
+    public static boolean isTrackableValue(Object val) {
+        if (val == null || val instanceof Boolean) return false;
+        if (val instanceof String) return ((String) val).length() > 4 && ((String) val).length() <= 4096;
+        if (val instanceof Integer) return ((int) val) > 50;
+        return true;
+    }
+
     public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
         if (body == null) return new HashMap<>();
         if (body.startsWith("[")) body = "{\"json\": "+body+"}";
