@@ -27,6 +27,7 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -81,6 +82,8 @@ public class AtlasPeopleService {
     private static final String STATUS_ACTIVE = "active";
     private static final String ALERT_ONLY_BEHAVIOUR = "alert";
     private static final String TEAM_TAG_KEY = "team";
+    // The team filter value for people and devices with no team tag; the Overview's team cards link here with it.
+    private static final String UNTAGGED_TEAM = AtlasPeople.UNTAGGED_TEAM.toLowerCase(Locale.ROOT);
     private static final String MISCONFIGURED_TAG_KEY = "misconfigured-config";
     private static final String UNKNOWN_USERNAME_PLACEHOLDER = "not-available";
     private static final String BROWSER_HOST_MARKER = "chrome";
@@ -958,7 +961,10 @@ public class AtlasPeopleService {
         for (int count : histogram) histogramList.add(count);
 
         Set<String> teamOptions = new TreeSet<>();
-        for (EmployeeRow employee : snapshot.employees) teamOptions.addAll(employee.teams);
+        for (EmployeeRow employee : snapshot.employees) {
+            teamOptions.addAll(employee.teams);
+            if (employee.teams.isEmpty()) teamOptions.add(UNTAGGED_TEAM);
+        }
         overview.put("teamOptions", new ArrayList<>(teamOptions));
         Set<String> tagOptions = new TreeSet<>();
         for (DeviceRow device : snapshot.devices) for (Map<String, String> tag : device.tags) tagOptions.add(tagPair(tag));
@@ -1066,7 +1072,7 @@ public class AtlasPeopleService {
             if (query.usesAi && device.toolCount() == 0) continue;
             if (query.riskMin > 0 && device.riskScore < query.riskMin) continue;
             if (query.riskMax < RISK_MAX && device.riskScore >= query.riskMax) continue;
-            if (notEmpty(query.teams) && deviceTeams(device).stream().noneMatch(query.teams::contains)) continue;
+            if (notEmpty(query.teams) && !matchesTeams(deviceTeams(device), query.teams)) continue;
             matching.add(device);
         }
         matching.sort(deviceComparator(query).thenComparing(device -> device.key));
@@ -1102,7 +1108,7 @@ public class AtlasPeopleService {
             List<DeviceRow> devices = devicesOf(snapshot, employee);
             if (deviceFiltered && devices.stream().noneMatch(device -> matchesDeviceFilters(device, query))) continue;
             if (!employeeMatchesAllTerms(employee, devices, terms)) continue;
-            if (notEmpty(query.teams) && employee.teams.stream().noneMatch(query.teams::contains)) continue;
+            if (notEmpty(query.teams) && !matchesTeams(employee.teams, query.teams)) continue;
             if (notEmpty(query.violationSeverities) && query.violationSeverities.stream().noneMatch(severity -> employee.violationsBySeverity.getOrDefault(severity, 0) > 0)) continue;
             if (query.usesAi && employee.toolCount == 0) continue;
             if (query.hasUnapproved && employee.unapprovedTools == 0) continue;
@@ -1268,6 +1274,11 @@ public class AtlasPeopleService {
 
     private static boolean contains(String value, String lowerText) {
         return value != null && value.toLowerCase(Locale.ROOT).contains(lowerText);
+    }
+
+    // No team tag matches only the untagged filter value.
+    private static boolean matchesTeams(Collection<String> teams, List<String> wanted) {
+        return teams.isEmpty() ? wanted.contains(UNTAGGED_TEAM) : teams.stream().anyMatch(wanted::contains);
     }
 
     private static boolean notEmpty(List<String> values) {
