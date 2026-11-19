@@ -120,6 +120,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     } 
 
     useEffect(() => {
+        if(isLocalDeploy) return;
         fetchLBs()
         checkStackState()
     },[])
