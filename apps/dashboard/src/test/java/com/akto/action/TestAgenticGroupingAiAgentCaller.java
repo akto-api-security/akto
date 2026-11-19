@@ -5,7 +5,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -15,6 +14,8 @@ import java.util.Map;
 
 import org.junit.Test;
 
+import com.akto.agentic.AgenticAssetGrouping;
+import com.akto.agentic.GroupSummary;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.AgenticObserveUtil;
@@ -38,12 +39,8 @@ public class TestAgenticGroupingAiAgentCaller {
         return c;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> classify(List<ApiCollection> collections) throws Exception {
-        Method m = AgenticObserveAction.class.getDeclaredMethod("classifyAllGroups",
-                List.class, Map.class, Map.class, Map.class);
-        m.setAccessible(true);
-        return (Map<String, Object>) m.invoke(new AgenticObserveAction(), collections,
+    private Map<String, GroupSummary> classify(List<ApiCollection> collections) {
+        return AgenticAssetGrouping.classifyAllGroups(collections,
                 Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
     }
 
@@ -56,7 +53,7 @@ public class TestAgenticGroupingAiAgentCaller {
 
     @Test
     public void aiAgentCallerCollectionReachesArgusAsAService() throws Exception {
-        Map<String, Object> groups = classify(Arrays.asList(
+        Map<String, GroupSummary> groups = classify(Arrays.asList(
                 collection(1, "payments-worker", Constants.AKTO_AI_AGENT_CALLER_TAG)));
 
         Object group = groups.get("service|payments-worker");
@@ -71,7 +68,7 @@ public class TestAgenticGroupingAiAgentCaller {
     public void bareServiceNameIsNotLostByServiceNameGrouping() throws Exception {
         // extractServiceNameForGrouping strips leading labels on dotted hosts; a stub is named after
         // its service and has no dots at all, which must still group rather than return blank.
-        Map<String, Object> groups = classify(Arrays.asList(
+        Map<String, GroupSummary> groups = classify(Arrays.asList(
                 collection(2, "a.b.internal.svc", Constants.AKTO_AI_AGENT_CALLER_TAG),
                 collection(3, "flat-name", Constants.AKTO_AI_AGENT_CALLER_TAG)));
 
@@ -81,7 +78,7 @@ public class TestAgenticGroupingAiAgentCaller {
 
     @Test
     public void collectionWithoutTheTagStillProducesNoGroup() throws Exception {
-        Map<String, Object> groups = classify(Arrays.asList(
+        Map<String, GroupSummary> groups = classify(Arrays.asList(
                 collection(4, "ordinary-api", "privatecloud.agoda.com/service")));
         assertNull("an ordinary collection must not appear in Argus", groups.get("service|ordinary-api"));
     }
@@ -99,7 +96,7 @@ public class TestAgenticGroupingAiAgentCaller {
 
     @Test
     public void genAiCollectionIsUnaffected() throws Exception {
-        Map<String, Object> groups = classify(Arrays.asList(
+        Map<String, GroupSummary> groups = classify(Arrays.asList(
                 collection(6, "llm-gateway.internal", Constants.AKTO_GEN_AI_TAG)));
         Object group = groups.get("service|llm-gateway.internal");
         assertNotNull("existing gen-ai grouping must not regress: " + groups.keySet(), group);

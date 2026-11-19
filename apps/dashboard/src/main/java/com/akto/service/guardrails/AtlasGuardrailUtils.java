@@ -1,6 +1,6 @@
 package com.akto.service.guardrails;
 
-import com.akto.action.AgenticObserveAction;
+import com.akto.agentic.AgenticAssetGrouping;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.DeviceTag;
@@ -200,15 +200,15 @@ public class AtlasGuardrailUtils {
         String name;
         if (AgenticObserveUtil.CLIENT_TYPE_LLM.equals(type)) {
             rowType = AtlasAssetStatusService.ROW_TYPE_LLM;
-            groupKey = AgenticObserveAction.llmGroupKey(c);
+            groupKey = AgenticAssetGrouping.llmGroupKey(c);
             name = groupKey;
         } else if (AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER.equals(type)) {
             rowType = AtlasAssetStatusService.ROW_TYPE_SERVICE;
-            groupKey = AgenticObserveAction.serviceGroupKey(c, AgenticObserveAction.agentGroupKey(c) != null);
+            groupKey = AgenticAssetGrouping.serviceGroupKey(c, AgenticAssetGrouping.agentGroupKey(c) != null);
             name = groupKey;
         } else {
             rowType = AtlasAssetStatusService.ROW_TYPE_AGENT;
-            groupKey = AgenticObserveAction.agentGroupKey(c);
+            groupKey = AgenticAssetGrouping.agentGroupKey(c);
             name = groupKey == null ? null : McpClientRegistry.formatDisplayName(groupKey);
         }
         if (groupKey == null) return null;
