@@ -10,7 +10,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.util.Constants;
 import com.akto.utils.AgentHostUtils;
-import com.akto.utils.TurnIdTracker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -88,7 +87,6 @@ public class ProviderGuardrailAction extends ActionSupport {
                 return Action.SUCCESS.toUpperCase();
             }
 
-            frame.messageId = resolveMessageId(frame);
             registerConnectorIdentity(frame);
 
             List<ParsedRequest.ToolCall> calls = frame.toolCalls != null
@@ -122,17 +120,6 @@ public class ProviderGuardrailAction extends ActionSupport {
         requestData.put("guardrails", "true");
         requestData.put("ingest_data", "true");
         return extractGuardrailsResult(gateway.processHttpProxy(requestData));
-    }
-
-    private static String resolveMessageId(ParsedRequest frame) {
-        if (frame.sessionId == null) {
-            return frame.requestId;
-        }
-        if (frame.turnKey != null) {
-            return TurnIdTracker.record(frame.sessionId, frame.turnKey);
-        }
-        String latest = TurnIdTracker.latest(frame.sessionId);
-        return latest != null ? latest : frame.requestId;
     }
 
     private static String[] mcpTarget(ParsedRequest.ToolCall call) {
@@ -202,7 +189,7 @@ public class ProviderGuardrailAction extends ActionSupport {
         requestHeaders.put("host", host);
         requestHeaders.put("content-type", "application/json");
         putIfPresent(requestHeaders, SESSION_HEADER, frame.sessionId);
-        putIfPresent(requestHeaders, MESSAGE_HEADER, frame.messageId);
+        putIfPresent(requestHeaders, MESSAGE_HEADER, frame.requestId);
         putIfPresent(requestHeaders, USER_EMAIL_HEADER, extractEmail(frame.actor));
 
         Map<String, Object> responseHeaders = new HashMap<>();
@@ -230,7 +217,6 @@ public class ProviderGuardrailAction extends ActionSupport {
         Map<String, Object> meta = new HashMap<>();
         meta.put("webhook_id", frame.requestId);
         meta.put("session_id", frame.sessionId);
-        meta.put("message_id", frame.messageId);
         meta.put("tenant_id", frame.tenantId);
         meta.put("model", frame.model);
         meta.put("actor", frame.actor);

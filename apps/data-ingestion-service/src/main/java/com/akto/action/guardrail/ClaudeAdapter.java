@@ -73,8 +73,6 @@ public class ClaudeAdapter implements ProviderAdapter {
             msgs = msgs.subList(msgs.size() - 1, msgs.size());
             List<ParsedRequest.ToolCall> calls = collectToolCalls(msgs);
             frame.toolCalls = calls.isEmpty() ? null : calls;
-        } else {
-            frame.turnKey = turnKey(frame.sessionId, msgs);
         }
         frame.prompt = flatten(msgs);
         return frame;
@@ -107,42 +105,6 @@ public class ClaudeAdapter implements ProviderAdapter {
             }
         }
         return calls;
-    }
-
-    private static String turnKey(String sessionId, List<Object> msgs) {
-        if (sessionId == null) {
-            return null;
-        }
-        for (int i = msgs.size() - 1; i >= 0; i--) {
-            if (isHumanTurn(msgs.get(i))) {
-                return sessionId + ":" + i;
-            }
-        }
-        return null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static boolean isHumanTurn(Object msgObj) {
-        if (!(msgObj instanceof Map)) {
-            return false;
-        }
-        Map<String, Object> msg = (Map<String, Object>) msgObj;
-        if (!"user".equals(stringOrEmpty(msg.get("role")))) {
-            return false;
-        }
-        Object content = msg.get("content");
-        if (content instanceof String) {
-            return true;
-        }
-        if (!(content instanceof List)) {
-            return false;
-        }
-        for (Object blockObj : (List<Object>) content) {
-            if (blockObj instanceof Map && !"tool_result".equals(stringOrEmpty(((Map<String, Object>) blockObj).get("type")))) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override

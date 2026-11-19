@@ -49,6 +49,4 @@ public class ParsedRequest {
     /** Hook event: "prompt" or "tool_call". */
     public String eventType;
     public List<ToolCall> toolCalls;
-    public String turnKey;
-    public String messageId;
 }
