@@ -147,6 +147,19 @@ public class Constants {
     // sub-fields (services, actions, resources, etc). Of those, "-resources" is the one
     // that actually identifies what the gateway's role can act on.
     public static final String AI_AGENT_TAG_GATEWAY_ROLE = "gateway-role-resources";
+    /**
+     * The conversation identifier, as delivered by a log-processing pipeline that has no
+     * request of its own to attach headers to. Already normalised by the producer from
+     * whichever spelling the caller used (session_id, sessionId, conversationId, ...), so
+     * prefer it over any single raw spelling.
+     */
+    public static final String AI_AGENT_TAG_SESSION_ID = "session-id";
+    /**
+     * The header every installed agentic source sets to carry a session, and the only one
+     * AgentQueryRecord reads. Sources that deliver the session as a tag have it injected
+     * under this name so the Traces UI groups their traffic like everyone else's.
+     */
+    public static final String AI_AGENT_HEADER_INSTALLER_SESSION_ID = "x-akto-installer-akto_session_id";
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";
