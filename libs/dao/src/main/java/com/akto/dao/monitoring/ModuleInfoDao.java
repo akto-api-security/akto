@@ -53,6 +53,10 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
                 .name("expiresAt_ttl")
                 .expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), ttlIndex, ttlOptions);
+
+        // the admin token list finds the modules of a token by tokenId; sparse since most rows have none
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending(ModuleInfo.TOKEN_ID),
+                new IndexOptions().name("tokenId_1").sparse(true));
     }
 
     @Override

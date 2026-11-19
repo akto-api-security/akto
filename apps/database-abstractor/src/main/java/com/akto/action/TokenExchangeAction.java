@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.TokenRegistry;
 import com.opensymphony.xwork2.ActionSupport;
 
 import java.util.HashMap;
@@ -22,6 +23,7 @@ public class TokenExchangeAction extends ActionSupport {
     private static final String ACCOUNT_ID = "accountId";
     private static final String SCOPE = "scope";
     private static final String MODULE_TYPE = "moduleType";
+    private static final String TOKEN_ID = "tid";
     private static final String ISSUER = "Akto";
 
     private String moduleType;
@@ -44,8 +46,14 @@ public class TokenExchangeAction extends ActionSupport {
             claims.put(ACCOUNT_ID, Context.accountId.get());
             claims.put(SCOPE, scope);
             claims.put(MODULE_TYPE, moduleType);
+            // exchanged token points back at the raw token so revoking the raw token revokes this one too
+            String tokenId = Context.tokenId.get();
+            if (tokenId != null) {
+                claims.put(TOKEN_ID, tokenId);
+            }
 
             token = JwtAuthenticator.createJWT(claims, ISSUER, moduleType, Context.tokenExpiry.get());
+            TokenRegistry.recordModuleType(tokenId, moduleType);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error exchanging token: " + e.getMessage(), LogDb.DASHBOARD);

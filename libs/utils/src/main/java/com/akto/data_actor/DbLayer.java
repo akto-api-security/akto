@@ -290,7 +290,7 @@ public class DbLayer {
 
         ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
-                Updates.combine(updateList),
+                withTokenId(Updates.combine(updateList)),
                 updateOptions);
 
         syncAgentUserFromModuleInfo(moduleInfo);
@@ -334,6 +334,12 @@ public class DbLayer {
     private static final String ORGANIZATION_TYPE_KEY = "organizationType";
     // Agents that predate organizationType report the same plan string as accountType.
     private static final String ACCOUNT_TYPE_KEY = "accountType";
+
+    // Stamps the id of the verified token from Context only; a tokenId in the heartbeat payload is never trusted.
+    private static Bson withTokenId(Bson updates) {
+        String tokenId = Context.tokenId.get();
+        return tokenId == null ? updates : Updates.combine(updates, Updates.set(ModuleInfo.TOKEN_ID, tokenId));
+    }
 
     private static Bson expiresAtUpdate(ModuleInfo.ModuleType moduleType) {
         if (moduleType == ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD) {
@@ -589,7 +595,7 @@ public class DbLayer {
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Filters.eq(ModuleInfo._REBOOT, false)
             );
-            Bson updates = Updates.combine(
+            Bson updates = withTokenId(Updates.combine(
                     //putting class name because findOneAndUpdate doesn't put class name by default
                     Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
                     Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
@@ -601,7 +607,7 @@ public class DbLayer {
                     Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
                     Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
-            );
+            ));
             bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
         }
 
@@ -681,7 +687,7 @@ public class DbLayer {
         );
 
         ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(filter,
-                Updates.combine(
+                withTokenId(Updates.combine(
                         //putting class name because findOneAndUpdate doesn't put class name by default
                         Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
                         Updates.setOnInsert(ID, moduleInfo.getId()),
@@ -691,7 +697,7 @@ public class DbLayer {
                         Updates.set(ModuleInfo.NAME, moduleInfo.getName()),
                         Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
-                ), updateOptions);
+                )), updateOptions);
 
         // Same agent user sync updateModuleInfo/bulkUpdateModuleInfo do — a device heartbeating
         // through V2 reports the same agentLogins and must produce the same identities.
