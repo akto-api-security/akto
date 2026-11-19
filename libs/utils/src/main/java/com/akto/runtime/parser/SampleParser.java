@@ -17,6 +17,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.TrafficProducerLog;
 import com.akto.runtime.utils.Utils;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.utils.GzipUtils;
@@ -26,6 +27,50 @@ import com.google.gson.Gson;
 public class SampleParser {
     
     private static final Gson gson = new Gson();
+
+    /**
+     * Carries a tag-delivered session into the header AgentQueryRecord reads, so Traces groups
+     * this traffic by conversation like every other agentic source.
+     *
+     * Sources installed on a machine (Claude CLI hooks, Copilot, the MCP shields) set
+     * x-akto-installer-akto_session_id on the request themselves. A pipeline that builds
+     * records from logs has no request to attach a header to, so it delivers the session as a
+     * tag instead; this bridges the two without teaching AgentQueryRecord a second lookup.
+     *
+     * Scoped to AWS_BEDROCK, the only source known to deliver a session this way. Nothing else
+     * writes a session-id tag today, so the gate changes no behaviour - it is there so that a
+     * source which starts writing one later opts in deliberately rather than by accident.
+     *
+     * Never overwrites a header that is already present - a real one always wins.
+     */
+    private static void injectSessionHeader(HttpRequestParams httpRequestParams, String tagsJson) {
+        if (tagsJson == null || tagsJson.isEmpty() || httpRequestParams == null) {
+            return;
+        }
+        try {
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return;
+            }
+            if (!Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(
+                    tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))) {
+                return;
+            }
+            String sessionId = tagsMap.get(Constants.AI_AGENT_TAG_SESSION_ID);
+            if (sessionId == null || sessionId.trim().isEmpty()) {
+                return;
+            }
+            Map<String, List<String>> headers = httpRequestParams.getHeaders();
+            if (headers == null || headers.containsKey(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID)) {
+                return;
+            }
+            List<String> values = new ArrayList<>();
+            values.add(sessionId.trim());
+            headers.put(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID, values);
+        } catch (Exception e) {
+            // A session we cannot read is not worth failing an otherwise good record for.
+        }
+    }
 
     private static void injectTagsInHeaders(HttpRequestParams httpRequestParams, String tagsJson){
         if(tagsJson == null || tagsJson.isEmpty()){
@@ -142,6 +187,7 @@ public class SampleParser {
                 printUrlDebugLog(tagLog);
             }
             injectTagsInHeaders(requestParams, tags);
+            injectSessionHeader(requestParams, tags);
         }
 
         return httpResponseParams;
