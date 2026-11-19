@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.akto.dao.RBACDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.Log;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -26,7 +29,7 @@ public class DbLogsAction extends UserAction {
     private static final Set<LogDb> CUSTOMER_VISIBLE_LOG_DBS = Collections.unmodifiableSet(EnumSet.of(
         LogDb.RUNTIME, LogDb.TESTING, LogDb.THREAT_DETECTION, LogDb.DATA_INGESTION,
         LogDb.AGENTIC_TESTING, LogDb.GUARDRAILS_SERVICE, LogDb.SMART_TESTING,
-        LogDb.MINI_TESTING_ORCHESTRATOR, LogDb.DAST
+        LogDb.MINI_TESTING_ORCHESTRATOR, LogDb.DAST, LogDb.PUPPETEER
     ));
 
     private static final String INTERNAL_EMAIL_DOMAIN = "@akto.io";
@@ -75,7 +78,21 @@ public class DbLogsAction extends UserAction {
             && user.getLogin().toLowerCase().endsWith(INTERNAL_EMAIL_DOMAIN);
     }
 
+    /**
+     * Logs are admin-only. The interceptor (ADMIN_ACTIONS) skips role checks on non-metered dashboards, so the
+     * role is also checked here, which makes the page admin-only on every deployment.
+     */
+    private boolean isAdmin() {
+        Integer accountId = Context.accountId.get();
+        User user = getSUser();
+        return accountId != null && user != null
+            && RBACDao.getCurrentRoleForUser(user.getId(), accountId) == Role.ADMIN;
+    }
+
     private List<LogDb> computeAllowedLogGroups() {
+        if (!isAdmin()) {
+            return Collections.emptyList();
+        }
         boolean internal = isInternalUser();
         return Arrays.stream(LogDb.values())
             .filter(db -> internal || CUSTOMER_VISIBLE_LOG_DBS.contains(db))
