@@ -186,7 +186,8 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 
 	var authMiddleware gin.HandlerFunc
 	if cfg.AuthEnabled {
-		m, err := auth.NewMiddleware(cfg.RSAPublicKey, logger)
+		revoked := auth.StartRevocationPoller(context.Background(), logger, cfg.DatabaseAbstractorURL, auth.GetDatabaseAbstractorServiceToken)
+		m, err := auth.NewMiddlewareWithRevocation(cfg.RSAPublicKey, logger, revoked)
 		if err != nil {
 			logger.Fatal("Failed to initialize auth middleware", zap.Error(err))
 		}
