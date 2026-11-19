@@ -12,7 +12,6 @@ import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
-import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
@@ -213,6 +212,25 @@ public class UsersCollectionsList {
         return collectionList;
     }
 
+    /**
+     * Collections that belong to the AGENTIC context: MCP, GenAI and ai-agent-caller collections
+     * (a service seen calling an AI asset is an agentic asset too), excluding endpoint-source
+     * collections, plus the unauthenticated MCP tools group.
+     * Shared by the AGENTIC context and by usage metering (AI_ASSET_COUNT), so both stay in sync.
+     */
+    public static Bson agenticCollectionsFilter() {
+        Bson filter = Filters.and(
+            Filters.exists(ApiCollection.TAGS_STRING),
+            Filters.or(
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_AI_AGENT_CALLER_TAG))
+            ),
+            Filters.nor(getEndpointSourceFilter())
+        );
+        return Filters.or(filter, Filters.eq(Constants.ID, UnauthenticatedEndpoint.UNAUTHENTICATED_MCP_TOOLS_GROUP_ID));
+    }
+
     public static Set<Integer> getContextCollections(CONTEXT_SOURCE source) {
         Set<Integer> collectionIds = new HashSet<>();
         Bson finalFilter = Filters.or(
@@ -242,18 +260,7 @@ public class UsersCollectionsList {
                 );
                 break;
             case AGENTIC:
-                // For agentic context, include MCP, GenAI and ai-agent-caller collections (a service
-                // seen calling an AI asset is an agentic asset too), EXCLUDE endpoint collections
-                finalFilter = Filters.and(
-                    Filters.exists(ApiCollection.TAGS_STRING),
-                    Filters.or(
-                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
-                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
-                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_AI_AGENT_CALLER_TAG))
-                    ),
-                    Filters.nor(getEndpointSourceFilter())
-                );
-                finalFilter = Filters.or(finalFilter, Filters.eq(Constants.ID, UnauthenticatedEndpoint.UNAUTHENTICATED_MCP_TOOLS_GROUP_ID));
+                finalFilter = agenticCollectionsFilter();
                 break;
             case DAST:
                 finalFilter = Filters.and(
