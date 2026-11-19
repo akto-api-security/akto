@@ -10,12 +10,21 @@ import com.akto.jobs.executors.AIAgentConnectorConstants;
 public final class AgentHostUtils {
 
     private static final String UNKNOWN_IDENTITY = "unknown";
+    private static final int MAX_HOST_LABEL = 63;
 
     private AgentHostUtils() {}
 
     /** {identity}.ai-agent.{app}; the identity is slugified, and "unknown" when that leaves nothing. */
     public static String agentHost(String identity, String app) {
         return identitySlug(identity) + AIAgentConnectorConstants.AI_AGENT_HOST_INFIX + app;
+    }
+
+    public static String mcpHost(String identity, String app, String server) {
+        String serverSlug = slugify(server);
+        if (serverSlug.length() > MAX_HOST_LABEL) {
+            serverSlug = serverSlug.substring(0, MAX_HOST_LABEL).replaceAll("-+$", "");
+        }
+        return identitySlug(identity) + "." + app + "." + (serverSlug.isEmpty() ? UNKNOWN_IDENTITY : serverSlug);
     }
 
     /** Slugified identity for the first host segment, "unknown" when that leaves nothing. */

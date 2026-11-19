@@ -1,5 +1,6 @@
 package com.akto.action.guardrail;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -9,6 +10,15 @@ import java.util.Map;
  * action never depends on a vendor-specific format.
  */
 public class ParsedRequest {
+
+    public static class ToolCall {
+        public String id;
+        public String name;
+        public Object input;
+        public Map<String, Object> info;
+        public String text;
+    }
+
     /** The transcript flattened into a single scannable string. */
     public String prompt;
     /** Vendor's per-request id (Claude's request_id == webhook-id). */
@@ -38,6 +48,5 @@ public class ParsedRequest {
     public boolean allowShortCircuit;
     /** Hook event: "prompt" or "tool_call". */
     public String eventType;
-    /** tool_info of each tool_use in a tool_call frame, in model order. */
-    public java.util.List<Map<String, Object>> toolInfos;
+    public List<ToolCall> toolCalls;
 }
