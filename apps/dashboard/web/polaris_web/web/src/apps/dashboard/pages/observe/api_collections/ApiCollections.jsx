@@ -685,7 +685,7 @@ function ApiCollections(props) {
             // coverage arrives separately (loadDetails), after the rows are shown
             coverageMap: {},
             riskScoreMap: resp.riskScoreMap || {},
-            riskScoreFactorsMap: resp.riskScoreFactorsMap || {},
+            riskScoreFactorsMap: resp.riskScoreFactorsUnavailable ? {} : (resp.riskScoreFactorsMap || {}),
             severityInfoMap: resp.severityInfoMap || {},
             sensitiveInfoMap: resp.sensitiveInfoMap || {},
             usernameMap,
@@ -693,6 +693,7 @@ function ApiCollections(props) {
         return (resp.apiCollections || []).map(c => ({
             ...transformRawCollectionData(c, transformMaps),
             issuesUnavailable: !!resp.issuesUnavailable,
+            riskScoreFactorsUnavailable: !!resp.riskScoreFactorsUnavailable,
         }))
     }
 

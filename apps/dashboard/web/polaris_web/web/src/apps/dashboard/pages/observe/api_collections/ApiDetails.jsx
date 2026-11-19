@@ -282,6 +282,9 @@ function ApiDetails(props) {
             setLoading(true)
             const { apiCollectionId, endpoint, method, description } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
+            // Clear stale factors before the fetch so an out-of-order response cannot win.
+            setEndpointRiskScoreFactors([]);
+            const fetchKey = `${apiCollectionId}|${method}|${endpoint}`;
             
             // Fetch ApiInfo to get detectedBasePrompt
             try {
@@ -290,6 +293,10 @@ function ApiDetails(props) {
                     method: method,
                     apiCollectionId: apiCollectionId
                 });
+                const stillSelected = apiDetail?.apiCollectionId === apiCollectionId
+                    && apiDetail?.method === method
+                    && apiDetail?.endpoint === endpoint;
+                if (!stillSelected) return;
                 // Check both apiInfoResp.data and apiInfoResp.data.apiInfo (depending on response structure)
                 const detectedPrompt = apiInfoResp?.data?.detectedBasePrompt || apiInfoResp?.detectedBasePrompt;
                 if (detectedPrompt && detectedPrompt.trim().length > 0) {
@@ -297,15 +304,19 @@ function ApiDetails(props) {
                 } else {
                     setDetectedBasePrompt(null);
                 }
-                const factors = apiInfoResp?.riskScoreFactors
+                const factors = apiInfoResp?.apiInfo?.riskScoreFactors
+                    || apiInfoResp?.riskScoreFactors
                     || apiInfoResp?.data?.riskScoreFactors
-                    || apiInfoResp?.apiInfo?.riskScoreFactors
                     || [];
-                setEndpointRiskScoreFactors(Array.isArray(factors) ? factors : []);
+                if (fetchKey === `${apiDetail?.apiCollectionId}|${apiDetail?.method}|${apiDetail?.endpoint}`) {
+                    setEndpointRiskScoreFactors(Array.isArray(factors) ? factors : []);
+                }
             } catch (error) {
                 console.error("Error fetching ApiInfo:", error);
-                setDetectedBasePrompt(null);
-                setEndpointRiskScoreFactors([]);
+                if (fetchKey === `${apiDetail?.apiCollectionId}|${apiDetail?.method}|${apiDetail?.endpoint}`) {
+                    setDetectedBasePrompt(null);
+                    setEndpointRiskScoreFactors([]);
+                }
             }
             
             try {
@@ -654,7 +665,7 @@ function ApiDetails(props) {
     const skillSample = isSkillEndpoint && sampleData.length > 0 ? parseSkillSample(sampleData[0].message) : null
     const skillMarkdown = skillSample?.markdown || null
 
-    // Saved with riskScore by the cron — never invent Other-factors balancing lines here.
+    // Prefer cron-written factors; fall back to collection baseRiskScoreReason until the writer backfills.
     const riskScoreFactors = (() => {
         if (Array.isArray(endpointRiskScoreFactors) && endpointRiskScoreFactors.length > 0) {
             return endpointRiskScoreFactors;
@@ -664,6 +675,9 @@ function ApiDetails(props) {
         }
         return [];
     })();
+    const showLegacyAgentBreakdown = riskScoreFactors.length === 0
+        && apiDetail?.baseRiskScore != null
+        && !!apiDetail?.baseRiskScoreReason;
 
     const ValuesTab = {
         id: 'values',
@@ -687,6 +701,17 @@ function ApiDetails(props) {
                                     </List.Item>
                                 ))}
                             </List>
+                        </VerticalStack>
+                    )}
+                    {showLegacyAgentBreakdown && (
+                        <VerticalStack gap="3">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Text variant='headingMd'>Agent's Risk Score Breakdown</Text>
+                                <Badge status={transform.getStatus(apiDetail?.riskScore)} size="small">{apiDetail?.riskScore}</Badge>
+                            </HorizontalStack>
+                            <Text variant="bodyMd" color="subdued">
+                                Base score: {apiDetail.baseRiskScore} — {apiDetail.baseRiskScoreReason}
+                            </Text>
                         </VerticalStack>
                     )}
                     <SampleDataList

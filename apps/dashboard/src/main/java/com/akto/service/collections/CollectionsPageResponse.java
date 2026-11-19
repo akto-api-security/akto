@@ -36,6 +36,8 @@ public final class CollectionsPageResponse {
          * rounded score equals the collection's riskScore (avoids a drifted stats score).
          */
         private Map<Integer, List<BasicDBObject>> riskScoreFactorsMap = Collections.emptyMap();
+        /** true when the riskScoreFactors aggregation failed or timed out; badge stays, tooltip omitted */
+        private boolean riskScoreFactorsUnavailable;
         private Map<Integer, Integer> lastSeenMap = Collections.emptyMap();
         private Map<Integer, List<String>> sensitiveInfoMap = Collections.emptyMap();
         /** collection id -> open issues by severity; empty with issuesUnavailable set when that query failed or ran out of time */

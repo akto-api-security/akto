@@ -167,8 +167,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     private static final Map<String, SkillDataCacheEntry> skillDataCache = new ConcurrentHashMap<>();
 
     private static final class SkillDataCacheEntry {
-        // skillName -> { riskScore, riskScoreFactors? } for the ApiInfo that last wrote the score
+        // skillName -> max riskScore (number) for the ApiInfo that last wrote the score
         final BasicDBObject skillScoreMap;
+        // skillName -> riskScoreFactors list for that same ApiInfo (kept separate so skillScoreMap stays numeric)
+        final BasicDBObject skillRiskScoreFactors;
         final Set<String> maliciousSkills;
         final Set<String> maliciousSkillKeys;
         final Set<String> misconfiguredSkills;
@@ -176,11 +178,12 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         // Same "<collectionId>|<skillNameLowercase>" keys as maliciousSkillKeys -> that copy's skill-tags
         final Map<String, Set<String>> skillTagsByKey;
         final long builtAt;
-        SkillDataCacheEntry(BasicDBObject skillScoreMap,
+        SkillDataCacheEntry(BasicDBObject skillScoreMap, BasicDBObject skillRiskScoreFactors,
                 Set<String> maliciousSkills, Set<String> maliciousSkillKeys,
                 Set<String> misconfiguredSkills, Set<Integer> misconfiguredCollectionIds,
                 Map<String, Set<String>> skillTagsByKey, long builtAt) {
             this.skillScoreMap = skillScoreMap;
+            this.skillRiskScoreFactors = skillRiskScoreFactors;
             this.maliciousSkills = maliciousSkills;
             this.maliciousSkillKeys = maliciousSkillKeys;
             this.misconfiguredSkills = misconfiguredSkills;
@@ -218,6 +221,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     ));
 
             BasicDBObject skillScoreMap = new BasicDBObject();
+            BasicDBObject skillRiskScoreFactors = new BasicDBObject();
             Set<String> maliciousSkills = new HashSet<>();
             // Collection-scoped "<collectionId>|<skillNameLowercase>" keys — matches constants.js's
             // skillCollectionKey exactly — so a same-named skill on a different user/collection
@@ -239,9 +243,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     String skillName = url.substring(idx + "skills/".length());
                     if (!skillName.isEmpty()) {
                         // Last ApiInfo for this skill name wins — score and factors stay in sync.
-                        BasicDBObject entry = new BasicDBObject("riskScore", info.getRiskScore());
-                        RiskScoreExplainer.putExplanation(entry, RiskScoreExplainer.explain(info));
-                        skillScoreMap.put(skillName, entry);
+                        skillScoreMap.put(skillName, info.getRiskScore());
+                        List<BasicDBObject> factors = RiskScoreExplainer.factorsIfMatches(info, info.getRiskScore());
+                        if (!factors.isEmpty()) {
+                            skillRiskScoreFactors.put(skillName, factors);
+                        } else {
+                            skillRiskScoreFactors.remove(skillName);
+                        }
                         if (malicious) {
                             maliciousSkills.add(skillName);
                             maliciousSkillKeys.add(info.getId().getApiCollectionId() + "|" + skillName.toLowerCase(Locale.ROOT));
@@ -259,7 +267,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             loggerMaker.warnAndAddToDb("[agenticSkillDataCache] rebuilt: " + (System.currentTimeMillis() - tStart)
                     + "ms, apiInfos=" + apiInfos.size() + ", maliciousSkillKeys=" + maliciousSkillKeys.size());
-            return new SkillDataCacheEntry(skillScoreMap, maliciousSkills,
+            return new SkillDataCacheEntry(skillScoreMap, skillRiskScoreFactors, maliciousSkills,
                     maliciousSkillKeys, misconfiguredSkills, misconfiguredCollectionIds, skillTagsByKey,
                     System.currentTimeMillis());
         });
@@ -269,6 +277,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         response = new BasicDBObject();
         SkillDataCacheEntry cached = getOrBuildSkillData();
         response.put("skillScoreMap", cached.skillScoreMap);
+        response.put("skillRiskScoreFactors", cached.skillRiskScoreFactors);
         response.put("maliciousSkills", new ArrayList<>(cached.maliciousSkills));
         response.put("maliciousSkillKeys", new ArrayList<>(cached.maliciousSkillKeys));
         response.put("misconfiguredSkills", new ArrayList<>(cached.misconfiguredSkills));
@@ -647,7 +656,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         double maxRiskScore = 0;
         // Collection whose collRisk last raised maxRiskScore — used to load the winning endpoint's
         // factor breakdown for the risk-score tooltip (see fetchAgenticAssetsSummary page loop).
-        // 0 means none.
+        // 0 means none; hashed collection ids may be negative.
         int winningCollectionId;
         Double baseRiskScore;
         String baseRiskScoreReason;
@@ -999,10 +1008,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         String username = "-";
         double riskScore = 0;
         // Collection whose collRisk last raised riskScore — for the risk-score tooltip factors.
-        // 0 means none.
+        // 0 means none; hashed collection ids may be negative. Factors are stamped after pagination
+        // in fetchAgenticAssetEndpointsPage.
         int winningCollectionId;
-        // Factors for the winning collection, stamped in groupCollectionsByEndpointId.
-        List<BasicDBObject> riskScoreFactors;
         Double baseRiskScore = null;
         String baseRiskScoreReason = null;
         int lastSeenEpoch = 0;
@@ -1035,7 +1043,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Set<String> maliciousSkillKeys, Map<String, String> usernameMap, String rowType) {
         boolean useServiceName = "agent".equals(rowType) || "skill".equals(rowType) || "plugin".equals(rowType);
         Map<String, EndpointGroup> groups = new LinkedHashMap<>();
-        Set<Integer> factorCollectionIds = new HashSet<>();
         for (ApiCollection c : collections) {
             String hostName = c.getHostName();
             if (StringUtils.isBlank(hostName)) continue;
@@ -1073,7 +1080,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             child.put("id", c.getId());
             child.put("name", StringUtils.isNotBlank(displayName) ? displayName : hostName);
             child.put("riskScore", collRisk > 0 ? AgenticObserveUtil.roundRiskScore(collRisk) : 0);
-            if (collRisk > 0) factorCollectionIds.add(c.getId());
             child.put("sensitiveInRespTypes", collSensitive != null ? collSensitive : Collections.emptyList());
             child.put("lastSeenEpoch", collTraffic);
             child.put("startTs", childStartTs);
@@ -1153,30 +1159,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (aiAgentEmail != null) g.aiAgentEmails.add(aiAgentEmail);
             if (childMalicious) g.hasMaliciousSkill = true;
         }
-
-        // One aggregation for this asset's collections; stamp factors on children and device winners
-        // here so fetchAgenticAssetEndpointsPage does not loop the page again.
-        Map<Integer, ApiInfo> factorApiInfos =
-                RiskScoreExplainer.loadHighestRiskApiInfoByCollection(factorCollectionIds);
-        for (EndpointGroup g : groups.values()) {
-            if (g.winningCollectionId > 0 && g.riskScore > 0) {
-                ApiInfo winning = factorApiInfos.get(g.winningCollectionId);
-                if (winning != null) {
-                    RiskScoreExplainer.Explanation explanation = RiskScoreExplainer.explain(winning);
-                    if (!explanation.factors.isEmpty()) g.riskScoreFactors = explanation.factors;
-                }
-            }
-            for (BasicDBObject child : g.children) {
-                Object childId = child.get("id");
-                Object childRisk = child.get("riskScore");
-                if (!(childId instanceof Number) || !(childRisk instanceof Number)) continue;
-                if (((Number) childRisk).doubleValue() <= 0) continue;
-                ApiInfo childWinning = factorApiInfos.get(((Number) childId).intValue());
-                if (childWinning != null) {
-                    RiskScoreExplainer.putExplanation(child, RiskScoreExplainer.explain(childWinning));
-                }
-            }
-        }
+        // Factors are stamped after pagination in fetchAgenticAssetEndpointsPage (page-scoped only).
         return groups;
     }
 
@@ -1248,7 +1231,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("endpointId", g.deviceId);
                 row.put("username", g.username);
                 row.put("riskScore", g.riskScore > 0 ? AgenticObserveUtil.roundRiskScore(g.riskScore) : 0);
-                if (g.riskScoreFactors != null) row.put("riskScoreFactors", g.riskScoreFactors);
+                if (RiskScoreExplainer.isSetCollectionId(g.winningCollectionId)) {
+                    row.put("winningCollectionId", g.winningCollectionId);
+                }
                 row.put("baseRiskScore", g.baseRiskScore);
                 row.put("baseRiskScoreReason", g.baseRiskScoreReason);
                 row.put("sensitiveInRespTypes", new ArrayList<>(g.sensitiveTypes));
@@ -1360,6 +1345,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             int from = Math.max(0, skip);
             int to = Math.min(rows.size(), from + effectiveLimit);
             List<BasicDBObject> page = from < to ? new ArrayList<>(rows.subList(from, to)) : new ArrayList<>();
+            stampEndpointPageRiskScoreFactors(page);
 
             response.put("endpoints", page);
             response.put("total", total);
@@ -1370,6 +1356,54 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             loggerMaker.errorAndAddToDb("Error fetching agentic asset endpoints page: " + e.getMessage());
             addActionError("Error fetching agentic asset endpoints page: " + e.getMessage());
             return ERROR.toUpperCase();
+        }
+    }
+
+    /** Page-scoped factors load: only the winning + child collections on this page of devices. */
+    private static void stampEndpointPageRiskScoreFactors(List<BasicDBObject> page) {
+        if (page == null || page.isEmpty()) return;
+        Set<Integer> collectionIds = new HashSet<>();
+        for (BasicDBObject row : page) {
+            Object winningId = row.get("winningCollectionId");
+            if (winningId instanceof Number && RiskScoreExplainer.isSetCollectionId((Number) winningId)) {
+                collectionIds.add(((Number) winningId).intValue());
+            }
+            Object children = row.get("children");
+            if (!(children instanceof List)) continue;
+            for (Object childObj : (List<?>) children) {
+                if (!(childObj instanceof BasicDBObject)) continue;
+                Object childId = ((BasicDBObject) childObj).get("id");
+                Object childRisk = ((BasicDBObject) childObj).get("riskScore");
+                if (childId instanceof Number && childRisk instanceof Number
+                        && ((Number) childRisk).doubleValue() > 0) {
+                    collectionIds.add(((Number) childId).intValue());
+                }
+            }
+        }
+        RiskScoreExplainer.LoadResult loaded =
+                RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(collectionIds);
+        if (loaded.unavailable) return;
+        for (BasicDBObject row : page) {
+            Object winningId = row.remove("winningCollectionId");
+            Object rowRisk = row.get("riskScore");
+            if (winningId instanceof Number && rowRisk instanceof Number
+                    && RiskScoreExplainer.isSetCollectionId((Number) winningId)
+                    && ((Number) rowRisk).doubleValue() > 0) {
+                ApiInfo winning = loaded.byCollection.get(((Number) winningId).intValue());
+                RiskScoreExplainer.putExplanationIfMatches(row, winning, ((Number) rowRisk).doubleValue());
+            }
+            Object children = row.get("children");
+            if (!(children instanceof List)) continue;
+            for (Object childObj : (List<?>) children) {
+                if (!(childObj instanceof BasicDBObject)) continue;
+                BasicDBObject child = (BasicDBObject) childObj;
+                Object childId = child.get("id");
+                Object childRisk = child.get("riskScore");
+                if (!(childId instanceof Number) || !(childRisk instanceof Number)) continue;
+                if (((Number) childRisk).doubleValue() <= 0) continue;
+                ApiInfo childWinning = loaded.byCollection.get(((Number) childId).intValue());
+                RiskScoreExplainer.putExplanationIfMatches(child, childWinning, ((Number) childRisk).doubleValue());
+            }
         }
     }
 
@@ -2698,21 +2732,23 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // (not all ~800 groups). Explains the endpoint that produced each row's max riskScore.
             Set<Integer> winningCollectionIds = new HashSet<>();
             for (GroupSummary g : page) {
-                if (g.winningCollectionId > 0 && g.maxRiskScore > 0 && !"plugin".equals(g.rowType)) {
+                if (RiskScoreExplainer.isSetCollectionId(g.winningCollectionId)
+                        && g.maxRiskScore > 0 && !"plugin".equals(g.rowType)) {
                     winningCollectionIds.add(g.winningCollectionId);
                 }
             }
-            Map<Integer, ApiInfo> winningApiInfos =
-                    RiskScoreExplainer.loadHighestRiskApiInfoByCollection(winningCollectionIds);
+            RiskScoreExplainer.LoadResult winningApiInfos =
+                    RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(winningCollectionIds);
             Set<Integer> maliciousServerIds = maliciousServerCollectionIds(cached.collections);
             List<BasicDBObject> rowsOut = new ArrayList<>();
             for (GroupSummary g : page) {
                 BasicDBObject row = g.toSummaryResponse();
-                if (!"plugin".equals(g.rowType) && g.winningCollectionId > 0 && g.maxRiskScore > 0) {
-                    ApiInfo winning = winningApiInfos.get(g.winningCollectionId);
-                    if (winning != null) {
-                        RiskScoreExplainer.putExplanation(row, RiskScoreExplainer.explain(winning));
-                    }
+                if (!winningApiInfos.unavailable
+                        && !"plugin".equals(g.rowType)
+                        && RiskScoreExplainer.isSetCollectionId(g.winningCollectionId)
+                        && g.maxRiskScore > 0) {
+                    ApiInfo winning = winningApiInfos.byCollection.get(g.winningCollectionId);
+                    RiskScoreExplainer.putExplanationIfMatches(row, winning, g.maxRiskScore);
                 }
                 // devices itself is NOT sent (dropped in favor of the two small values actually
                 // derived from it below) — a group with hundreds of member devices turned this into
@@ -2898,13 +2934,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 return ERROR.toUpperCase();
             }
 
-            // Uses the request's own trafficMap/riskScoreMap (not empty maps) even though this
-            // endpoint itself never reads GroupSummary's traffic/risk-derived fields — it shares the
-            // classification cache with fetchAgenticAssetsSummary/fetchAgenticAssetsStats (which DO
-            // read them), so building with empty maps here could win the rebuild race and leave every
-            // other caller reading zeroed-out traffic/risk for the whole TTL window.
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            // Same server-side traffic/risk fallback as fetchAgenticAssetDevicesPage — a cold call
+            // without client maps must not rebuild the shared classification cache with zeros.
+            Map<String, Integer> traffic = getOrComputeTrafficMap();
+            Map<String, Double> risk = getOrComputeRiskScoreMap();
             ClassificationCacheEntry cached = getOrBuildClassification(traffic, risk, Collections.emptyMap());
             List<ApiCollection> collections = cached.collections;
             GroupSummary g = cached.groups.get(rowType + "|" + groupKey);
@@ -2944,17 +2977,33 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             assetCollectionIds = g.collectionIds;
             assetDescription = g.description();
             assetSkillCount = g.skillNames.size();
-            if (g.maxRiskScore > 0 && g.winningCollectionId > 0 && !"plugin".equals(g.rowType)) {
-                assetRiskScore = AgenticObserveUtil.roundRiskScore(g.maxRiskScore);
-                Map<Integer, ApiInfo> winning =
-                        RiskScoreExplainer.loadHighestRiskApiInfoByCollection(
-                                Collections.singleton(g.winningCollectionId));
-                ApiInfo top = winning.get(g.winningCollectionId);
-                if (top != null) {
-                    assetRiskScoreFactors = RiskScoreExplainer.explain(top).factors;
+            if ("skill".equals(g.rowType)) {
+                // List shows skillScoreMap[name]; header must match that score/factors, not g.maxRiskScore.
+                SkillDataCacheEntry skillData = getOrBuildSkillData();
+                Object skillScore = skillData.skillScoreMap.get(g.groupKey);
+                if (skillScore instanceof Number && ((Number) skillScore).doubleValue() > 0) {
+                    assetRiskScore = AgenticObserveUtil.roundRiskScore(((Number) skillScore).doubleValue());
+                    Object factors = skillData.skillRiskScoreFactors.get(g.groupKey);
+                    if (factors instanceof List) {
+                        @SuppressWarnings("unchecked")
+                        List<BasicDBObject> typed = (List<BasicDBObject>) factors;
+                        assetRiskScoreFactors = typed;
+                    } else {
+                        assetRiskScoreFactors = Collections.emptyList();
+                    }
                 } else {
+                    assetRiskScore = null;
                     assetRiskScoreFactors = Collections.emptyList();
                 }
+            } else if (g.maxRiskScore > 0
+                    && RiskScoreExplainer.isSetCollectionId(g.winningCollectionId)
+                    && !"plugin".equals(g.rowType)) {
+                assetRiskScore = AgenticObserveUtil.roundRiskScore(g.maxRiskScore);
+                RiskScoreExplainer.LoadResult winning =
+                        RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(
+                                Collections.singleton(g.winningCollectionId));
+                ApiInfo top = winning.unavailable ? null : winning.byCollection.get(g.winningCollectionId);
+                assetRiskScoreFactors = RiskScoreExplainer.factorsIfMatches(top, g.maxRiskScore);
             } else {
                 assetRiskScore = null;
                 assetRiskScoreFactors = Collections.emptyList();
@@ -3428,7 +3477,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final Set<String> sensitiveTypes = new HashSet<>();
         double maxRiskScore = 0;
         // Collection whose collRisk last raised maxRiskScore — for the risk-score tooltip factors.
-        // 0 means none.
+        // 0 means none; hashed collection ids may be negative.
         int winningCollectionId;
         int maxTrafficTimestamp = 0;
         boolean hasPersonalAccount = false;
@@ -3724,20 +3773,20 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             boolean isUserGroup = "user".equals(groupBy);
             Set<Integer> winningCollectionIds = new HashSet<>();
             for (HostGroupSummary g : page) {
-                if (g.winningCollectionId > 0 && g.maxRiskScore > 0) {
+                if (RiskScoreExplainer.isSetCollectionId(g.winningCollectionId) && g.maxRiskScore > 0) {
                     winningCollectionIds.add(g.winningCollectionId);
                 }
             }
-            Map<Integer, ApiInfo> winningApiInfos =
-                    RiskScoreExplainer.loadHighestRiskApiInfoByCollection(winningCollectionIds);
+            RiskScoreExplainer.LoadResult winningApiInfos =
+                    RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(winningCollectionIds);
             List<BasicDBObject> rowsOut = new ArrayList<>();
             for (HostGroupSummary g : page) {
                 BasicDBObject row = g.toRow(isUserGroup);
-                if (g.winningCollectionId > 0 && g.maxRiskScore > 0) {
-                    ApiInfo winning = winningApiInfos.get(g.winningCollectionId);
-                    if (winning != null) {
-                        RiskScoreExplainer.putExplanation(row, RiskScoreExplainer.explain(winning));
-                    }
+                if (!winningApiInfos.unavailable
+                        && RiskScoreExplainer.isSetCollectionId(g.winningCollectionId)
+                        && g.maxRiskScore > 0) {
+                    ApiInfo winning = winningApiInfos.byCollection.get(g.winningCollectionId);
+                    RiskScoreExplainer.putExplanationIfMatches(row, winning, g.maxRiskScore);
                 }
                 rowsOut.add(row);
             }
@@ -4424,9 +4473,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             double skillRisk = 0;
             if (AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType) && g.name != null) {
                 Object skillEntryObj = skillScores.get(g.name);
-                if (skillEntryObj instanceof BasicDBObject) {
-                    Object scoreObj = ((BasicDBObject) skillEntryObj).get("riskScore");
-                    if (scoreObj instanceof Number) skillRisk = ((Number) scoreObj).doubleValue();
+                if (skillEntryObj instanceof Number) {
+                    skillRisk = ((Number) skillEntryObj).doubleValue();
                 }
             }
             double risk = AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType)

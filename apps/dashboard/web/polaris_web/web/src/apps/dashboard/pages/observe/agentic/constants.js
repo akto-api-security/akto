@@ -1170,9 +1170,17 @@ export function hasMaliciousSkillInCollections(maliciousSkillKeys, collections) 
     );
 }
 
+/** Coerce a skillScoreMap entry that may still be a pre-split object `{ riskScore }` from an old cache. */
+export function coerceSkillRiskScore(entry) {
+    if (entry == null) return 0;
+    if (typeof entry === "number") return entry;
+    if (typeof entry === "object" && entry.riskScore != null) return Number(entry.riskScore) || 0;
+    return Number(entry) || 0;
+}
+
 /**
- * Fetch whole-account skill risk data and cache it. Returns { skillScoreMap, maliciousSkills, ... }.
- * skillScoreMap is skillName -> { riskScore, riskScoreFactors? }.
+ * Fetch whole-account skill risk data and cache it. Returns { skillScoreMap, skillRiskScoreFactors, ... }.
+ * skillScoreMap is skillName -> number; skillRiskScoreFactors is skillName -> factors[].
  * `maliciousSkillKeys` holds `<collectionId>|<skillName>` keys so callers can scope the flag to
  * the collection that actually owns the tagged skill; `maliciousSkills` stays name-only for
  * callers that have no collection context.
@@ -1188,6 +1196,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     if (cacheAge <= SKILL_RISK_CACHE_TTL_MS && cached?.ts > 0) {
         return {
             skillScoreMap: cached.data || {},
+            skillRiskScoreFactors: cached.skillRiskScoreFactors || {},
             maliciousSkills: new Set(cached.maliciousSkills || []),
             maliciousSkillKeys: new Set(cached.maliciousSkillKeys || []),
             misconfiguredSkills: new Set(cached.misconfiguredSkills || []),
@@ -1206,6 +1215,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     // scoped `<collectionId>|<skillName>` keys, same format skillCollectionKey produces, so this stays
     // a single query instead of reintroducing the old per-collection fetchApiInfosForCollection N+1.
     const skillScoreMap = resp?.skillScoreMap || {};
+    const skillRiskScoreFactors = resp?.skillRiskScoreFactors || {};
     const maliciousSkills = new Set(resp?.maliciousSkills || []);
     const maliciousSkillKeys = new Set(resp?.maliciousSkillKeys || []);
     const misconfiguredSkills = new Set(resp?.misconfiguredSkills || []);
@@ -1213,13 +1223,14 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
 
     PersistStore.getState().setSkillRiskScoreCache({
         data: skillScoreMap,
+        skillRiskScoreFactors,
         maliciousSkills: [...maliciousSkills],
         maliciousSkillKeys: [...maliciousSkillKeys],
         misconfiguredSkills: [...misconfiguredSkills],
         misconfiguredCollectionIds: [...misconfiguredCollectionIds],
         ts: Date.now(),
     });
-    return { skillScoreMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills, misconfiguredCollectionIds };
+    return { skillScoreMap, skillRiskScoreFactors, maliciousSkills, maliciousSkillKeys, misconfiguredSkills, misconfiguredCollectionIds };
 }
 
 // Promise.allSettled helpers — a page's mount batch must degrade per-member, never blank the page.

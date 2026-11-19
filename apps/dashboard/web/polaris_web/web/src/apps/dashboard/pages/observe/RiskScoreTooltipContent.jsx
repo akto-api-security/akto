@@ -66,8 +66,9 @@ function FactorRow({ points, label, detail }) {
     );
 }
 
-export default function RiskScoreTooltipContent({ riskScore, status, factors }) {
+export default function RiskScoreTooltipContent({ riskScore, status, factors, scope = "asset" }) {
     const applied = [...(factors || [])].sort((a, b) => (b.points || 0) - (a.points || 0));
+    const showAssetSubtitle = scope === "asset";
 
     return (
         <Box width="350px" paddingBlockStart="1" paddingBlockEnd="1">
@@ -81,7 +82,9 @@ export default function RiskScoreTooltipContent({ riskScore, status, factors }) 
                         </HorizontalStack>
                         <RiskMeter score={riskScore} status={status} />
                     </HorizontalStack>
-                    <Text variant="bodySm" color="subdued">Based on the highest-risk endpoint in this asset</Text>
+                    {showAssetSubtitle ? (
+                        <Text variant="bodySm" color="subdued">Based on the highest-risk endpoint in this asset</Text>
+                    ) : null}
                 </VerticalStack>
 
                 {applied.length > 0 ? (

@@ -1,5 +1,5 @@
 import func from "@/util/func";
-import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import RiskScoreTooltipContent from "./RiskScoreTooltipContent";
 import TooltipText from "../../components/shared/TooltipText";
@@ -425,7 +425,7 @@ const transform = {
 
     // Prefer riskScoreFactors saved with the score when present. Fall back to the older
     // baseRiskScoreReason string used on inventory / collection pages.
-    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason, riskScoreFactors){
+    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason, riskScoreFactors, scope = "asset"){
         if (riskScore && Array.isArray(riskScoreFactors) && riskScoreFactors.length > 0) {
             return (
                 <Tooltip dismissOnMouseOut content={
@@ -433,6 +433,7 @@ const transform = {
                         riskScore={Number(riskScore)}
                         status={transform.getStatus(Number(riskScore))}
                         factors={riskScoreFactors}
+                        scope={scope}
                     />
                 }>
                     {badge}
@@ -809,6 +810,7 @@ const transform = {
                     null,
                     null,
                     url.riskScoreFactors,
+                    "row",
                 ),
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),

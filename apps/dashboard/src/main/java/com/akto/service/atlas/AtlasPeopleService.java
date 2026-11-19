@@ -514,6 +514,7 @@ public class AtlasPeopleService {
             device.personalAccounts = primary.personalAccounts;
             device.misconfigured = primary.misconfigured;
             device.riskScore = primary.riskScore;
+            device.riskCollectionId = primary.riskCollectionId;
         }
     }
 
@@ -1150,19 +1151,18 @@ public class AtlasPeopleService {
         if (rows == null || riskCollectionIds == null || rows.isEmpty()) return;
         Set<Integer> ids = new HashSet<>();
         for (Integer id : riskCollectionIds) {
-            if (id != null && id > 0) ids.add(id);
+            if (RiskScoreExplainer.isSetCollectionId(id)) ids.add(id);
         }
         if (ids.isEmpty()) return;
-        Map<Integer, ApiInfo> byCollection = RiskScoreExplainer.loadHighestRiskApiInfoByCollection(ids);
+        RiskScoreExplainer.LoadResult loaded = RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(ids);
+        if (loaded.unavailable) return;
         for (int i = 0; i < rows.size() && i < riskCollectionIds.size(); i++) {
             Integer collectionId = riskCollectionIds.get(i);
-            if (collectionId == null || collectionId <= 0) continue;
-            ApiInfo winning = byCollection.get(collectionId);
-            if (winning == null) continue;
-            RiskScoreExplainer.Explanation explanation = RiskScoreExplainer.explain(winning);
-            if (!explanation.factors.isEmpty()) {
-                rows.get(i).put("riskScoreFactors", explanation.factors);
-            }
+            if (!RiskScoreExplainer.isSetCollectionId(collectionId)) continue;
+            ApiInfo winning = loaded.byCollection.get(collectionId);
+            Object displayed = rows.get(i).get("riskScore");
+            double displayedScore = displayed instanceof Number ? ((Number) displayed).doubleValue() : 0;
+            RiskScoreExplainer.putExplanationIfMatches(rows.get(i), winning, displayedScore);
         }
     }
 

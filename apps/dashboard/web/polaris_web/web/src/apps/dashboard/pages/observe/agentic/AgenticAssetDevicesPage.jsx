@@ -491,7 +491,7 @@ export default function AgenticAssetDevicesPage() {
                 if (!cancelled) {
                     collectionIdsRef.current = [];
                     setDescription("");
-                    setAssetRisk({ score: null, factors: [], note: null });
+                    setAssetRisk({ score: null, factors: [] });
                     setPluginBundle(null);
                     setOwningPluginName(null);
                 }

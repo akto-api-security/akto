@@ -25,7 +25,6 @@ import com.akto.service.collections.CollectionsPageResponse.TabCounts;
 import com.akto.service.collections.CollectionsPageResponse.UntrackedApi;
 import com.akto.service.collections.CollectionsPageResponse.UntrackedRow;
 import com.akto.usage.UsageMetricCalculator;
-import com.akto.util.AgenticObserveUtil;
 import com.akto.util.IconUtils;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.RiskScoreExplainer;
@@ -110,18 +109,29 @@ public class CollectionsPageService extends TimedService {
         Map<Integer, Double> riskScoreMap = rows.stream()
                 .collect(Collectors.toMap(ApiCollectionStats::getId, ApiCollectionStats::getRiskScore));
         page.setRiskScoreMap(riskScoreMap);
-        page.setRiskScoreFactorsMap(loadRiskScoreFactorsMap(ids, riskScoreMap));
         page.setLastSeenMap(rows.stream().collect(Collectors.toMap(ApiCollectionStats::getId, ApiCollectionStats::getLastSeen)));
         page.setSensitiveInfoMap(rows.stream().collect(Collectors.toMap(ApiCollectionStats::getId,
                 row -> row.getSensitiveSubTypes() == null ? new ArrayList<String>() : row.getSensitiveSubTypes())));
 
-        // open issues are queried while the collections' documents load, and given a time limit of their own
+        // open issues and riskScoreFactors run while collections load, each with their own time limit
         Future<Map<Integer, Map<String, Integer>>> issues = submitLimited(
                 "issues of the page's collections", () -> loadSeverityInfo(ids), Map::size);
+        Future<RiskScoreExplainer.LoadResult> factorsFuture = submitLimited(
+                "riskScoreFactors of the page's collections",
+                () -> RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(ids),
+                r -> r == null || r.byCollection == null ? 0 : r.byCollection.size());
         page.setApiCollections(timed("load the page's collections", () -> loadCollectionsInOrder(ids, endpointCounts), List::size));
         Map<Integer, Map<String, Integer>> severityInfo = awaitOrNull(issues, "issues");
         page.setIssuesUnavailable(severityInfo == null);
         if (severityInfo != null) page.setSeverityInfoMap(severityInfo);
+        RiskScoreExplainer.LoadResult factorsLoad = awaitOrNull(factorsFuture, "riskScoreFactors");
+        if (factorsLoad == null || factorsLoad.unavailable) {
+            page.setRiskScoreFactorsUnavailable(true);
+            page.setRiskScoreFactorsMap(java.util.Collections.emptyMap());
+        } else {
+            page.setRiskScoreFactorsUnavailable(false);
+            page.setRiskScoreFactorsMap(toRiskScoreFactorsMap(ids, riskScoreMap, factorsLoad.byCollection));
+        }
         return page;
     }
 
@@ -129,23 +139,17 @@ public class CollectionsPageService extends TimedService {
      * Per-collection riskScoreFactors for the page: only when the highest-risk api_info's rounded
      * score matches the collection's stats riskScore (avoids a drifted precomputed score).
      */
-    private static Map<Integer, List<BasicDBObject>> loadRiskScoreFactorsMap(
-            List<Integer> ids, Map<Integer, Double> riskScoreMap) {
+    private static Map<Integer, List<BasicDBObject>> toRiskScoreFactorsMap(
+            List<Integer> ids, Map<Integer, Double> riskScoreMap, Map<Integer, ApiInfo> winning) {
         Map<Integer, List<BasicDBObject>> out = new HashMap<>();
-        if (ids == null || ids.isEmpty() || riskScoreMap == null) return out;
-        Map<Integer, ApiInfo> winning = RiskScoreExplainer.loadHighestRiskApiInfoByCollection(ids);
+        if (ids == null || ids.isEmpty() || riskScoreMap == null || winning == null) return out;
         for (Integer id : ids) {
             if (id == null) continue;
             ApiInfo info = winning.get(id);
-            if (info == null) continue;
             Double collectionScore = riskScoreMap.get(id);
             if (collectionScore == null) continue;
-            if (AgenticObserveUtil.roundRiskScore(info.getRiskScore())
-                    != AgenticObserveUtil.roundRiskScore(collectionScore)) {
-                continue;
-            }
-            RiskScoreExplainer.Explanation explanation = RiskScoreExplainer.explain(info);
-            if (!explanation.factors.isEmpty()) out.put(id, explanation.factors);
+            List<BasicDBObject> factors = RiskScoreExplainer.factorsIfMatches(info, collectionScore);
+            if (!factors.isEmpty()) out.put(id, factors);
         }
         return out;
     }

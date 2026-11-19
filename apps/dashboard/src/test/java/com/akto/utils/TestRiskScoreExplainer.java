@@ -1,6 +1,7 @@
 package com.akto.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
@@ -89,5 +90,73 @@ public class TestRiskScoreExplainer {
         assertEquals(1, explanation.factors.size());
         assertEquals("Publicly accessible", explanation.factors.get(0).getString("label"));
         assertTrue(!explanation.factors.get(0).containsKey("detail"));
+    }
+
+    @Test
+    public void scoresMatchWhenDisplayedEqualsWinning() {
+        ApiInfo winning = new ApiInfo();
+        winning.setRiskScore(4.2f);
+        winning.setRiskScoreFactors(Collections.singletonList(
+                new RiskScoreFactor(4.2f, "Open security findings", null)));
+        assertTrue(RiskScoreExplainer.scoresMatch(winning, 4.2));
+        assertTrue(RiskScoreExplainer.scoresMatch(winning, 4.21));
+        assertFalse(RiskScoreExplainer.scoresMatch(winning, 3.0));
+        assertFalse(RiskScoreExplainer.scoresMatch(null, 4.2));
+    }
+
+    @Test
+    public void scoresMatchDropsWhenFactorsScoreDisagrees() {
+        ApiInfo winning = new ApiInfo();
+        winning.setRiskScore(4.2f);
+        winning.setRiskScoreFactorsScore(3.0f);
+        winning.setRiskScoreFactorsScorePresent(true);
+        winning.setRiskScoreFactors(Collections.singletonList(
+                new RiskScoreFactor(3.0f, "Publicly accessible", null)));
+        assertFalse(RiskScoreExplainer.scoresMatch(winning, 4.2));
+    }
+
+    @Test
+    public void scoresMatchIgnoresMissingFactorsScore() {
+        ApiInfo winning = new ApiInfo();
+        winning.setRiskScore(4.2f);
+        winning.setRiskScoreFactorsScorePresent(false);
+        winning.setRiskScoreFactors(Collections.singletonList(
+                new RiskScoreFactor(4.2f, "Publicly accessible", null)));
+        assertTrue(RiskScoreExplainer.scoresMatch(winning, 4.2));
+    }
+
+    @Test
+    public void putExplanationIfMatchesOnlyWhenScoresAgree() {
+        ApiInfo winning = new ApiInfo();
+        winning.setRiskScore(4.2f);
+        winning.setRiskScoreFactors(Collections.singletonList(
+                new RiskScoreFactor(1f, "Publicly accessible", null)));
+
+        BasicDBObject matched = new BasicDBObject();
+        RiskScoreExplainer.putExplanationIfMatches(matched, winning, 4.2);
+        assertTrue(matched.containsKey("riskScoreFactors"));
+
+        BasicDBObject mismatched = new BasicDBObject();
+        RiskScoreExplainer.putExplanationIfMatches(mismatched, winning, 3.0);
+        assertFalse(mismatched.containsKey("riskScoreFactors"));
+    }
+
+    @Test
+    public void isSetCollectionIdTreatsZeroAsUnsetAndAllowsNegativeIds() {
+        assertFalse(RiskScoreExplainer.isSetCollectionId(0));
+        assertFalse(RiskScoreExplainer.isSetCollectionId((Number) null));
+        assertTrue(RiskScoreExplainer.isSetCollectionId(-134853966));
+        assertTrue(RiskScoreExplainer.isSetCollectionId(1298715383));
+        assertTrue(RiskScoreExplainer.isSetCollectionId(Integer.valueOf(-1)));
+    }
+
+    @Test
+    public void factorsIfMatchesReturnsEmptyOnMismatch() {
+        ApiInfo winning = new ApiInfo();
+        winning.setRiskScore(5f);
+        winning.setRiskScoreFactors(Collections.singletonList(
+                new RiskScoreFactor(5f, "Capped at maximum risk score of 5", null)));
+        assertTrue(RiskScoreExplainer.factorsIfMatches(winning, 3.0).isEmpty());
+        assertEquals(1, RiskScoreExplainer.factorsIfMatches(winning, 5.0).size());
     }
 }
