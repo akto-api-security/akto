@@ -1577,6 +1577,7 @@ public class ApiCollectionsAction extends UserAction {
                 if(updateResult == null) {
                     return Action.ERROR.toUpperCase();
                 }
+                UsersCollectionsList.deleteContextCollectionsForAccount(Context.accountId.get());
                 RuleCollections.refreshSoon(Context.accountId.get());
                 return Action.SUCCESS.toUpperCase();
             }

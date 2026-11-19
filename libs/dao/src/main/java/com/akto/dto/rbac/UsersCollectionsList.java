@@ -196,16 +196,27 @@ public class UsersCollectionsList {
         contextCollectionsMap.remove(key);
     }
 
+    public static void deleteContextCollectionsForAccount(int accountId) {
+        for (CONTEXT_SOURCE source : CONTEXT_SOURCE.values()) {
+            deleteContextCollectionsForUser(accountId, source);
+        }
+    }
+
     public static Set<Integer> getContextCollectionsForUser(int accountId, CONTEXT_SOURCE source) {
         if(source == null) {
             source = CONTEXT_SOURCE.API;
+        }
+        Integer dbAccountId = Context.accountId.get();
+        if (dbAccountId == null || dbAccountId != accountId) {
+            return getContextCollections(source);
         }
         Pair<Integer, CONTEXT_SOURCE> key = new Pair<>(accountId, source);
         Pair<Set<Integer>, Integer> collectionIdEntry = contextCollectionsMap.get(key);
         Set<Integer> collectionList = new HashSet<>();
 
         if (collectionIdEntry == null || (Context.now() - collectionIdEntry.getSecond() > CONTEXT_EXPIRY_TIME)) {
-            collectionList = getContextCollections(source);
+            collectionList = Collections.unmodifiableSet(getContextCollections(source));
+            contextCollectionsMap.put(key, new Pair<>(collectionList, Context.now()));
         } else {
             collectionList = collectionIdEntry.getFirst();
         }
