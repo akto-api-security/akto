@@ -8,7 +8,9 @@ import com.akto.dao.context.Context;
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
+import com.akto.util.Constants;
 import com.akto.utils.AgentHostUtils;
+import com.akto.utils.TurnIdTracker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -16,7 +18,9 @@ import org.apache.struts2.ServletActionContext;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -45,6 +49,16 @@ public class ProviderGuardrailAction extends ActionSupport {
     private static final String INFERENCE_HOOKS_TAG = "inference-hooks";
     private static final String TOOL_CALL_EVENT = "tool_call";
     private static final String ENDPOINT_PREFIX = "inference-hook-";
+    private static final String INSTALLER_HEADER_PREFIX = "x-akto-installer-";
+    private static final String SESSION_HEADER = INSTALLER_HEADER_PREFIX + "akto_session_id";
+    private static final String MESSAGE_HEADER = INSTALLER_HEADER_PREFIX + "akto_message_id";
+    private static final String USER_EMAIL_HEADER = INSTALLER_HEADER_PREFIX + "user_email";
+    private static final String MCP_TOOL_PREFIX = "mcp__";
+    private static final String MCP_SEPARATOR = "__";
+    private static final String MCP_SERVER_TAG_VALUE = "MCP Server";
+    private static final String MCP_TOOLS_CALL_PATH = "/mcp/tools/call";
+    private static final String TOOL_CALL_SEGMENT = "/tool-call";
+    private static final String THIRD_PARTY_TOOL = "third_party";
 
     static {
         gateway.setDataPublisher(new KafkaDataPublisher());
@@ -69,22 +83,28 @@ public class ProviderGuardrailAction extends ActionSupport {
             Map<String, Object> body = readBody();
             ParsedRequest frame = adapter.parse(body);
 
-            // Non-inspectable event or empty prompt -> allow without validating.
             if (frame.allowShortCircuit || frame.prompt == null || frame.prompt.isEmpty()) {
                 response = adapter.verdict(true, null, frame.requestId);
                 return Action.SUCCESS.toUpperCase();
             }
 
-            Map<String, Object> requestData = buildEnvelope(frame);
-            requestData.put("guardrails", "true");
-            requestData.put("ingest_data", "true");
+            frame.messageId = resolveMessageId(frame);
+            registerConnectorIdentity(frame);
 
-            Map<String, Object> result = gateway.processHttpProxy(requestData);
-            Map<String, Object> guardrailsResult = extractGuardrailsResult(result);
+            List<ParsedRequest.ToolCall> calls = frame.toolCalls != null
+                    ? frame.toolCalls
+                    : Collections.<ParsedRequest.ToolCall>singletonList(null);
+            Map<String, Object> denied = null;
+            for (ParsedRequest.ToolCall call : calls) {
+                Map<String, Object> guardrailsResult = process(frame, call);
+                if (guardrailsResult != null && !isAllowed(guardrailsResult)) {
+                    denied = guardrailsResult;
+                    break;
+                }
+            }
 
-            boolean allow = guardrailsResult == null || isAllowed(guardrailsResult);
-            String reason = guardrailsResult == null ? null : stringOrNull(guardrailsResult.get("Reason"));
-            response = adapter.verdict(allow, reason, frame.requestId);
+            String reason = denied == null ? null : stringOrNull(denied.get("Reason"));
+            response = adapter.verdict(denied == null, reason, frame.requestId);
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
@@ -97,34 +117,111 @@ public class ProviderGuardrailAction extends ActionSupport {
         }
     }
 
+    private Map<String, Object> process(ParsedRequest frame, ParsedRequest.ToolCall call) {
+        Map<String, Object> requestData = buildEnvelope(frame, call);
+        requestData.put("guardrails", "true");
+        requestData.put("ingest_data", "true");
+        return extractGuardrailsResult(gateway.processHttpProxy(requestData));
+    }
+
+    private static String resolveMessageId(ParsedRequest frame) {
+        if (frame.sessionId == null) {
+            return frame.requestId;
+        }
+        if (frame.turnKey != null) {
+            return TurnIdTracker.record(frame.sessionId, frame.turnKey);
+        }
+        String latest = TurnIdTracker.latest(frame.sessionId);
+        return latest != null ? latest : frame.requestId;
+    }
+
+    private static String[] mcpTarget(ParsedRequest.ToolCall call) {
+        if (call == null) {
+            return null;
+        }
+        if (call.name.startsWith(MCP_TOOL_PREFIX)) {
+            String rest = call.name.substring(MCP_TOOL_PREFIX.length());
+            int sep = rest.indexOf(MCP_SEPARATOR);
+            if (sep > 0 && sep + MCP_SEPARATOR.length() < rest.length()) {
+                return new String[]{rest.substring(0, sep), rest.substring(sep + MCP_SEPARATOR.length())};
+            }
+        }
+        if (call.info != null && THIRD_PARTY_TOOL.equals(call.info.get("type")) && call.info.get("toolset_name") != null) {
+            String server = call.info.get("toolset_name").toString();
+            if (!server.isEmpty()) {
+                return new String[]{server, call.name};
+            }
+        }
+        return null;
+    }
+
+    private static String toolPathSegment(String toolName) {
+        String segment = toolName.replaceAll("[^A-Za-z0-9_.-]", "_");
+        return segment.isEmpty() ? "unknown" : segment;
+    }
+
+    private static void putIfPresent(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.trim().isEmpty()) {
+            target.put(key, value);
+        }
+    }
+
+    private Map<String, Object> requestPayload(ParsedRequest frame, ParsedRequest.ToolCall call, String[] mcp) {
+        Map<String, Object> payload = new HashMap<>();
+        if (mcp != null) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("name", mcp[1]);
+            params.put("arguments", call.input != null ? call.input : new HashMap<String, Object>());
+            payload.put("jsonrpc", "2.0");
+            payload.put("id", call.id);
+            payload.put("method", "tools/call");
+            payload.put("params", params);
+        } else if (call != null) {
+            payload.put("body", call.text);
+            payload.put("tool_name", call.name);
+            payload.put("tool_use_id", call.id);
+        } else {
+            payload.put("body", frame.prompt);
+        }
+        return payload;
+    }
+
     /**
      * Build the flat Akto envelope for processHttpProxy. Host names the collection
      * (one per provider); important metadata (webhook/request id, session, tenant,
      * model, actor) is carried through so it is recorded and available to policies.
      */
-    private Map<String, Object> buildEnvelope(ParsedRequest frame) {
-        String host = buildAgentHost(frame);
-        registerConnectorIdentity(frame);
+    private Map<String, Object> buildEnvelope(ParsedRequest frame, ParsedRequest.ToolCall call) {
+        String[] mcp = mcpTarget(call);
+        String app = normalizeApp(frame.application);
+        String host = mcp != null
+                ? AgentHostUtils.mcpHost(endpointId(frame), app, mcp[0])
+                : buildAgentHost(frame);
 
         Map<String, Object> requestHeaders = new HashMap<>();
         requestHeaders.put("host", host);
         requestHeaders.put("content-type", "application/json");
+        putIfPresent(requestHeaders, SESSION_HEADER, frame.sessionId);
+        putIfPresent(requestHeaders, MESSAGE_HEADER, frame.messageId);
+        putIfPresent(requestHeaders, USER_EMAIL_HEADER, extractEmail(frame.actor));
 
         Map<String, Object> responseHeaders = new HashMap<>();
         responseHeaders.put("content-type", "application/json");
 
-        // Match the http-proxy/browser payload shape: user text under "body".
-        // model / session_id are carried in metadata (below), not here.
-        Map<String, Object> requestPayload = new HashMap<>();
-        requestPayload.put("body", frame.prompt);
-
         Map<String, Object> tag = new HashMap<>();
-        tag.put("gen-ai", "Gen AI");
-        tag.put("ai-agent", agentTagValue(normalizeApp(frame.application)));
         tag.put("source", "ENDPOINT");
-        // Marks the collection as inference-hooks traffic.
+        tag.put(Constants.AKTO_GUARDRAIL_MODE, Constants.AKTO_GUARDRAIL_MODE_INLINE);
         tag.put(INFERENCE_HOOKS_TAG, provider.toLowerCase());
-        // The Username column falls back to a "username" collection tag when there is no Endpoint Shield module.
+        if (mcp != null) {
+            tag.put(Constants.AKTO_MCP_SERVER_TAG, MCP_SERVER_TAG_VALUE);
+            tag.put("mcp-client", agentTagValue(app));
+        } else {
+            tag.put("gen-ai", "Gen AI");
+            tag.put("ai-agent", agentTagValue(app));
+        }
+        if (frame.application != null && !frame.application.isEmpty()) {
+            tag.put("product-surface", frame.application.toLowerCase().replaceAll("[^a-z0-9]+", "_"));
+        }
         String usernameSlug = actorSlug(frame);
         if (!usernameSlug.isEmpty()) {
             tag.put("username", usernameSlug);
@@ -133,31 +230,40 @@ public class ProviderGuardrailAction extends ActionSupport {
         Map<String, Object> meta = new HashMap<>();
         meta.put("webhook_id", frame.requestId);
         meta.put("session_id", frame.sessionId);
+        meta.put("message_id", frame.messageId);
         meta.put("tenant_id", frame.tenantId);
         meta.put("model", frame.model);
         meta.put("actor", frame.actor);
-        // Advisory only (e.g. claude-code = CLI, claude-ai = app). Recorded for
-        // visibility/routing; never used in the allow/deny decision.
         meta.put("application", frame.application);
         if (frame.metadata != null) {
             meta.put("provider_metadata", frame.metadata);
         }
         meta.put("event_type", frame.eventType);
-        if (frame.toolInfos != null) {
-            meta.put("tool_infos", frame.toolInfos);
+        if (call != null) {
+            meta.put("tool_name", call.name);
+            meta.put("tool_use_id", call.id);
+            if (call.info != null) {
+                meta.put("tool_info", call.info);
+            }
+        }
+        if (mcp != null) {
+            meta.put("mcp_server", mcp[0]);
         }
 
         String path = "/" + provider.toLowerCase() + "/guardrail";
-        // Tool-call frames get their own endpoint so they stay separate from prompt traffic.
-        if (TOOL_CALL_EVENT.equals(frame.eventType)) {
-            path += "/tool-call";
+        if (mcp != null) {
+            path = MCP_TOOLS_CALL_PATH;
+        } else if (call != null) {
+            path += TOOL_CALL_SEGMENT + "/" + toolPathSegment(call.name);
+        } else if (TOOL_CALL_EVENT.equals(frame.eventType)) {
+            path += TOOL_CALL_SEGMENT;
         }
 
         Map<String, Object> envelope = new HashMap<>();
         envelope.put("akto_connector", provider.toLowerCase());
         envelope.put("path", path);
         envelope.put("method", "POST");
-        envelope.put("requestPayload", toJson(requestPayload));
+        envelope.put("requestPayload", toJson(requestPayload(frame, call, mcp)));
         envelope.put("responsePayload", "{}");
         envelope.put("requestHeaders", toJson(requestHeaders));
         envelope.put("responseHeaders", toJson(responseHeaders));

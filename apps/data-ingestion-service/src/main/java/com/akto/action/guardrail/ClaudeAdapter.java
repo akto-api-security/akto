@@ -66,41 +66,83 @@ public class ClaudeAdapter implements ProviderAdapter {
         }
         List<Object> msgs = (List<Object>) messages;
         if (toolCall) {
-            // A tool_call frame carries the latest assistant message as the last entry; earlier turns were in the prompt frame.
             if (msgs.isEmpty()) {
                 frame.prompt = "";
                 return frame;
             }
             msgs = msgs.subList(msgs.size() - 1, msgs.size());
-            List<Map<String, Object>> infos = collectToolInfos(msgs);
-            frame.toolInfos = infos.isEmpty() ? null : infos;
+            List<ParsedRequest.ToolCall> calls = collectToolCalls(msgs);
+            frame.toolCalls = calls.isEmpty() ? null : calls;
+        } else {
+            frame.turnKey = turnKey(frame.sessionId, msgs);
         }
         frame.prompt = flatten(msgs);
         return frame;
     }
 
-    /** tool_info of every tool_use block, in order; tool_info is omitted (never null) when it does not apply. */
     @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> collectToolInfos(List<Object> msgs) {
-        List<Map<String, Object>> infos = new ArrayList<>();
+    private List<ParsedRequest.ToolCall> collectToolCalls(List<Object> msgs) {
+        List<ParsedRequest.ToolCall> calls = new ArrayList<>();
         for (Object msgObj : msgs) {
             if (!(msgObj instanceof Map) || !(((Map<String, Object>) msgObj).get("content") instanceof List)) {
                 continue;
             }
-            for (Object blockObj : (List<Object>) ((Map<String, Object>) msgObj).get("content")) {
+            Map<String, Object> msg = (Map<String, Object>) msgObj;
+            String role = stringOrEmpty(msg.get("role"));
+            for (Object blockObj : (List<Object>) msg.get("content")) {
                 if (!(blockObj instanceof Map)) {
                     continue;
                 }
                 Map<String, Object> block = (Map<String, Object>) blockObj;
-                if (!"tool_use".equals(stringOrEmpty(block.get("type"))) || !(block.get("tool_info") instanceof Map)) {
+                if (!"tool_use".equals(stringOrEmpty(block.get("type")))) {
                     continue;
                 }
-                Map<String, Object> info = new HashMap<>((Map<String, Object>) block.get("tool_info"));
-                info.put("tool_name", stringOrNull(block.get("tool_name")));
-                infos.add(info);
+                ParsedRequest.ToolCall call = new ParsedRequest.ToolCall();
+                call.id = stringOrNull(block.get("id"));
+                call.name = stringOrEmpty(block.get("tool_name"));
+                call.input = block.get("input");
+                call.info = block.get("tool_info") instanceof Map ? (Map<String, Object>) block.get("tool_info") : null;
+                call.text = toolUseText(role, block);
+                calls.add(call);
             }
         }
-        return infos;
+        return calls;
+    }
+
+    private static String turnKey(String sessionId, List<Object> msgs) {
+        if (sessionId == null) {
+            return null;
+        }
+        for (int i = msgs.size() - 1; i >= 0; i--) {
+            if (isHumanTurn(msgs.get(i))) {
+                return sessionId + ":" + i;
+            }
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean isHumanTurn(Object msgObj) {
+        if (!(msgObj instanceof Map)) {
+            return false;
+        }
+        Map<String, Object> msg = (Map<String, Object>) msgObj;
+        if (!"user".equals(stringOrEmpty(msg.get("role")))) {
+            return false;
+        }
+        Object content = msg.get("content");
+        if (content instanceof String) {
+            return true;
+        }
+        if (!(content instanceof List)) {
+            return false;
+        }
+        for (Object blockObj : (List<Object>) content) {
+            if (blockObj instanceof Map && !"tool_result".equals(stringOrEmpty(((Map<String, Object>) blockObj).get("type")))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -147,17 +189,7 @@ public class ClaudeAdapter implements ProviderAdapter {
                 Map<String, Object> block = (Map<String, Object>) blockObj;
                 switch (stringOrEmpty(block.get("type"))) {
                     case "tool_use":
-                        String toolUse = role + " tool_use " + stringOrEmpty(block.get("tool_name"));
-                        Object input = block.get("input");
-                        if (input != null) {
-                            toolUse += " " + toJson(input);
-                        }
-                        // tool_info (who runs/provides the tool) only exists on tool_call frames.
-                        Object toolInfo = block.get("tool_info");
-                        if (toolInfo != null) {
-                            toolUse += " tool_info " + toJson(toolInfo);
-                        }
-                        appendLine(sb, toolUse);
+                        appendLine(sb, toolUseText(role, block));
                         break;
                     case "tool_result":
                         String prefix = role + " tool_result " + stringOrEmpty(block.get("tool_name"));
@@ -178,6 +210,19 @@ public class ClaudeAdapter implements ProviderAdapter {
             }
         }
         return sb.toString().trim();
+    }
+
+    private static String toolUseText(String role, Map<String, Object> block) {
+        String text = role + " tool_use " + stringOrEmpty(block.get("tool_name"));
+        Object input = block.get("input");
+        if (input != null) {
+            text += " " + toJson(input);
+        }
+        Object toolInfo = block.get("tool_info");
+        if (toolInfo != null) {
+            text += " tool_info " + toJson(toolInfo);
+        }
+        return text;
     }
 
     private static void appendLine(StringBuilder sb, String s) {
