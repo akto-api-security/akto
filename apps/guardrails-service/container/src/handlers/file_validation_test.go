@@ -57,6 +57,21 @@ func assertFileAllowed(t *testing.T, recorder *httptest.ResponseRecorder, allowe
 	}
 }
 
+// assertUninspected checks the verdict's uninspected flag: set only when a file was allowed
+// without its content being checked, so callers know not to remember the allow.
+func assertUninspected(t *testing.T, recorder *httptest.ResponseRecorder, want bool) {
+	t.Helper()
+	var response struct {
+		Uninspected bool `json:"uninspected"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Uninspected != want {
+		t.Fatalf("uninspected = %v, want %v: %s", response.Uninspected, want, recorder.Body.String())
+	}
+}
+
 func TestValidateFileInspectionFailures(t *testing.T) {
 	registry := fileprocessor.DefaultRegistry(1024)
 	registry.RegisterWithLimit(panickingFileProcessor{}, 1024)
@@ -66,11 +81,13 @@ func TestValidateFileInspectionFailures(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name, filename, content string
+		uninspected             bool
 	}{
-		{"empty extraction", "empty.txt", ""},
-		{"whitespace extraction", "empty.txt", " \t\n"},
-		{"sanitized empty extraction", "empty.txt", "\x00\x01"},
-		{"parser panic", "crash.panic", "data"},
+		// A file with no text was read: the allow is a verdict on its content.
+		{"empty extraction", "empty.txt", "", false},
+		{"whitespace extraction", "empty.txt", " \t\n", false},
+		{"sanitized empty extraction", "empty.txt", "\x00\x01", false},
+		{"parser panic", "crash.panic", "data", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fr := h.validateSingleFile(context.Background(), &fileInput{
@@ -78,8 +95,9 @@ func TestValidateFileInspectionFailures(t *testing.T) {
 			}, &models.ValidateRequestParams{}, "", "")
 			recorder := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(recorder)
-			h.writeMultiFileResponse(c, []*fileResult{fr})
+			h.writeMultiFileResponse(c, []*fileResult{fr}, false)
 			assertFileAllowed(t, recorder, true)
+			assertUninspected(t, recorder, tc.uninspected)
 		})
 	}
 
@@ -93,6 +111,7 @@ func TestValidateFileInspectionFailures(t *testing.T) {
 		}}
 		h.ValidateFile(c)
 		assertFileAllowed(t, recorder, true)
+		assertUninspected(t, recorder, true)
 	})
 
 	t.Run("multipart parse failure", func(t *testing.T) {
@@ -102,6 +121,7 @@ func TestValidateFileInspectionFailures(t *testing.T) {
 		c.Request.Header.Set("Content-Type", "multipart/form-data; boundary=broken")
 		h.ValidateFile(c)
 		assertFileAllowed(t, recorder, true)
+		assertUninspected(t, recorder, true)
 	})
 
 	t.Run("missing configuration", func(t *testing.T) {
@@ -109,6 +129,7 @@ func TestValidateFileInspectionFailures(t *testing.T) {
 		c, _ := gin.CreateTestContext(recorder)
 		(&ValidationHandler{logger: zap.NewNop()}).ValidateFile(c)
 		assertFileAllowed(t, recorder, true)
+		assertUninspected(t, recorder, true)
 	})
 }
 
@@ -120,7 +141,7 @@ func TestWriteMultiFileResponseVerdict(t *testing.T) {
 	t.Run("allow carries no reason or behaviour", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(recorder)
-		h.writeMultiFileResponse(c, []*fileResult{{Filename: "a.txt", Allowed: true}})
+		h.writeMultiFileResponse(c, []*fileResult{{Filename: "a.txt", Allowed: true}}, false)
 
 		var resp mcp.ValidationResult
 		if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
@@ -129,7 +150,25 @@ func TestWriteMultiFileResponseVerdict(t *testing.T) {
 		if !resp.Allowed || resp.Reason != "" || resp.Behaviour != "" {
 			t.Fatalf("unexpected allow verdict: %s", recorder.Body.String())
 		}
+		assertUninspected(t, recorder, false)
 	})
+
+	for _, tc := range []struct {
+		name    string
+		results []*fileResult
+		dropped bool
+	}{
+		{"an uninspected file marks the allow", []*fileResult{{Allowed: true}, {Allowed: true, Uninspected: true}}, false},
+		{"inputs dropped over the file limit mark the allow", []*fileResult{{Allowed: true}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			h.writeMultiFileResponse(c, tc.results, tc.dropped)
+			assertFileAllowed(t, recorder, true)
+			assertUninspected(t, recorder, true)
+		})
+	}
 
 	t.Run("block carries reason and behaviour from the failing chunk", func(t *testing.T) {
 		blocked := &fileResult{
@@ -141,7 +180,7 @@ func TestWriteMultiFileResponseVerdict(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(recorder)
 		// The first blocked file wins even when an allowed file precedes it.
-		h.writeMultiFileResponse(c, []*fileResult{{Allowed: true}, blocked})
+		h.writeMultiFileResponse(c, []*fileResult{{Allowed: true, Uninspected: true}, blocked}, true)
 
 		var resp mcp.ValidationResult
 		if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
@@ -160,6 +199,8 @@ func TestWriteMultiFileResponseVerdict(t *testing.T) {
 		if resp.ModifiedPayload != "" {
 			t.Fatalf("modifiedPayload must be empty, got %q", resp.ModifiedPayload)
 		}
+		// A block is a verdict whatever else was skipped.
+		assertUninspected(t, recorder, false)
 	})
 }
 
@@ -201,6 +242,9 @@ func TestFileChunkFailuresDoNotHidePolicyBlocks(t *testing.T) {
 			}
 			if !tc.allowed && fr.FailedChunkIndex != 2 {
 				t.Fatalf("failed chunk = %d, want policy-blocked chunk 2", fr.FailedChunkIndex)
+			}
+			if tc.allowed && !fr.Uninspected {
+				t.Fatal("a chunk with no verdict must mark the file uninspected")
 			}
 		})
 	}
@@ -344,6 +388,7 @@ func TestValidateFileAllowsExtractionFailure(t *testing.T) {
 			c.Request.Header.Set("Content-Type", writer.FormDataContentType())
 			h.ValidateFile(c)
 			assertFileAllowed(t, recorder, true)
+			assertUninspected(t, recorder, true)
 			if got := processor.calls.Load(); got != tc.extractions {
 				t.Fatalf("extraction attempts = %d, want %d", got, tc.extractions)
 			}

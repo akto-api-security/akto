@@ -1433,15 +1433,12 @@ export default {
         })
     },
 
-    async getApiSequences(apiCollectionId) {
-        const resp = await request({
-            url: '/api/getApiSequences',
+    async fetchSessionSteps(apiCollectionId, path) {
+        return await request({
+            url: '/api/fetchSessionSteps',
             method: 'post',
-            data: {
-                apiCollectionId: apiCollectionId
-            }
+            data: { apiCollectionId, path }
         })
-        return resp
     },
 
     async fetchMcpToolsApiCalls(apiCollectionId) {

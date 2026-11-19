@@ -161,6 +161,13 @@ export default {
             data: {testingIssuesIdList, teamId, aktoDashboardHost}
         })
     },
+    createPortIOTickets(testingIssuesIdList, aktoDashboardHost) {
+        return request({
+            url: 'api/createPortIOTickets',
+            method: 'post',
+            data: {testingIssuesIdList, aktoDashboardHost}
+        })
+    },
     createWizFindings(testingIssuesIdList) {
         return request({
             url: 'api/createWizFindings',

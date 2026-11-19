@@ -1,48 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Badge, Box, Button, Card, Divider, HorizontalGrid, HorizontalStack, LegacyCard, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Card, Checkbox, Divider, HorizontalStack, LegacyCard, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
 import settingFunctions from '../module'
 import IntegrationsLayout from './IntegrationsLayout'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
-import Dropdown from '../../../components/layouts/Dropdown'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import AllowedAction from '../../../components/shared/AllowedAction'
+import SeverityPriorityMapping, { DEFAULT_SEVERITY_TO_PRIORITY } from '../../../components/shared/SeverityPriorityMapping'
 import func from "@/util/func"
 import { usePermissions, whenAllowed } from "@/util/permissions"
 import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
-const SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
-
-const DEFAULT_SEVERITY_TO_PRIORITY = { CRITICAL: '1', HIGH: '2', MEDIUM: '3', LOW: '4' }
-
-const PRIORITY_OPTIONS = [
-    { label: 'Urgent', value: '1' },
-    { label: 'High', value: '2' },
-    { label: 'Medium', value: '3' },
-    { label: 'Low', value: '4' },
-    { label: 'No priority', value: '0' }
-]
-
-const SEVERITY_BADGE_STATUS = { CRITICAL: 'critical', HIGH: 'warning', MEDIUM: 'attention', LOW: 'info' }
-
 const toOptions = (teamsMap) => Object.entries(teamsMap || {}).map(([id, name]) => ({ label: name, value: id }))
 
-const priorityLabel = (value) => PRIORITY_OPTIONS.find(option => option.value === value)?.label || ''
-
 const errorMessageOf = (error, fallback) => error?.response?.data?.actionErrors?.[0] || fallback
-
-const MappingCell = ({ children, header, compact }) => (
-    <Box
-        padding={compact ? '2' : '4'}
-        background={header ? 'bg-surface-secondary' : undefined}
-        borderWidth="1"
-        borderColor="border"
-        borderRadius="2"
-    >
-        <HorizontalStack align="center" blockAlign="center">
-            {children}
-        </HorizontalStack>
-    </Box>
-)
 
 const Linear = () => {
 
@@ -62,6 +32,8 @@ const Linear = () => {
     const [teams, setTeams] = useState([])
     const [workspaceTeams, setWorkspaceTeams] = useState([])
     const [isSavingTeams, setIsSavingTeams] = useState(false)
+    const [syncEnabled, setSyncEnabled] = useState(false)
+    const [isSavingSync, setIsSavingSync] = useState(false)
     const [loadingTeams, setLoadingTeams] = useState(false)
     const [createModalActive, setCreateModalActive] = useState(false)
     const [rowToReveal, setRowToReveal] = useState(null)
@@ -88,6 +60,7 @@ const Linear = () => {
                 return
             }
             setIsIntegrated(true)
+            setSyncEnabled(!!linearInteg.biDirectionalSyncEnabled)
             const savedTeams = Object.entries(linearInteg.teamMappings || {}).map(([teamId, mapping]) =>
                 newTeamRow(teamId, { ...DEFAULT_SEVERITY_TO_PRIORITY, ...mapping.severityToPriority })
             )
@@ -219,34 +192,21 @@ const Linear = () => {
         }
     }
 
+    async function toggleSync(enabled) {
+        setIsSavingSync(true)
+        try {
+            await settingFunctions.saveLinearBiDirectionalSync(enabled)
+            setSyncEnabled(enabled)
+            func.setToast(true, false, enabled ? 'Bi-directional sync enabled' : 'Bi-directional sync disabled')
+        } catch (error) {
+            func.setToast(true, true, errorMessageOf(error, 'Failed to update bi-directional sync'))
+        } finally {
+            setIsSavingSync(false)
+        }
+    }
+
     const canSaveTeams = !isSavingTeams && teams.length > 0 && teams.every(team => team.teamId)
     const isCreateDisabled = isCreatingTeam || newTeamName.trim().length === 0
-
-    const renderSeverityMappingTable = (team) => (
-        <VerticalStack gap="2">
-            <HorizontalGrid columns={2} gap="2">
-                <MappingCell header><Text variant="bodyMd" fontWeight="semibold">Akto Severity</Text></MappingCell>
-                <MappingCell header><Text variant="bodyMd" fontWeight="semibold">Linear Priority</Text></MappingCell>
-            </HorizontalGrid>
-            {SEVERITIES.map(severity => (
-                <HorizontalGrid columns={2} gap="2" key={`${team.rowId}-${severity}`}>
-                    <MappingCell>
-                        <Badge status={SEVERITY_BADGE_STATUS[severity]}>{func.toSentenceCase(severity)}</Badge>
-                    </MappingCell>
-                    <MappingCell compact={team.editingMapping}>
-                        {team.editingMapping
-                            ? <Dropdown
-                                menuItems={PRIORITY_OPTIONS}
-                                initial={team.severityToPriority[severity]}
-                                selected={(value) => updatePriority(team.rowId, severity, value)}
-                                placeHolder="Select Priority"
-                            />
-                            : <Text variant="bodyMd">{priorityLabel(team.severityToPriority[severity])}</Text>}
-                    </MappingCell>
-                </HorizontalGrid>
-            ))}
-        </VerticalStack>
-    )
 
     const TeamCards = teams.map((team, index) => {
         const options = optionsFor(team.rowId)
@@ -289,7 +249,12 @@ const Linear = () => {
                                 </Button>
                             </AllowedAction>
                         </HorizontalStack>
-                        {renderSeverityMappingTable(team)}
+                        <SeverityPriorityMapping
+                            rowId={team.rowId}
+                            severityToPriority={team.severityToPriority}
+                            editing={team.editingMapping}
+                            onChange={(severity, value) => updatePriority(team.rowId, severity, value)}
+                        />
                     </VerticalStack>
                 </VerticalStack>
             </Card>
@@ -368,6 +333,27 @@ const Linear = () => {
         </LegacyCard>
     )
 
+    const SyncCard = (
+        <LegacyCard>
+            <LegacyCard.Section>
+                <VerticalStack gap="4">
+                    <Text variant="headingMd">Bi-directional sync</Text>
+                    <Text variant="bodyMd" color="subdued">
+                        Every hour, Akto keeps issue status and Linear ticket status aligned for the saved teams. Open in Akto matches Linear's backlog, to do and in progress states, Fixed matches done, and Ignored matches canceled.
+                    </Text>
+                    <AllowedAction allowed={canCall('api/saveLinearBiDirectionalSync')}>
+                        <Checkbox
+                            label="Enable bi-directional sync"
+                            checked={syncEnabled}
+                            onChange={toggleSync}
+                            disabled={!isIntegrated || isSavingSync}
+                        />
+                    </AllowedAction>
+                </VerticalStack>
+            </LegacyCard.Section>
+        </LegacyCard>
+    )
+
     const CreateTeamModal = (
         <Modal
             open={createModalActive}
@@ -414,6 +400,7 @@ const Linear = () => {
                 <VerticalStack gap="4">
                     {KeyCard}
                     {isIntegrated ? TeamsCard : null}
+                    {isIntegrated ? SyncCard : null}
                     {CreateTeamModal}
                 </VerticalStack>
             }

@@ -506,6 +506,20 @@ function IssuesPage() {
         })
     }
 
+    const handleSaveBulkPortTicketsAction = (selectedIssuesItems) => {
+        setToast(true, false, "Please wait while we create your Linear tickets through Port.io.")
+        api.createPortIOTickets(selectedIssuesItems, window.location.origin).then((res) => {
+            if (res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} Linear ticket${selectedIssuesItems.length === 1 ? "" : "s"} created through Port.io.`)
+            }
+            resetResourcesSelected()
+        }).catch((err) => {
+            setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating Linear tickets through Port.io")
+        })
+    }
+
     // Use keys directly for reasons and compulsorySettings
     const requiresDescription = (reasonKey) => {
         return compulsorySettings[reasonKey] || false;
@@ -777,6 +791,12 @@ function IssuesPage() {
                 onAction: () => { createLinearTicketBulk() },
                 disabled: (window.LINEAR_INTEGRATED === 'false'),
                 requires: ['api/fetchLinearIntegration', 'api/createLinearTickets']
+            },
+            {
+                content: 'Create Linear ticket via Port.io',
+                onAction: () => { handleSaveBulkPortTicketsAction(items) },
+                disabled: (window.PORT_IO_INTEGRATED === 'false'),
+                requires: ['api/fetchPortIOIntegration', 'api/createPortIOTickets']
             },
             {
                 content: 'Create Wiz finding(s)',

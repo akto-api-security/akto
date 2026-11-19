@@ -910,9 +910,57 @@ const settingRequests = {
         })
     },
 
+    saveLinearBiDirectionalSync(biDirectionalSyncEnabled) {
+        return request({
+            url: '/api/saveLinearBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled }
+        })
+    },
+
     removeLinearIntegration() {
         return request({
             url: '/api/removeLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchPortIOIntegration() {
+        return request({
+            url: '/api/fetchPortIOIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addPortIOIntegration(clientId, clientSecret, workflowId) {
+        return request({
+            url: '/api/addPortIOIntegration',
+            method: 'post',
+            data: { clientId, clientSecret, workflowId }
+        })
+    },
+
+    savePortIOSeverityMapping(severityToPriority) {
+        return request({
+            url: '/api/savePortIOSeverityMapping',
+            method: 'post',
+            data: { severityToPriority }
+        })
+    },
+
+    savePortIOBiDirectionalSync(biDirectionalSyncEnabled, updateWorkflowId) {
+        return request({
+            url: '/api/savePortIOBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled, updateWorkflowId }
+        })
+    },
+
+    removePortIOIntegration() {
+        return request({
+            url: '/api/removePortIOIntegration',
             method: 'post',
             data: {}
         })

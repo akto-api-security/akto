@@ -26,7 +26,7 @@ import IssuesStore from "../../../pages/issues/issuesStore";
 import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_ENDPOINT_SECURITY, CATEGORY_DAST, mapLabel, isAgenticSecurityCategory } from "../../../../main/labelHelper";
 
 // The Overview tiles link to these nav pages (and Back returns to Overview); the highlight follows them.
-const LINKED_NAV_IDS = new Set(["dashboard_observe_agentic_discovery", "dashboard_observe_agentic_assets", "dashboard_observe_endpoints"]);
+const LINKED_NAV_IDS = new Set(["dashboard_observe_agentic_discovery", "dashboard_observe_agentic_assets", "dashboard_observe_endpoints", "dashboard_observe_agent_discovery"]);
 
 // a nav item's "requires" is the action its page loads first; items the role can't open are left out,
 // a section with nothing left is hidden, and a section opens its first item the role can open
@@ -268,6 +268,16 @@ export default function LeftNav() {
                 },
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
+                    ...(dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
+                        label: "Overview",
+                        requires: pageRequires("/dashboard/observe/agent-discovery"),
+                        onClick: () => {
+                            navigate("/dashboard/observe/agent-discovery");
+                            handleSelect("dashboard_observe_agent_discovery");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_agent_discovery",
+                    }] : []),
                     ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [
                     // { label: "Agentic assets (legacy)", onClick: () => { navigate("/dashboard/observe/agentic-assets"); handleSelect("dashboard_observe_agentic_assets"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_agentic_assets" },
                     {
@@ -616,6 +626,17 @@ export default function LeftNav() {
                     url: "#",
                     key: "7",
                     subNavigationItems: [
+                        ...(dashboardCategory === "Endpoint Security" && func.isAktoUser() ? [{
+                            label: "Overview",
+                            requires: pageRequires("/dashboard/guardrails/atlas-overview"),
+                            badge: <Badge status="info">Beta</Badge>,
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/atlas-overview");
+                                handleSelect("dashboard_atlas_guardrails_overview");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_atlas_guardrails_overview",
+                        }] : []),
                         // Argus has no "AI Agent Guardrails" block (that one is Gen AI only), so Overview lives here.
                         ...(dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
                             label: "Overview",
@@ -627,7 +648,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_overview",
                         }] : []),
-                        ...((dashboardCategory === "API Security" || dashboardCategory === "Endpoint Security") ? [{
+                        ...((dashboardCategory === "API Security" || (dashboardCategory === "Endpoint Security" && !func.isAktoUser())) ? [{
                             label: "Dashboard",
                             requires: pageRequires("/dashboard/protection/threat-dashboard"),
                             onClick: () => {

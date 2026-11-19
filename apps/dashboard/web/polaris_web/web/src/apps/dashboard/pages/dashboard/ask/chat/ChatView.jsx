@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Box, Button, Divider, Form, HorizontalStack, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { ArrowUpMinor, CancelMinor, ChevronLeftMinor } from "@shopify/polaris-icons"
 import AgenticThinkingBox from "@/apps/dashboard/pages/agentic/components/AgenticThinkingBox"
 import ChatMessage from "./ChatMessage"
 import ScrollArea from "../components/ScrollArea"
+import { TEST_SCRIPT } from "./useAskChat"
+import { latestScriptsByType } from "../script/scriptBlocks"
 
 // Sheet height min(700px, 100vh - 80px) minus the header and the composer.
 const MESSAGES_HEIGHT = "min(548px, calc(100vh - 232px))"
@@ -11,7 +13,10 @@ const MESSAGES_HEIGHT = "min(548px, calc(100vh - 232px))"
 // The overlay's chat mode — design_handoff_ask_akto_overlay/README.md, "4. Answer view".
 // Presentational: the conversation itself lives in useAskChat, owned by AskOverlay.
 export default function ChatView({ chat, onClose, onNewQuestion, onOpenRoute }) {
-    const { messages, loading, acts, ask, markStreamed, reviewAction, cancelAction, confirmAction, undoAction } = chat
+    const { messages, loading, acts, ask, markStreamed, reviewAction, cancelAction, confirmAction, undoAction, conversationType } = chat
+    const scriptMode = conversationType === TEST_SCRIPT
+    // The newest script of each type in this conversation, so a pre script can be validated with its post script.
+    const conversationScripts = useMemo(() => (scriptMode ? latestScriptsByType(messages) : {}), [scriptMode, messages])
     const [draft, setDraft] = useState("")
     const scrollRef = useRef(null)
 
@@ -72,6 +77,8 @@ export default function ChatView({ chat, onClose, onNewQuestion, onOpenRoute }) 
                             onUndoAction={() => undoAction(msg.id)}
                             onOpenRoute={onOpenRoute}
                             onAsk={ask}
+                            scriptMode={scriptMode}
+                            conversationScripts={conversationScripts}
                         />
                     ))}
                     {loading ? <AgenticThinkingBox /> : null}
@@ -106,7 +113,11 @@ export default function ChatView({ chat, onClose, onNewQuestion, onOpenRoute }) 
                             </HorizontalStack>
                         </Box>
                         <HorizontalStack align="center">
-                            <Text as="p" variant="bodySm" color="subdued">Actions that change data always show a preview first.</Text>
+                            <Text as="p" variant="bodySm" color="subdued">
+                                {scriptMode
+                                    ? "Validate replays a real request; nothing is saved until you choose Save to library."
+                                    : "Actions that change data always show a preview first."}
+                            </Text>
                         </HorizontalStack>
                     </VerticalStack>
                 </Form>

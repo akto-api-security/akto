@@ -2780,6 +2780,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return !!window?.USER_NAME && window.USER_NAME.toLowerCase().indexOf("@akto.io") > 0;
     },
 
+    isDastAllowedUser(){
+      const email = (window?.USER_NAME || "").toLowerCase();
+      return ["umesh@akto.io", "ankush@akto.io"].includes(email) || ["@tapestry.com", "@mongodb.com"].some(domain => email.endsWith(domain));
+    },
+
     isTempAccount(){
       if (!window?.USER_NAME) return false;
       

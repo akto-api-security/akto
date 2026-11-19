@@ -7,6 +7,8 @@ import TestRoleDropdown from '../../../components/shared/TestRoleDropdown';
 import MiniTestingSelector from './MiniTestingSelector';
 
 const MAX_HEADERS = 5
+const IMPORT_POLL_INTERVAL_MS = 2000
+const IMPORT_MAX_POLLS = 300
 
 const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.", defaultRequestBody = { "model": "llama3.2", "prompt": "Why is the sky blue?" }, docsLink = "https://docs.akto.io/ai-security" }) => {
     const [loading, setLoading] = useState(false)
@@ -52,6 +54,22 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
         return Object.keys(obj).length > 0 ? obj : null
     }
 
+    const waitForImport = async (uploadId) => {
+        for (let i = 0; i < IMPORT_MAX_POLLS; i++) {
+            await new Promise(resolve => setTimeout(resolve, IMPORT_POLL_INTERVAL_MS))
+            const res = await api.fetchAgentImportStatus(uploadId)
+            if (res.uploadStatus === 'SUCCEEDED') {
+                return true
+            }
+            if (res.uploadStatus === 'FAILED') {
+                func.setToast(true, true, res.errorMessage || "AI agent import failed.")
+                return false
+            }
+        }
+        func.setToast(true, true, "AI agent import is taking longer than expected. Please check again in a while.")
+        return false
+    }
+
     const handleImport = async () => {
         if (!url || url.length === 0) {
             func.setToast(true, true, "Please enter a valid URL.")
@@ -73,11 +91,15 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                 : null
             const customResponseHeadersToSend = useCustomResponse ? headersArrayToObject(responseHeaders) : null
             const miniTestingNameToSend = useMiniTesting && !useCustomResponse ? (miniTestingName || null) : null
-            await api.importFromUrl(
+            const started = await api.importFromUrl(
                 url, testRoleToSend, requestBodyToSend || null, customHeaders, collectionNameToSend,
                 customResponseBodyToSend, customResponseStatusCodeToSend, customResponseHeadersToSend,
                 miniTestingNameToSend
             )
+            const succeeded = await waitForImport(started.uploadId)
+            if (!succeeded) {
+                return
+            }
             func.setToast(true, false, "AI agent imported successfully.")
             setUrl('')
             setCollectionName('')

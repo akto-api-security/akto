@@ -38,7 +38,7 @@ const getAvailableProductScopes = () => {
         scopes.push({ label: 'Akto ATLAS', value: 'ENDPOINT' })
     }
 
-    if (dastGranted) {
+    if (dastGranted && func.isDastAllowedUser()) {
         scopes.push({ label: 'DAST', value: 'DAST' })
     }
 

@@ -63,6 +63,10 @@ public class TestingRunIssues {
     @Getter @Setter
     private String linearIssueUrl;
 
+    public static final String TICKET_CREATED_VIA = "ticketCreatedVia";
+    @Getter @Setter
+    private String ticketCreatedVia;
+
     public static final String WIZ_FINDING_CREATION_STATUS = "wizFindingCreationStatus";
     @Getter @Setter
     private String wizFindingCreationStatus;

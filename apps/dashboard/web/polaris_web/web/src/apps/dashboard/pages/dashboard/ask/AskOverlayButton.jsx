@@ -1,4 +1,3 @@
-import { useCallback, useState } from "react"
 import { Box, HorizontalStack, Text } from "@shopify/polaris"
 import { CATEGORY_AGENTIC_SECURITY } from "@/apps/main/labelHelper"
 import AskOverlay from "./AskOverlay"
@@ -6,6 +5,7 @@ import Pressable from "./components/Pressable"
 import Dot from "./components/Dot"
 import useAskShortcut from "./palette/useAskShortcut"
 import useDashboardCategory from "./palette/useDashboardCategory"
+import AskOverlayStore from "./askOverlayStore"
 import "./askOverlay.css"
 
 const LIGHT_TOPBAR_TONE = {
@@ -31,9 +31,10 @@ const DARK_TOPBAR_TONE = {
 // The topbar's Ask Akto entry point: the button, the ⌘K binding, and the overlay itself. Which
 // dashboard's tiles and prompts it shows follows the current dashboard category.
 export default function AskOverlayButton() {
-    const [open, setOpen] = useState(false)
-    const handleToggle = useCallback(() => setOpen((o) => !o), [])
-    const handleClose = useCallback(() => setOpen(false), [])
+    // Shared so other pages (the Scripts page) can open it too.
+    const open = AskOverlayStore((state) => state.open)
+    const handleToggle = AskOverlayStore((state) => state.toggle)
+    const handleClose = AskOverlayStore((state) => state.close)
     const tone = useDashboardCategory() === CATEGORY_AGENTIC_SECURITY ? DARK_TOPBAR_TONE : LIGHT_TOPBAR_TONE
 
     useAskShortcut(handleToggle)

@@ -1276,7 +1276,7 @@ function ApiEndpoints(props) {
     const viewConfigs = [
         {
             key: 'sequences',
-            label: 'Display graph view',
+            label: 'Display session explorer',
             state: showSequencesFlow,
             setState: setShowSequencesFlow,
             condition: !isEndpointSecurityCategory()

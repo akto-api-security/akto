@@ -12,7 +12,7 @@ import { SCRIPT_TYPES } from '../../testing/scripts/scriptTypes';
 // value of the dropdown's default option (not empty: the dropdown matches values as patterns)
 const DEFAULT_SMART_TESTING = "DEFAULT_SMART_TESTING"
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, linearTeamsMap, generateLabelForJiraIntegration, scriptsState}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, linearTeamsMap, portIOIntegrated, generateLabelForJiraIntegration, scriptsState}) => {
     console.log("isAgenticCategory in config", isAgenticCategory)
     // smart agents for the Smart agent dropdown, loaded once smart testing is switched on
     const [smartAgentOptions, setSmartAgentOptions] = useState([{ label: "Default smart testing", value: DEFAULT_SMART_TESTING }])
@@ -64,15 +64,20 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
 
     const ticketToolOptions = [
         ...(jiraProjectMap ? [{ label: 'Jira', value: 'JIRA' }] : []),
-        ...(linearTeamsMap ? [{ label: 'Linear', value: 'LINEAR' }] : [])
+        ...(linearTeamsMap ? [{ label: 'Linear', value: 'LINEAR' }] : []),
+        ...(portIOIntegrated ? [{ label: 'Linear via Port.io', value: 'PORT_IO' }] : [])
     ]
 
     const ticketSource = testRun?.autoTicketingDetails?.ticketSource || 'JIRA'
     const isLinearTicketing = ticketSource === 'LINEAR'
+    const isPortIOTicketing = ticketSource === 'PORT_IO'
 
     function firstProjectAndIssueTypeFor(source) {
         if (source === 'LINEAR') {
             return { projectId: linearTeams[0]?.value || "", issueType: "" }
+        }
+        if (source === 'PORT_IO') {
+            return { projectId: "", issueType: "" }
         }
         const firstProject = allProjects[0]?.value || "";
         const firstIssueType =
@@ -82,6 +87,10 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 : "";
         return { projectId: firstProject, issueType: firstIssueType }
     }
+
+    // DropdownSearch shows `value` as the field text and highlights `preSelected`, so single-selects need both
+    const labelOf = (items, val) => items.find((item) => item.value === val)?.label ?? ""
+    const selectedOf = (val) => (val ? [val] : [])
 
     const severitiesArr = func.getAktoSeverities()
     const allSeverity = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
@@ -98,7 +107,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
     }
 
     function toggleCreateTicketCheckbox() {
-        const defaultSource = jiraProjectMap ? 'JIRA' : 'LINEAR';
+        const defaultSource = jiraProjectMap ? 'JIRA' : (linearTeamsMap ? 'LINEAR' : 'PORT_IO');
         const { projectId, issueType } = firstProjectAndIssueTypeFor(defaultSource);
 
         const checkPrevToggle = !testRun?.autoTicketingDetails?.shouldCreateTickets;
@@ -216,18 +225,18 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             testRunTimeLabel: testRunTimeOption.label
                         }));
                     }} />
-                    <Dropdown
-                        menuItems={testRolesArr}
+                    <DropdownSearch
+                        optionsList={testRolesArr}
                         label={"Select " + mapLabel("Test", getDashboardCategory()) + " Role"}
-                        initial={testRun.testRoleLabel}
-                        selected={(requests) => {
-                            let testRole;
-                            if (!(requests === "No test role selected")) { testRole = requests; }
+                        placeholder="Select role"
+                        value={labelOf(testRolesArr, testRun.testRoleId) || testRun.testRoleLabel}
+                        preSelected={selectedOf(testRun.testRoleId)}
+                        setSelected={(requests) => {
                             const testRoleOption = getLabel(testRolesArr, requests);
 
                             setTestRun(prev => ({
                                 ...prev,
-                                testRoleId: testRole,
+                                testRoleId: requests,
                                 testRoleLabel: testRoleOption.label
                             }));
                         }} />
@@ -333,7 +342,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             />
             <HorizontalStack gap={4}>
             <Checkbox
-                    disabled={!jiraProjectMap && !linearTeamsMap}
+                    disabled={!jiraProjectMap && !linearTeamsMap && !portIOIntegrated}
                     label={generateLabelForJiraIntegration()}
                     checked={testRun.autoTicketingDetails.shouldCreateTickets}
                     onChange={() => { toggleCreateTicketCheckbox()}}
@@ -341,42 +350,46 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 {testRun.autoTicketingDetails.shouldCreateTickets &&
                     <>
                         {ticketToolOptions.length > 1 &&
-                            <Dropdown
-                                menuItems={ticketToolOptions}
-                                selected={changeTicketTool}
-                                placeHolder={"Select Ticket Tool"}
-                                initial={ticketSource}
+                            <DropdownSearch
+                                optionsList={ticketToolOptions}
+                                setSelected={changeTicketTool}
+                                placeholder={"Select Ticket Tool"}
+                                value={labelOf(ticketToolOptions, ticketSource)}
+                                preSelected={selectedOf(ticketSource)}
                             />
                         }
-                        {isLinearTicketing ?
-                            <Dropdown
+                        {isPortIOTicketing ? null : isLinearTicketing ?
+                            <DropdownSearch
                                 key="linear-team"
-                                menuItems={linearTeams}
-                                selected={(val) => {
+                                optionsList={linearTeams}
+                                setSelected={(val) => {
                                     setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
                                 }}
-                                placeHolder={"Select Team"}
-                                initial={testRun.autoTicketingDetails.projectId}
+                                placeholder={"Select Team"}
+                                value={labelOf(linearTeams, testRun.autoTicketingDetails.projectId)}
+                                preSelected={selectedOf(testRun.autoTicketingDetails.projectId)}
                             />
                             :
                             <>
-                                <Dropdown
+                                <DropdownSearch
                                     key="jira-project"
-                                    menuItems={allProjects}
-                                    selected={(val) => {
+                                    optionsList={allProjects}
+                                    setSelected={(val) => {
                                         setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
                                     }}
                                     disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
-                                    placeHolder={"Select Project"}
-                                    initial={testRun.autoTicketingDetails.projectId}
+                                    placeholder={"Select Project"}
+                                    value={labelOf(allProjects, testRun.autoTicketingDetails.projectId)}
+                                    preSelected={selectedOf(testRun.autoTicketingDetails.projectId)}
                                 />
-                                <Dropdown
+                                <DropdownSearch
                                     key="jira-issue-type"
                                     disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
-                                    menuItems={allIssuesType}
-                                    selected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
-                                    placeHolder={"Select Issue Type"}
-                                    initial={testRun.autoTicketingDetails.issueType}
+                                    optionsList={allIssuesType}
+                                    setSelected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
+                                    placeholder={"Select Issue Type"}
+                                    value={labelOf(allIssuesType, testRun.autoTicketingDetails.issueType)}
+                                    preSelected={selectedOf(testRun.autoTicketingDetails.issueType)}
                                 />
                             </>
                         }

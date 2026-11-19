@@ -23,6 +23,7 @@ public class LinearIntegrationAction extends UserAction {
         LoggerMaker.LogDb.DASHBOARD);
 
     private String apiToken;
+    private boolean biDirectionalSyncEnabled;
     private Map<String, LinearTeamMapping> teamMappings;
     private String teamName;
     private String teamKey;
@@ -52,6 +53,19 @@ public class LinearIntegrationAction extends UserAction {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error saving Linear teams: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    @Audit(description = "User changed Linear bi-directional sync", resource = Resource.LINEAR_INTEGRATION, operation = Operation.UPDATE)
+    public String saveLinearBiDirectionalSync() {
+        try {
+            linearIntegration = new LinearIntegrationService().saveBiDirectionalSync(biDirectionalSyncEnabled);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error saving Linear bi-directional sync: " + e.getMessage(),
+                LoggerMaker.LogDb.DASHBOARD);
             addActionError(e.getMessage());
             return Action.ERROR.toUpperCase();
         }

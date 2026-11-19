@@ -1,0 +1,20 @@
+.compact-button {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 14px;
+    border: 1px solid #C9CCCF;
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: #202223;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 20px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.compact-button:hover {
+    background: #F6F6F7;
+}
