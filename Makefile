@@ -8,3 +8,4 @@ build: proto-gen
 
 build-clean: proto-gen
 	mvn clean install -DskipTests
+   
