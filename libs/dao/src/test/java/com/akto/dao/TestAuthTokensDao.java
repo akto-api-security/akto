@@ -5,13 +5,16 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Arrays;
 import java.util.Date;
 
 import org.bson.Document;
 import org.junit.Test;
 
 import com.akto.MongoBasedTest;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AuthToken;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.util.AuthTokenIds;
 
 public class TestAuthTokensDao extends MongoBasedTest {
@@ -45,5 +48,24 @@ public class TestAuthTokensDao extends MongoBasedTest {
         }
         assertTrue("deleteAt TTL index missing", ttl != null);
         assertEquals(0, ((Number) ttl.get("expireAfterSeconds")).intValue());
+    }
+
+    @Test
+    public void moduleInfoHasASparseTokenIdIndexThatTheTokenListQueryUses() {
+        ModuleInfoDao.instance.createIndicesIfAbsent();
+
+        Document tokenIdIndex = null;
+        for (Document index : ModuleInfoDao.instance.getMCollection().listIndexes()) {
+            if (((Document) index.get("key")).containsKey(ModuleInfo.TOKEN_ID)) {
+                tokenIdIndex = index;
+            }
+        }
+        assertTrue("tokenId index missing", tokenIdIndex != null);
+        assertEquals(Boolean.TRUE, tokenIdIndex.get("sparse"));
+
+        Document explain = MCollection.clients[0].getDatabase(ModuleInfoDao.instance.getDBName()).runCommand(
+                new Document("explain", new Document("find", ModuleInfoDao.instance.getCollName())
+                        .append("filter", new Document(ModuleInfo.TOKEN_ID, new Document("$in", Arrays.asList("a", "b"))))));
+        assertTrue("the token list query must use the index: " + explain.toJson(), explain.toJson().contains("IXSCAN"));
     }
 }

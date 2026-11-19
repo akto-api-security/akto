@@ -96,12 +96,12 @@ public class AuthTokenService {
         return true;
     }
 
-    // Only active generated tokens; legacy discovered tokens are left alone.
-    public static long revokeAllGenerated(String reason, String revokedBy) {
+    // Every active, unexpired token, generated or discovered; a token cyborg has not seen yet has no record to revoke.
+    public static long revokeAllActive(String reason, String revokedBy) {
         return AuthTokensDao.instance.updateManyNoUpsert(
                 Filters.and(
                         Filters.eq(AuthToken.STATUS, AuthToken.STATUS_ACTIVE),
-                        Filters.eq(AuthToken.SOURCE, AuthToken.SOURCE_GENERATED)
+                        Filters.or(Filters.eq(AuthToken.EXPIRES_AT, 0), Filters.gt(AuthToken.EXPIRES_AT, Context.now()))
                 ),
                 revokeUpdate(reason, revokedBy)
         ).getModifiedCount();

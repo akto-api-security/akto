@@ -188,23 +188,31 @@ public class TestAuthTokenAction extends MongoBasedTest {
     }
 
     @Test
-    public void testRevokeAllOnlyTouchesActiveGeneratedTokens() {
+    public void testRevokeAllRevokesEveryActiveTokenIncludingDiscoveredOnes() {
         insertToken("a", AuthToken.STATUS_ACTIVE, AuthToken.SOURCE_GENERATED, 10);
         insertToken("b", AuthToken.STATUS_ACTIVE, AuthToken.SOURCE_GENERATED, 20);
         insertToken("already", AuthToken.STATUS_REVOKED, AuthToken.SOURCE_GENERATED, 30);
         insertToken("legacy", AuthToken.STATUS_ACTIVE, AuthToken.SOURCE_DISCOVERED, 40);
+        AuthToken expired = new AuthToken();
+        expired.setId("expired");
+        expired.setName("expired");
+        expired.setStatus(AuthToken.STATUS_ACTIVE);
+        expired.setSource(AuthToken.SOURCE_DISCOVERED);
+        expired.setExpiresAt(Context.now() - 100);
+        AuthTokensDao.instance.insertOne(expired);
 
         AuthTokenAction action = action();
         action.setReason("rotation");
         assertEquals(Action.SUCCESS.toUpperCase(), action.revokeAllAuthTokens());
 
-        assertEquals(2, action.getRevokedCount());
-        assertEquals(AuthToken.STATUS_REVOKED, find("a").getStatus());
-        assertEquals(AuthToken.STATUS_REVOKED, find("b").getStatus());
-        assertEquals("rotation", find("a").getRevokeReason());
-        assertEquals(USER, find("b").getRevokedBy());
+        assertEquals(3, action.getRevokedCount());
+        for (String id : new String[]{"a", "b", "legacy"}) {
+            assertEquals(AuthToken.STATUS_REVOKED, find(id).getStatus());
+            assertEquals("rotation", find(id).getRevokeReason());
+            assertEquals(USER, find(id).getRevokedBy());
+        }
         assertEquals(0, find("already").getRevokedAt());
-        assertEquals(AuthToken.STATUS_ACTIVE, find("legacy").getStatus());
+        assertEquals(AuthToken.STATUS_ACTIVE, find("expired").getStatus());
     }
 
     @Test
@@ -238,6 +246,26 @@ public class TestAuthTokenAction extends MongoBasedTest {
             assertEquals(live, module.get("active"));
             assertEquals(live ? "runtime-1" : "runtime-2", module.get("name"));
         }
+    }
+
+    @Test
+    public void testFetchAuthTokensCapsModulesPerTokenNewestFirstAndReportsTheTotal() {
+        insertToken("shared", AuthToken.STATUS_ACTIVE, AuthToken.SOURCE_GENERATED, 100);
+        for (int i = 0; i < 25; i++) {
+            ModuleInfoDao.instance.insertOne(ModuleInfo.builder().id("m-" + i).name("device-" + i)
+                    .moduleType(ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD).lastHeartbeatReceived(1000 + i).tokenId("shared").build());
+        }
+
+        AuthTokenAction action = action();
+        assertEquals(Action.SUCCESS.toUpperCase(), action.fetchAuthTokens());
+
+        Map<String, Object> row = action.getAuthTokens().get(0);
+        assertEquals(25, row.get("moduleCount"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> modules = (List<Map<String, Object>>) row.get("modules");
+        assertEquals(20, modules.size());
+        assertEquals("m-24", modules.get(0).get("id"));
+        assertEquals("m-5", modules.get(19).get("id"));
     }
 
     @Test

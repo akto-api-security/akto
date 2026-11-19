@@ -14,7 +14,7 @@ const MAX_USED_BY_CHIPS = 3
 const REVOKE_CONFIRM_TEXT = "REVOKE"
 // services re-sync their revoked list on this schedule, so a revoke can take this long to reach all of them
 const REVOKE_DELAY = "up to 15 minutes"
-const REVOKE_ALL_INFO = `Revoke all works after upgrading modules to the latest version. It applies only to tokens generated after this feature was released; legacy tokens can be revoked one at a time. Revoked tokens can take ${REVOKE_DELAY} to stop working everywhere.`
+const REVOKE_ALL_INFO = `Revoke all works after upgrading modules to the latest version. It revokes every active token, including the legacy tokens listed here; a legacy token that has not connected yet is not listed, so it is not included. Revoked tokens can take ${REVOKE_DELAY} to stop working everywhere.`
 
 const nowSeconds = () => Math.floor(Date.now() / 1000)
 
@@ -60,7 +60,7 @@ function TokensTab() {
 
     const now = nowSeconds()
     const activeTokens = tokens.filter(token => tokenState(token, now) === 'ACTIVE')
-    const revocableByAll = activeTokens.filter(token => !isLegacy(token))
+    const activeLegacyCount = activeTokens.filter(isLegacy).length
     const expiringSoon = activeTokens.filter(token => token.expiresAt > 0 && token.expiresAt - now <= EXPIRING_SOON_SECONDS)
     const isIdle = (token) => now - (token.lastUsedAt || token.createdAt || 0) > IDLE_SECONDS
     const idleTokens = activeTokens.filter(isIdle)
@@ -123,7 +123,7 @@ function TokensTab() {
     const usedBy = (token) => {
         const modules = token.modules || []
         if (modules.length === 0) return '-'
-        const extra = modules.length - MAX_USED_BY_CHIPS
+        const extra = (token.moduleCount ?? modules.length) - MAX_USED_BY_CHIPS
         return (
             <HorizontalStack gap="1" wrap={false}>
                 {modules.slice(0, MAX_USED_BY_CHIPS).map(module => (
@@ -181,8 +181,10 @@ function TokensTab() {
         actions(token)
     ])
 
+    // the server sends at most a few modules per token plus the real total in moduleCount
     const affectedModules = (revokeTarget?.modules) || []
-    const revokeAllModuleCount = revocableByAll.reduce((count, token) => count + (token.modules || []).length, 0)
+    const moreAffected = (revokeTarget?.moduleCount ?? affectedModules.length) - affectedModules.length
+    const revokeAllModuleCount = activeTokens.reduce((count, token) => count + (token.moduleCount ?? (token.modules || []).length), 0)
 
     return (
         <VerticalStack gap="4">
@@ -209,7 +211,7 @@ function TokensTab() {
                                 <Button disabled={!canCall('api/createAuthToken')} onClick={openCreateModal}>Create token</Button>
                                 <Button
                                     destructive
-                                    disabled={!canCall('api/revokeAllAuthTokens') || revocableByAll.length === 0}
+                                    disabled={!canCall('api/revokeAllAuthTokens') || activeTokens.length === 0}
                                     onClick={() => setRevokeAllOpen(true)}
                                 >
                                     Revoke all
@@ -272,6 +274,7 @@ function TokensTab() {
                                         {module.name || module.id} ({module.moduleType || '-'}), last heartbeat {func.epochToDateTime(module.lastHeartbeatReceived)}
                                     </Text>
                                 ))}
+                                {moreAffected > 0 && <Text variant="bodyMd" color="subdued">and {moreAffected} more</Text>}
                             </VerticalStack>
                         ) : (
                             <Text variant="bodyMd" color="subdued">No modules are currently using this token.</Text>
@@ -303,7 +306,7 @@ function TokensTab() {
                 <Modal.Section>
                     <VerticalStack gap="3">
                         <Banner status="critical">
-                            This revokes {revocableByAll.length} active token(s), affecting {revokeAllModuleCount} module(s). Legacy tokens are not affected; revoke them one at a time.
+                            This revokes {activeTokens.length} active token(s){activeLegacyCount > 0 ? `, including ${activeLegacyCount} legacy token(s),` : ''} affecting {revokeAllModuleCount} module(s).
                         </Banner>
                         <Text variant="bodyMd" color="subdued">{REVOKE_ALL_INFO}</Text>
                         <TextField

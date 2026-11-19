@@ -26,6 +26,7 @@ import lombok.Setter;
 public class AuthTokenAction extends UserAction {
 
     private static final int MAX_LISTED_TOKENS = 1000;
+    private static final int MAX_MODULES_PER_TOKEN = 20;
     private static final int ACTIVE_HEARTBEAT_SECONDS = 300;
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> ROW_TYPE = new TypeReference<Map<String, Object>>() {};
@@ -63,11 +64,21 @@ public class AuthTokenAction extends UserAction {
 
         this.authTokens = new ArrayList<>();
         for (AuthToken token : tokens) {
+            List<Map<String, Object>> tokenModules = modules.getOrDefault(token.getId(), new ArrayList<>());
             Map<String, Object> row = MAPPER.convertValue(token, ROW_TYPE);
-            row.put("modules", modules.getOrDefault(token.getId(), new ArrayList<>()));
+            row.put("moduleCount", tokenModules.size());
+            row.put("modules", newestFirst(tokenModules));
             authTokens.add(row);
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    // Capped so a token shared by thousands of devices cannot bloat the response; moduleCount carries the real total.
+    private static List<Map<String, Object>> newestFirst(List<Map<String, Object>> modules) {
+        return modules.stream()
+                .sorted((a, b) -> Integer.compare((int) b.get("lastHeartbeatReceived"), (int) a.get("lastHeartbeatReceived")))
+                .limit(MAX_MODULES_PER_TOKEN)
+                .collect(Collectors.toList());
     }
 
     private Map<String, List<Map<String, Object>>> modulesByToken(List<AuthToken> tokens) {
@@ -105,7 +116,7 @@ public class AuthTokenAction extends UserAction {
     }
 
     public String revokeAllAuthTokens() {
-        this.revokedCount = AuthTokenService.revokeAllGenerated(reason, revokedBy());
+        this.revokedCount = AuthTokenService.revokeAllActive(reason, revokedBy());
         return Action.SUCCESS.toUpperCase();
     }
 
