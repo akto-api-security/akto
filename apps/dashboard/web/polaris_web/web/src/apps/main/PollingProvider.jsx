@@ -4,6 +4,8 @@ import homeRequests from '../dashboard/pages/home/api';
 import PersistStore from './PersistStore';
 import { isEndpointSecurityCategory } from './labelHelper';
 const PollingContext = createContext();
+const ACTIVE_POLL_MS = 2000;
+const IDLE_POLL_MS = 10000;
 
 export const usePolling = () => useContext(PollingContext);
 
@@ -17,33 +19,57 @@ export const PollingProvider = ({ children }) => {
     const intervalIdRef = useRef(null);
     const intervalAlertRef = useRef(null);
     const [currentTestingRuns, setCurrentTestingRuns] = useState([])
+    const pollingStoppedRef = useRef(false);
 
     useEffect(() => {
-        const fetchTestingStatus = () => {
-            const id = setInterval(() => {
-                testingApi.fetchTestingRunStatus().then((resp) => {
-                    setCurrentTestingRuns((prev) => {
-                        if(prev.length === 0 && resp?.currentRunningTestsStatus === 0){
-                            return prev
-                        }else{
-                            return resp?.currentRunningTestsStatus
-                        }
-                    })
-                    setCurrentTestsObj(prevState => {
-                        const newTestsObj = {
-                            totalTestsInitiated: resp?.testRunsScheduled || 0,
-                            totalTestsCompleted: resp?.totalTestsCompleted || 0,
-                            totalTestsQueued: resp?.testRunsQueued || 0,
-                            testRunsArr: resp?.currentRunningTestsStatus || []
-                        };
-                        if (JSON.stringify(prevState) !== JSON.stringify(newTestsObj)) {
-                            return newTestsObj;
-                        }
-                        return prevState;
-                    });
+        // Poll fast only while tests are running or queued, and not at all while the tab is hidden
+        let effectActive = true;
+        const scheduleNextPoll = (delay) => {
+            // A request still in flight at unmount must not start a new poll
+            if (!effectActive) {
+                return;
+            }
+            clearTimeout(intervalIdRef.current);
+            intervalIdRef.current = setTimeout(pollTestingStatus, delay);
+        };
+        const onVisibilityChange = () => {
+            if (!document.hidden && !pollingStoppedRef.current) {
+                scheduleNextPoll(0);
+            }
+        };
+        const pollTestingStatus = () => {
+            if (pollingStoppedRef.current || document.hidden) {
+                return;
+            }
+            testingApi.fetchTestingRunStatus().then((resp) => {
+                setCurrentTestingRuns((prev) => {
+                    if(prev.length === 0 && resp?.currentRunningTestsStatus === 0){
+                        return prev
+                    }else{
+                        return resp?.currentRunningTestsStatus
+                    }
+                })
+                setCurrentTestsObj(prevState => {
+                    const newTestsObj = {
+                        totalTestsInitiated: resp?.testRunsScheduled || 0,
+                        totalTestsCompleted: resp?.totalTestsCompleted || 0,
+                        totalTestsQueued: resp?.testRunsQueued || 0,
+                        testRunsArr: resp?.currentRunningTestsStatus || []
+                    };
+                    if (JSON.stringify(prevState) !== JSON.stringify(newTestsObj)) {
+                        return newTestsObj;
+                    }
+                    return prevState;
                 });
-            }, 2000);
-            intervalIdRef.current = id; 
+                const testsActive = (resp?.currentRunningTestsStatus?.length || 0) > 0 || (resp?.testRunsQueued || 0) > 0;
+                scheduleNextPoll(testsActive ? ACTIVE_POLL_MS : IDLE_POLL_MS);
+            }).catch(() => {
+                scheduleNextPoll(IDLE_POLL_MS);
+            });
+        };
+        const fetchTestingStatus = () => {
+            document.addEventListener('visibilitychange', onVisibilityChange);
+            scheduleNextPoll(ACTIVE_POLL_MS);
         };
         const fetchAlerts = () => {
             const id2 = setInterval(() => {
@@ -62,13 +88,16 @@ export const PollingProvider = ({ children }) => {
             }
         }
         return () => {
-            clearInterval(intervalIdRef.current);
+            effectActive = false;
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            clearTimeout(intervalIdRef.current);
             clearInterval(intervalAlertRef.current);
         };
     }, []);
 
     const clearPollingInterval = () => {
-        clearInterval(intervalIdRef.current);
+        pollingStoppedRef.current = true;
+        clearTimeout(intervalIdRef.current);
         clearInterval(intervalAlertRef.current);
     };
 
