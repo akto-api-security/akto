@@ -1,11 +1,14 @@
 import React from "react";
-import { Badge, Box, HorizontalStack, Text } from "@shopify/polaris";
+import { Badge, Box, HorizontalStack, Text, Tooltip } from "@shopify/polaris";
 import observeFunc from "../transform";
-import { getRiskStatus } from "./agenticPageBuilders";
+import { getRiskLevel, getRiskStatus } from "./agenticPageBuilders";
+import func from "@/util/func";
 import AssetIcon from "./AssetIcon";
 import { TypeBadge } from "@/apps/dashboard/components/tables/rows/AgGridRow";
 import MisconfiguredBadge from "./MisconfiguredBadge";
+import SkillTagBadges from "./SkillTagBadges";
 import "../../../components/layouts/style.css";
+import { LegendDot } from "./AgenticStatsCard";
 
 // ─── Shared badges ────────────────────────────────────────────────────────────
 // All badges are Polaris <Badge>. Where the colour isn't in Polaris' status set
@@ -23,15 +26,12 @@ export function RiskPill({ score }) {
 // Severity badge — same pattern as TestRunResultFlyout: a .badge-wrapper-<SEVERITY>
 // wrapper colours the Polaris <Badge>, and status comes from observeFunc.getColor.
 // `children` lets callers show a count instead of the severity label (violation pills).
-export function SeverityBadge({ severity, children }) {
+export function SeverityBadge({ severity, children, useDot=false }) {
     const sev = String(severity || "").toUpperCase();
     if (!sev) return null;
     const label = children != null ? children : (sev.charAt(0) + sev.slice(1).toLowerCase());
-    return (
-        <Box as="span" className={`badge-wrapper-${sev}`}>
-            <Badge size="small" status={observeFunc.getColor(sev)}>{label}</Badge>
-        </Box>
-    );
+    const Comp = useDot ? <LegendDot color={observeFunc.getColorForSensitiveData(sev)} /> : <Box as="span" className={`badge-wrapper-${sev}`}><Badge size="small" status={observeFunc.getColor(sev)}>{label}</Badge></Box>
+    return Comp;
 }
 
 // ─── Shared schema / param cell renderers ─────────────────────────────────────
@@ -70,13 +70,13 @@ export function ParamDescCellRenderer({ data }) {
 
 export function AssetNameCellRenderer({ data }) {
     if (!data) return null;
-    // Match old UI: personal-account + local-MCP tags for non-Skill rows; malicious tag for Skills
+    // Match old UI: personal-account + local-MCP tags for non-Skill rows; malicious tag for Skills and MCP servers
     const isSkill = data.type === "Skill";
     // Skill/Plugin rows fan out from the agent collection, so they'd inherit its markers otherwise.
     const isFanout = isSkill || data.type === "Plugin";
     const showLocalMcp = data.hasLocalMcpServer && !isFanout;
     const showPersonal = data.hasPersonalAccount && !isFanout;
-    const showMalicious = data.isMalicious && isSkill;
+    const showMalicious = data.isMalicious && (isSkill || data.type === "MCP Server");
     // Misconfigured is an Agent/MCP-server-only concept — Skill (and Plugin) rows never show it.
     const showMisconfigured = data.hasMisconfiguredConfig && !isFanout;
     return (
@@ -84,11 +84,13 @@ export function AssetNameCellRenderer({ data }) {
             <AssetIcon type={data.type} assetTagValue={data.assetTagValue} size={24} />
             <Box width="100%" overflowX="hidden">
                 <Text variant="bodySm" fontWeight="medium" truncate>{data.name}</Text>
+                {data.subtitle && <Text variant="bodySm" color="subdued" truncate>{data.subtitle}</Text>}
             </Box>
             {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
             {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
             {showMisconfigured && <MisconfiguredBadge deviceCount={data.misconfiguredDeviceCount} />}
             {showMalicious && <Badge size="small" status="critical">Malicious</Badge>}
+            {isSkill && <SkillTagBadges tags={data.skillTags} />}
         </HorizontalStack>
     );
 }
@@ -113,9 +115,57 @@ export function PluginAgentCellRenderer({ value }) {
     );
 }
 
-export function RiskScoreCellRenderer({ value }) {
+export function RiskScoreCellRenderer({ value, data }) {
     if (value == null) return null;
-    return <RiskPill score={value} />;
+    // Prefer riskScoreFactors saved with the score. baseRiskScoreReason stays as a fallback for
+    // collections that still carry the older LLM/base reason fields.
+    return observeFunc.wrapRiskScoreTooltip(
+        <RiskPill score={value} />,
+        value,
+        data?.baseRiskScore,
+        data?.baseRiskScoreReason,
+        data?.riskScoreFactors,
+    );
+}
+
+// MCP server / LLM / AI agent rows only (AgenticObserveAction's approvalStatus); Blocked stays neutral.
+const APPROVAL_BADGE_STATUS = { Approved: "success", Unapproved: "critical", "Under review": "attention" };
+
+export function ApprovalStatusBadge({ status }) {
+    if (!status) return null;
+    return <Badge size="small" status={APPROVAL_BADGE_STATUS[status]}>{status}</Badge>;
+}
+
+export function ApprovalStatusCellRenderer({ value }) {
+    if (!value) return <Text variant="bodyMd" color="subdued">-</Text>;
+    return <ApprovalStatusBadge status={value} />;
+}
+
+// Discovered tool names (an agent's built-in tools, an MCP server's tools); the full list on hover.
+const MAX_TOOLTIP_TOOLS = 20;
+
+export function ToolsCellRenderer({ value }) {
+    const tools = value || [];
+    if (!tools.length) return <Text variant="bodyMd" color="subdued">-</Text>;
+    const toolList = tools.slice(0, MAX_TOOLTIP_TOOLS).join(", ") + (tools.length > MAX_TOOLTIP_TOOLS ? `, and ${tools.length - MAX_TOOLTIP_TOOLS} more` : "");
+    return (
+        <Tooltip content={toolList}>
+            <Text variant="bodyMd" truncate>{tools.join(", ")}</Text>
+        </Tooltip>
+    );
+}
+
+// Coloured dot + risk level; same score tooltip as RiskScoreCellRenderer.
+export function RiskLevelCellRenderer({ value, data }) {
+    if (!value) return null;
+    const level = getRiskLevel(value);
+    const label = (
+        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+            <LegendDot color={observeFunc.getColorForSensitiveData(level)} />
+            <Text variant="bodySm">{func.toSentenceCase(level)}</Text>
+        </HorizontalStack>
+    );
+    return observeFunc.wrapRiskScoreTooltip(label, value, data?.baseRiskScore, data?.baseRiskScoreReason, data?.riskScoreFactors);
 }
 
 export function ViolationsCellRenderer({ value }) {

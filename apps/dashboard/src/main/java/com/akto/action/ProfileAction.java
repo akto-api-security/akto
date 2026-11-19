@@ -52,7 +52,11 @@ public class ProfileAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void executeMeta1(Utility utility, User user, HttpServletRequest request, HttpServletResponse response) {
+    public static boolean executeMeta1(Utility utility, User user, HttpServletRequest request, HttpServletResponse response) {
+        if (user == null || user.getAccounts() == null || user.getAccounts().isEmpty()) {
+            logger.errorAndAddToDb("Signed-in user has no account: " + (user == null ? "" : user.getLogin()), LogDb.DASHBOARD);
+            return false;
+        }
         BasicDBObject userDetails = new BasicDBObject();
         BasicDBObject accounts = new BasicDBObject();
         Integer sessionAccId = Context.accountId.get();
@@ -76,7 +80,8 @@ public class ProfileAction extends UserAction {
         };
 
         if (sessionAccId == 0) {
-            throw new IllegalStateException("user has no accounts associated");
+            logger.errorAndAddToDb("Signed-in user has no account: " + user.getLogin(), LogDb.DASHBOARD);
+            return false;
         } else {
             logger.debug("setting session: " + sessionAccId);
             request.getSession().setAttribute("accountId", sessionAccId);
@@ -156,6 +161,24 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        boolean linearIntegrated = false;
+        try {
+            long documentCount = LinearIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                linearIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
+        boolean portIOIntegrated = false;
+        try {
+            long documentCount = PortIOIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                portIOIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         boolean wizIntegrated = false;
         try {
             long documentCount = WizIntegrationDao.instance.estimatedDocumentCount();
@@ -192,9 +215,20 @@ public class ProfileAction extends UserAction {
         ));
 
         BasicDBObject scopeRoleMapping = new BasicDBObject();
+        // base role per product (custom roles resolved), so the UI checks the role of the product it is in
+        BasicDBObject scopeBaseRoleMapping = new BasicDBObject();
+        // threat access per product with custom role changes applied, so the UI shows threat pages a custom role allows
+        BasicDBObject scopeThreatAccess = new BasicDBObject();
         if(userRbac.getScopeRoleMapping() != null){
             for(String key : userRbac.getScopeRoleMapping().keySet()){
                 scopeRoleMapping.append(key, userRbac.getScopeRoleMapping().get(key));
+                try {
+                    RBAC.Role baseRole = userRbac.getRoleForScope(GlobalEnums.CONTEXT_SOURCE.valueOf(key));
+                    if (baseRole != null) scopeBaseRoleMapping.append(key, baseRole.name());
+                    scopeThreatAccess.append(key, RBACDao.accessFor(userRbac.getScopeRoleMapping().get(key),
+                            com.akto.dto.rbac.RbacEnums.Feature.THREAT_PROTECTION, false).name());
+                } catch (Exception ignored) {
+                }
             }
         }
 
@@ -214,6 +248,8 @@ public class ProfileAction extends UserAction {
                 .append("azureBoardsIntegrated", azureBoardsIntegrated)
                 .append("servicenowIntegrated", servicenowIntegrated)
                 .append("devrevIntegrated", devrevIntegrated)
+                .append("linearIntegrated", linearIntegrated)
+                .append("portIOIntegrated", portIOIntegrated)
                 .append("wizIntegrated", wizIntegrated)
                 .append("userRole", userRole!=null ?userRole.toString().toUpperCase(): "")
                 .append("currentTimeZone", timeZone)
@@ -221,7 +257,8 @@ public class ProfileAction extends UserAction {
                 .append("isAwsWafIntegrated", awsWafCount != 0)
                 .append("isCloudflareWafIntegrated", cloudflareWafCount != 0)
                 .append("scopeRoleMapping", scopeRoleMapping)
-                .append("AG_GRID_LICENSE_KEY", System.getenv("AG_GRID_LICENSE_KEY"));
+                .append("scopeBaseRoleMapping", scopeBaseRoleMapping)
+                .append("scopeThreatAccess", scopeThreatAccess);
 
         boolean inviteDisabledForSSO = com.akto.utils.Utils.allowNewUserInviteViaDashboard(sessionAccId, user);
         userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);
@@ -386,7 +423,7 @@ public class ProfileAction extends UserAction {
             request.setAttribute(k, userDetails.get(k));
         }
 
-        return;
+        return true;
     }
 
     private String type;

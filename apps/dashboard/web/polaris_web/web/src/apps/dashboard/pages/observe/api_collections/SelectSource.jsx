@@ -1,6 +1,7 @@
-import { Modal, Checkbox, Box, Text, VerticalStack } from "@shopify/polaris"
+import { Modal, Checkbox, Box, VerticalStack } from "@shopify/polaris"
 import DropdownSearch from "../../../components/shared/DropdownSearch"
 import { useState } from "react"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 
 const sourcesAvailable = [
@@ -16,7 +17,7 @@ export function SelectSource({show, setShow, primaryAction}) {
         <Modal
             open={show}
             onClose={() => setShow(false)}
-            title="Select the source for your APIs"
+            title={"Select the source for your " + mapLabel('APIs', getDashboardCategory())}
             primaryAction={{
                 content: "Upload",
                 onAction: () => {

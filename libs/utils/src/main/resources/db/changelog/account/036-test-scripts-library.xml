@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors TestScriptsDao.createIndicesIfAbsent and TestingRunConfigDao.createIndicesIfAbsent for the
+        pre/post request script library (see apps/dashboard/.../service/scripts/CLAUDE.md).
+
+        - test_scripts holds the named library scripts. name is UNIQUE: it is what keeps a retried create
+          from adding a second script, and default-test-pre / default-test-post are looked up by name.
+        - testing_run_config.preRequestScriptId / postRequestScriptId back the delete guard
+          (TestingRunConfigDao.existsReferenceToScript).
+
+        Index names match MCollection.generateIndexName, so these are no-ops where the DAO already built
+        them. Copying the legacy scripts into test_scripts is the BackwardCompatibility hook
+        migrateTestScriptsToLibrary, not this file.
+    -->
+
+    <changeSet id="036-account-create-test-scripts" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="test_scripts"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="test_scripts"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="test_scripts"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="036-account-test-scripts-name-unique-index" author="akto">
+        <mongodb:createIndex collectionName="test_scripts">
+            <mongodb:keys>{ "name": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "name_1", "unique": true }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="test_scripts">
+                <mongodb:keys>{ "name": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="036-account-test-scripts-type-index" author="akto">
+        <mongodb:createIndex collectionName="test_scripts">
+            <mongodb:keys>{ "type": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "type_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="test_scripts">
+                <mongodb:keys>{ "type": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="036-account-test-scripts-last-updated-at-index" author="akto">
+        <mongodb:createIndex collectionName="test_scripts">
+            <mongodb:keys>{ "lastUpdatedAt": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "lastUpdatedAt_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="test_scripts">
+                <mongodb:keys>{ "lastUpdatedAt": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="036-account-testing-run-config-pre-request-script-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="testing_run_config"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="testing_run_config">
+            <mongodb:keys>{ "preRequestScriptId": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "preRequestScriptId_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="testing_run_config">
+                <mongodb:keys>{ "preRequestScriptId": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="036-account-testing-run-config-post-request-script-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="testing_run_config"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="testing_run_config">
+            <mongodb:keys>{ "postRequestScriptId": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "postRequestScriptId_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="testing_run_config">
+                <mongodb:keys>{ "postRequestScriptId": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

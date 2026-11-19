@@ -1,11 +1,14 @@
 import { Box, Button, Spinner, Text, VerticalStack } from "@shopify/polaris"
 import { useState } from "react";
 import api from "../api";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 
 function TableExpand({ data, childApiCollectionId, childUrl, childMethod, showEditModal }) {
     const [paramToValuesMap, setParamToValuesMap] = useState(null)
     const [loading, setLoading] = useState(true)
+    const { canCall } = usePermissions()
 
     function convertToText(ele) {
         const childParam = ele["childParam"]
@@ -52,7 +55,7 @@ function TableExpand({ data, childApiCollectionId, childUrl, childMethod, showEd
             </td>
             <td style={{ width: '20%', verticalAlign: 'top', textAlign: 'right', padding: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', height: '100%' }}>
-                    <Button key={childMethod + "-" + childUrl} onClick={() => { showEditModal(childApiCollectionId, childUrl, childMethod, data) }}>Edit</Button>
+                    <AllowedAction allowed={canCall('api/saveReplaceDetails')}><Button key={childMethod + "-" + childUrl} onClick={() => { showEditModal(childApiCollectionId, childUrl, childMethod, data) }}>Edit</Button></AllowedAction>
                 </div>
             </td>
         </tr>

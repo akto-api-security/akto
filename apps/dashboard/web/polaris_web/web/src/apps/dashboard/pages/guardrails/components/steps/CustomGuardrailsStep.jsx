@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Badge, Banner } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, Box, Checkbox, HorizontalStack, Badge, Banner } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
@@ -73,13 +73,11 @@ export const CustomGuardrailsConfig = {
 
 const CustomGuardrailsStep = ({
     onTryPrompt,
-    // LLM prompt based rule
+    // LLM prompt based detection
     enableLlmPrompt,
     setEnableLlmPrompt,
     llmRule,
     setLlmRule,
-    llmConfidenceScore,
-    setLlmConfidenceScore,
     // LLM rule compliance (controlled by parent)
     llmCompliance,
     setLlmCompliance,
@@ -92,9 +90,7 @@ const CustomGuardrailsStep = ({
     enableExternalModel,
     setEnableExternalModel,
     url,
-    setUrl,
-    confidenceScore,
-    setConfidenceScore
+    setUrl
 }) => {
     const [urlError, setUrlError] = useState("");
     const [llmRuleCompliance, setLlmRuleCompliance] = useState({ loading: false, suggested: {}, accepted: {} });
@@ -105,7 +101,7 @@ const CustomGuardrailsStep = ({
     useEffect(() => {
         if (llmCompliance && Object.keys(llmCompliance).length > 0) {
             const accepted = Object.keys(llmCompliance).reduce((acc, framework) => { acc[framework] = true; return acc; }, {});
-            setLlmRuleCompliance({ loading: false, suggested: llmCompliance, accepted });
+            setLlmRuleCompliance({ loading: false, suggested: llmCompliance, accepted, evaluated: true });
         }
     }, []);
 
@@ -140,11 +136,12 @@ const CustomGuardrailsStep = ({
                 acc[framework] = true;
                 return acc;
             }, {});
-            setLlmRuleCompliance({ loading: false, suggested, accepted });
+            setLlmRuleCompliance({ loading: false, suggested, accepted, evaluated: true });
             setLlmCompliance(buildComplianceMap(suggested, accepted));
         } catch (error) {
             if (reqId !== requestIdRef.current) return;
             console.error('Error fetching compliance suggestions:', error);
+            // Leave evaluated false: a failed call is not a finding of "nothing maps".
             setLlmRuleCompliance({ loading: false, suggested: {}, accepted: {} });
         }
     };
@@ -188,6 +185,75 @@ const CustomGuardrailsStep = ({
         }
     };
 
+    // Redaction compliance mirrors the detection flow and is stored on the first redaction rule.
+    const [redactionCompliance, setRedactionCompliance] = useState({ loading: false, suggested: {}, accepted: {} });
+    const redactionRequestIdRef = useRef(0);
+    const redactionDebounceTimerRef = useRef(null);
+    const isRedactionInitialMount = useRef(true);
+
+    // Functional update so a late suggestion never writes back a stale rule list.
+    const saveRedactionCompliance = (compliance) => {
+        setRedactionRules(prev => (prev || []).map((rule, i) => (i === 0 ? { ...rule, compliance } : rule)));
+    };
+
+    useEffect(() => {
+        const saved = redactionRule.compliance;
+        if (saved && Object.keys(saved).length > 0) {
+            const accepted = Object.keys(saved).reduce((acc, framework) => { acc[framework] = true; return acc; }, {});
+            setRedactionCompliance({ loading: false, suggested: saved, accepted, evaluated: true });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isRedactionInitialMount.current) {
+            isRedactionInitialMount.current = false;
+            return;
+        }
+        const rule = (redactionRule.userPrompt || "").trim();
+        clearTimeout(redactionDebounceTimerRef.current);
+
+        if (rule.length < PROMPT_MIN_LENGTH) {
+            redactionRequestIdRef.current++;
+            setRedactionCompliance({ loading: false, suggested: {}, accepted: {} });
+            saveRedactionCompliance({});
+            return;
+        }
+
+        redactionDebounceTimerRef.current = setTimeout(() => {
+            fetchRedactionCompliance(rule);
+        }, 1000);
+
+        return () => clearTimeout(redactionDebounceTimerRef.current);
+    }, [redactionRule.userPrompt]);
+
+    const fetchRedactionCompliance = async (rule) => {
+        const reqId = ++redactionRequestIdRef.current;
+        setRedactionCompliance(prev => ({ ...prev, loading: true }));
+        try {
+            const resp = await guardrailApi.suggestGuardrailCompliance('redaction_rule', { llmRule: rule });
+            if (reqId !== redactionRequestIdRef.current) return;
+            const suggested = resp?.response?.mapComplianceToListClauses || {};
+            const accepted = Object.keys(suggested).reduce((acc, framework) => { acc[framework] = true; return acc; }, {});
+            setRedactionCompliance({ loading: false, suggested, accepted, evaluated: true });
+            saveRedactionCompliance(buildComplianceMap(suggested, accepted));
+        } catch (error) {
+            if (reqId !== redactionRequestIdRef.current) return;
+            console.error('Error fetching redaction compliance suggestions:', error);
+            setRedactionCompliance({ loading: false, suggested: {}, accepted: {} });
+        }
+    };
+
+    const toggleRedactionFramework = (framework) => {
+        const newAccepted = { ...redactionCompliance.accepted };
+        if (newAccepted[framework]) {
+            delete newAccepted[framework];
+        } else {
+            newAccepted[framework] = true;
+        }
+        setRedactionCompliance({ ...redactionCompliance, accepted: newAccepted });
+        saveRedactionCompliance(buildComplianceMap(redactionCompliance.suggested, newAccepted));
+    };
+
     const handleUrlChange = (value) => {
         setUrl(value);
         if (value && value.trim() && !validateUrl(value.trim())) {
@@ -205,15 +271,19 @@ const CustomGuardrailsStep = ({
             <OwaspTag stepNumber={6} />
 
             <VerticalStack gap="4">
-                {/* LLM Prompt Based Rule */}
+                {/* LLM Prompt Based Detection */}
                 <Box>
                     <Checkbox
                         label={
                             <HorizontalStack gap="1" blockAlign="center">
-                                <Text as="span">LLM prompt based rule</Text>
+                                <Text as="span">LLM prompt based detection</Text>
                                 <ControlInfoIcon
                                     {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmPromptRule}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => {
+                                        setEnableLlmPrompt(true);
+                                        if (!llmRule.trim()) setLlmRule("Block requests for competitor pricing");
+                                    }}
                                 />
                             </HorizontalStack>
                         }
@@ -225,38 +295,21 @@ const CustomGuardrailsStep = ({
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <FormLayout>
                                 <TextField
-                                    label="Prompt"
+                                    label="Detection instruction"
                                     value={llmRule}
                                     onChange={setLlmRule}
                                     multiline={4}
+                                    maxHeight={400}
                                     placeholder="Enter your LLM evaluation prompt here..."
                                     helpText="This prompt will be used to evaluate whether content should be blocked. Be specific about what you want to detect."
-                                />
-
-                                <RangeSlider
-                                    label={
-                                        <HorizontalStack gap="1" blockAlign="center">
-                                            <Text as="span">Confidence score threshold</Text>
-                                            <ControlInfoIcon
-                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmConfidenceThreshold}
-                                                onTryPrompt={onTryPrompt}
-                                            />
-                                        </HorizontalStack>
-                                    }
-                                    value={llmConfidenceScore}
-                                    onChange={setLlmConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    helpText="Content will be blocked if the LLM's confidence score exceeds this threshold"
                                 />
 
                                 <ComplianceMappingTags
                                     loading={llmRuleCompliance.loading}
                                     complianceMap={buildComplianceMap(llmRuleCompliance.suggested, llmRuleCompliance.accepted)}
                                     onRemove={toggleLlmFramework}
-                                    onAdd={Object.keys(llmRuleCompliance.suggested).length > 0 ? toggleLlmFramework : undefined}
+                                    onAdd={toggleLlmFramework}
+                                    evaluated={!!llmRuleCompliance.evaluated}
                                 />
                             </FormLayout>
                         </Box>
@@ -285,11 +338,23 @@ const CustomGuardrailsStep = ({
                     {enableLlmRedaction && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="4">
-                                <Banner>
-                                    Requires Akto browser extension v1.0.69 or later. Currently
-                                    supported only via the browser extension. Endpoint Shield
-                                    Agent support is coming soon.
-                                </Banner>
+                                <VerticalStack gap="0">
+                                    <Banner>
+                                        Requires Akto browser extension v1.0.69 or later. Currently
+                                        supported only via the browser extension. Endpoint Shield
+                                        Agent support is coming soon.
+                                    </Banner>
+                                    <Banner status="warning">
+                                        <VerticalStack gap="1">
+                                            <Text variant="bodyMd">
+                                                Prompts are never blocked. Text matching your redaction instruction will be redacted from the prompt.
+                                            </Text>
+                                            <Text variant="bodyMd">
+                                                File uploads are always blocked if they contain matching text.
+                                            </Text>
+                                        </VerticalStack>
+                                    </Banner>
+                                </VerticalStack>
                                 <FormLayout>
                                     <TextField
                                         label="Redaction instruction"
@@ -300,23 +365,12 @@ const CustomGuardrailsStep = ({
                                         helpText="Be specific about what to mask. Anything not described here is left untouched. To redact a second, unrelated category, create another policy."
                                     />
 
-                                    <RangeSlider
-                                        label={
-                                            <HorizontalStack gap="1" blockAlign="center">
-                                                <Text as="span">Confidence score threshold</Text>
-                                                <ControlInfoIcon
-                                                    {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionConfidenceThreshold}
-                                                    onTryPrompt={onTryPrompt}
-                                                />
-                                            </HorizontalStack>
-                                        }
-                                        value={redactionRule.confidenceScore}
-                                        onChange={(value) => updateRedactionRule({ confidenceScore: value })}
-                                        min={0}
-                                        max={1}
-                                        step={0.1}
-                                        output
-                                        helpText="Text is only masked if the LLM's confidence that it matches your instruction exceeds this threshold"
+                                    <ComplianceMappingTags
+                                        loading={redactionCompliance.loading}
+                                        complianceMap={buildComplianceMap(redactionCompliance.suggested, redactionCompliance.accepted)}
+                                        onRemove={toggleRedactionFramework}
+                                        onAdd={toggleRedactionFramework}
+                                        evaluated={!!redactionCompliance.evaluated}
                                     />
                                 </FormLayout>
                             </VerticalStack>
@@ -350,25 +404,6 @@ const CustomGuardrailsStep = ({
                                     placeholder="https://api.example.com/evaluate"
                                     helpText="The endpoint URL for your external evaluation model"
                                     error={urlError}
-                                />
-
-                                <RangeSlider
-                                    label={
-                                        <HorizontalStack gap="1" blockAlign="center">
-                                            <Text as="span">Confidence score threshold</Text>
-                                            <ControlInfoIcon
-                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.externalConfidenceThreshold}
-                                                onTryPrompt={onTryPrompt}
-                                            />
-                                        </HorizontalStack>
-                                    }
-                                    value={confidenceScore}
-                                    onChange={setConfidenceScore}
-                                    min={0}
-                                    max={100}
-                                    step={25}
-                                    output
-                                    helpText="Content will be blocked if the model's confidence score exceeds this threshold (0-100)"
                                 />
                             </FormLayout>
                         </Box>

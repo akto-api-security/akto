@@ -1,5 +1,7 @@
 """Gibberish detection prompt (Gemma-tuned; used for all providers today)."""
 
+from ._abcd import to_abcd
+
 GEMMA = """You are a security system that detects gibberish or nonsensical input.
 
 Gibberish is text from which a competent reader cannot extract any intent or content. Examples:
@@ -18,7 +20,9 @@ NOT gibberish — even when it looks "weird" to a non-specialist:
 - Text with typos, autocorrect mistakes, or formatting glitches that still contains recognisable words
 - Placeholder text (lorem ipsum) — intentional, not noise
 
-The signal is "can a competent reader extract meaning, intent, or structure from this," NOT "does this look unusual." Judge the input as a whole: recognizing one token or spotting a pattern in the noise is not the same as the input conveying something, so a repeated or patterned sequence with nothing to say is still gibberish.
+The input may arrive wrapped in request metadata: a JSON body with fields such as model, messages, role and content. That wrapper is protocol, not the user's message — ignore it and judge only the human-authored content. A keyboard-mash message stays gibberish inside a wrapper; a real sentence in any script stays meaningful inside one.
+
+The signal is "can a competent reader extract meaning, intent, or structure from this," NOT "does this look unusual." Judge the authored content as a whole: recognizing one token or spotting a pattern in the noise is not the same as the input conveying something, so a repeated or patterned sequence with nothing to say is still gibberish.
 
 Examples (these inputs are NOT from the test set):
 
@@ -37,16 +41,37 @@ Output: {"isGibberish": true, "confidence": 0.93, "reason": "One syllable repeat
 Input: "no no no, don't run that against prod, use the staging key"
 Output: {"isGibberish": false, "confidence": 0.03, "reason": "Repetition is emphasis inside an ordinary sentence that states a clear request."}
 
+Input: "{\\"model\\": \\"gpt-4o\\", \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"xkcqv wptzr bnmlkj\\"}]}"
+Output: {"isGibberish": true, "confidence": 0.92, "reason": "Ignoring the request wrapper, the user's content is random letter runs with no word structure."}
+
+Input: "{\\"model\\": \\"gpt-4o\\", \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Сколько стоит доставка в Казань?\\"}]}"
+Output: {"isGibberish": false, "confidence": 0.02, "reason": "Ignoring the request wrapper, the content is an ordinary Russian question about delivery cost."}
+
+Input: "გამარჯობა, როგორ ხარ? ხვალ დაგირეკავ."
+Output: {"isGibberish": false, "confidence": 0.02, "reason": "Ordinary Georgian greeting and a promise to call tomorrow; a non-Latin script is not noise."}
+
 Analyze this text and respond ONLY with valid JSON:
 {
   "isGibberish": <true if this text is gibberish, false otherwise>,
   "confidence": <float 0.0 to 1.0 — your estimated p(boolean-above-is-true). Use ~0.9+ when sure it is true, ~0.1 or lower when sure it is false. NEVER invert.>,
-  "reason": "<one sentence explanation>"
+  "reason": "<one sentence explanation; refer to any PII, secret or personal data by category only, never quote the values>"
 }
 
 Text to analyze:
 %s"""
 
 
-def build(text: str) -> str:
-    return GEMMA % text
+# Single-letter variant, derived from GEMMA so the rules stay in one place.
+GEMMA_ABCD = to_abcd(
+    GEMMA,
+    flag_key="isGibberish",
+    safe="NOT GIBBERISH",
+    flag="GIBBERISH",
+    near_miss="unusual-looking but meaningful text (code, hashes, identifiers, other scripts, typos)",
+    label="gibberish",
+)
+
+
+def build(text: str, response_format: str = "") -> str:
+    template = GEMMA_ABCD if response_format == "abcd" else GEMMA
+    return template % text

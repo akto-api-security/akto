@@ -39,7 +39,6 @@ THREAT_DETECTION_API_CHAIN_PATTERN.md
 **/__pycache__/
 run-guardrails-service.sh
 .github/hooks
-**/CLAUDE.md
 scripts/**
 apps/guardrails-service/container/scripts/**
 **.log
@@ -54,3 +53,4 @@ run-embedder.sh
 data-adhoc/**
 .playwright-mcp/
 run-guardrails-threat-client.sh
+run-threat-detection-backend.sh

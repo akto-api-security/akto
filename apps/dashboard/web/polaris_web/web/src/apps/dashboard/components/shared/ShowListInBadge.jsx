@@ -2,19 +2,20 @@ import { Badge, Box, HorizontalStack, List, Tooltip } from '@shopify/polaris'
 import React from 'react'
 import TooltipText from './TooltipText'
 
-function ShowListInBadge({itemsArr, maxWidth, status, maxItems, itemWidth, useBadge, useTooltip, wrap = false}) {
+function ShowListInBadge({itemsArr, maxWidth, status, maxItems, itemWidth, useBadge, useTooltip, wrap = false, getItemStatus}) {
 
     return (
-        <Box maxWidth={maxWidth} overflowX="hidden">
+        <Box maxWidth={maxWidth} overflowX="hidden" overflowY="visible">
             <HorizontalStack gap={"1"} wrap={wrap}>
                 {itemsArr.slice(0,maxItems).map((item, index) => {
+                    const itemStatus = getItemStatus ? getItemStatus(item) : status
                     return(
                         (useBadge === undefined || useBadge) ?
-                        <Badge key={index + item} size="medium" status={status}>
+                        <Badge key={index + item} size="medium" status={itemStatus}>
                             <Box maxWidth={itemWidth || maxWidth}>
                                 <TooltipText tooltip={item} text={item} />
                             </Box>
-                        </Badge>: 
+                        </Badge>:
                         <Box maxWidth={itemWidth || maxWidth}>
                             {item}
                         </Box>
@@ -22,7 +23,7 @@ function ShowListInBadge({itemsArr, maxWidth, status, maxItems, itemWidth, useBa
                 })}
 
                 {(itemsArr.length - maxItems) > 0 ? (
-                    useTooltip ? 
+                    useTooltip ?
                         <Tooltip width="wide" borderRadius="2" padding="4" content={itemsArr?.slice(maxItems)?.map((item, index) => {
                             return (
                                 <Box key={index + item} paddingInlineStart="1"><List.Item><div style={{whiteSpace: 'nowrap'}}>{item}</div></List.Item></Box>

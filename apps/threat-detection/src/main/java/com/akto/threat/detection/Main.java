@@ -110,7 +110,7 @@ public class Main {
 
     // Start PatternUpdateService for periodic pattern updates from public URL
     try {
-      String patternFileUrl = "https://akto.blob.core.windows.net/threat-config/threat-patterns.txt";
+      String patternFileUrl = "https://threatstorageacc.blob.core.windows.net/threat-pattern-config/threat-patterns.txt";
       String localPatternFile = System.getenv().getOrDefault("LOCAL_PATTERN_FILE", "threat-patterns-example.txt");
 
       PatternUpdateService patternUpdateService = new PatternUpdateService(

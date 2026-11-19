@@ -2,17 +2,23 @@ package com.akto.action;
 
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dao.RBACDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.GuardrailPolicies;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.GuardrailSource;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.utils.ArgusCollectionScope;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -34,11 +40,15 @@ import org.bson.types.ObjectId;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 
 public class GuardrailPoliciesAction extends UserAction {
@@ -105,8 +115,20 @@ public class GuardrailPoliciesAction extends UserAction {
             // Mongo treats limit <= 0 as "unlimited", so clamp instead of passing it through as-is.
             skip = Math.max(skip, 0);
             limit = limit <= 0 ? DEFAULT_FETCH_LIMIT : Math.min(limit, MAX_FETCH_LIMIT);
-            this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
-            this.total = GuardrailPoliciesDao.instance.getTotalCount();
+            List<ApiCollection> ownCollections = ArgusCollectionScope.getRestrictedCollections(getSUser());
+            if (ownCollections == null) {
+                this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
+                this.total = GuardrailPoliciesDao.instance.getTotalCount();
+            } else {
+                // Users limited to collections don't see policies that target only other teams' servers
+                Set<String> allowedTargets = allowedTargets(ownCollections);
+                List<GuardrailPolicies> visible = new ArrayList<>();
+                for (GuardrailPolicies p : GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 0)) {
+                    if (isVisibleToScope(p, allowedTargets)) visible.add(p);
+                }
+                this.total = visible.size();
+                this.guardrailPolicies = new ArrayList<>(visible.subList(Math.min(skip, visible.size()), Math.min(skip + limit, visible.size())));
+            }
 
             // Resolve targetTags/targetDeviceIds → device IDs fresh on every fetch.
             // applyToDeviceIds left null (never set below) = no targeting configured → apply to all devices.
@@ -119,7 +141,7 @@ public class GuardrailPoliciesAction extends UserAction {
                         || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
                     p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTags(
-                            p.getTargetTags(), p.getTargetDeviceIds()));
+                            p.getTargetTags(), p.getNegatedTargetTags(), p.getTargetDeviceIds(), p.isNegatedTargetDeviceIds()));
                 }
                 EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
             }
@@ -233,8 +255,31 @@ public class GuardrailPoliciesAction extends UserAction {
             Bson filter = (hexId != null && !hexId.isEmpty()) 
                 ? Filters.eq(Constants.ID, new ObjectId(hexId))
                 : Filters.eq("name", policy.getName()); // or use another unique identifier
+
+            // The saved policy and the one it replaces (if any) must both be within the user's scope
+            String accessError = validatePolicyAccess(() -> {
+                List<GuardrailPolicies> policiesToCheck = new ArrayList<>();
+                policiesToCheck.add(policy);
+                GuardrailPolicies existingPolicy = GuardrailPoliciesDao.instance.findOne(filter);
+                if (existingPolicy != null) {
+                    policiesToCheck.add(existingPolicy);
+                }
+                return policiesToCheck;
+            });
+            if (accessError != null) {
+                addActionError(accessError);
+                return ERROR.toUpperCase();
+            }
             
             EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
+
+            // userMetadata is derived solely from policy.targetUserNames — the explicit "Users"
+            // picks — never combined with the identities behind targetDeviceIds (device targeting
+            // stays purely device-level, resolved separately via applyToDeviceIds). targetUserNames
+            // itself is never persisted (see GuardrailPolicies#targetUserNames, @BsonIgnore);
+            // userMetadata is the durable record of which identities were picked, so it's always
+            // re-resolved fresh from live sources here rather than trusting whatever the client sent.
+            policy.setUserMetadata(AgentUsersDao.instance.resolveUserMetadata(policy.getTargetUserNames()));
 
             List<Bson> updates = buildPolicyUpdates(policy, contextSource);
 
@@ -278,6 +323,9 @@ public class GuardrailPoliciesAction extends UserAction {
         updates.add(Updates.set("applyOnRequest", p.isApplyOnRequest()));
         updates.add(Updates.set("applyToAllServers", p.isApplyToAllServers()));
         updates.add(Updates.set("active", p.isActive()));
+        updates.add(Updates.set("negatedAgentServers", p.isNegatedAgentServers()));
+        updates.add(Updates.set("negatedMcpServers", p.isNegatedMcpServers()));
+        updates.add(Updates.set("negatedLlmServers", p.isNegatedLlmServers()));
 
         if (StringUtils.isNotBlank(p.getDescription())) {
             updates.add(Updates.set("description", p.getDescription()));
@@ -351,6 +399,9 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getSelectedAgentServersV2() != null) {
             updates.add(Updates.set("selectedAgentServersV2", p.getSelectedAgentServersV2()));
         }
+        if (p.getSelectedLlmServersV2() != null) {
+            updates.add(Updates.set("selectedLlmServersV2", p.getSelectedLlmServersV2()));
+        }
         if (p.getBlockedHosts() != null) {
             updates.add(Updates.set("blockedHosts", p.getBlockedHosts()));
         }
@@ -360,10 +411,22 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getTargetDeviceIds() != null) {
             updates.add(Updates.set("targetDeviceIds", p.getTargetDeviceIds()));
         }
+        // targetUserNames is intentionally never persisted (@BsonIgnore) — it's an inbound-only
+        // request field; userMetadata (set unconditionally below) is the durable record instead.
         if (p.getTargetTags() != null) {
             updates.add(Updates.set("targetTags", p.getTargetTags()));
         }
+        // Always set (not conditional) so toggling back to false (Include) actually persists.
+        updates.add(Updates.set("negatedTargetTags", p.getNegatedTargetTags()));
+        updates.add(Updates.set("negatedTargetDeviceIds", p.isNegatedTargetDeviceIds()));
+        updates.add(Updates.set("negatedTargetUserNames", p.isNegatedTargetUserNames()));
+        // Always set (never conditional): computed fresh from targetDeviceIds/targetUserNames
+        // right before this call, so it must overwrite any stale snapshot from a previous save.
+        updates.add(Updates.set("userMetadata", p.getUserMetadata()));
         updates.add(Updates.set("blockPersonalAccounts", p.isBlockPersonalAccounts()));
+        updates.add(Updates.set("blockPublicShare", p.isBlockPublicShare()));
+        updates.add(Updates.set("blockedHostsAllowOnly", p.isBlockedHostsAllowOnly()));
+        updates.add(Updates.set("skipEnterpriseAccounts", p.isSkipEnterpriseAccounts()));
         if (StringUtils.isNotBlank(p.getBehaviour())) {
             updates.add(Updates.set("behaviour", p.getBehaviour()));
         }
@@ -403,6 +466,11 @@ public class GuardrailPoliciesAction extends UserAction {
             }
 
             Bson filter = Filters.in(GuardrailPoliciesDao.ID, objectIds);
+            String accessError = validatePolicyAccess(() -> GuardrailPoliciesDao.instance.findAll(filter));
+            if (accessError != null) {
+                addActionError(accessError);
+                return ERROR.toUpperCase();
+            }
             GuardrailPoliciesDao.instance.getMCollection().deleteMany(filter);
 
             loggerMaker.info("Deleted " + policyIds.size() + " guardrail policies by user: " + user.getLogin());
@@ -412,6 +480,84 @@ public class GuardrailPoliciesAction extends UserAction {
             loggerMaker.errorAndAddToDb("Error deleting guardrail policies: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
+    }
+
+    /*
+     * Argus only (other products and accounts without the RBAC feature are not affected):
+     * - only Admin and Threat Engineer base roles (including custom roles on them) can create, edit,
+     *   delete or approve guardrail policies
+     * - users limited to specific collections can manage only policies that target their own
+     *   collections: no "apply to all", no exclude mode, and every selected server must be theirs
+     * The policies are only loaded when the user is limited. Returns an error message, or null if allowed.
+     */
+    private String validatePolicyAccess(Supplier<List<GuardrailPolicies>> policies) {
+        Integer accountId = Context.accountId.get();
+        // Same as roleAccessInterceptor: roles are only enforced on metered (SaaS / on-prem) dashboards with the RBAC feature
+        if (accountId == null || getSUser() == null || !ArgusCollectionScope.isArgusContext() || !DashboardMode.isMetered()
+                || !UsageMetricCalculator.isRbacFeatureAvailable(accountId)) {
+            return null;
+        }
+        Role role = RBACDao.getCurrentRoleForUser(getSUser().getId(), accountId);
+        if (role != Role.ADMIN && role != Role.THREAT_ENGINEER) {
+            return "Only Admin and Threat Engineer roles can manage guardrail policies";
+        }
+
+        List<ApiCollection> ownCollections = ArgusCollectionScope.getRestrictedCollections(getSUser());
+        if (ownCollections == null) {
+            return null;
+        }
+        Set<String> allowedTargets = allowedTargets(ownCollections);
+
+        String scopeError = "You can apply guardrail policies only to the collections assigned to you";
+        for (GuardrailPolicies p : policies.get()) {
+            if (p.isApplyToAllServers() || p.isNegatedAgentServers() || p.isNegatedMcpServers() || p.isNegatedLlmServers()) {
+                return scopeError;
+            }
+            List<String> targets = policyTargets(p);
+            if (targets.isEmpty()) {
+                return scopeError;
+            }
+            for (String target : targets) {
+                if (target == null || !allowedTargets.contains(target)) {
+                    return scopeError;
+                }
+            }
+        }
+        return null;
+    }
+
+    static Set<String> allowedTargets(List<ApiCollection> ownCollections) {
+        Set<String> allowedTargets = new HashSet<>();
+        for (ApiCollection collection : ownCollections) {
+            allowedTargets.add(String.valueOf(collection.getId()));
+            if (collection.getHostName() != null) allowedTargets.add(collection.getHostName());
+            if (collection.getName() != null) allowedTargets.add(collection.getName());
+            if (collection.getDisplayName() != null) allowedTargets.add(collection.getDisplayName());
+        }
+        return allowedTargets;
+    }
+
+    static List<String> policyTargets(GuardrailPolicies p) {
+        List<String> targets = new ArrayList<>();
+        if (p.getSelectedMcpServers() != null) targets.addAll(p.getSelectedMcpServers());
+        if (p.getSelectedAgentServers() != null) targets.addAll(p.getSelectedAgentServers());
+        for (List<GuardrailPolicies.SelectedServer> servers : Arrays.asList(
+                p.getSelectedMcpServersV2(), p.getSelectedAgentServersV2(), p.getSelectedLlmServersV2())) {
+            if (servers == null) continue;
+            for (GuardrailPolicies.SelectedServer server : servers) {
+                targets.add(server.getId() != null ? server.getId() : server.getName());
+            }
+        }
+        return targets;
+    }
+
+    /** Global policies (apply to all, exclude mode, no servers picked) also cover the user's servers, so they stay visible. */
+    static boolean isVisibleToScope(GuardrailPolicies p, Set<String> allowedTargets) {
+        if (p.isApplyToAllServers() || p.isNegatedAgentServers() || p.isNegatedMcpServers() || p.isNegatedLlmServers()) {
+            return true;
+        }
+        List<String> targets = policyTargets(p);
+        return targets.isEmpty() || targets.stream().anyMatch(allowedTargets::contains);
     }
 
     private static final int MAX_APPROVAL_DAYS = 365;
@@ -443,6 +589,12 @@ public class GuardrailPoliciesAction extends UserAction {
                 policyObjId = existing.getId();
             } else {
                 addActionError("Policy id or policy name is required");
+                return ERROR.toUpperCase();
+            }
+
+            String accessError = validatePolicyAccess(() -> GuardrailPoliciesDao.instance.findAll(Filters.eq(Constants.ID, policyObjId)));
+            if (accessError != null) {
+                addActionError(accessError);
                 return ERROR.toUpperCase();
             }
 

@@ -7,9 +7,12 @@ import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useSearchParams } from "react-router-dom";
 import { updateThreatFiltersStore } from "../utils/threatFilters";
 import SessionStore from "../../../../main/SessionStore";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave, showDelete = false }) {
     const[searchParams] = useSearchParams()
+    const { canCall } = usePermissions()
     const filteredPolicy = searchParams.get("policy")
     const [ogData, setOgData] = useState({ message: "" })
     const [data, setData] = useState({ message: "" })
@@ -162,13 +165,17 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
                         {!readOnly && (
                             <HorizontalStack gap="2">
                                 {showDelete && (
-                                    <Button outline size="slim" onClick={onDeleteClick}>
-                                        Delete
-                                    </Button>
+                                    <AllowedAction allowed={canCall('api/deleteFilterYamlTemplate')}>
+                                        <Button outline size="slim" onClick={onDeleteClick}>
+                                            Delete
+                                        </Button>
+                                    </AllowedAction>
                                 )}
-                                <Button outline size="slim" onClick={onSave}>
-                                    Save
-                                </Button>
+                                <AllowedAction allowed={canCall('api/saveFilterYamlTemplate')}>
+                                    <Button outline size="slim" onClick={onSave}>
+                                        Save
+                                    </Button>
+                                </AllowedAction>
                             </HorizontalStack>
                         )}
                     </HorizontalStack>

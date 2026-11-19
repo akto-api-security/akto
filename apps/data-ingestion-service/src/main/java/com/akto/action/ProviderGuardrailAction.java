@@ -8,6 +8,8 @@ import com.akto.dao.context.Context;
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
+import com.akto.util.Constants;
+import com.akto.utils.AgentHostUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -15,7 +17,9 @@ import org.apache.struts2.ServletActionContext;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -41,6 +45,19 @@ public class ProviderGuardrailAction extends ActionSupport {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ProviderGuardrailAction.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final Gateway gateway = Gateway.getInstance();
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String INFERENCE_HOOKS_TAG = "inference-hooks";
+    private static final String TOOL_CALL_EVENT = "tool_call";
+    private static final String ENDPOINT_PREFIX = "inference-hook-";
+    private static final String INSTALLER_HEADER_PREFIX = "x-akto-installer-";
+    private static final String SESSION_HEADER = INSTALLER_HEADER_PREFIX + "akto_session_id";
+    private static final String MESSAGE_HEADER = INSTALLER_HEADER_PREFIX + "akto_message_id";
+    private static final String USER_EMAIL_HEADER = INSTALLER_HEADER_PREFIX + "user_email";
+    private static final String MCP_TOOL_PREFIX = "mcp__";
+    private static final String MCP_SEPARATOR = "__";
+    private static final String MCP_SERVER_TAG_VALUE = "MCP Server";
+    private static final String MCP_PATH = "/mcp";
+    private static final String TOOL_CALL_SEGMENT = "/tool-call";
+    private static final String THIRD_PARTY_TOOL = "third_party";
 
     static {
         gateway.setDataPublisher(new KafkaDataPublisher());
@@ -65,22 +82,27 @@ public class ProviderGuardrailAction extends ActionSupport {
             Map<String, Object> body = readBody();
             ParsedRequest frame = adapter.parse(body);
 
-            // Non-inspectable event or empty prompt -> allow without validating.
             if (frame.allowShortCircuit || frame.prompt == null || frame.prompt.isEmpty()) {
                 response = adapter.verdict(true, null, frame.requestId);
                 return Action.SUCCESS.toUpperCase();
             }
 
-            Map<String, Object> requestData = buildEnvelope(frame);
-            requestData.put("guardrails", "true");
-            requestData.put("ingest_data", "true");
+            registerConnectorIdentity(frame);
 
-            Map<String, Object> result = gateway.processHttpProxy(requestData);
-            Map<String, Object> guardrailsResult = extractGuardrailsResult(result);
+            List<ParsedRequest.ToolCall> calls = frame.toolCalls != null
+                    ? frame.toolCalls
+                    : Collections.<ParsedRequest.ToolCall>singletonList(null);
+            Map<String, Object> denied = null;
+            for (ParsedRequest.ToolCall call : calls) {
+                Map<String, Object> guardrailsResult = process(frame, call);
+                if (guardrailsResult != null && !isAllowed(guardrailsResult)) {
+                    denied = guardrailsResult;
+                    break;
+                }
+            }
 
-            boolean allow = guardrailsResult == null || isAllowed(guardrailsResult);
-            String reason = guardrailsResult == null ? null : stringOrNull(guardrailsResult.get("Reason"));
-            response = adapter.verdict(allow, reason, frame.requestId);
+            String reason = denied == null ? null : stringOrNull(denied.get("Reason"));
+            response = adapter.verdict(denied == null, reason, frame.requestId);
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
@@ -93,31 +115,104 @@ public class ProviderGuardrailAction extends ActionSupport {
         }
     }
 
+    private Map<String, Object> process(ParsedRequest frame, ParsedRequest.ToolCall call) {
+        Map<String, Object> requestData = buildEnvelope(frame, call);
+        requestData.put("guardrails", "true");
+        requestData.put("ingest_data", "true");
+        return extractGuardrailsResult(gateway.processHttpProxy(requestData));
+    }
+
+    private static String[] mcpTarget(ParsedRequest.ToolCall call) {
+        if (call == null) {
+            return null;
+        }
+        if (call.name.startsWith(MCP_TOOL_PREFIX)) {
+            String rest = call.name.substring(MCP_TOOL_PREFIX.length());
+            int sep = rest.indexOf(MCP_SEPARATOR);
+            if (sep > 0 && sep + MCP_SEPARATOR.length() < rest.length()) {
+                return new String[]{rest.substring(0, sep), rest.substring(sep + MCP_SEPARATOR.length())};
+            }
+        }
+        if (call.info != null && THIRD_PARTY_TOOL.equals(call.info.get("type")) && call.info.get("toolset_name") != null) {
+            String server = call.info.get("toolset_name").toString();
+            if (!server.isEmpty()) {
+                return new String[]{server, call.name};
+            }
+        }
+        return null;
+    }
+
+    private static String toolPathSegment(String toolName) {
+        String segment = toolName.replaceAll("[^A-Za-z0-9_.-]", "_");
+        return segment.isEmpty() ? "unknown" : segment;
+    }
+
+    private static void putIfPresent(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.trim().isEmpty()) {
+            target.put(key, value);
+        }
+    }
+
+    private Map<String, Object> requestPayload(ParsedRequest frame, ParsedRequest.ToolCall call, String[] mcp) {
+        Map<String, Object> payload = new HashMap<>();
+        if (mcp != null) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("name", mcp[1]);
+            params.put("arguments", call.input != null ? call.input : new HashMap<String, Object>());
+            payload.put("jsonrpc", "2.0");
+            payload.put("id", call.id);
+            payload.put("method", "tools/call");
+            payload.put("params", params);
+        } else if (call != null) {
+            payload.put("body", call.text);
+            payload.put("tool_name", call.name);
+            payload.put("tool_use_id", call.id);
+        } else {
+            payload.put("body", frame.prompt);
+        }
+        return payload;
+    }
+
     /**
      * Build the flat Akto envelope for processHttpProxy. Host names the collection
      * (one per provider); important metadata (webhook/request id, session, tenant,
      * model, actor) is carried through so it is recorded and available to policies.
      */
-    private Map<String, Object> buildEnvelope(ParsedRequest frame) {
-        String host = buildAgentHost(frame);
-        registerConnectorIdentity(frame);
+    private Map<String, Object> buildEnvelope(ParsedRequest frame, ParsedRequest.ToolCall call) {
+        String[] mcp = mcpTarget(call);
+        String app = normalizeApp(frame.application);
+        String host = mcp != null
+                ? AgentHostUtils.mcpHost(endpointId(frame), app, mcp[0])
+                : buildAgentHost(frame);
 
         Map<String, Object> requestHeaders = new HashMap<>();
         requestHeaders.put("host", host);
         requestHeaders.put("content-type", "application/json");
+        putIfPresent(requestHeaders, SESSION_HEADER, frame.sessionId);
+        putIfPresent(requestHeaders, MESSAGE_HEADER, frame.requestId);
+        putIfPresent(requestHeaders, USER_EMAIL_HEADER, extractEmail(frame.actor));
 
         Map<String, Object> responseHeaders = new HashMap<>();
         responseHeaders.put("content-type", "application/json");
 
-        // Match the http-proxy/browser payload shape: user text under "body".
-        // model / session_id are carried in metadata (below), not here.
-        Map<String, Object> requestPayload = new HashMap<>();
-        requestPayload.put("body", frame.prompt);
-
         Map<String, Object> tag = new HashMap<>();
-        tag.put("gen-ai", "Gen AI");
-        tag.put("ai-agent", provider.toLowerCase());
         tag.put("source", "ENDPOINT");
+        tag.put(Constants.AKTO_GUARDRAIL_MODE, Constants.AKTO_GUARDRAIL_MODE_INLINE);
+        tag.put(INFERENCE_HOOKS_TAG, provider.toLowerCase());
+        if (mcp != null) {
+            tag.put(Constants.AKTO_MCP_SERVER_TAG, MCP_SERVER_TAG_VALUE);
+            tag.put("mcp-client", agentTagValue(app));
+        } else {
+            tag.put("gen-ai", "Gen AI");
+            tag.put("ai-agent", agentTagValue(app));
+        }
+        if (frame.application != null && !frame.application.isEmpty()) {
+            tag.put("product-surface", frame.application.toLowerCase().replaceAll("[^a-z0-9]+", "_"));
+        }
+        String usernameSlug = actorSlug(frame);
+        if (!usernameSlug.isEmpty()) {
+            tag.put("username", usernameSlug);
+        }
 
         Map<String, Object> meta = new HashMap<>();
         meta.put("webhook_id", frame.requestId);
@@ -125,18 +220,36 @@ public class ProviderGuardrailAction extends ActionSupport {
         meta.put("tenant_id", frame.tenantId);
         meta.put("model", frame.model);
         meta.put("actor", frame.actor);
-        // Advisory only (e.g. claude-code = CLI, claude-ai = app). Recorded for
-        // visibility/routing; never used in the allow/deny decision.
         meta.put("application", frame.application);
         if (frame.metadata != null) {
             meta.put("provider_metadata", frame.metadata);
         }
+        meta.put("event_type", frame.eventType);
+        if (call != null) {
+            meta.put("tool_name", call.name);
+            meta.put("tool_use_id", call.id);
+            if (call.info != null) {
+                meta.put("tool_info", call.info);
+            }
+        }
+        if (mcp != null) {
+            meta.put("mcp_server", mcp[0]);
+        }
+
+        String path = "/" + provider.toLowerCase() + "/guardrail";
+        if (mcp != null) {
+            path = MCP_PATH;
+        } else if (call != null) {
+            path += TOOL_CALL_SEGMENT + "/" + toolPathSegment(call.name);
+        } else if (TOOL_CALL_EVENT.equals(frame.eventType)) {
+            path += TOOL_CALL_SEGMENT;
+        }
 
         Map<String, Object> envelope = new HashMap<>();
         envelope.put("akto_connector", provider.toLowerCase());
-        envelope.put("path", "/" + provider.toLowerCase() + "/guardrail");
+        envelope.put("path", path);
         envelope.put("method", "POST");
-        envelope.put("requestPayload", toJson(requestPayload));
+        envelope.put("requestPayload", toJson(requestPayload(frame, call, mcp)));
         envelope.put("responsePayload", "{}");
         envelope.put("requestHeaders", toJson(requestHeaders));
         envelope.put("responseHeaders", toJson(responseHeaders));
@@ -190,7 +303,7 @@ public class ProviderGuardrailAction extends ActionSupport {
     }
 
     /**
-     * Agent collection hostname, built server-side as {emailSlug}.ai-agent.{app}.
+     * Agent collection hostname, built server-side as inference-hook-{emailSlug}.ai-agent.{app}.
      * Mirrors the client-side endpoint-shield convention
      * ({deviceLabel}.ai-agent.{agentName}, see device.go GetAgentCollectionName)
      * but uses the incoming email as the slug because the device name and
@@ -198,20 +311,41 @@ public class ProviderGuardrailAction extends ActionSupport {
      * is intentionally omitted.
      */
     private static String buildAgentHost(ParsedRequest frame) {
-        String emailSlug = slugify(emailLocalPart(extractEmail(frame.actor)));
-        if (emailSlug.isEmpty()) {
-            emailSlug = "unknown";
-        }
-        return emailSlug + ".ai-agent." + normalizeApp(frame.application);
+        return AgentHostUtils.agentHost(endpointId(frame), normalizeApp(frame.application));
     }
 
-    /** Local part of the email (before "@"); the domain is dropped. */
-    private static String emailLocalPart(String email) {
-        if (email == null) {
-            return null;
+    // Endpoint ID is the first host segment; the prefix keeps hook endpoints apart from real devices.
+    private static String endpointId(ParsedRequest frame) {
+        return ENDPOINT_PREFIX + AgentHostUtils.identitySlug(actorIdentity(frame.actor));
+    }
+
+    private static String actorSlug(ParsedRequest frame) {
+        return AgentHostUtils.slugify(actorIdentity(frame.actor));
+    }
+
+    private static String actorIdentity(Map<String, Object> actor) {
+        String email = extractEmail(actor);
+        if (email != null && !email.trim().isEmpty()) {
+            return AgentHostUtils.emailLocalPart(email);
         }
-        int at = email.indexOf('@');
-        return at > 0 ? email.substring(0, at) : email;
+        Object id = actor == null ? null : actor.get("id");
+        return id != null ? id.toString() : null;
+    }
+
+    // Registry-known ai-agent values keep each Claude surface in its own group instead of folding everything into Claude CLI.
+    private String agentTagValue(String app) {
+        if ("claude".equalsIgnoreCase(provider)) {
+            if ("claude-cli".equals(app)) {
+                return "claude-cli";
+            }
+            if ("cowork".equals(app)) {
+                return "claude_cowork";
+            }
+            if ("claude-app".equals(app)) {
+                return "claude-app";
+            }
+        }
+        return provider.toLowerCase();
     }
 
     // Self-registers this actor's email-slug into agent_users on first contact, so it becomes
@@ -219,9 +353,8 @@ public class ProviderGuardrailAction extends ActionSupport {
     private static void registerConnectorIdentity(ParsedRequest frame) {
         try {
             String email = extractEmail(frame.actor);
-            String slug = slugify(emailLocalPart(email));
-            if (!slug.isEmpty()) {
-                AgentUsersDao.instance.ensureConnectorIdentity(email, slug, "inference-hooks");
+            if (!actorSlug(frame).isEmpty()) {
+                AgentUsersDao.instance.ensureConnectorIdentity(email, endpointId(frame), "inference-hooks");
             }
         } catch (Exception e) {
             loggerMaker.error("Provider guardrail: failed to register connector identity", e);
@@ -237,14 +370,6 @@ public class ProviderGuardrailAction extends ActionSupport {
             email = actor.get("email");
         }
         return email != null ? email.toString() : null;
-    }
-
-    /** Lowercase; each run of non-alphanumerics -> "-"; trim leading/trailing "-". */
-    private static String slugify(String s) {
-        if (s == null) {
-            return "";
-        }
-        return s.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-+|-+$)", "");
     }
 
     /**
@@ -263,7 +388,7 @@ public class ProviderGuardrailAction extends ActionSupport {
         if (a.equals("claude-ai")) {
             return "claude-app";
         }
-        return slugify(a);
+        return AgentHostUtils.slugify(a);
     }
 
     private static String resolveAccountId() {

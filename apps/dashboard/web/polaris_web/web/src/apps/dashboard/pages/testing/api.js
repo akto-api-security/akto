@@ -12,10 +12,11 @@ export default {
         return resp
     },
 
-    async fetchTestingRunResultSummaries(testingRunHexId, startTimestamp, endTimestamp) {
+    async fetchTestingRunResultSummaries(testingRunHexId, startTimestamp, endTimestamp, suppressErrorToast = false) {
         const resp = await request({
             url: '/api/fetchTestingRunResultSummaries',
             method: 'post',
+            suppressErrorToast,
             data: {
                 testingRunHexId,
                 startTimestamp,
@@ -42,6 +43,22 @@ export default {
                 testingRunResultSummaryId,
                 ...(Array.isArray(logKeys) && logKeys.length > 0 ? { logKeys } : {})
             }
+        })
+        return resp
+    },
+    async fetchSmartTestingLive(testingRunResultSummaryHexId, afterTs) {
+        const resp = await request({
+            url: '/api/fetchSmartTestingLive',
+            method: 'post',
+            data: { testingRunResultSummaryHexId, afterTs }
+        })
+        return resp
+    },
+    async sendSmartTestingRunMessage(testingRunResultSummaryHexId, text) {
+        const resp = await request({
+            url: '/api/sendSmartTestingRunMessage',
+            method: 'post',
+            data: { testingRunResultSummaryHexId, text }
         })
         return resp
     },
@@ -569,25 +586,58 @@ export default {
             data: {reportId, organizationName, reportDate, reportUrl, username, firstPollRequest}
         })
     },
-    fetchScript(scriptType = 'PRE_REQUEST') {
+    fetchAllScripts() {
+        return request({
+            url: '/api/fetchAllScripts',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchScript(scriptId) {
         return request({
             url: '/api/fetchScript',
             method: 'post',
-            data: { scriptType }
+            data: { scriptId }
         })
     },
-    addScript({ javascript, scriptType = 'PRE_REQUEST' }) {
+    addScript({ name, scriptType, javascript }) {
         return request({
             url: '/api/addScript',
             method: 'post',
-            data: { testScript: { javascript, type: scriptType } }
+            data: { name, scriptType, javascript }
         })
     },
-    updateScript(id, javascript) {
+    updateScript(scriptId, javascript) {
         return request({
             url: '/api/updateScript',
             method: 'post',
-            data: {testScript:{id, javascript}}
+            data: { scriptId, javascript }
+        })
+    },
+    deleteScript(scriptId) {
+        return request({
+            url: '/api/deleteScript',
+            method: 'post',
+            data: { scriptId }
+        })
+    },
+    // Ask Akto script validation (service/scripts/validation/CLAUDE.md). In the dashboard module the replay runs
+    // inline like the test editor, and a polling script can take minutes, so this call waits longer than the
+    // default 60s. With a miniTestingName it returns scriptValidationPlaygroundId at once; poll
+    // fetchScriptValidation for the result.
+    validateTestScript(validationRequest) {
+        return request({
+            url: '/api/validateTestScript',
+            method: 'post',
+            data: { validationRequest },
+            timeout: 11 * 60 * 1000
+        })
+    },
+    fetchScriptValidation(scriptValidationPlaygroundId) {
+        return request({
+            url: '/api/fetchScriptValidation',
+            method: 'post',
+            data: { scriptValidationPlaygroundId }
         })
     },
     updateDeltaTimeForSummaries(deltaTimeForScheduledSummaries){
@@ -642,6 +692,13 @@ export default {
             url: '/api/handleRefreshTableCount',
             method: 'post',
             data: {testingRunResultSummaryHexId}
+        })
+    },
+    verifyTestRunWithAi(testingRunResultSummaryHexId, testingRunResultHexIds = []) {
+        return request({
+            url: '/api/verifyTestRunWithAi',
+            method: 'post',
+            data: {testingRunResultSummaryHexId, testingRunResultHexIds}
         })
     },
     createNewTestSuite(testSuiteName,subCategoryList) {
@@ -755,5 +812,23 @@ export default {
             }
         })
         return resp
+    },
+    // Smart agents
+    async fetchSmartAgentProfiles() {
+        return await request({ url: '/api/fetchSmartAgentProfiles', method: 'post', data: {} })
+    },
+    async fetchSmartAgentProfile(hexId) {
+        return await request({ url: '/api/fetchSmartAgentProfile', method: 'post', data: { hexId } })
+    },
+    async saveSmartAgentProfile(profile) {
+        const { hexId, name, description, skills, customSkills, allowCreateIdentities, instructions, knowledgeFiles, knowledgeLinks } = profile
+        return await request({
+            url: '/api/saveSmartAgentProfile',
+            method: 'post',
+            data: { hexId, name, description, skills, customSkills, allowCreateIdentities, instructions, knowledgeFiles, knowledgeLinks }
+        })
+    },
+    async deleteSmartAgentProfile(hexId) {
+        return await request({ url: '/api/deleteSmartAgentProfile', method: 'post', data: { hexId } })
     },
 }

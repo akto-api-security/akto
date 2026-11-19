@@ -1,4 +1,4 @@
-import { Button, Form,  HorizontalStack, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Banner, Button, Form,  HorizontalStack, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from './SSOTextfield'
 import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
@@ -95,7 +95,8 @@ function SignUp() {
 
     setSsoList(copySsoList)
 
-    if (window.IS_SAAS && window.IS_SAAS === "true") {
+    const noAccount = new URLSearchParams(location.search).get('error') === 'no_account'
+    if (window.IS_SAAS && window.IS_SAAS === "true" && !noAccount) {
       navigate('/dashboard/observe/inventory');
     }
   }, [])
@@ -305,8 +306,15 @@ function SignUp() {
     </VerticalStack>
   )
 
+  const noAccount = new URLSearchParams(location.search).get('error') === 'no_account'
+
   const customComponent = (
     <VerticalStack gap={8}>
+      {noAccount && (
+        <Banner status="warning" title="No account for this user">
+          <Text as="p">This user isn't a member of any Akto account. Ask an admin to send an invite, then sign in with that link.</Text>
+        </Banner>
+      )}
       <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
       <VerticalStack gap={5}>
         {ssoCard}

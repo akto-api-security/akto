@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -29,12 +30,22 @@ public class McpAuditInfo {
     public static final String APPROVED_AT = "approvedAt";
     public static final String CONTEXT_SOURCE = "contextSource";
     public static final String BLOCK_ALL = "blockAll";
+    public static final String RAW_VALUES = "rawValues";
+    public static final String TARGET_TAGS = "targetTags";
+    public static final String NEGATED_TARGET_TAGS = "negatedTargetTags";
+    public static final String TARGET_DEVICE_IDS = "targetDeviceIds";
+    public static final String NEGATED_TARGET_DEVICE_IDS = "negatedTargetDeviceIds";
+    public static final String USER_METADATA = "userMetadata";
+    public static final String NEGATED_TARGET_USER_NAMES = "negatedTargetUserNames";
 
     // Value used in the `type` field for AI-agent skill audit records.
     public static final String TYPE_AGENT_SKILL = "AGENT_SKILL";
     // Values used in the `remarks` field for skill/MCP-server approval flows.
     public static final String REMARKS_REJECTED = "Rejected";
     public static final String REMARKS_APPROVED = "Approved";
+    // AI inventory "Mark under review": not a decision, so guardrails (which only fetches
+    // Approved / Conditionally Approved / Rejected rows) treats it like a pending record.
+    public static final String REMARKS_UNDER_REVIEW = "Under review";
 
     private ObjectId id;
 
@@ -63,6 +74,17 @@ public class McpAuditInfo {
     // When true, any newly detected record for this server name is auto-blocked.
     // Set server-side when the user triggers "Block for all agents".
     private boolean blockAll;
+
+    // ai-agent rows: lower-cased agent names guardrails matches the agent's traffic on.
+    private List<String> rawValues;
+
+    // Who a block applies to, same fields as GuardrailPolicies; none set = everyone.
+    private Map<String, List<String>> targetTags;
+    private Map<String, Boolean> negatedTargetTags;
+    private List<String> targetDeviceIds;
+    private boolean negatedTargetDeviceIds;
+    private List<AgenticUsers> userMetadata;
+    private boolean negatedTargetUserNames;
 
     @BsonIgnore
     private boolean verified;

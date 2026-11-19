@@ -11,6 +11,7 @@ import {useState} from 'react';
 import '../settings.css'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
 import { useNavigate} from 'react-router-dom'
+import { usePermissions } from "@/util/permissions"
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
 import func from "@/util/func"
 import { isAgenticSecurityCategory, isMCPSecurityCategory } from '../../../../main/labelHelper'
@@ -19,6 +20,7 @@ function Integrations() {
 
     const [sortValue, setSortValue] = useState('DATE_MODIFIED_DESC');
     const navigate = useNavigate()
+    const { canOpen } = usePermissions()
 
     let burpSuiteObj = {
         id: 'burp',
@@ -95,6 +97,16 @@ function Integrations() {
       id: 'devrev',
       name:'DevRev',
       source: '/public/devrev-ai.svg'
+    }
+    let linearObj={
+      id: 'linear',
+      name:'Linear',
+      source: '/public/linear.svg'
+    }
+    let portIOObj={
+      id: 'port',
+      name:'Port.io',
+      source: '/public/portio.svg'
     }
     let jenkinsObj={
       id: `jenkins`,
@@ -264,14 +276,19 @@ function Integrations() {
         },
     ]
 
+  // integrations the role can't open are neither listed nor counted
   function getTabItems(tabId) {
+    return allTabItems(tabId).filter(item => !item?.id || canOpen(`/dashboard/settings/integrations/${item.id}`))
+  }
+
+  function allTabItems(tabId) {
     const emptyItem = [];
     const trafficItems = [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [/* aktoGptObj, */ agentConfigObj, mcpRegistryObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
-    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, wizObj];
+    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, linearObj, portIOObj, wizObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj, datadogObj];
     const monitoringItems = [newRelicObj, openTelemetryObj]
@@ -321,7 +338,7 @@ function Integrations() {
         }
         return monitoringItems;
       default:
-        let allItems = [...trafficItems, ...aiItems]
+        let allItems = [...aiItems]
         if (!func.checkLocal()){
           allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems, ...wafItems, ...siemItems, ...monitoringItems]
         }
@@ -331,7 +348,7 @@ function Integrations() {
         if (func.isDemoAccount()) {
           allItems = [...allItems, ...wafItems, ...siemItems]
         }
-        return allItems;
+        return [...allItems, ...trafficItems];
     }
   }
 

@@ -1,7 +1,11 @@
-import { VerticalStack, Text, Checkbox, HorizontalStack, Box, RangeSlider } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, HorizontalStack, Box } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import { LANGUAGE_SAFETY_DESCRIPTIONS } from "../../guardrailDescriptions";
+import Store from "../../../../store";
+
+// nginx-demo and ironheart accounts
+const LANGUAGE_SAFETY_BETA_ACCOUNT_IDS = ['1726615470', '1000000', '1669322524'];
 
 export const LanguageSafetyConfig = {
     number: 3,
@@ -11,10 +15,11 @@ export const LanguageSafetyConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ enableGibberishDetection, enableSentiment }) => {
+    getSummary: ({ enableGibberishDetection, enableSentiment, enableMultiLingualBlock }) => {
         const filters = [];
         if (enableGibberishDetection) filters.push('Gibberish detection');
-        if (enableSentiment) filters.push('Sentiment');
+        if (enableSentiment) filters.push('Sentiment detection');
+        if (enableMultiLingualBlock) filters.push('Multi-lingual prompts blocked');
         return filters.length > 0 ? filters.join(", ") : null;
     }
 };
@@ -24,14 +29,16 @@ const LanguageSafetyStep = ({
     // Gibberish detection
     enableGibberishDetection,
     setEnableGibberishDetection,
-    gibberishConfidenceScore,
-    setGibberishConfidenceScore,
     // Sentiment detection
     enableSentiment,
     setEnableSentiment,
-    sentimentConfidenceScore,
-    setSentimentConfidenceScore,
+    // Multi-lingual prompts
+    enableMultiLingualBlock,
+    setEnableMultiLingualBlock,
 }) => {
+    const activeAccount = Store(state => state.activeAccount);
+    const isBetaEnabled = LANGUAGE_SAFETY_BETA_ACCOUNT_IDS.includes(String(activeAccount));
+
     return (
         <VerticalStack gap="4">
             <Text variant="bodyMd" tone="subdued">
@@ -49,6 +56,7 @@ const LanguageSafetyStep = ({
                                 <ControlInfoIcon
                                     {...LANGUAGE_SAFETY_DESCRIPTIONS.gibberishDetection}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => setEnableGibberishDetection(true)}
                                 />
                             </HorizontalStack>
                         }
@@ -56,71 +64,49 @@ const LanguageSafetyStep = ({
                         onChange={setEnableGibberishDetection}
                         helpText="Detect and block gibberish or nonsensical text in user inputs. This helps prevent meaningless prompts that could confuse the AI or be used as attack vectors."
                     />
-                    {enableGibberishDetection && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <HorizontalStack gap="1" blockAlign="center">
-                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                    <ControlInfoIcon
-                                        {...LANGUAGE_SAFETY_DESCRIPTIONS.gibberishConfidenceThreshold}
-                                        onTryPrompt={onTryPrompt}
-                                    />
-                                </HorizontalStack>
-                                <RangeSlider
-                                    label=""
-                                    value={gibberishConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setGibberishConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting gibberish."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
                 </Box>
 
-                {/* Sentiment Detection */}
-                <Box>
-                    <Checkbox
-                        label={
-                            <HorizontalStack gap="1" blockAlign="center">
-                                <Text as="span">Enable sentiment detection</Text>
-                                <ControlInfoIcon
-                                    {...LANGUAGE_SAFETY_DESCRIPTIONS.sentimentDetection}
-                                    onTryPrompt={onTryPrompt}
-                                />
-                            </HorizontalStack>
-                        }
-                        checked={enableSentiment}
-                        onChange={setEnableSentiment}
-                        helpText="Analyze sentiment in user inputs to detect negative, toxic, or inappropriate emotional content."
-                    />
-                    {enableSentiment && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
+                {isBetaEnabled && (
+                    <>
+                    {/* Sentiment Detection */}
+                    <Box>
+                        <Checkbox
+                            label={
                                 <HorizontalStack gap="1" blockAlign="center">
-                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                    <Text as="span">Enable sentiment detection</Text>
                                     <ControlInfoIcon
-                                        {...LANGUAGE_SAFETY_DESCRIPTIONS.sentimentConfidenceThreshold}
+                                        {...LANGUAGE_SAFETY_DESCRIPTIONS.sentimentDetection}
                                         onTryPrompt={onTryPrompt}
+                                        onEnable={() => setEnableSentiment(true)}
                                     />
                                 </HorizontalStack>
-                                <RangeSlider
-                                    label=""
-                                    value={sentimentConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setSentimentConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting negative sentiment."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
+                            }
+                            checked={enableSentiment}
+                            onChange={setEnableSentiment}
+                            helpText="Analyze user input to detect negative, toxic, or inappropriate content."
+                        />
+                    </Box>
+
+                    {/* Multi-lingual Prompts */}
+                    <Box>
+                        <Checkbox
+                            label={
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text as="span">Multi-lingual prompts are not allowed</Text>
+                                    <ControlInfoIcon
+                                        {...LANGUAGE_SAFETY_DESCRIPTIONS.multiLingualBlock}
+                                        onTryPrompt={onTryPrompt}
+                                        onEnable={() => setEnableMultiLingualBlock(true)}
+                                    />
+                                </HorizontalStack>
+                            }
+                            checked={enableMultiLingualBlock}
+                            onChange={setEnableMultiLingualBlock}
+                            helpText="Block prompts written in languages other than English to help prevent guardrail bypass."
+                        />
+                    </Box>
+                    </>
+                )}
             </VerticalStack>
         </VerticalStack>
     );

@@ -1,7 +1,11 @@
 package com.akto.threat.backend.utils;
 
 import com.akto.ProtoMessageUtils;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.HostScope;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
+import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.core.JsonParser;
@@ -16,11 +20,86 @@ import com.mongodb.client.model.Indexes;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ThreatUtils {
+
+  /*
+   * Events of the given hosts, matched the same way as the activity list: exact host, loose "device service"
+   * key, or claude-config events by device id. Null when nothing is given.
+   */
+  public static final long REGEX_MAX_TIME_MS = Long.parseLong(
+      System.getenv().getOrDefault("LATEST_API_ORIG_REGEX_MAX_TIME_MS", "120000")
+  );
+
+  public static String anchorLookaheadRegex(String regex) {
+    if (regex != null && regex.startsWith("(?i)(?=")) {
+      return "(?is)^" + regex.substring(4);
+    }
+    return regex;
+  }
+
+  public static Document hostAttributionMatch(List<String> hosts, List<String> looseHostKeys,
+                                              List<String> claudeDeviceIds, boolean matchClaudeConfig) {
+    List<Document> hostOrConditions = new ArrayList<>();
+    if (!hosts.isEmpty()) {
+      hostOrConditions.add(new Document("host", new Document("$in", hosts)));
+    }
+    if (!looseHostKeys.isEmpty()) {
+      Document looseKeyExpr = new Document("$concat", Arrays.asList(
+          new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), 0)),
+          " ",
+          new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), -1))
+      ));
+      hostOrConditions.add(new Document("$expr",
+          new Document("$in", Arrays.asList(looseKeyExpr, looseHostKeys))));
+    }
+    Document claudeConfigHostMatch = new Document("host",
+        Pattern.compile("^[^.]+\\.(claude-settings|claude)$", Pattern.CASE_INSENSITIVE));
+    if (matchClaudeConfig) {
+      hostOrConditions.add(claudeConfigHostMatch);
+    } else if (!claudeDeviceIds.isEmpty()) {
+      Document deviceIdExpr = new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), 0));
+      hostOrConditions.add(new Document("$and", Arrays.asList(
+          claudeConfigHostMatch,
+          new Document("$expr", new Document("$in", Arrays.asList(deviceIdExpr, claudeDeviceIds)))
+      )));
+    }
+    if (hostOrConditions.isEmpty()) {
+      return null;
+    }
+    return hostOrConditions.size() == 1 ? hostOrConditions.get(0) : new Document("$or", hostOrConditions);
+  }
+
+  /** Match limiting an aggregation to the request's HostScope (some agents only); matches nothing when its lists are all empty. */
+  public static Document hostScopeMatch(HostScope scope) {
+    Document match = hostAttributionMatch(scope.getHostsList(), scope.getLooseHostKeysList(), scope.getClaudeDeviceIdsList(), false);
+    return match != null ? match : new Document("host", new Document("$in", Collections.emptyList()));
+  }
+
+  /** Adds the host scope to a $match document, alongside any $and it already has. */
+  public static void andHostScope(Document match, Document hostScopeMatch) {
+    if (hostScopeMatch == null) {
+      return;
+    }
+    List<Object> and = new ArrayList<>();
+    Object existing = match.get("$and");
+    if (existing instanceof List) {
+      and.addAll((List<?>) existing);
+    }
+    and.add(hostScopeMatch);
+    match.put("$and", and);
+  }
+
+  /** Adds the host scope as the first stage of an events aggregation (Mongo merges it with the following $match). */
+  public static void addHostScope(List<Document> pipeline, Document hostScopeMatch) {
+    if (hostScopeMatch != null) {
+      pipeline.add(0, new Document("$match", hostScopeMatch));
+    }
+  }
 
     private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
       System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
@@ -97,6 +176,111 @@ public class ThreatUtils {
         return new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN));
     }
 
+    public static final Pattern CONFIG_ENDPOINT_PATTERN = Pattern.compile("/config/");
+
+    // Skills Evaluations / Misconfigured Settings partitions — Atlas (ENDPOINT) only. An event
+    // belongs to Skills Evaluations iff latestApiEndpoint starts with "/skills/"; it belongs to
+    // Misconfigured Settings iff latestApiEndpoint contains "/config/" (e.g.
+    // "/codex/config/mcp_servers.computer-use.command" — the agent name prefix varies, so this
+    // isn't anchored to the start like the skills pattern). Each mode independently narrows to
+    // just its own partition ("only") or excludes it ("exclude") — Active sets both to "exclude"
+    // so neither shows up there. Returns the conditions to AND onto a match; empty for other
+    // contexts or when no mode is set.
+    public static List<Document> evaluationModeConditions(String contextSource, String skillEvalMode, String configEvalMode) {
+        List<Document> conditions = new ArrayList<>();
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+            return conditions;
+        }
+        if ("only".equalsIgnoreCase(skillEvalMode)) {
+            conditions.add(new Document("latestApiEndpoint", SKILLS_ENDPOINT_PATTERN));
+        } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
+            conditions.add(new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN)));
+        }
+        if ("only".equalsIgnoreCase(configEvalMode)) {
+            conditions.add(new Document("latestApiEndpoint", CONFIG_ENDPOINT_PATTERN));
+        } else if ("exclude".equalsIgnoreCase(configEvalMode)) {
+            conditions.add(new Document("latestApiEndpoint", new Document("$not", CONFIG_ENDPOINT_PATTERN)));
+        }
+        return conditions;
+    }
+
+    private static Document configScanDedupeKey() {
+        Document isConfigEvent = new Document("$regexMatch",
+            new Document("input", new Document("$ifNull", Arrays.asList("$latestApiEndpoint", "")))
+                .append("regex", "/config/"));
+
+        return new Document("$cond", Arrays.asList(
+            isConfigEvent,
+            new Document("host", "$host").append("actor", "$actor").append("category", "$category")
+                .append("latestApiEndpoint", "$latestApiEndpoint"),
+            new Document("uniqueId", "$_id")));
+    }
+
+    private static final List<String> CONFIG_SCAN_DEDUPE_FIELDS = Arrays.asList(
+        "host", "category", "subCategory", "status", "severity", "detectedAt", "successfulExploit");
+
+    // Collapses repeated config-scan findings to the latest one per {host, actor, category, setting}; every other
+    // event stays its own row. Only the (few) /config/ events are sorted and grouped: the rest are projected to the
+    // same shape and the deduped config events are unioned back in, so no group is built per event.
+    // precedingStages are the caller's stages so far, replayed for the config branch.
+    public static List<Document> configScanDedupeStages(List<Document> precedingStages, String contextSource) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+            return Collections.emptyList();
+        }
+
+        Document passThrough = new Document("_id", new Document("uniqueId", "$_id"));
+        Document latestPerSetting = new Document("_id", new Document("host", "$host").append("actor", "$actor")
+            .append("category", "$category").append("latestApiEndpoint", "$latestApiEndpoint"));
+        for (String field : CONFIG_SCAN_DEDUPE_FIELDS) {
+            // $first gives null for a missing field, so the pass-through does too
+            passThrough.append(field, new Document("$ifNull", Arrays.asList("$" + field, null)));
+            latestPerSetting.append(field, new Document("$first", "$" + field));
+        }
+
+        List<Document> configBranch = new ArrayList<>(precedingStages);
+        configBranch.add(new Document("$match", new Document("latestApiEndpoint", CONFIG_ENDPOINT_PATTERN)));
+        configBranch.add(new Document("$sort", new Document("detectedAt", -1)));
+        configBranch.add(new Document("$group", latestPerSetting));
+
+        return Arrays.asList(
+            new Document("$match", new Document("latestApiEndpoint", new Document("$not", CONFIG_ENDPOINT_PATTERN))),
+            new Document("$project", passThrough),
+            new Document("$unionWith", new Document("coll", MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS)
+                .append("pipeline", configBranch)));
+    }
+
+    public static List<Document> configScanLatestDocStages(String contextSource) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+            return Collections.emptyList();
+        }
+
+        return Arrays.asList(
+            new Document("$sort", new Document("detectedAt", -1)),
+            new Document("$group",
+                new Document("_id", configScanDedupeKey()).append("doc", new Document("$first", "$$ROOT"))),
+            new Document("$replaceRoot", new Document("newRoot", "$doc")),
+            new Document("$sort", new Document("detectedAt", -1)));
+    }
+
+    // An event's case history as the proto the dashboard reads, oldest first; empty for events with none.
+    public static List<ListMaliciousRequestsResponse.CaseActivity> caseActivities(MaliciousEventDto event) {
+        List<ListMaliciousRequestsResponse.CaseActivity> out = new ArrayList<>();
+        if (event.getCaseTimeline() == null) {
+            return out;
+        }
+        for (MaliciousEventDto.CaseActivity c : event.getCaseTimeline()) {
+            out.add(ListMaliciousRequestsResponse.CaseActivity.newBuilder()
+                .setTimestamp(c.getTimestamp())
+                .setUpdatedBy(c.getUpdatedBy() != null ? c.getUpdatedBy() : "")
+                .setActivityType(c.getActivityType() != null ? c.getActivityType() : "")
+                .setStatus(c.getStatus() != null ? c.getStatus() : "")
+                .setOwner(c.getOwner() != null ? c.getOwner() : "")
+                .setNotes(c.getNotes() != null ? c.getNotes() : "")
+                .build());
+        }
+        return out;
+    }
+
     public static boolean isAgenticOrEndpointContext(String contextSource) {
         if (contextSource == null || contextSource.isEmpty()) {
             return false;
@@ -107,19 +291,28 @@ public class ThreatUtils {
     }
 
     public static String fetchMetadataString(String metadataStr) {
+        return metadataJson(parseMetadata(metadataStr));
+    }
+
+    public static Metadata parseMetadata(String metadataStr) {
         if (metadataStr == null || metadataStr.isEmpty()) {
-            return "";
+            return null;
         }
 
         Metadata.Builder metadataBuilder = Metadata.newBuilder();
         try {
             TextFormat.getParser().merge(metadataStr, metadataBuilder);
         } catch (Exception e) {
+            return null;
+        }
+        return metadataBuilder.build();
+    }
+
+    public static String metadataJson(Metadata metadataProto) {
+        if (metadataProto == null) {
             return "";
         }
-        Metadata metadataProto = metadataBuilder.build();
-        metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
-        return metadataStr;
+        return ProtoMessageUtils.toString(metadataProto).orElse("");
     }
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -234,6 +427,121 @@ public class ThreatUtils {
         }
     }
 
+    // Guardrail activities from one Bedrock caller repeating the same prompt (an agent re-sends it on
+    // every step, tripping the same policies each time) within this gap of each other are one activity.
+    public static final long ACTIVITY_GROUP_GAP_SECONDS = 20 * 60;
+    public static final String ACTIVITY_GROUP_INDEX = "idx_groupKey_detectedAt";
+    public static final Bson ACTIVITY_GROUP_INDEX_KEYS = Indexes.ascending("groupKey", "detectedAt");
+    private static final String BEDROCK_IDENTITY_ARN_HEADER = "bedrock-identity-arn";
+    private static final Set<String> GROUPED_ACTIVITY_ACCOUNTS = parseAccountList(
+        System.getenv().getOrDefault("AKTO_GROUPED_ACTIVITY_ACCOUNTS", "1703087742"));
+
+    private static Set<String> parseAccountList(String csv) {
+        Set<String> accounts = new HashSet<>();
+        for (String id : csv.split(",")) {
+            if (!id.trim().isEmpty()) {
+                accounts.add(id.trim());
+            }
+        }
+        return accounts;
+    }
+
+    /**
+     * Pipeline stages that turn matching events into activity rows. Events with the same groupKey whose
+     * detectedAt is within ACTIVITY_GROUP_GAP_SECONDS of the previous one form one row: the latest event,
+     * plus groupCount, groupFirstDetectedAt, groupEventIds (every event in it, so actions on the row reach
+     * exactly the events the current filters grouped) and groupFilterIds (the policies they tripped).
+     * Events without a groupKey stay one row each. The stored payload is dropped first; the list never
+     * returns it and it is most of each event's size.
+     */
+    public static List<Document> activityGroupStages(Document query) {
+        Document hasKey = new Document("$eq", Arrays.asList(new Document("$type", "$groupKey"), "string"));
+        Document byKeyOldestFirst = new Document("partitionBy", "$groupKey").append("sortBy", new Document("detectedAt", 1));
+        return Arrays.asList(
+            new Document("$match", query),
+            new Document("$unset", "latestApiOrig"),
+            new Document("$setWindowFields", new Document(byKeyOldestFirst).append("output", new Document("prevDetectedAt",
+                new Document("$shift", new Document("output", "$detectedAt").append("by", -1))))),
+            new Document("$set", new Document("startsActivity", new Document("$cond", Arrays.asList(
+                new Document("$or", Arrays.asList(
+                    new Document("$not", Arrays.asList(hasKey)),
+                    new Document("$eq", Arrays.asList("$prevDetectedAt", null)),
+                    new Document("$gt", Arrays.asList(new Document("$subtract", Arrays.asList("$detectedAt", "$prevDetectedAt")),
+                        ACTIVITY_GROUP_GAP_SECONDS)))),
+                1, 0)))),
+            new Document("$setWindowFields", new Document(byKeyOldestFirst).append("output", new Document("activityNo",
+                new Document("$sum", "$startsActivity").append("window", new Document("documents", Arrays.asList("unbounded", "current")))))),
+            new Document("$sort", new Document("detectedAt", -1)),
+            new Document("$group", new Document("_id", new Document("$cond", Arrays.asList(hasKey,
+                    new Document("groupKey", "$groupKey").append("activityNo", "$activityNo"), "$_id")))
+                .append("doc", new Document("$first", "$$ROOT"))
+                .append("groupCount", new Document("$sum", 1))
+                .append("groupFirstDetectedAt", new Document("$min", "$detectedAt"))
+                .append("groupEventIds", new Document("$push", "$_id"))
+                .append("groupFilterIds", new Document("$addToSet", "$filterId"))),
+            new Document("$replaceRoot", new Document("newRoot", new Document("$mergeObjects", Arrays.asList("$doc",
+                new Document("groupCount", "$groupCount").append("groupFirstDetectedAt", "$groupFirstDetectedAt")
+                    .append("groupEventIds", "$groupEventIds").append("groupFilterIds", "$groupFilterIds"))))),
+            new Document("$unset", Arrays.asList("prevDetectedAt", "startsActivity", "activityNo"))
+        );
+    }
+
+    /** Whether repeated Bedrock activities are grouped for this account (opt-in per account). */
+    public static boolean groupsActivities(String accountId) {
+        return accountId != null && GROUPED_ACTIVITY_ACCOUNTS.contains(accountId);
+    }
+
+    /**
+     * Grouping key of a guardrail activity: the Bedrock caller ARN (bedrock-identity-arn request header)
+     * plus the normalized prompt (requestPayload) of its stored envelope. Null when the envelope carries
+     * no ARN, so only Bedrock activities are ever grouped.
+     */
+    public static String activityGroupKey(String envelope) {
+        if (envelope == null || envelope.isEmpty()) {
+            return null;
+        }
+        try {
+            Map<String, Object> fields = OBJECT_MAPPER.readValue(envelope, new TypeReference<Map<String, Object>>() {});
+            Object prompt = fields.get("requestPayload");
+            Object headers = fields.get("requestHeaders");
+            if (!(prompt instanceof String) || ((String) prompt).isEmpty() || !(headers instanceof String)) {
+                return null;
+            }
+            Map<String, Object> headerMap = OBJECT_MAPPER.readValue((String) headers, new TypeReference<Map<String, Object>>() {});
+            Object arn = null;
+            for (Map.Entry<String, Object> header : headerMap.entrySet()) {
+                if (BEDROCK_IDENTITY_ARN_HEADER.equalsIgnoreCase(header.getKey())) {
+                    arn = header.getValue();
+                }
+            }
+            if (!(arn instanceof String) || ((String) arn).isEmpty()) {
+                return null;
+            }
+            return UUID.nameUUIDFromBytes((arn + "\n" + normalizePrompt((String) prompt)).getBytes(StandardCharsets.UTF_8)).toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static final Pattern REDACTION_MARKER = Pattern.compile("\\[[a-z_]*redacted[a-z_]*\\]");
+    private static final Pattern LONG_ID = Pattern.compile("\\b[0-9a-f]{8}(-?[0-9a-f]{4}){3}-?[0-9a-f]{12}\\b|\\b[0-9a-f]{12,}\\b");
+    private static final Pattern NOT_LETTERS = Pattern.compile("[^a-z]+");
+    private static final int PROMPT_WORDS_COMPARED = 40;
+
+    // An agent's repeated prompt differs only in what it fills in on each step (turn numbers, ids,
+    // redacted values, the data it pastes after its instructions), so only the words of its opening
+    // are compared: same opening words in the same order is the same prompt.
+    static String normalizePrompt(String prompt) {
+        String text = prompt.toLowerCase(Locale.ROOT);
+        text = REDACTION_MARKER.matcher(text).replaceAll(" ");
+        text = LONG_ID.matcher(text).replaceAll(" ");
+        String words = NOT_LETTERS.matcher(text).replaceAll(" ").trim();
+        // No words left (only numbers or ids): compare the prompt as it is rather than as empty.
+        if (words.isEmpty()) return prompt;
+        String[] split = words.split(" ", PROMPT_WORDS_COMPARED + 1);
+        return split.length <= PROMPT_WORDS_COMPARED ? words : String.join(" ", Arrays.copyOf(split, PROMPT_WORDS_COMPARED));
+    }
+
     public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {
         // Get the collection from DAO - this will create the collection if it doesn't exist
         MongoCollection<?> collection = maliciousEventDao.getCollection(accountId);
@@ -268,11 +576,19 @@ public class ThreatUtils {
         requiredIndexes.put("idx_context_detectedAt_host", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("host")));
         requiredIndexes.put("idx_context_detectedAt_latestApiEndpoint", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("latestApiEndpoint")));
         requiredIndexes.put("idx_context_detectedAt_category_subCategory", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("category"), Indexes.ascending("subCategory")));
+        // Lets the Active tab count and its skills/config exclusion count be answered from index keys alone.
+        requiredIndexes.put("idx_ctx_status_detected_endpoint", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending("status"), Indexes.descending("detectedAt"), Indexes.ascending("latestApiEndpoint")));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {
                 collection.createIndex(entry.getValue(), new IndexOptions().name(entry.getKey()));
             }
+        }
+
+        // Only accounts that group activities have keyed events; partial so it stays small.
+        if (groupsActivities(accountId) && !existingIndexes.contains(ACTIVITY_GROUP_INDEX)) {
+            collection.createIndex(ACTIVITY_GROUP_INDEX_KEYS, new IndexOptions().name(ACTIVITY_GROUP_INDEX)
+                .partialFilterExpression(new Document("groupKey", new Document("$type", "string"))));
         }
     }
 

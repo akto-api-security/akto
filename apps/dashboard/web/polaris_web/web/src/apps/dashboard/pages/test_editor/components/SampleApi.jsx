@@ -22,9 +22,12 @@ import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
 import LocalStore from "../../../../main/LocalStorageStore";
 import observeFunc from "../../observe/transform";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 import { getCallbackCheckError, getResultColor, getResultDescription, isCallbackTest, markTestResultVulnerable, normalizeCallbackUuids, startCallbackPolling, startPlaygroundPolling } from "../webhookCallbackUtils"
 
 const SampleApi = () => {
+    const { canCall } = usePermissions()
 
     const setToastConfig = Store(state => state.setToastConfig)
     const allCollections = PersistStore(state => state.allCollections);
@@ -461,7 +464,9 @@ const SampleApi = () => {
                             </Tooltip>
                         </Box>
                     </Button>
-                    <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">{isChatBotOpen ? "Chat" : mapLabel('Run test', getDashboardCategory())}</Button>
+                    <AllowedAction allowed={isChatBotOpen || canCall('api/runTestForGivenTemplate')}>
+                        <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">{isChatBotOpen ? "Chat" : mapLabel('Run test', getDashboardCategory())}</Button>
+                    </AllowedAction>
                 </HorizontalStack>
             </div>
 
@@ -471,15 +476,15 @@ const SampleApi = () => {
                 <Box minHeight="84.4vh">
                     <EmptySampleApi
                         iconSrc={"/public/file_plus.svg"}
-                        headingText={"Discover APIs to get started"}
-                        description={"You have an inactive API collection or one with no data. Create or populate a collection now to get started."}
-                        buttonText={"Create new a API collection"}
+                        headingText={"Discover " + mapLabel('APIs', getDashboardCategory()) + " to get started"}
+                        description={"You have an inactive " + mapLabel('API', getDashboardCategory()) + " collection or one with no data. Create or populate a collection now to get started."}
+                        buttonText={"Create a new " + mapLabel('API', getDashboardCategory()) + " collection"}
                         redirectUrl={"/dashboard/observe/inventory"}
                     />
                 </Box> :
                 <>{
                     editorData?.message?.length === 0 ?
-                    <Box padding={3} minHeight="84.4vh"><Text>Sample data is not available for this API endpoint. Please choose a different endpoint.</Text></Box>
+                    <Box padding={3} minHeight="84.4vh"><Text>Sample data is not available for this {mapLabel('API endpoint', getDashboardCategory())}. Please choose a different endpoint.</Text></Box>
                         : <><SampleData data={editorData} minHeight="80.4vh"  editorLanguage="custom_http" />
                         {resultComponent}</>
                 }</>
@@ -524,7 +529,7 @@ const SampleApi = () => {
                     <DropdownSearch
                         id={"select-api-collection"}
                         label="Select collection"
-                        placeholder="Select API collection"
+                        placeholder={mapLabel('Select API collection', getDashboardCategory())}
                         optionsList={allCollectionsOptions}
                         setSelected={setCopyCollectionId}
                         value={mapCollectionIdToName?.[copyCollectionId]}
@@ -536,8 +541,8 @@ const SampleApi = () => {
                     <DropdownSearch
                         id={"select-api-endpoint"}
                         disabled={apiEndpointsOptions.length === 0}
-                        label="API"
-                        placeholder="Select API endpoint"
+                        label={mapLabel('API', getDashboardCategory())}
+                        placeholder={"Select " + mapLabel('API endpoint', getDashboardCategory())}
                         optionsList={apiEndpointsOptions}
                         setSelected={setCopySelectedApiEndpoint}
                         value={copyEndpointLabel}

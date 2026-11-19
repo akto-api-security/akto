@@ -19,6 +19,7 @@ public class ThreatDetectionConstants {
     public static final String BLOCKED = "BLOCKED";
     public static final String IGNORED = MaliciousEventDto.Status.IGNORED.toString();
     public static final String TRAINING = MaliciousEventDto.Status.TRAINING.toString();
+    public static final String HUMAN_APPROVAL = MaliciousEventDto.Status.HUMAN_APPROVAL.toString();
 
     // Category constants
     public static final String THREAT_PROTECTION_SUCCESSFUL_EXPLOIT_CATEGORY = "SuccessfulExploit";

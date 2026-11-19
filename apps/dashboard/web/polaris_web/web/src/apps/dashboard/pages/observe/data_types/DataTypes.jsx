@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text, Form, HorizontalStack, Tag, Button, Box, Checkbox } from '@shopify/polaris'
+import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text, Form, HorizontalStack, Tag, Button, Box, Checkbox, Banner } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"
 import ConditionsPicker from '../../../components/ConditionsPicker'
@@ -11,7 +11,9 @@ import {produce} from "immer"
 import DetailsPage from '../../../components/DetailsPage'
 import InformationBannerComponent from '../../quick_start/components/shared/InformationBannerComponent'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
+import { usePermissions } from '@/util/permissions'
 import { EmailMajor, CreditCardMajor, IdentityCardFilledMajor, PhoneMajor, CalendarMajor, LocationMajor, KeyMajor } from "@shopify/polaris-icons"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const severitiesArr = func.getAktoSeverities()
 
@@ -145,6 +147,8 @@ function DataTypes() {
   const [currState, dispatchCurrState] = useReducer(produce((draft, action) => conditionStateReducer(draft, action)), initialState);
   const [change, setChange] = useState(false)
   const [tagValue, setTagValue] = useState('')
+  const { canCall } = usePermissions()
+  const canSave = canCall(currState.dataType === 'Akto' ? 'api/saveAktoDataType' : 'api/saveCustomDataType')
   const resetFunc =()=>{
     dispatchCurrState({type:"update", obj:initialState})
     setChange(false)
@@ -343,7 +347,7 @@ function DataTypes() {
   )
 
   const compareFunc = () => {
-    return !change
+    return !change || !canSave
   }
 
   const requestCard = (
@@ -378,7 +382,7 @@ function DataTypes() {
           />}
       >
         <div className='card-items'>
-          <InformationBannerComponent docsUrl={""} content="When enabled, existing sample payload values will be deleted, and this data type will be redacted in future payloads. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.">
+          <InformationBannerComponent docsUrl={""} content={"When enabled, existing sample payload values will be deleted, and this data type will be redacted in future payloads. Please note that your " + mapLabel('API', getDashboardCategory()) + " Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values."}>
           </InformationBannerComponent>
         </div>
         <LegacyCard.Section>
@@ -416,6 +420,9 @@ function DataTypes() {
   )
 
   let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, conditionsCard, requestCard, redactCard] : [descriptionCard, conditionsCard, requestCard, redactCard, TestTemplateCard]
+  if (!canSave) {
+    components = [<Banner key="read-only" status="info">Read-only: your role can't save changes to data types. Ask an admin if you need it.</Banner>, ...components]
+  }
 
   return (
     <DetailsPage

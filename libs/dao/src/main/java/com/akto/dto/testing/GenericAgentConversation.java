@@ -18,7 +18,11 @@ public class GenericAgentConversation {
         ANALYZE_REQUESTS,
         DOCS_AGENT,
         ANALYZE_DASHBOARD_DATA,
-        AGENTIC_OBSERVE
+        AGENTIC_OBSERVE,
+        INSIGHTS,
+        COMMAND_PALETTE,
+        /** Ask Akto writing pre/post-request scripts; see service/scripts/validation/CLAUDE.md. */
+        TEST_SCRIPT
     }
 
     private String title;
@@ -35,4 +39,17 @@ public class GenericAgentConversation {
     private int externalApiTokens;
     private int tokensLimit;
     private ConversationType conversationType;
+    public static final String CONTEXT_SOURCE = "contextSource";
+    private String contextSource;
+    public static final String USER_ID = "userId";
+    /** Id (Context.userId) of the user who sent the turn; null on conversations stored before this field existed. */
+    private Integer userId;
+
+    // Keeps the 12-arg constructor for existing callers (AgentClient, AgentConversationResult)
+    public GenericAgentConversation(String title, String conversationId, String prompt, String response,
+            String finalSentPrompt, int createdAt, int lastUpdatedAt, int tokensUsed, int externalApiTokens,
+            int tokensLimit, ConversationType conversationType, String contextSource) {
+        this(title, conversationId, prompt, response, finalSentPrompt, createdAt, lastUpdatedAt, tokensUsed,
+            externalApiTokens, tokensLimit, conversationType, contextSource, null);
+    }
 }

@@ -12,7 +12,7 @@ from urllib.parse import quote
 from typing import Any, Dict, Set, Tuple, Union
 
 from akto_helpers import get_device_ip
-from akto_ingestion_utility import installer_headers, resolve_session_info
+from akto_ingestion_utility import installer_headers, invoked_by_claude_code, resolve_session_info
 
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -470,6 +470,9 @@ def ingest_blocked_request(
 
 def main():
     logger.info(f"=== Hook execution started - Sync: {AKTO_SYNC_MODE} ===")
+    if not invoked_by_claude_code():
+        logger.info("Not launched by Claude Code (e.g. Cursor running Claude hooks), skipping")
+        sys.exit(0)
 
     try:
         input_data = json.load(sys.stdin)
@@ -500,18 +503,34 @@ def main():
             mcp_tool_name=mcp_tool_name,
             session_info=session_info,
         )
-        fingerprint = pretool_fingerprint(tool_name, tool_input)
-        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
+        if not gr_allowed and _is_alert_behaviour(behaviour):
+            logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
+            gr_allowed = True
 
-        if not allowed:
-            if _is_warn_behaviour(behaviour):
-                block_reason = (
-                    "Warning!!, tool request blocked, please review it. Send again to bypass. "
-                    f"Reason for blocking: {gr_reason}"
-                )
-            else:
-                block_reason = f"Tool request blocked: {gr_reason}"
+        if not gr_allowed and _is_warn_behaviour(behaviour):
+            ask_reason = f"Akto guardrails flagged this tool request: {gr_reason}"
+            output = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "ask",
+                    "permissionDecisionReason": ask_reason,
+                }
+            }
+            logger.warning(f"ASKING for approval - Tool: {tool_name}, Reason: {gr_reason}")
+            print(json.dumps(output))
+            ingest_blocked_request(
+                tool_name,
+                tool_input,
+                gr_reason,
+                is_mcp=is_mcp,
+                mcp_server_name=mcp_server_name,
+                mcp_tool_name=mcp_tool_name,
+                session_info=session_info,
+            )
+            sys.exit(0)
 
+        if not gr_allowed:
+            block_reason = f"Tool request blocked: {gr_reason}"
             output = {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",

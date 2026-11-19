@@ -1,10 +1,11 @@
 package com.akto.filter;
 
+import com.akto.dao.context.Context;
 import com.akto.listener.InfraMetricsListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.MetricLabelBuilder;
 
-import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
 
@@ -12,6 +13,7 @@ import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
@@ -40,47 +42,41 @@ public class InfraMetricsFilter implements Filter {
             HttpServletRequest  httpServletRequest = (HttpServletRequest) request;
 
             int statusCode = httpServletResponse.getStatus();
-            String uri = httpServletRequest.getRequestURI();
+            // templatize the path so ids do not explode metric cardinality
+            String uri = MetricLabelBuilder.templatize(httpServletRequest.getRequestURI());
             String method = httpServletRequest.getMethod();
 
+            // Account id is set by UserDetailsFilter, which wraps this filter in the chain,
+            // so the ThreadLocal is still populated here (metric is recorded before the
+            // outer filter's finally clears it). Fall back to "unknown" for unauthenticated
+            // requests so the label stays present and bounded.
+            Integer accountIdValue = Context.accountId.get();
+            String accountId = accountIdValue == null ? "unknown" : accountIdValue.toString();
+
+            // OpenTelemetry HTTP server semantic-convention label names. The Prometheus
+            // registry renders the dotted keys as underscores (http_route, etc.).
             ArrayList<Tag> tags = new ArrayList<>(Arrays.asList(
-                    Tag.of("uri", uri),
-                    Tag.of("method", method)
+                    // templatized route, not the raw path, to keep cardinality bounded
+                    Tag.of("http.route", uri),
+                    Tag.of("http.request.method", method),
+                    // real HTTP status code (bounded set) instead of a good/bad collapse
+                    Tag.of("http.response.status_code", Integer.toString(statusCode)),
+                    // tenant dimension; cardinality scales with active account count
+                    Tag.of("account.id", accountId)
             ));
 
-            if (statusCode >= 200 && statusCode< 300) {
-                tags.add(Tag.of("status", "good"));
-            } else {
-                tags.add(Tag.of("status", "bad"));
-            }
-
-            Counter.builder("api_requests_total")
-                    .description("API Requests Total")
+            // Single histogram named per the OTel/Micrometer convention. Micrometer
+            // appends the base unit, publishing http_server_request_duration_seconds with
+            // _count (request total), _sum and _bucket{le=...} series; Prometheus derives
+            // request rates and quantiles from these, so no separate request counter and
+            // no client-side percentiles are needed.
+            Timer.builder("http.server.request.duration")
+                    .description("HTTP server request duration")
                     .tags(tags)
-                    .register(InfraMetricsListener.registry)
-                    .increment();
-
-            Timer.builder("api_response_time_90")
-                    .description("API Response Time 90th Percentile")
-                    .tags(tags)
-                    .publishPercentileHistogram()
-                    .publishPercentiles(0.9)
-                    .register(InfraMetricsListener.registry)
-                    .record(duration, TimeUnit.MILLISECONDS);
-
-            Timer.builder("api_response_time_75")
-                    .description("API Response Time 75th Percentile")
-                    .tags(tags)
-                    .publishPercentileHistogram()
-                    .publishPercentiles(0.75)
-                    .register(InfraMetricsListener.registry)
-                    .record(duration, TimeUnit.MILLISECONDS);
-
-            Timer.builder("api_response_time_50")
-                    .description("API Response Time 50th Percentile")
-                    .tags(tags)
-                    .publishPercentileHistogram()
-                    .publishPercentiles(0.50)
+                    // Bucket boundaries: 100ms, 600ms, 1s, 3s, 6s, 10s (plus +Inf).
+                    .serviceLevelObjectives(
+                            Duration.ofMillis(100), Duration.ofMillis(600), Duration.ofMillis(1000),
+                            Duration.ofMillis(3000), Duration.ofMillis(6000), Duration.ofMillis(10000))
                     .register(InfraMetricsListener.registry)
                     .record(duration, TimeUnit.MILLISECONDS);
         } catch (Exception e) {

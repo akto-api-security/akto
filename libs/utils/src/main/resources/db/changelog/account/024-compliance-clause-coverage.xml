@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collection + lastScannedAt index for ComplianceClauseCoverageDao.createIndicesIfAbsent
+        (collName: compliance_clause_coverage, index on ComplianceClauseCoverage.LAST_SCANNED_AT
+        descending). One document per compliance framework (_id = canonical framework name,
+        see ComplianceSubClauseCatalog#canonicalFramework), written by ComplianceClauseScanService,
+        read by PostureService#frameworkReadiness for the AI Security Posture page's Framework
+        readiness panel. Index name matches MCollection.generateIndexName ("lastScannedAt_-1") so
+        the DAO's own createIndexIfAbsent treats it as present.
+    -->
+
+    <changeSet id="024-account-create-compliance-clause-coverage" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="compliance_clause_coverage"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="compliance_clause_coverage"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="compliance_clause_coverage"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="024-account-compliance-clause-coverage-last-scanned-at-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="compliance_clause_coverage"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="compliance_clause_coverage">
+            <mongodb:keys>{ "lastScannedAt": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "lastScannedAt_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="compliance_clause_coverage">
+                <mongodb:keys>{ "lastScannedAt": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

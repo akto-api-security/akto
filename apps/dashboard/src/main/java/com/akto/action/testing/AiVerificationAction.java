@@ -1,0 +1,471 @@
+package com.akto.action.testing;
+
+import com.akto.action.UserAction;
+import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.WorkflowNodeDetails;
+import com.akto.dto.testing.WorkflowTestResult.NodeResult;
+import com.akto.dto.testing.YamlNodeDetails;
+import com.akto.gpt.handlers.gpt_prompts.FalsePositiveVerifierPromptHandler;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing_utils.TestingUtils;
+import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+/**
+ * "Verify with AI" on the test run and issues pages: asks the LLM about every vulnerable result and
+ * writes its verdict, confidence and reason into the issue's description. Issue status is never
+ * changed; users review the verdicts and ignore the false positives themselves. Runs in the
+ * background; the page shows the verdicts on refresh.
+ */
+public class AiVerificationAction extends UserAction {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AiVerificationAction.class, LogDb.DASHBOARD);
+
+    private static final int MAX_RESULTS_PER_RUN = 500;
+    private static final int MAX_ATTEMPTS_PER_RESULT = 3;
+    // Descriptions Verify with AI writes start with this, e.g. "[AI verified: false positive, confidence 85%] <reason>".
+    public static final String DESCRIPTION_PREFIX = "[AI verified";
+    // Values of the "AI verdict" filter on the issues and test run tables.
+    public static final String AI_VERDICT_FILTER = "aiVerdict";
+    private static final String VERDICT_NOT_VERIFIED = "NOT_VERIFIED";
+    // Passive tests (e.g. sensitive data exposure) send no attack: the finding is in the captured
+    // traffic itself, so they are recorded as true positives without asking the AI. Every other test
+    // is sent to the AI, which answers TRUE_POSITIVE only when the stored evidence proves the finding.
+    private static final int PASSIVE_CONFIDENCE = 90;
+    // A TRUE_POSITIVE label says the finding is confirmed, so one the AI is unsure of is recorded as not proven.
+    static final int MIN_TRUE_POSITIVE_CONFIDENCE = 70;
+    private static final String PASSIVE_REASON = "Passive test: the finding comes from the captured traffic itself and "
+        + "no attack was sent, so it is kept as reported.";
+
+    // One background job per test run at a time; jobs run here, LLM calls in a separate pool so a
+    // job waiting on its calls cannot starve them.
+    private static final Set<String> IN_PROGRESS = ConcurrentHashMap.newKeySet();
+    private static final ExecutorService JOB_EXECUTOR = Executors.newFixedThreadPool(2);
+    private static final ExecutorService LLM_EXECUTOR = Executors.newFixedThreadPool(4);
+
+    private String testingRunResultSummaryHexId;
+    // Optional: only these results (rows selected in the table); empty = every vulnerable result of the run.
+    private List<String> testingRunResultHexIds;
+    // Issues page: the selected issues.
+    private List<TestingIssuesId> issueIdArray;
+
+    /** An OPEN issue and the vulnerable result the AI judges it by. */
+    private static class Target {
+        final TestingRunIssues issue;
+        final TestingRunResult result;
+
+        Target(TestingRunIssues issue, TestingRunResult result) {
+            this.issue = issue;
+            this.result = result;
+        }
+    }
+
+    /** Background work. */
+    private interface Job {
+        void run() throws Exception;
+    }
+
+    /** Test run page: every vulnerable result of the run, or only the selected ones. */
+    public String verifyTestRunWithAi() {
+        ObjectId summaryId;
+        List<ObjectId> resultIds = new ArrayList<>();
+        try {
+            summaryId = new ObjectId(testingRunResultSummaryHexId);
+            if (testingRunResultHexIds != null) {
+                for (String hexId : testingRunResultHexIds) {
+                    resultIds.add(new ObjectId(hexId));
+                }
+            }
+        } catch (Exception e) {
+            addActionError("Invalid test run or test result id");
+            return ERROR.toUpperCase();
+        }
+
+        int accountId = Context.accountId.get();
+        return startJob(accountId + ":run:" + testingRunResultSummaryHexId,
+            "Verification already running for this test run",
+            () -> verifyTargets("test run " + summaryId, targetsForSummary(summaryId, resultIds)));
+    }
+
+    /** Issues page: the selected issues, each judged by its latest vulnerable result. */
+    public String verifyIssuesWithAi() {
+        if (issueIdArray == null || issueIdArray.isEmpty()) {
+            addActionError("Select at least one issue to verify");
+            return ERROR.toUpperCase();
+        }
+        if (issueIdArray.size() > MAX_RESULTS_PER_RUN) {
+            addActionError("Select at most " + MAX_RESULTS_PER_RUN + " issues to verify at once");
+            return ERROR.toUpperCase();
+        }
+        // Built here, with the user's context, so only issues the user can access are verified.
+        Bson openIssuesFilter = Filters.and(
+            TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.in(Constants.ID, issueIdArray)),
+            Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN));
+
+        int accountId = Context.accountId.get();
+        return startJob(accountId + ":issues",
+            "Verification already running for selected issues",
+            () -> verifyTargets(issueIdArray.size() + " selected issues", targetsForIssues(openIssuesFilter)));
+    }
+
+    /** Checks the AI provider and the per-scope guard, then runs the job in the background. */
+    private String startJob(String key, String busyMessage, Job job) {
+        int accountId = Context.accountId.get();
+        if (!FalsePositiveVerifierPromptHandler.isConfigured()) {
+            addActionError("AI provider is not configured. Set the AZURE_OPENAI_* environment variables or configure a model for 'false-positive-verification'.");
+            return ERROR.toUpperCase();
+        }
+        if (!IN_PROGRESS.add(key)) {
+            addActionError(busyMessage);
+            return ERROR.toUpperCase();
+        }
+
+        JOB_EXECUTOR.submit(() -> {
+            Context.accountId.set(accountId);
+            try {
+                job.run();
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "AI verification failed for " + key + ": " + e.getMessage());
+            } finally {
+                IN_PROGRESS.remove(key);
+            }
+        });
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private static List<Target> targetsForSummary(ObjectId summaryId, List<ObjectId> resultIds) {
+        boolean inVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(summaryId, true);
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId));
+        filters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+        filters.add(Filters.ne(TestingRunResult.IS_IGNORED_RESULT, true));
+        if (!resultIds.isEmpty()) {
+            filters.add(Filters.in(Constants.ID, resultIds));
+        }
+        List<TestingRunResult> results = resultCollection(inVulnerableCollection)
+            .find(Filters.and(filters)).limit(MAX_RESULTS_PER_RUN).into(new ArrayList<>());
+        List<Target> targets = new ArrayList<>();
+        if (results.isEmpty()) {
+            return targets;
+        }
+
+        // Only results whose issue is still OPEN are verified.
+        Map<TestingIssuesId, TestingRunResult> resultByIssue = new HashMap<>();
+        for (TestingRunResult result : results) {
+            resultByIssue.put(TestingUtils.getTestingIssueIdFromRunResult(result), result);
+        }
+        List<TestingRunIssues> openIssues = TestingRunIssuesDao.instance.findAll(
+            Filters.and(
+                Filters.in(Constants.ID, new ArrayList<>(resultByIssue.keySet())),
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN)
+            ),
+            Projections.include(TestingRunIssues.DESCRIPTION)
+        );
+        for (TestingRunIssues issue : openIssues) {
+            TestingRunResult result = resultByIssue.get(issue.getId());
+            if (result != null) targets.add(new Target(issue, result));
+        }
+        return targets;
+    }
+
+    /** For each OPEN issue, the vulnerable result from the latest test run that found it. */
+    private static List<Target> targetsForIssues(Bson openIssuesFilter) {
+        List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(openIssuesFilter,
+            Projections.include(TestingRunIssues.DESCRIPTION, TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID));
+        Map<ObjectId, Boolean> inVulnerableCollection = new HashMap<>();
+        List<Target> targets = new ArrayList<>();
+        int skipped = 0;
+        for (TestingRunIssues issue : issues) {
+            // One bad issue must not stop the rest, so each lookup is isolated.
+            try {
+                ObjectId summaryId = issue.getLatestTestingRunSummaryId();
+                TestingIssuesId id = issue.getId();
+                ApiInfoKey apiInfoKey = id == null ? null : id.getApiInfoKey();
+                if (summaryId == null || apiInfoKey == null || apiInfoKey.getMethod() == null
+                    || apiInfoKey.getUrl() == null || id.getTestSubCategory() == null) {
+                    skipped++;
+                    continue;
+                }
+                boolean inVuln = inVulnerableCollection.computeIfAbsent(summaryId,
+                    s -> VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(s, true));
+                TestingRunResult result = resultCollection(inVuln).find(Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId),
+                    Filters.eq(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.API_COLLECTION_ID, apiInfoKey.getApiCollectionId()),
+                    Filters.eq(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.URL, apiInfoKey.getUrl()),
+                    Filters.eq(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.METHOD, apiInfoKey.getMethod().name()),
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, id.getTestSubCategory()),
+                    Filters.eq(TestingRunResult.VULNERABLE, true)
+                )).first();
+                if (result == null) {
+                    skipped++;
+                    continue;
+                }
+                targets.add(new Target(issue, result));
+            } catch (Exception e) {
+                skipped++;
+                loggerMaker.errorAndAddToDb(e, "AI verification could not load evidence for issue " + issue.getId() + ": " + e.getMessage());
+            }
+        }
+        if (skipped > 0) {
+            loggerMaker.infoAndAddToDb("AI verification skipped " + skipped + " of " + issues.size()
+                + " issues with no vulnerable result in their latest test run");
+        }
+        return targets;
+    }
+
+    /**
+     * Issues filter for Verify with AI's verdict (the aiVerdict field): any of FALSE_POSITIVE,
+     * TRUE_POSITIVE and NOT_VERIFIED. Unknown values match nothing.
+     */
+    public static Bson aiVerdictFilter(List<String> verdicts) {
+        List<Bson> anyOf = new ArrayList<>();
+        for (String verdict : verdicts) {
+            if (FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(verdict)
+                || FalsePositiveVerifierPromptHandler.TRUE_POSITIVE.equals(verdict)) {
+                anyOf.add(Filters.eq(TestingRunIssues.AI_VERDICT, verdict));
+            } else if (VERDICT_NOT_VERIFIED.equals(verdict)) {
+                anyOf.add(Filters.exists(TestingRunIssues.AI_VERDICT, false));
+            }
+        }
+        return anyOf.isEmpty() ? Filters.in(Constants.ID, new ArrayList<>()) : Filters.or(anyOf);
+    }
+
+    private static MongoCollection<TestingRunResult> resultCollection(boolean inVulnerableCollection) {
+        return inVulnerableCollection
+            ? VulnerableTestingRunResultDao.instance.getMCollection()
+            : TestingRunResultDao.instance.getMCollection();
+    }
+
+    /** Result of judging one target. */
+    private enum Outcome { FALSE_POSITIVE, TRUE_POSITIVE, SKIPPED, ERROR }
+
+    /** Asks the LLM about every target in parallel and records each verdict on its issue. */
+    private void verifyTargets(String label, List<Target> targets) {
+        if (targets.isEmpty()) {
+            loggerMaker.infoAndAddToDb("AI verification for " + label + ": nothing to verify");
+            return;
+        }
+        List<TestingRunResult> results = new ArrayList<>();
+        for (Target target : targets) results.add(target.result);
+        Map<String, String> templates = loadTemplates(results);
+
+        int accountId = Context.accountId.get();
+        List<Future<Outcome>> calls = new ArrayList<>();
+        int notVerifiable = 0;
+        int passive = 0;
+        for (Target target : targets) {
+            String template = templates.get(target.result.getTestSubType());
+            if (FalsePositiveVerifierPromptHandler.isPassiveTest(template)) {
+                writeVerdict(target.issue, false, PASSIVE_CONFIDENCE, PASSIVE_REASON);
+                passive++;
+                continue;
+            }
+            calls.add(LLM_EXECUTOR.submit(() -> {
+                Context.accountId.set(accountId);
+                return verifyResult(target.issue, target.result, template);
+            }));
+        }
+
+        int falsePositives = 0;
+        int truePositives = 0;
+        int errors = 0;
+        for (Future<Outcome> call : calls) {
+            Outcome outcome;
+            try {
+                outcome = call.get();
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "AI verification call failed: " + e.getMessage());
+                outcome = Outcome.ERROR;
+            }
+            if (outcome == Outcome.FALSE_POSITIVE) falsePositives++;
+            else if (outcome == Outcome.TRUE_POSITIVE) truePositives++;
+            else if (outcome == Outcome.SKIPPED) notVerifiable++;
+            else errors++;
+        }
+
+        String summary = "AI verification for " + label + ": checked " + calls.size() + ", false positives "
+            + falsePositives + ", true positives " + truePositives + ", errors " + errors + ", passive tests marked true positive "
+            + passive + ", skipped " + notVerifiable + " not verifiable by AI";
+        if (!calls.isEmpty() && errors == calls.size()) {
+            loggerMaker.errorAndAddToDb(summary + ". Every AI call failed; check the AI provider configuration and logs.");
+        } else {
+            loggerMaker.infoAndAddToDb(summary);
+        }
+    }
+
+    /** The test template YAML of every test in the batch, by test id, in one query. */
+    private static Map<String, String> loadTemplates(List<TestingRunResult> results) {
+        Set<String> testIds = new HashSet<>();
+        for (TestingRunResult result : results) {
+            if (result.getTestSubType() != null) testIds.add(result.getTestSubType());
+        }
+        Map<String, String> templates = new HashMap<>();
+        if (testIds.isEmpty()) return templates;
+        for (YamlTemplate template : YamlTemplateDao.instance.findAll(
+                Filters.in(Constants.ID, new ArrayList<>(testIds)), Projections.include(YamlTemplate.CONTENT))) {
+            templates.put(template.getId(), template.getContent());
+        }
+        return templates;
+    }
+
+    /**
+     * Asks the LLM about one result, in one call, and writes its verdict into the issue's description.
+     * A TRUE_POSITIVE below MIN_TRUE_POSITIVE_CONFIDENCE is recorded as a false positive that is not proven.
+     */
+    private Outcome verifyResult(TestingRunIssues issue, TestingRunResult result, String template) {
+        String prompt = buildPrompt(result, template);
+        if (prompt == null) return Outcome.SKIPPED;
+
+        BasicDBObject verdict = new FalsePositiveVerifierPromptHandler().handle(new BasicDBObject("prompt", prompt));
+        if (verdict.containsField("error")) {
+            loggerMaker.infoAndAddToDb("AI verification skipped result " + result.getHexId() + ": " + verdict.get("error"));
+            return Outcome.ERROR;
+        }
+        String answer = verdict.getString(FalsePositiveVerifierPromptHandler.VERDICT);
+        int confidence = verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE);
+        String reason = verdict.getString(FalsePositiveVerifierPromptHandler.REASON);
+        boolean truePositive = isConfirmed(answer, confidence);
+        if (!truePositive && FalsePositiveVerifierPromptHandler.TRUE_POSITIVE.equals(answer)) {
+            reason = "Not proven, the AI was only " + confidence + "% sure it is real: " + reason;
+            confidence = 100 - confidence;
+        }
+        writeVerdict(issue, !truePositive, confidence, reason);
+        return truePositive ? Outcome.TRUE_POSITIVE : Outcome.FALSE_POSITIVE;
+    }
+
+    /** Whether an answer confirms the finding: a TRUE_POSITIVE the AI is sure enough of. */
+    static boolean isConfirmed(String answer, int confidence) {
+        return FalsePositiveVerifierPromptHandler.TRUE_POSITIVE.equals(answer) && confidence >= MIN_TRUE_POSITIVE_CONFIDENCE;
+    }
+
+    /**
+     * Records a verdict on the issue: the aiVerdict and aiConfidence fields, and the reason at the start of
+     * the description. A description the user wrote is kept; one written by an earlier verification is
+     * replaced. Only while the issue is still OPEN, so one the user ignored or fixed meanwhile is left as it is.
+     */
+    private static void writeVerdict(TestingRunIssues issue, boolean falsePositive, int confidence, String reason) {
+        List<Bson> updates = new ArrayList<>();
+        updates.add(Updates.set(TestingRunIssues.AI_VERDICT, falsePositive
+            ? FalsePositiveVerifierPromptHandler.FALSE_POSITIVE : FalsePositiveVerifierPromptHandler.TRUE_POSITIVE));
+        updates.add(Updates.set(TestingRunIssues.AI_CONFIDENCE, confidence));
+        String description = issue.getDescription();
+        boolean canWriteDescription = description == null || description.trim().isEmpty()
+            || description.startsWith(DESCRIPTION_PREFIX);
+        if (canWriteDescription && reason != null && !reason.isEmpty()) {
+            updates.add(Updates.set(TestingRunIssues.DESCRIPTION, DESCRIPTION_PREFIX + ": "
+                + (falsePositive ? "false positive" : "true positive") + ", confidence " + confidence + "%] " + reason));
+        }
+        TestingRunIssuesDao.instance.getMCollection().updateOne(
+            Filters.and(
+                Filters.eq(Constants.ID, issue.getId()),
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN)
+            ),
+            Updates.combine(updates)
+        );
+    }
+
+    /**
+     * The prompt for one result: every step of a multi-step test, otherwise its flagged attempts. Null
+     * when nothing was stored to judge.
+     */
+    private static String buildPrompt(TestingRunResult result, String template) {
+        List<GenericTestResult> testResults = result.getTestResults();
+        if (testResults == null || testResults.isEmpty()) return null;
+        if (testResults.get(0) instanceof MultiExecTestResult) {
+            List<FalsePositiveVerifierPromptHandler.Step> steps = stepsToJudge(result, (MultiExecTestResult) testResults.get(0));
+            return steps.isEmpty() ? null : FalsePositiveVerifierPromptHandler.buildStepsPrompt(result.getTestSubType(), template, steps);
+        }
+        List<TestResult> attempts = attemptsToJudge(testResults);
+        if (attempts.isEmpty()) return null;
+        List<String> attemptMessages = new ArrayList<>();
+        for (TestResult attempt : attempts) attemptMessages.add(attempt.getMessage());
+        return FalsePositiveVerifierPromptHandler.buildPrompt(result.getTestSubType(), template,
+            attempts.get(0).getOriginalMessage(), attemptMessages);
+    }
+
+    /**
+     * Every step of a multi-step result, in execution order, with the requests it sent and its baseline.
+     * Empty when no step stored a request.
+     */
+    static List<FalsePositiveVerifierPromptHandler.Step> stepsToJudge(TestingRunResult result, MultiExecTestResult multi) {
+        List<FalsePositiveVerifierPromptHandler.Step> steps = new ArrayList<>();
+        Map<String, NodeResult> nodes = multi.getNodeResultMap();
+        if (nodes == null) return steps;
+        Map<String, WorkflowNodeDetails> details = result.getWorkflowTest() == null ? null
+            : result.getWorkflowTest().getMapNodeIdToWorkflowNodeDetails();
+        boolean anyRequest = false;
+        for (String nodeId : multi.getExecutionOrder()) {
+            NodeResult node = nodes.get(nodeId);
+            if (node == null) continue;
+            WorkflowNodeDetails nodeDetails = details == null ? null : details.get(nodeId);
+            String originalMessage = nodeDetails instanceof YamlNodeDetails ? ((YamlNodeDetails) nodeDetails).getOriginalMessage() : null;
+            List<String> messages = MultiExecTestResult.stepMessages(node);
+            anyRequest |= !messages.isEmpty();
+            steps.add(new FalsePositiveVerifierPromptHandler.Step(nodeId, originalMessage, messages,
+                node.isVulnerable(), node.getValidationReason()));
+        }
+        return anyRequest ? steps : new ArrayList<>();
+    }
+
+    /**
+     * The attempts the scanner flagged vulnerable (up to MAX_ATTEMPTS_PER_RESULT), since those are what
+     * the verdict is about. Falls back to the last attempt if none carries the vulnerable flag.
+     */
+    private static List<TestResult> attemptsToJudge(List<GenericTestResult> testResults) {
+        List<TestResult> picked = new ArrayList<>();
+        TestResult last = null;
+        for (GenericTestResult attempt : testResults) {
+            if (!(attempt instanceof TestResult)) continue;
+            last = (TestResult) attempt;
+            if (attempt.isVulnerable() && picked.size() < MAX_ATTEMPTS_PER_RESULT) {
+                picked.add(last);
+            }
+        }
+        if (picked.isEmpty() && last != null) picked.add(last);
+        return picked;
+    }
+
+    public void setTestingRunResultSummaryHexId(String testingRunResultSummaryHexId) {
+        this.testingRunResultSummaryHexId = testingRunResultSummaryHexId;
+    }
+
+    public void setTestingRunResultHexIds(List<String> testingRunResultHexIds) {
+        this.testingRunResultHexIds = testingRunResultHexIds;
+    }
+
+    public void setIssueIdArray(List<TestingIssuesId> issueIdArray) {
+        this.issueIdArray = issueIdArray;
+    }
+}

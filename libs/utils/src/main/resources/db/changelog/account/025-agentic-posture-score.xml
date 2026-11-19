@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collection + computedAt index for AgenticPostureScoreHistoryDao.createIndicesIfAbsent
+        (collName: agentic_posture_score_history, index on AgenticPostureScoreHistory.COMPUTED_AT
+        ascending). AgenticPostureScoreCron appends one row per account per run; the latest row
+        (sorted by computedAt) is the current account-level posture score, and ArgusPostureAction /
+        ArgusPostureChangesService read the history for the trend and last-week comparison. Index
+        name matches MCollection.generateIndexName ("computedAt_1") so the DAO's own
+        createIndexIfAbsent treats it as present.
+    -->
+
+    <changeSet id="025-account-create-agentic-posture-score-history" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="agentic_posture_score_history"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="agentic_posture_score_history"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="agentic_posture_score_history"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="025-account-agentic-posture-score-history-computed-at-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agentic_posture_score_history"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="agentic_posture_score_history">
+            <mongodb:keys>{ "computedAt": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "computedAt_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="agentic_posture_score_history">
+                <mongodb:keys>{ "computedAt": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <!--
+        ApiCollection gained postureScore, postureSubScores, postureGaps and postureScoreCalculatedAt
+        on api_collections documents, written per agent collection by AgenticPostureScoreCron. No-op:
+        MongoDB is schema-less, the cron creates the fields with $set, all four are nullable
+        (Double / Map / Integer), and readers treat a missing field as "not scored yet", so existing
+        documents need no backfill. No index is added; posture reads go through the collection id.
+    -->
+
+    <changeSet id="025-account-api-collections-posture-score-fields" author="akto">
+        <empty/>
+    </changeSet>
+
+</databaseChangeLog>

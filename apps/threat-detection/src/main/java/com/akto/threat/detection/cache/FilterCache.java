@@ -9,6 +9,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.utils.GzipUtils;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.lettuce.core.api.StatefulRedisConnection;
 
 import java.util.ArrayList;
@@ -19,6 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public class FilterCache {
 
@@ -31,6 +34,11 @@ public class FilterCache {
 
     private final DataActor dataActor;
     private final StatefulRedisConnection<String, String> apiCache;
+
+    private final Cache<Integer, Boolean> noSchemaCollections = Caffeine.newBuilder()
+            .maximumSize(100_000)
+            .expireAfterWrite(REFRESH_INTERVAL_SEC, TimeUnit.SECONDS)
+            .build();
 
     private Map<String, FilterConfig> apiFilters;
     private final List<FilterConfig> successfulExploitFilters = new ArrayList<>();
@@ -107,10 +115,17 @@ public class FilterCache {
     }
 
     public String getApiSchema(int apiCollectionId) {
+        if (apiCollectionId == 0 || noSchemaCollections.getIfPresent(apiCollectionId) != null) {
+            return null;
+        }
         String apiSchema = null;
         try {
             if (this.apiCache == null) {
-                return dataActor.fetchOpenApiSchema(apiCollectionId);
+                apiSchema = dataActor.fetchOpenApiSchema(apiCollectionId);
+                if (apiSchema == null || apiSchema.isEmpty()) {
+                    noSchemaCollections.put(apiCollectionId, Boolean.TRUE);
+                }
+                return apiSchema;
             }
             apiSchema = this.apiCache.sync().get(Constants.AKTO_THREAT_DETECTION_CACHE_PREFIX + apiCollectionId);
             if (apiSchema != null && !apiSchema.isEmpty()) {
@@ -118,7 +133,7 @@ public class FilterCache {
             }
             apiSchema = dataActor.fetchOpenApiSchema(apiCollectionId);
             if (apiSchema == null || apiSchema.isEmpty()) {
-                logger.warnAndAddToDb("No schema found for api collection id: " + apiCollectionId);
+                noSchemaCollections.put(apiCollectionId, Boolean.TRUE);
                 return null;
             }
             this.apiCache.sync().setex(Constants.AKTO_THREAT_DETECTION_CACHE_PREFIX + apiCollectionId, Constants.ONE_DAY_TIMESTAMP, apiSchema);

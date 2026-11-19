@@ -1,11 +1,10 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Button, Modal, HorizontalStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid, Box } from "@shopify/polaris"
+import { Button, HorizontalStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid, Box } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { useNavigate } from "react-router-dom"
-import dashboardFunc from "../../transform"
 // import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import { CellType } from "../../../components/tables/rows/GithubRow"
@@ -19,6 +18,8 @@ import ChartypeComponent from "../../testing/TestRunsPage/ChartypeComponent"
 import BarGraph from "../../../components/charts/BarGraph"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
+import { usePermissions } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 const headers = [
     {
@@ -53,13 +54,13 @@ const headers = [
     },
     {
         title: mapLabel("API response", getDashboardCategory()),
-        text: "API response",
+        text: mapLabel('API response', getDashboardCategory()),
         value: "response",
         sortActive: true,
     },
     {
         title: mapLabel("API request", getDashboardCategory()),
-        text: "API request",
+        text: mapLabel('API request', getDashboardCategory()),
         value: "request",
         sortActive: true
     },
@@ -157,6 +158,7 @@ function AllSensitiveData() {
     // const [prompts, setPrompts] = useState([])
     // const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const navigate = useNavigate()
+    const { canCall } = usePermissions()
     const collectionsMap = PersistStore((state) => state.collectionsMap)
     const filtersMap = PersistStore((state) => state.filtersMap)
     const setFiltersMap = PersistStore((state) => state.setFiltersMap)
@@ -350,9 +352,9 @@ function AllSensitiveData() {
 
     const secondaryActionsComp = (
         <HorizontalStack gap={"2"}>
-            { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
+            { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <AllowedAction allowed={canCall('api/resetSampleData')}><Button onClick={resetSampleData}>Reset Sample Data</Button></AllowedAction> : <></>}
             {/* <Button onClick={displayGPT}>Ask AktoGPT</Button> */}
-            <Button onClick={fillSensitiveDataTypes}>Fill Data Types</Button>
+            <AllowedAction allowed={canCall('api/fillSensitiveDataTypes')}><Button onClick={fillSensitiveDataTypes}>Fill Data Types</Button></AllowedAction>
         </HorizontalStack>
     )
 
@@ -382,7 +384,7 @@ function AllSensitiveData() {
             />
             <InfoCard
                 title={"Top 5 sensitive datatype"}
-                titleToolTip={"Numbers of APIs having the corresponding data type in request or response"}
+                titleToolTip={"Numbers of " + mapLabel('APIs', getDashboardCategory()) + " having the corresponding data type in request or response"}
                 component={
                     <Box paddingBlockStart={"6"}>
                         <ChartypeComponent
@@ -433,11 +435,11 @@ function AllSensitiveData() {
             title={
                 <TitleWithInfo 
                     titleText={"Sensitive data exposure"} 
-                    tooltipContent={"Akto allows you to identify which sensitive data an API contains in request or response."}
+                    tooltipContent={"Akto allows you to identify which sensitive data an " + mapLabel('API', getDashboardCategory()) + " contains in request or response."}
                     docsUrl="https://docs.akto.io/api-inventory/concepts/sensitive-data" 
                 />
             }
-            primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
+            primaryAction={<AllowedAction allowed={canCall('api/saveCustomDataType')}><Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button></AllowedAction>}
             secondaryActions={secondaryActionsComp}
             isFirstPage={true}
             components={

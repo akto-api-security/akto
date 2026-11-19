@@ -8,6 +8,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import org.bson.conversions.Bson;
 
+import java.util.Collection;
 import java.util.List;
 
 public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> {
@@ -54,6 +55,22 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
 
         fieldNames = new String[]{"name", "contextSource"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+    }
+
+    /** True if a policy in this context source was created by createdBy, or has any of the given names. */
+    public boolean existsByCreatedByOrName(CONTEXT_SOURCE contextSource, String createdBy, Collection<String> names) {
+        Bson filter = Filters.and(
+                Filters.eq("contextSource", contextSource),
+                Filters.or(Filters.eq("createdBy", createdBy), Filters.in("name", names)));
+        return instance.findOne(filter, Projections.include("_id")) != null;
+    }
+
+    /** Removes the policies of this context source that were created by createdBy and carry one of the given names. */
+    public void deleteByCreatedByAndName(CONTEXT_SOURCE contextSource, String createdBy, Collection<String> names) {
+        instance.deleteAll(Filters.and(
+                Filters.eq("contextSource", contextSource),
+                Filters.eq("createdBy", createdBy),
+                Filters.in("name", names)));
     }
 
     public List<GuardrailPolicies> findAllSortedByCreatedTimestamp(int skip, int limit) {

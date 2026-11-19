@@ -400,7 +400,11 @@ const transform = {
                     formattedPayload = this.formatJson(payLoad)
                 }
             }
-            return (localFirstLine + "\n" + finalData + (finalData.trim().length === 0 || isPayloadEmpty ? "\n" : "\n\n") + formattedPayload)
+            // Bare-body samples have no first line or headers - start directly with the payload.
+            if (!localFirstLine && finalData.trim().length === 0) {
+                return formattedPayload
+            }
+            return ((localFirstLine ? localFirstLine + "\n" : "") + finalData + (finalData.trim().length === 0 || isPayloadEmpty ? "\n" : "\n\n") + formattedPayload)
         }
         return (data?.firstLine ? data?.firstLine + "\n" : "") + (data?.json && Object.keys(data?.json).length > 0 ? this.formatJson(data.json) : "");
       }  

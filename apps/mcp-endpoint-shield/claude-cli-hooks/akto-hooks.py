@@ -6,7 +6,7 @@ import sys
 if not os.getenv("LOG_DIR"):
     os.environ["LOG_DIR"] = os.path.expanduser("~/.claude/akto/logs")
 
-from akto_ingestion_utility import run_observability_hook
+from akto_ingestion_utility import invoked_by_claude_code, run_observability_hook
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -15,6 +15,8 @@ if __name__ == "__main__":
 
     hook = sys.argv[1]
 
-    run_observability_hook(hook)
+    # Other agents (e.g. Cursor) can run Claude hooks; their own hooks already cover them
+    if invoked_by_claude_code():
+        run_observability_hook(hook)
     print("{}")
     sys.exit(0)

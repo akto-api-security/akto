@@ -8,6 +8,7 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.Callable;
 
 public class Context {
 public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
@@ -24,6 +25,43 @@ public static ThreadLocal<Log.ActivityType> activityType = new ThreadLocal<Log.A
         isRedactPayload.remove();
         activityId.remove();
         activityType.remove();
+    }
+
+    /** Wraps {@code body} so it runs with accountId/userId/contextSource set on whatever thread
+     *  actually executes it, clearing them again once it finishes — the one place this logic
+     *  lives now, in place of an identical private copy that used to be pasted into
+     *  ArgusPostureAction, SecurityPostureAction, InsightService, InsightDataLoader, and
+     *  ArgusPostureService. Any {@code ExecutorService.submit(...)} fan-out across a worker-thread
+     *  pool must wrap its task with this (or the accountId-only overload below) or the worker
+     *  silently reads/writes the wrong account — these ThreadLocals are never inherited from the
+     *  submitting thread. */
+    public static <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
+        return () -> {
+            Context.accountId.set(accountId);
+            Context.userId.set(userId);
+            Context.contextSource.set(contextSource);
+            try {
+                return body.call();
+            } finally {
+                Context.accountId.remove();
+                Context.userId.remove();
+                Context.contextSource.remove();
+            }
+        };
+    }
+
+    /** accountId-only variant — for background jobs (e.g. PostureDrillNarrativeService's own
+     *  narrative-generation tasks) that outlive the request thread and only need accountId
+     *  re-set for their one account-scoped DAO call, not the full 3-field context. */
+    public static <T> Callable<T> withContext(int accountId, Callable<T> body) {
+        return () -> {
+            Context.accountId.set(accountId);
+            try {
+                return body.call();
+            } finally {
+                Context.accountId.remove();
+            }
+        };
     }
 
     public static int getId() {

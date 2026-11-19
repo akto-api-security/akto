@@ -1,6 +1,7 @@
 package com.akto.dto.threat_detection_backend;
 
 import com.akto.dto.type.URLMethods;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +34,34 @@ public class MaliciousEventDto {
   private String contextSource;
   private String sessionId;
   private List<OwaspCategory> owaspCategories;
+  private String remediation;
+  private String evidenceLine;
+  // Case management for events marked for review. Field names are the Mongo field names.
+  public static final String CASE_OWNER = "caseOwner";
+  public static final String CASE_NOTES = "caseNotes";
+  public static final String CASE_TIMELINE = "caseTimeline";
+  private String caseOwner;
+  private String caseNotes;
+  private List<CaseActivity> caseTimeline;
+  public static final String FIRST_TRIAGED_AT = "firstTriagedAt";
+  private Long firstTriagedAt;
+  // Bedrock caller ARN + prompt hash: events with the same key close together in time are one activity.
+  private String groupKey;
+  // Set only by the grouped activity list (never stored): how many events are behind this row, the first
+  // one's time, their ids, and the policies they tripped.
+  private Integer groupCount;
+  private Long groupFirstDetectedAt;
+  private List<String> groupEventIds;
+  private List<String> groupFilterIds;
+  public static final String HUMAN_RESPONSE = "humanResponse";
+  @JsonProperty("humanResponse")
+  private String humanResponse;
+
+  public enum HumanResponse {
+    PENDING,
+    APPROVED,
+    BLOCKED
+  }
 
   public enum EventType {
     SINGLE,
@@ -43,7 +72,9 @@ public class MaliciousEventDto {
     ACTIVE,
     UNDER_REVIEW,
     IGNORED,
-    TRAINING
+    TRAINING,
+    HUMAN_APPROVAL,
+    FIXED
   }
 
   public enum Label {
@@ -76,6 +107,54 @@ public class MaliciousEventDto {
     public void setConfidence(String confidence) { this.confidence = confidence; }
   }
 
+  // One entry of the case history: who changed what, when. Appended by MaliciousEventService, never edited.
+  public static class CaseActivity {
+    // activityType says which of status, owner and notes the entry is about; the others are empty.
+    // STATUS: status = the new status. OWNER: owner = the new owner (empty when unassigned).
+    // NOTES: notes = the notes as saved (empty when cleared).
+    public static final String ACTIVITY_TYPE_STATUS = "STATUS";
+    public static final String ACTIVITY_TYPE_OWNER = "OWNER";
+    public static final String ACTIVITY_TYPE_NOTES = "NOTES";
+    // Mongo field names of an entry, which the service writes by name in its pipeline update.
+    public static final String TIMESTAMP = "timestamp";
+    public static final String UPDATED_BY = "updatedBy";
+    public static final String ACTIVITY_TYPE = "activityType";
+    public static final String STATUS = "status";
+    public static final String OWNER = "owner";
+    public static final String NOTES = "notes";
+
+    private long timestamp;
+    private String updatedBy;
+    private String activityType;
+    private String status;
+    private String owner;
+    private String notes;
+
+    public CaseActivity() {}
+
+    public CaseActivity(long timestamp, String updatedBy, String activityType, String status, String owner, String notes) {
+      this.timestamp = timestamp;
+      this.updatedBy = updatedBy;
+      this.activityType = activityType;
+      this.status = status;
+      this.owner = owner;
+      this.notes = notes;
+    }
+
+    public long getTimestamp() { return timestamp; }
+    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+    public String getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(String updatedBy) { this.updatedBy = updatedBy; }
+    public String getActivityType() { return activityType; }
+    public void setActivityType(String activityType) { this.activityType = activityType; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getOwner() { return owner; }
+    public void setOwner(String owner) { this.owner = owner; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+  }
+
   public MaliciousEventDto() {}
 
   private MaliciousEventDto(Builder builder) {
@@ -105,6 +184,10 @@ public class MaliciousEventDto {
     this.contextSource = builder.contextSource;
     this.sessionId = builder.sessionId;
     this.owaspCategories = builder.owaspCategories;
+    this.remediation = builder.remediation;
+    this.humanResponse = builder.humanResponse;
+    this.evidenceLine = builder.evidenceLine;
+    this.groupKey = builder.groupKey;
   }
 
   public static class Builder {
@@ -133,6 +216,11 @@ public class MaliciousEventDto {
     private String contextSource;
     private String sessionId;
     private List<OwaspCategory> owaspCategories;
+    private String remediation;
+    private String humanResponse;
+    private String evidenceLine;
+    private String groupKey;
+
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
       return this;
@@ -253,8 +341,28 @@ public class MaliciousEventDto {
       return this;
     }
 
+    public Builder setRemediation(String remediation) {
+      this.remediation = remediation;
+      return this;
+    }
+
+    public Builder setGroupKey(String groupKey) {
+      this.groupKey = groupKey;
+      return this;
+    }
+
+    public Builder setEvidenceLine(String evidenceLine) {
+      this.evidenceLine = evidenceLine;
+      return this;
+    }
+
     public Builder setOwaspCategories(List<OwaspCategory> owaspCategories) {
       this.owaspCategories = owaspCategories;
+      return this;
+    }
+
+    public Builder setHumanResponse(String humanResponse) {
+      this.humanResponse = humanResponse;
       return this;
     }
 
@@ -467,12 +575,108 @@ public class MaliciousEventDto {
     this.sessionId = sessionId;
   }
 
+  public String getRemediation() {
+    return remediation;
+  }
+
+  public void setRemediation(String remediation) {
+    this.remediation = remediation;
+  }
+
+  public String getEvidenceLine() {
+    return evidenceLine;
+  }
+
+  public void setEvidenceLine(String evidenceLine) {
+    this.evidenceLine = evidenceLine;
+  }
+
+  public String getCaseOwner() {
+    return caseOwner;
+  }
+
+  public void setCaseOwner(String caseOwner) {
+    this.caseOwner = caseOwner;
+  }
+
+  public String getCaseNotes() {
+    return caseNotes;
+  }
+
+  public void setCaseNotes(String caseNotes) {
+    this.caseNotes = caseNotes;
+  }
+
+  public List<CaseActivity> getCaseTimeline() {
+    return caseTimeline;
+  }
+
+  public void setCaseTimeline(List<CaseActivity> caseTimeline) {
+    this.caseTimeline = caseTimeline;
+  }
+
+  public Long getFirstTriagedAt() {
+    return firstTriagedAt;
+  }
+
+  public void setFirstTriagedAt(Long firstTriagedAt) {
+    this.firstTriagedAt = firstTriagedAt;
+  }
+
   public List<OwaspCategory> getOwaspCategories() {
     return owaspCategories;
   }
 
   public void setOwaspCategories(List<OwaspCategory> owaspCategories) {
     this.owaspCategories = owaspCategories;
+  }
+
+  public String getGroupKey() {
+    return groupKey;
+  }
+
+  public void setGroupKey(String groupKey) {
+    this.groupKey = groupKey;
+  }
+
+  public Integer getGroupCount() {
+    return groupCount;
+  }
+
+  public void setGroupCount(Integer groupCount) {
+    this.groupCount = groupCount;
+  }
+
+  public Long getGroupFirstDetectedAt() {
+    return groupFirstDetectedAt;
+  }
+
+  public void setGroupFirstDetectedAt(Long groupFirstDetectedAt) {
+    this.groupFirstDetectedAt = groupFirstDetectedAt;
+  }
+
+  public List<String> getGroupEventIds() {
+    return groupEventIds;
+  }
+
+  public void setGroupEventIds(List<String> groupEventIds) {
+    this.groupEventIds = groupEventIds;
+  }
+
+  public List<String> getGroupFilterIds() {
+    return groupFilterIds;
+  }
+
+  public void setGroupFilterIds(List<String> groupFilterIds) {
+    this.groupFilterIds = groupFilterIds;
+  }
+
+  public String getHumanResponse() {
+    return humanResponse;
+  }
+
+  public void setHumanResponse(String humanResponse) {
+    this.humanResponse = humanResponse;
   }
 
 }

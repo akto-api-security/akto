@@ -1,7 +1,11 @@
 package com.akto.utils;
 
+import com.akto.gateway.GuardrailsClient;
 import com.akto.log.LoggerMaker;
 import com.akto.util.http_util.CoreHTTPClient;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.binder.okhttp3.OkHttpMetricsEventListener;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -29,6 +33,15 @@ public class HttpTrafficPublisher implements TrafficPublisher {
             .connectTimeout(5, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
+            // Same shared outbound-client metric as guardrails, tagged client="http_ingest".
+            // Buckets and status/tag normalization are applied centrally in InfraMetricsListener.
+            .eventListener(OkHttpMetricsEventListener
+                    .builder(Metrics.globalRegistry, GuardrailsClient.EXTERNAL_HTTP_CLIENT_METRIC)
+                    .tags(Tags.of("client", "http_ingest",
+                            "account.id", OperationalAlerts.deploymentAccountId()))
+                    .uriMapper(req -> req.url().encodedPath())
+                    .includeHostTag(false)
+                    .build())
             .build();
 
     private final String ingestUrl;

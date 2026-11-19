@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Text } from '@shopify/polaris';
 import DropdownSearch from './DropdownSearch';
 import settingRequests from '../../pages/settings/api';
 
@@ -35,7 +36,7 @@ function ThreatPoliciesDropdown({ threatPolicies, setThreatPolicies }) {
 
   if (loading) {
     return <DropdownSearch
-      label="Block threat policies"
+      label={<Text variant="headingMd" as="span">Auto Block Threat Policies</Text>}
       placeholder="Loading threat policies..."
       optionsList={[]}
       setSelected={setThreatPolicies}
@@ -49,7 +50,7 @@ function ThreatPoliciesDropdown({ threatPolicies, setThreatPolicies }) {
 
   return (
     <DropdownSearch
-      label="Block threat policies"
+      label={<Text variant="headingMd" as="span">Auto Block Threat Policies</Text>}
       placeholder="Select threat policies"
       optionsList={threatPoliciesOptions}
       setSelected={setThreatPolicies}

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors ApiSequencesDao.createIndicesIfAbsent for session sequences (one row per seqKey).
+        Index names match MCollection.generateIndexName, so these are no-ops where cyborg already built them.
+    -->
+
+    <!-- The baseline unique {apiCollectionId, paths} index is multikey: it blocks A->B and A->C from coexisting.
+         failOnError=false: it is already gone where api_sequences was dropped and recreated. -->
+    <changeSet id="035-account-api-sequences-drop-paths-unique-index" author="akto" failOnError="false">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="api_sequences"/>
+        </preConditions>
+        <mongodb:dropIndex collectionName="api_sequences">
+            <mongodb:keys>{ "apiCollectionId": -1, "paths": -1 }</mongodb:keys>
+        </mongodb:dropIndex>
+    </changeSet>
+
+    <!-- Old IP-pair rows have no seqKey and would block the unique seqKey index. No rollback: the rows are not usable by the new model. -->
+    <changeSet id="035-account-api-sequences-delete-pair-rows" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="api_sequences"/>
+        </preConditions>
+        <mongodb:runCommand>
+            <mongodb:command>{ "delete": "api_sequences", "deletes": [{ "q": { "seqKey": { "$exists": false } }, "limit": 0 }] }</mongodb:command>
+        </mongodb:runCommand>
+    </changeSet>
+
+    <changeSet id="035-account-api-sequences-seqkey-unique-index" author="akto">
+        <mongodb:createIndex collectionName="api_sequences">
+            <mongodb:keys>{ "seqKey": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "seqKey_1", "unique": true }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_sequences">
+                <mongodb:keys>{ "seqKey": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="035-account-api-sequences-last-seen-ttl-index" author="akto">
+        <mongodb:createIndex collectionName="api_sequences">
+            <mongodb:keys>{ "lastSeen": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "lastSeen_ttl", "expireAfterSeconds": 604800 }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_sequences">
+                <mongodb:keys>{ "lastSeen": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="035-account-api-sequences-score-index" author="akto">
+        <mongodb:createIndex collectionName="api_sequences">
+            <mongodb:keys>{ "score": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "score_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_sequences">
+                <mongodb:keys>{ "score": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="035-account-api-sequences-precedence-low-index" author="akto">
+        <mongodb:createIndex collectionName="api_sequences">
+            <mongodb:keys>{ "precedenceLow": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "precedenceLow_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_sequences">
+                <mongodb:keys>{ "precedenceLow": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

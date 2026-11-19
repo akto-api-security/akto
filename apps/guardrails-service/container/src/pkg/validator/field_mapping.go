@@ -17,6 +17,10 @@ const (
 	// Multiple paths per side are pipe-separated (first match wins).
 	// Example: POST:/v1/chat/completions:messages.role=user.content|messages.role=user.content.0.text,choices.0.message.content
 	EnvFieldMapping = "GUARDRAIL_FIELD_MAPPING"
+
+	// jsonStringSuffix marks a path segment whose string value is itself JSON to descend into.
+	// Example: body@json.messages.role=user.content for {"body": "{\"messages\": [...]}"}
+	jsonStringSuffix = "@json"
 )
 
 type endpointPaths struct {
@@ -329,6 +333,26 @@ func GetValueAtPathFromJSON(payload string, path string) (string, bool) {
 	return coerceValueToString(v)
 }
 
+// decodeJSONString decodes a JSON-encoded object or array held in a string field.
+// Used only for path segments explicitly marked with jsonStringSuffix: decoding
+// strings implicitly would let a user-controlled JSON-shaped prompt steer which
+// part of it gets scanned.
+func decodeJSONString(v any) any {
+	s, ok := v.(string)
+	if !ok {
+		return nil
+	}
+	var decoded any
+	if err := json.Unmarshal([]byte(s), &decoded); err != nil {
+		return nil
+	}
+	switch decoded.(type) {
+	case map[string]any, []any:
+		return decoded
+	}
+	return nil
+}
+
 func coerceValueToString(v any) (string, bool) {
 	switch val := v.(type) {
 	case string:
@@ -363,9 +387,15 @@ func valueAtPath(data any, parts []string) any {
 	rest := parts[1:]
 	switch m := data.(type) {
 	case map[string]any:
-		next, ok := m[key]
+		field, decode := strings.CutSuffix(key, jsonStringSuffix)
+		next, ok := m[field]
 		if !ok {
 			return nil
+		}
+		if decode {
+			if next = decodeJSONString(next); next == nil {
+				return nil
+			}
 		}
 		if len(rest) == 0 {
 			return next

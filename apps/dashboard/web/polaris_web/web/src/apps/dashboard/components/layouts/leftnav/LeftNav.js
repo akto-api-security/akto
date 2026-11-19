@@ -7,7 +7,6 @@ import {
     DiamondAlertMinor,
     FinancesMinor,
     LockMajor,
-    AutomationFilledMajor,
     MagicMinor,
     SocialAdMajor,
 } from "@shopify/polaris-icons";
@@ -18,12 +17,34 @@ import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
 import Store from "../../../store";
 import api from "../../../../signup/api";
-import { useCallback, useMemo, useState} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import func from "@/util/func";
+import { usePermissions, pageRequires } from "@/util/permissions";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_ENDPOINT_SECURITY, CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_ENDPOINT_SECURITY, CATEGORY_DAST, mapLabel, isAgenticSecurityCategory } from "../../../../main/labelHelper";
+
+// The Overview tiles link to these nav pages (and Back returns to Overview); the highlight follows them.
+const LINKED_NAV_IDS = new Set(["dashboard_observe_agentic_discovery", "dashboard_observe_agentic_assets", "dashboard_observe_endpoints", "dashboard_observe_agent_discovery"]);
+
+// a nav item's "requires" is the action its page loads first; items the role can't open are left out,
+// a section with nothing left is hidden, and a section opens its first item the role can open
+function withoutPagesTheRoleCantOpen(items, canCall) {
+    const allowed = (item) => !item.requires || canCall(item.requires)
+    const clean = ({ requires, ...item }) => item
+    return items.filter(allowed).map(item => {
+        if (!item.subNavigationItems || item.subNavigationItems.length === 0) return clean(item)
+        const subItems = item.subNavigationItems.filter(allowed)
+        if (subItems.length === 0) return null
+        const removedFirst = subItems[0] !== item.subNavigationItems[0]
+        return {
+            ...clean(item),
+            subNavigationItems: subItems.map(clean),
+            onClick: removedFirst ? subItems[0].onClick : item.onClick,
+        }
+    }).filter(Boolean)
+}
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -38,12 +59,19 @@ export default function LeftNav() {
     const activeAccount = Store(state => state.activeAccount);
     const resetAll = PersistStore(state => state.resetAll);
     const resetStore = LocalStore(state => state.resetStore);
+    const agenticNewLayout = LocalStore(state => state.agenticNewLayout);
     const resetSession = SessionStore(state => state.resetStore);
     const resetFields = IssuesStore(state => state.resetStore);
 
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
     };
+
+    // A link (not a nav click) to one of those pages moves the highlight; exact ids only, so sub-pages keep their parent's.
+    useEffect(() => {
+        const observeId = currPathString.replace(/-/g, "_");
+        if (LINKED_NAV_IDS.has(observeId)) setLeftNavSelected(observeId);
+    }, [currPathString]);
 
     const handleAccountChange = useCallback(async (selected) => {
         const accountId = selected === undefined || selected === null || selected === ""
@@ -74,6 +102,7 @@ export default function LeftNav() {
     }));
 
     const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+    const { canCall } = usePermissions();
 
     let reportsSubNavigationItems = [
         {
@@ -99,6 +128,7 @@ export default function LeftNav() {
         })
         reportsSubNavigationItems.push({
             label: "Threat",
+            requires: pageRequires("/dashboard/reports/threat"),
             onClick: () => {
                 navigate("/dashboard/reports/threat");
                 handleSelect("dashboard_reports_tthreat");
@@ -119,10 +149,7 @@ export default function LeftNav() {
     ];
     const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
 
-
-    // Allowed users to for NHI Data
-    const allowedNhiUsers = ["ankush@akto.io", "umesh@akto.io"];
-    const isAllowedNhiUser = window.USER_NAME && allowedNhiUsers.includes(window.USER_NAME.toLowerCase());
+    const showAgenticPosture = isAgenticSecurityCategory();
 
     const navItems = useMemo(() => {
         let items = [
@@ -181,12 +208,12 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_endpoint_security_dashboard" || currPathString === "dashboard_endpoint_dashboard",
                 key: "1",
             }] : []),
-            ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY && window.USER_NAME.indexOf("@akto.io") !== -1 ? [{
+            ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
                 label: "AI Security Posture",
                 icon: ReportFilledMinor,
                 onClick: () => {
                     handleSelect("dashboard_endpoint_posture");
-                    navigate("/dashboard/endpoint-dashboard");
+                    navigate("/dashboard/security-posture");
                     setActive("normal");
                 },
                 selected: leftNavSelected === "dashboard_endpoint_posture",
@@ -196,11 +223,18 @@ export default function LeftNav() {
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
                 onClick: () => {
-                    handleSelect("dashboard_home");
-                    navigate("/dashboard/home");
+                    if (showAgenticPosture) {
+                        handleSelect("dashboard_agentic_posture");
+                        navigate("/dashboard/agentic-posture");
+                    } else {
+                        handleSelect("dashboard_home");
+                        navigate("/dashboard/home");
+                    }
                     setActive("normal");
                 },
-                selected: leftNavSelected === "dashboard_home",
+                selected: showAgenticPosture
+                    ? leftNavSelected === "dashboard_agentic_posture" || currPathString.startsWith("dashboard_agentic_posture")
+                    : leftNavSelected === "dashboard_home",
                 key: "2",
             }] : []),
             {
@@ -234,8 +268,28 @@ export default function LeftNav() {
                 },
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
+                    ...(dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
+                        label: "Overview",
+                        requires: pageRequires("/dashboard/observe/agent-discovery"),
+                        onClick: () => {
+                            navigate("/dashboard/observe/agent-discovery");
+                            handleSelect("dashboard_observe_agent_discovery");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_agent_discovery",
+                    }] : []),
                     ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [
                     // { label: "Agentic assets (legacy)", onClick: () => { navigate("/dashboard/observe/agentic-assets"); handleSelect("dashboard_observe_agentic_assets"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_agentic_assets" },
+                    {
+                        label: "Overview",
+                        requires: pageRequires("/dashboard/observe/agentic-discovery"),
+                        onClick: () => {
+                            navigate("/dashboard/observe/agentic-discovery");
+                            handleSelect("dashboard_observe_agentic_discovery");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_agentic_discovery",
+                    },
                     {
                         label: "Agentic assets",
                         onClick: () => {
@@ -247,7 +301,7 @@ export default function LeftNav() {
                     },
                     // { label: "Users and devices", onClick: () => { navigate("/dashboard/observe/users-and-devices"); handleSelect("dashboard_observe_users_and_devices"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_users_and_devices" },
                     {
-                        label: "Endpoints",
+                        label: agenticNewLayout ? "Devices & Employees" : "Endpoints",
                         onClick: () => {
                             navigate("/dashboard/observe/endpoints");
                             handleSelect("dashboard_observe_endpoints");
@@ -265,7 +319,7 @@ export default function LeftNav() {
                     }]),
                     ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && window?.STIGG_FEATURE_WISE_ALLOWED?.AGENT_TRAFFIC_LOGS?.isGranted === true ? [{
                         label: "Traces",
-                        badge: <Badge status="info">Beta</Badge>,
+                        requires: pageRequires("/dashboard/observe/llm-observability"),
                         onClick: () => {
                             navigate("/dashboard/observe/llm-observability");
                             handleSelect("dashboard_observe_llm_observability");
@@ -286,6 +340,7 @@ export default function LeftNav() {
                     }] : []),
                     ...((activeAccount === 1669322524 || (dashboardCategory !== CATEGORY_AGENTIC_SECURITY && dashboardCategory !== CATEGORY_ENDPOINT_SECURITY)) ? [{
                         label: "Sensitive Data",
+                        requires: pageRequires("/dashboard/observe/sensitive"),
                         onClick: () => {
                             navigate("/dashboard/observe/sensitive");
                             handleSelect("dashboard_observe_sensitive");
@@ -304,6 +359,7 @@ export default function LeftNav() {
                     }] : []),
                     ...((dashboardCategory === "MCP Security" || dashboardCategory === "Endpoint Security") ? [{
                         label: "Audit Data",
+                        requires: pageRequires("/dashboard/observe/audit"),
                         onClick: () => {
                             navigate("/dashboard/observe/audit");
                             handleSelect("dashboard_observe_audit");
@@ -383,7 +439,29 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_testing_test_suite",
-                    }
+                    },
+                    ...(func.checkForFeatureSaas("TEST_PRE_SCRIPT") ? [{
+                        label: "Scripts",
+                        onClick: () => {
+                            navigate("/dashboard/testing/scripts");
+                            handleSelect("dashboard_testing_scripts");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_testing_scripts",
+                        requires: pageRequires("/dashboard/testing/scripts"),
+                    }] : []),
+                    // smart agents: same access as smart testing in the Run test modal
+                    ...((window?.STIGG_FEATURE_WISE_ALLOWED?.AUTOMATED_AGENTIC_TEST_RUN?.isGranted === true || window?.USER_NAME?.indexOf("@akto.io") !== -1) ? [{
+                        label: "Smart agents",
+                        badge: <Badge status="info">Beta</Badge>,
+                        onClick: () => {
+                            navigate("/dashboard/testing/smart-agents");
+                            handleSelect("dashboard_testing_smart_agents");
+                            setActive("active");
+                        },
+                        selected: typeof leftNavSelected === "string" && leftNavSelected.startsWith("dashboard_testing_smart_agents"),
+                        requires: pageRequires("/dashboard/testing/smart-agents"),
+                    }] : []),
                 ],
                 key: "4",
             }] : []),
@@ -442,6 +520,7 @@ export default function LeftNav() {
                 subNavigationItems: [
                     {
                         label: "Identities",
+                        requires: pageRequires("/dashboard/nhi/identities"),
                         onClick: () => {
                             navigate("/dashboard/nhi/identities");
                             handleSelect("dashboard_nhi_identities");
@@ -451,6 +530,7 @@ export default function LeftNav() {
                     },
                     {
                         label: "Violations",
+                        requires: pageRequires("/dashboard/nhi/violations"),
                         onClick: () => {
                             navigate("/dashboard/nhi/violations");
                             handleSelect("dashboard_nhi_violations");
@@ -460,6 +540,7 @@ export default function LeftNav() {
                     },
                     {
                         label: "Policies",
+                        requires: pageRequires("/dashboard/nhi/policies"),
                         onClick: () => {
                             navigate("/dashboard/nhi/policies");
                             handleSelect("dashboard_nhi_policies");
@@ -518,6 +599,7 @@ export default function LeftNav() {
                 subNavigationItems: dashboardCategory === CATEGORY_ENDPOINT_SECURITY
                     ? [{
                         label: "Threat",
+                        requires: pageRequires("/dashboard/reports/threat"),
                         onClick: () => {
                             navigate("/dashboard/reports/threat");
                             handleSelect("dashboard_reports_threat");
@@ -544,8 +626,31 @@ export default function LeftNav() {
                     url: "#",
                     key: "7",
                     subNavigationItems: [
-                        ...((dashboardCategory === "API Security" || dashboardCategory === "Endpoint Security") ? [{
+                        ...(dashboardCategory === "Endpoint Security" && func.isAktoUser() ? [{
+                            label: "Overview",
+                            requires: pageRequires("/dashboard/guardrails/atlas-overview"),
+                            badge: <Badge status="info">Beta</Badge>,
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/atlas-overview");
+                                handleSelect("dashboard_atlas_guardrails_overview");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_atlas_guardrails_overview",
+                        }] : []),
+                        // Argus has no "AI Agent Guardrails" block (that one is Gen AI only), so Overview lives here.
+                        ...(dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
+                            label: "Overview",
+                            requires: pageRequires("/dashboard/guardrails/overview"),
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/overview");
+                                handleSelect("dashboard_guardrails_overview");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_guardrails_overview",
+                        }] : []),
+                        ...((dashboardCategory === "API Security" || (dashboardCategory === "Endpoint Security" && !func.isAktoUser())) ? [{
                             label: "Dashboard",
+                            requires: pageRequires("/dashboard/protection/threat-dashboard"),
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-dashboard");
                                 handleSelect("dashboard_threat_dashboard");
@@ -555,6 +660,7 @@ export default function LeftNav() {
                         }] : []),
                         {
                             label: `${mapLabel("Threat", dashboardCategory)} Actors`,
+                            requires: pageRequires("/dashboard/protection/threat-actor"),
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-actor");
                                 handleSelect("dashboard_threat_actor");
@@ -564,6 +670,7 @@ export default function LeftNav() {
                         },
                         {
                             label: `${mapLabel("Threat", dashboardCategory)} Activity`,
+                            requires: pageRequires("/dashboard/protection/threat-activity"),
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-activity");
                                 handleSelect("dashboard_threat_activity");
@@ -574,6 +681,7 @@ export default function LeftNav() {
                         },
                         {
                             label: `${mapLabel("APIs", dashboardCategory)} Under ${mapLabel("Threat", dashboardCategory)}`,
+                            requires: pageRequires("/dashboard/protection/threat-api"),
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-api");
                                 handleSelect("dashboard_threat_api");
@@ -584,6 +692,7 @@ export default function LeftNav() {
                         },
                         ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
                             label: "Guardrail Policies",
+                            requires: pageRequires("/dashboard/guardrails/policies"),
                             onClick: () => {
                                 navigate("/dashboard/guardrails/policies");
                                 handleSelect("dashboard_guardrails_policies");
@@ -593,6 +702,7 @@ export default function LeftNav() {
                             }] : []),
                         ...((dashboardCategory === "Endpoint Security") ? [{
                             label: "Misconfigurations",
+                            requires: pageRequires("/dashboard/guardrails/misconfigurations"),
                             badge: <Badge status="info">Beta</Badge>,
                             onClick: () => {
                                 navigate("/dashboard/guardrails/misconfigurations");
@@ -603,6 +713,7 @@ export default function LeftNav() {
                             }] : []),
                         ...(dashboardCategory === CATEGORY_API_SECURITY || dashboardCategory === CATEGORY_DAST ? [{
                             label: "Threat Policies",
+                            requires: pageRequires("/dashboard/protection/threat-policy"),
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-policy");
                                 handleSelect("dashboard_threat_policy");
@@ -647,6 +758,7 @@ export default function LeftNav() {
                 subNavigationItems: [
                     {
                         label: "Guardrails Activity",
+                        requires: pageRequires("/dashboard/guardrails/activity"),
                         onClick: () => {
                             navigate("/dashboard/guardrails/activity");
                             handleSelect("dashboard_guardrails_activity");
@@ -656,6 +768,7 @@ export default function LeftNav() {
                     },
                     {
                         label: "Guardrails Policies",
+                        requires: pageRequires("/dashboard/guardrails/policies"),
                         onClick: () => {
                             navigate("/dashboard/guardrails/policies");
                             handleSelect("dashboard_guardrails_policies");
@@ -666,6 +779,7 @@ export default function LeftNav() {
                     },
                     {
                         label: "Misconfigurations",
+                        requires: pageRequires("/dashboard/guardrails/misconfigurations"),
                         badge: <Badge status="info">Beta</Badge>,
                         onClick: () => {
                             navigate("/dashboard/guardrails/misconfigurations");
@@ -687,7 +801,7 @@ export default function LeftNav() {
                 icon: LockMajor,
                 onClick: () => {
                     handleSelect("dashboard_ai_agent_guardrails");
-                    navigate("/dashboard/guardrails/activity");
+                    navigate("/dashboard/guardrails/overview");
                     setActive("normal");
                 },
                 selected: leftNavSelected.includes("_guardrails"),
@@ -695,7 +809,18 @@ export default function LeftNav() {
                 key: "10",
                 subNavigationItems: [
                     {
+                        label: "Overview",
+                        requires: pageRequires("/dashboard/guardrails/overview"),
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/overview");
+                            handleSelect("dashboard_guardrails_overview");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_guardrails_overview",
+                    },
+                    {
                         label: "Guardrails Activity",
+                        requires: pageRequires("/dashboard/guardrails/activity"),
                         onClick: () => {
                             navigate("/dashboard/guardrails/activity");
                             handleSelect("dashboard_guardrails_activity");
@@ -705,6 +830,7 @@ export default function LeftNav() {
                     },
                     {
                         label: "Guardrails Policies",
+                        requires: pageRequires("/dashboard/guardrails/policies"),
                         onClick: () => {
                             navigate("/dashboard/guardrails/policies");
                             handleSelect("dashboard_guardrails_policies");
@@ -715,6 +841,7 @@ export default function LeftNav() {
                     },
                     {
                         label: "Misconfigurations",
+                        requires: pageRequires("/dashboard/guardrails/misconfigurations"),
                         badge: <Badge status="info">Beta</Badge>,
                         onClick: () => {
                             navigate("/dashboard/guardrails/misconfigurations");
@@ -776,8 +903,8 @@ export default function LeftNav() {
             })
         }
 
-        return items
-    }, [activeAccount, accounts, dashboardCategory, handleAccountChange, isAllowedDashboardUser, leftNavSelected, currPathString])
+        return withoutPagesTheRoleCantOpen(items, canCall)
+    }, [activeAccount, accounts, dashboardCategory, handleAccountChange, isAllowedDashboardUser, showAgenticPosture, leftNavSelected, currPathString, canCall])
 
     const navigationMarkup = (
         <div className={`${active} ${dashboardCategory === "Agentic Security" ? "agentic-security-nav" : ""}`}>

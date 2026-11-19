@@ -1,0 +1,41 @@
+/*
+ * Ask Akto design colors with no matching Polaris token (after the overrides in dashboard.css).
+ * Consumed only through Polaris props, e.g. <Box background="bg-ask-high">, which resolve to
+ * var(--p-color-<name>). Every other color in the overlay uses a stock Polaris token.
+ */
+:root {
+    --p-color-bg-ask-backdrop: rgba(31, 33, 36, 0.45);
+    --p-color-bg-ask-action: #FBFAFF;
+    --p-color-bg-ask-magic-hover: #D9D8FF;
+    --p-color-border-ask-magic: #D9D8FF;
+    --p-color-text-ask-magic: #5400CB;
+    --p-color-border-ask-divider: #EBECEF;
+    --p-color-text-ask-success: #007A5C;
+
+    --p-color-border-ask-critical: #FBC5BC;
+    --p-color-text-ask-critical: #9F200A;
+
+    --p-color-bg-ask-high: #FEF3EC;
+    --p-color-border-ask-high: #FAC9A8;
+    --p-color-bg-ask-high-strong: #F59352;
+    --p-color-text-ask-high: #A44C0A;
+
+    --p-color-border-ask-medium: #F8D990;
+
+    --p-color-bg-ask-info: #EEFAFB;
+    --p-color-border-ask-info: #B8E9EF;
+    --p-color-bg-ask-info-strong: #175C64;
+    --p-color-text-ask-info: #175C64;
+
+    /* The topbar button on the Agentic Security dashboard, whose topbar is a purple gradient that
+       forces its text white (components/layouts/header/Headers.css). */
+    --p-color-bg-ask-on-dark: rgba(255, 255, 255, 0.16);
+    --p-color-bg-ask-on-dark-hover: rgba(255, 255, 255, 0.26);
+    --p-color-border-ask-on-dark: rgba(255, 255, 255, 0.45);
+    --p-color-bg-ask-on-dark-chip: rgba(255, 255, 255, 0.22);
+}
+
+/* Pressable (components/Pressable.jsx) is a Box, and Polaris has no cursor prop. */
+[data-ask-pressable] {
+    cursor: pointer;
+}

@@ -7,7 +7,7 @@ import PersistStore from '../../../main/PersistStore';
 import observeFunc from "../../pages/observe/transform"
 
 
-function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle, navUrlBuilder, invertTextSizes, onSegmentClick, titleColor}) {
+function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle, navUrlBuilder, invertTextSizes, onSegmentClick, titleColor, titleFontWeight, sliceBorderWidth}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -50,7 +50,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
                     )
                     .css({
                         fontSize: invertTextSizes ? '12px' : '20px',
-                        fontWeight: invertTextSizes ? 'normal' : '400',
+                        fontWeight: titleFontWeight || (invertTextSizes ? 'normal' : '400'),
                         color: titleColor || (invertTextSizes ? '#666' : undefined),
                         textAlign: 'center'
                     })
@@ -81,6 +81,10 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
         credits:{
             enabled: false,
         },
+        // Callers render their own legend; Highcharts' default one throws the pie off-center.
+        legend: {
+            enabled: false,
+        },
         title: subtitle ? { text: null } : {
             text: title,
             y: size*0.4,
@@ -104,6 +108,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
             pie: {
               size: (size+'px'),
               innerSize: pieInnerSize ? pieInnerSize : '60%',
+              ...(sliceBorderWidth !== undefined && { borderWidth: sliceBorderWidth }),
               dataLabels: {
                 enabled: false
               },

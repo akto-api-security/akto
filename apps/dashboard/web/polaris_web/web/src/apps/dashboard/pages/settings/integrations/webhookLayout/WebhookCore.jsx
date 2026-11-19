@@ -12,6 +12,12 @@ import SampleDataList from "../../../../components/shared/SampleDataList"
 import SampleData from '../../../../components/shared/SampleData'
 import func from "@/util/func"
 import TitleWithInfo from "../../../../components/shared/TitleWithInfo"
+import { usePermissions, whenAllowed } from "@/util/permissions"
+import AllowedAction from "../../../../components/shared/AllowedAction"
+import SensitiveDataAlertRules, { invalidRuleMessage } from "./SensitiveDataAlertRules"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
+
+const SENSITIVE_DATA_THRESHOLD_ALERTS = "SENSITIVE_DATA_THRESHOLD_ALERTS"
 
 const testingOptionsObj = {
     "type":"TESTING",
@@ -34,6 +40,7 @@ const resultTab = {
 function WebhookCore(props) {
 
     const {webhookType, defaultPayload} = props
+    const { canCall } = usePermissions()
 
     const initialState = {
         name: "",
@@ -45,6 +52,7 @@ function WebhookCore(props) {
         selectedWebhookOptions: [],
         newEndpointCollections: [],
         newSensitiveEndpointCollections: [],
+        sensitiveDataAlertRules: [],
         frequencyInSeconds: 900,
         batchSize: 20,
         sendInstantly: false,
@@ -83,7 +91,7 @@ function WebhookCore(props) {
                     const mapCustomWebhooks = filterCustomWebhooks.map(customWebhook => ({
                         ...customWebhook,
                         createTime: func.prettifyEpoch(customWebhook.createTime),
-                        lastSentTimestamp: func.prettifyEpoch(customWebhook.createTime),
+                        lastSentTimestamp: func.prettifyEpoch(customWebhook.lastSentTimestamp),
                         nextUrl: `${customWebhook.id}`
                     }))
 
@@ -101,6 +109,7 @@ function WebhookCore(props) {
                 selectedWebhookOptions: customWebhookFindId?.selectedWebhookOptions,
                 newEndpointCollections: customWebhookFindId?.newEndpointCollections,
                 newSensitiveEndpointCollections: customWebhookFindId?.newSensitiveEndpointCollections,
+                sensitiveDataAlertRules: customWebhookFindId?.sensitiveDataAlertRules || [],
                 frequencyInSeconds: customWebhookFindId?.frequencyInSeconds,
                 batchSize: customWebhookFindId?.batchSize,
                 sendInstantly: customWebhookFindId?.sendInstantly
@@ -138,9 +147,16 @@ function WebhookCore(props) {
         { "type":"TRAFFIC", "title": "New sensitive endpoint count", "value": "NEW_SENSITIVE_ENDPOINT_COUNT", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "New sensitive parameter count", "value": "NEW_SENSITIVE_PARAMETER_COUNT", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "New parameter count", "value": "NEW_PARAMETER_COUNT", "collectionSelection": false },
-        { "type":"TRAFFIC", "title": "New API runtime threats", "value": "API_THREAT_PAYLOADS", "collectionSelection": false },
+        { "type":"TRAFFIC", "title": "New " + mapLabel('API', getDashboardCategory()) + " runtime threats", "value": "API_THREAT_PAYLOADS", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "Pending tests alerts", "value": "PENDING_TESTS_ALERTS", "collectionSelection": false }
     ]
+
+    // Sent as plain JSON (with a Slack-readable "text" field), so offered on default webhooks only.
+    if (webhookType === "DEFAULT") {
+        customWebhookOptions.push(
+            { "type":"TRAFFIC", "title": "Sensitive data threshold alerts", "value": SENSITIVE_DATA_THRESHOLD_ALERTS, "collectionSelection": false, "sensitiveDataRules": true }
+        )
+    }
 
     if (webhookType === "MICROSOFT_TEAMS") {
         customWebhookOptions.push(
@@ -222,6 +238,8 @@ function WebhookCore(props) {
         const selectedWebhookOptions = showOptions ? webhook.selectedWebhookOptions : null
         const newEndpointCollections = showOptions ? webhook.newEndpointCollections : null
         const newSensitiveEndpointCollections = showOptions ? webhook.newSensitiveEndpointCollections : null
+        const sensitiveDataAlertsSelected = showOptions && (webhook.selectedWebhookOptions || []).includes(SENSITIVE_DATA_THRESHOLD_ALERTS)
+        const sensitiveDataAlertRules = sensitiveDataAlertsSelected ? (webhook.sensitiveDataAlertRules || []) : null
         const frequencyInSeconds = webhook.frequencyInSeconds
         const batchSize = webhook.batchSize
         const sendInstantly = webhook.sendInstantly
@@ -237,12 +255,19 @@ function WebhookCore(props) {
             setToastConfig({ isActive: true, isError: true, message: message })
             return
         }
+        if (sensitiveDataAlertsSelected) {
+            const ruleError = invalidRuleMessage(sensitiveDataAlertRules, selectedWebhookOptions)
+            if (ruleError) {
+                setToastConfig({ isActive: true, isError: true, message: ruleError })
+                return
+            }
+        }
 
         if (webhookId) {
-            await settingRequests.updateCustomWebhook(parseInt(webhookId), webhookName, url, queryParams, method, headers, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, sendInstantly)
+            await settingRequests.updateCustomWebhook(parseInt(webhookId), webhookName, url, queryParams, method, headers, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, sendInstantly, sensitiveDataAlertRules)
             setToastConfig({ isActive: true, isError: false, message: "Webhook updated successfully!" })
         } else {
-            await settingRequests.addCustomWebhook(webhookName, url, queryParams, method, headers, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly)
+            await settingRequests.addCustomWebhook(webhookName, url, queryParams, method, headers, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly, sensitiveDataAlertRules)
             setToastConfig({ isActive: true, isError: false, message: "Webhook created successfully!" })
             navigate(-1)
         }
@@ -318,6 +343,14 @@ function WebhookCore(props) {
                             checked={webhook.selectedWebhookOptions && webhook.selectedWebhookOptions.includes(customWebhookOption.value)}
                             onChange={() => { updateWebhookState("selectedWebhookOptions", customWebhookOption.value) }}
                         />
+                        {customWebhookOption.sensitiveDataRules && webhook.selectedWebhookOptions && webhook.selectedWebhookOptions.includes(customWebhookOption.value) ?
+                            <div style={{ padding: "10px 0 0 28px" }}>
+                                <SensitiveDataAlertRules
+                                    rules={webhook.sensitiveDataAlertRules}
+                                    setRules={(rules) => updateWebhookState("sensitiveDataAlertRules", rules)}
+                                />
+                            </div>
+                            : null}
                     </div>
                 )
             })}
@@ -354,7 +387,8 @@ function WebhookCore(props) {
             <LegacyCard.Section>
                 {CardComponent}
                 {(webhook.selectedWebhookOptions && !webhook.selectedWebhookOptions.includes("TRAFFIC_ALERTS")
-                    && !webhook.selectedWebhookOptions.includes("PENDING_TESTS_ALERTS")) ?
+                    && !webhook.selectedWebhookOptions.includes("PENDING_TESTS_ALERTS")
+                    && !webhook.selectedWebhookOptions.includes(SENSITIVE_DATA_THRESHOLD_ALERTS)) ?
                 (<>
                 <Divider />
                 <div style={{ paddingTop: "10px" }}>
@@ -474,22 +508,26 @@ function WebhookCore(props) {
                 <ButtonGroup>
                     <Button onClick={handleDiscard} disabled={!hasChanges}>Discard</Button>
                     {webhookId ?
+                        <AllowedAction allowed={canCall('api/updateCustomWebhook')}>
                         <Button
                             primary
                             onClick={saveWebhook}
                             connectedDisclosure={{
                                 accessibilityLabel: 'Other save actions',
-                                actions: [{ content: 'Run once', onAction: () => runOnce() }],
+                                actions: [{ content: 'Run once', onAction: () => runOnce(), ...whenAllowed(canCall('api/runOnce')) }],
                             }}
                         >
                             Save
                         </Button>
-                        : <Button
+                        </AllowedAction>
+                        : <AllowedAction allowed={canCall('api/addCustomWebhook')}>
+                        <Button
                             primary
                             onClick={saveWebhook}
                         >
                             Save
                         </Button>
+                        </AllowedAction>
                     }
                 </ButtonGroup>
             }

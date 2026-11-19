@@ -6,6 +6,11 @@ const MODULE_TYPE = {
 };
 const DEFAULT_VALUE = '-';
 
+// Installer device IDs are raw hex (no hyphens); extension IDs are hyphenated UUIDs or missing ("-").
+// Newer extension builds also suffix their version with "-extension"
+const isExtensionAgent = (deviceId, agentVersion) =>
+    !deviceId || deviceId.includes('-') || !!agentVersion?.toLowerCase().includes('extension');
+
 const USERNAME_TAG_KEYS = new Set([
     'username',
     'user',
@@ -133,6 +138,12 @@ const fetchEndpointShieldUserMetadata = async (force = false) => {
             const agenticUsers = agenticUsersResp?.agenticUsers || [];
             agenticUsers.forEach((u) => {
                 if (!u?.userName) return;
+                // First row wins. fetchAgenticUsers emits the username-deduped row — the one whose
+                // deviceTags are the union across that identity's docs — before appending any
+                // org-scoped Claude rows, which deliberately share its userName. Overwriting here
+                // would hand this map one org's doc instead, and a doc created after the last tag
+                // write carries no tags at all, silently blanking that user's team/role/department.
+                if (userMetadataMap[u.userName]) return;
                 userMetadataMap[u.userName] = {
                     userEmail: u.userEmail || '',
                     tags: u.deviceTags || [],
@@ -225,6 +236,14 @@ const getUsernameForCollection = (collection, usernameMap, actor) => {
     return coworkActorFallback(collection, actor) || DEFAULT_VALUE;
 };
 
+const BROWSER_EXTENSION_HOST = /^[^.]+\.(chrome|edge|opera|firefox|safari|unknown)\./i;
+
+const getBrowserExtensionActorEmail = (host, actor) => {
+    if (typeof host !== 'string' || !BROWSER_EXTENSION_HOST.test(host)) return null;
+    const a = typeof actor === 'string' ? actor.trim() : '';
+    return a.includes('@') ? a : null;
+};
+
 /**
  * Username from Endpoint Shield map, else from envType tags (e.g. username=) for local / mixed setups.
  */
@@ -235,12 +254,73 @@ const getResolvedUsernameForCollection = (collection, usernameMap) => {
     return fromTags || DEFAULT_VALUE;
 };
 
+// installStatus values written by the endpoint-shield installers:
+//   in progress: pending → installing → postinstall
+//   failed:      failed (installer error, or exit 90 nothing running / 91 agent
+//                never reported / 93 pkg failed), verify-failed (standalone
+//                verifier), uninstall-failed
+// The agent reports "running" once it is up, which supersedes any of these.
+// Exactly ModuleInfoAction.INSTALL_FAILED_STATUSES — the server classifies the device
+// into currentStatus from the same two values, and a row's icon, the Status filter and
+// this banner have to agree about what "failed" means. "uninstall-failed" is deliberately
+// not one of them: a removal that did not go through usually leaves the agent running.
+const INSTALL_FAILED_STATUSES = ['failed', 'verify-failed'];
+const isInstallFailed = (installStatus) =>
+    typeof installStatus === 'string' && INSTALL_FAILED_STATUSES.includes(installStatus);
+
+// Mirrors the install_failed branch of ModuleInfoAction.endpointShieldCurrentStatusExpr,
+// so the panel's banner and the row's status icon answer the same question. installOutcome
+// is the installer's verdict for the latest attempt — the agent never overwrites it, so a
+// failed deploy still reads as failed once an older agent heartbeats again; a later attempt
+// that recovers or rolls back writes its own outcome and that one wins.
+const hasFailedDeployment = (agent) =>
+    isInstallFailed(agent?.installStatus) || agent?.installOutcome === 'failed';
+
+// installId is "yyyyMMddTHHmmssZ-<suffix>" (UTC) → epoch seconds, or null.
+const installIdToEpoch = (installId) => {
+    const m = typeof installId === 'string' && installId.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/);
+    if (!m) return null;
+    return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) / 1000);
+};
+
+// Latest deployment attempt, from the fields the installers write on every attempt
+// (installStartedTs / installFinishedTs / installOutcome / installVersion — never
+// written by the agent, so its "running" heartbeat cannot hide a failed deploy).
+// An attempt still "in-progress" after this long never reported an end: the
+// installer was killed, timed out, or lost power mid-run.
+const INSTALL_STALE_SECONDS = 30 * 60;
+
+// Returns { startedTs, finishedTs, outcome, version } or null when the device has
+// no attempt data (installed before installers sent it; e.g. Windows today).
+// outcome: 'installed' | 'failed' | 'in-progress' | 'did-not-finish'
+const getDeploymentAttempt = (agent) => {
+    const startedTs = agent?.installStartedTs || 0;
+    if (!startedTs) return null;
+    let outcome = agent?.installOutcome || null;
+    if (outcome === 'in-progress' && (Date.now() / 1000) - startedTs > INSTALL_STALE_SECONDS) {
+        outcome = 'did-not-finish';
+    }
+    return {
+        startedTs,
+        finishedTs: agent?.installFinishedTs || 0,
+        outcome,
+        version: agent?.installVersion || null,
+    };
+};
+
 export {
+    INSTALL_STALE_SECONDS,
+    getDeploymentAttempt,
+    INSTALL_FAILED_STATUSES,
+    hasFailedDeployment,
+    installIdToEpoch,
     fetchEndpointShieldUsernameMap,
     fetchEndpointShieldUserMetadata,
     buildUserAnalysisKeysByDeviceId,
     getUsernameForCollection,
+    getBrowserExtensionActorEmail,
     getResolvedUsernameForCollection,
     MODULE_TYPE,
-    DEFAULT_VALUE
+    DEFAULT_VALUE,
+    isExtensionAgent
 };

@@ -1,13 +1,28 @@
 import React, { useEffect, useReducer, useState } from 'react';
-import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack } from '@shopify/polaris';
+import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack, Text } from '@shopify/polaris';
 import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
+import testingApi from "../../testing/api"
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import ScriptSelectDropdown from '../../testing/scripts/ScriptSelectDropdown';
+import { SCRIPT_TYPES } from '../../testing/scripts/scriptTypes';
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration}) => {
+// value of the dropdown's default option (not empty: the dropdown matches values as patterns)
+const DEFAULT_SMART_TESTING = "DEFAULT_SMART_TESTING"
+
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, linearTeamsMap, portIOIntegrated, generateLabelForJiraIntegration, scriptsState}) => {
     console.log("isAgenticCategory in config", isAgenticCategory)
+    // smart agents for the Smart agent dropdown, loaded once smart testing is switched on
+    const [smartAgentOptions, setSmartAgentOptions] = useState([{ label: "Default smart testing", value: DEFAULT_SMART_TESTING }])
+    useEffect(() => {
+        if (!testRun.runAutomatedTests || smartAgentOptions.length > 1) return
+        testingApi.fetchSmartAgentProfiles().then((res) => {
+            const agents = (res?.smartAgentProfiles || []).map(p => ({ label: p.name, value: p.hexId }))
+            if (agents.length > 0) setSmartAgentOptions([{ label: "Default smart testing", value: DEFAULT_SMART_TESTING }, ...agents])
+        }).catch(() => {})
+    }, [testRun.runAutomatedTests])
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
@@ -45,16 +60,55 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
         }))
         : [];
 
-    const severitiesArr = func.getAktoSeverities()
-    const allSeverity = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
+    const linearTeams = Object.entries(linearTeamsMap || {}).map(([id, name]) => ({ label: name, value: id }))
 
-    function toggleCreateTicketCheckbox() {
+    const ticketToolOptions = [
+        ...(jiraProjectMap ? [{ label: 'Jira', value: 'JIRA' }] : []),
+        ...(linearTeamsMap ? [{ label: 'Linear', value: 'LINEAR' }] : []),
+        ...(portIOIntegrated ? [{ label: 'Linear via Port.io', value: 'PORT_IO' }] : [])
+    ]
+
+    const ticketSource = testRun?.autoTicketingDetails?.ticketSource || 'JIRA'
+    const isLinearTicketing = ticketSource === 'LINEAR'
+    const isPortIOTicketing = ticketSource === 'PORT_IO'
+
+    function firstProjectAndIssueTypeFor(source) {
+        if (source === 'LINEAR') {
+            return { projectId: linearTeams[0]?.value || "", issueType: "" }
+        }
+        if (source === 'PORT_IO') {
+            return { projectId: "", issueType: "" }
+        }
         const firstProject = allProjects[0]?.value || "";
         const firstIssueType =
             Array.isArray(jiraProjectMap?.[firstProject]) &&
             jiraProjectMap[firstProject]?.[0]?.issueType
                 ? jiraProjectMap[firstProject][0].issueType
                 : "";
+        return { projectId: firstProject, issueType: firstIssueType }
+    }
+
+    // DropdownSearch shows `value` as the field text and highlights `preSelected`, so single-selects need both
+    const labelOf = (items, val) => items.find((item) => item.value === val)?.label ?? ""
+    const selectedOf = (val) => (val ? [val] : [])
+
+    const severitiesArr = func.getAktoSeverities()
+    const allSeverity = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
+
+    function changeTicketTool(source) {
+        setTestRun((prev) => ({
+            ...prev,
+            autoTicketingDetails: {
+                ...prev.autoTicketingDetails,
+                ticketSource: source,
+                ...firstProjectAndIssueTypeFor(source),
+            },
+        }));
+    }
+
+    function toggleCreateTicketCheckbox() {
+        const defaultSource = jiraProjectMap ? 'JIRA' : (linearTeamsMap ? 'LINEAR' : 'PORT_IO');
+        const { projectId, issueType } = firstProjectAndIssueTypeFor(defaultSource);
 
         const checkPrevToggle = !testRun?.autoTicketingDetails?.shouldCreateTickets;
 
@@ -64,9 +118,10 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 autoTicketingDetails: {
                     ...prev.autoTicketingDetails,
                     shouldCreateTickets: true,
-                    projectId: firstProject,
+                    ticketSource: defaultSource,
+                    projectId,
                     severities: ["CRITICAL", "HIGH"],
-                    issueType: firstIssueType,
+                    issueType,
                 },
             }));
         } else {
@@ -170,18 +225,18 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             testRunTimeLabel: testRunTimeOption.label
                         }));
                     }} />
-                    <Dropdown
-                        menuItems={testRolesArr}
+                    <DropdownSearch
+                        optionsList={testRolesArr}
                         label={"Select " + mapLabel("Test", getDashboardCategory()) + " Role"}
-                        initial={testRun.testRoleLabel}
-                        selected={(requests) => {
-                            let testRole;
-                            if (!(requests === "No test role selected")) { testRole = requests; }
+                        placeholder="Select role"
+                        value={labelOf(testRolesArr, testRun.testRoleId) || testRun.testRoleLabel}
+                        preSelected={selectedOf(testRun.testRoleId)}
+                        setSelected={(requests) => {
                             const testRoleOption = getLabel(testRolesArr, requests);
 
                             setTestRun(prev => ({
                                 ...prev,
-                                testRoleId: testRole,
+                                testRoleId: requests,
                                 testRoleLabel: testRoleOption.label
                             }));
                         }} />
@@ -203,6 +258,24 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             }));
                         }} />
             </HorizontalGrid>
+            {scriptsState?.enabled && (scriptsState.failed ? (
+                <Text as="p" color="subdued">Scripts could not be loaded, so this run will use the default scripts (default-test-pre / default-test-post) if they exist.</Text>
+            ) : (
+                <HorizontalGrid gap={"4"} columns={"3"}>
+                    <ScriptSelectDropdown
+                        type={SCRIPT_TYPES.PRE_REQUEST}
+                        scripts={scriptsState.scripts}
+                        value={testRun.preRequestScriptId}
+                        onChange={(scriptId) => setTestRun(prev => ({ ...prev, preRequestScriptId: scriptId }))}
+                    />
+                    <ScriptSelectDropdown
+                        type={SCRIPT_TYPES.POST_REQUEST}
+                        scripts={scriptsState.scripts}
+                        value={testRun.postRequestScriptId}
+                        onChange={(scriptId) => setTestRun(prev => ({ ...prev, postRequestScriptId: scriptId }))}
+                    />
+                </HorizontalGrid>
+            ))}
             {isAgenticCategory && (
                 <HorizontalGrid gap={"4"} columns={"3"}>
                     <Dropdown
@@ -269,29 +342,57 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             />
             <HorizontalStack gap={4}>
             <Checkbox
-                    disabled={!jiraProjectMap}
+                    disabled={!jiraProjectMap && !linearTeamsMap && !portIOIntegrated}
                     label={generateLabelForJiraIntegration()}
                     checked={testRun.autoTicketingDetails.shouldCreateTickets}
                     onChange={() => { toggleCreateTicketCheckbox()}}
                 />
                 {testRun.autoTicketingDetails.shouldCreateTickets &&
                     <>
-                        <Dropdown
-                            menuItems={allProjects}
-                            selected={(val) => {
-                                setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
-                            }}
-                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
-                            placeHolder={"Select Project"}
-                            initial={testRun.autoTicketingDetails.projectId}
-                        />
-                        <Dropdown
-                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
-                            menuItems={allIssuesType}
-                            selected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
-                            placeHolder={"Select Issue Type"}
-                            initial={testRun.autoTicketingDetails.issueType}
-                        />
+                        {ticketToolOptions.length > 1 &&
+                            <DropdownSearch
+                                optionsList={ticketToolOptions}
+                                setSelected={changeTicketTool}
+                                placeholder={"Select Ticket Tool"}
+                                value={labelOf(ticketToolOptions, ticketSource)}
+                                preSelected={selectedOf(ticketSource)}
+                            />
+                        }
+                        {isPortIOTicketing ? null : isLinearTicketing ?
+                            <DropdownSearch
+                                key="linear-team"
+                                optionsList={linearTeams}
+                                setSelected={(val) => {
+                                    setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
+                                }}
+                                placeholder={"Select Team"}
+                                value={labelOf(linearTeams, testRun.autoTicketingDetails.projectId)}
+                                preSelected={selectedOf(testRun.autoTicketingDetails.projectId)}
+                            />
+                            :
+                            <>
+                                <DropdownSearch
+                                    key="jira-project"
+                                    optionsList={allProjects}
+                                    setSelected={(val) => {
+                                        setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
+                                    }}
+                                    disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                                    placeholder={"Select Project"}
+                                    value={labelOf(allProjects, testRun.autoTicketingDetails.projectId)}
+                                    preSelected={selectedOf(testRun.autoTicketingDetails.projectId)}
+                                />
+                                <DropdownSearch
+                                    key="jira-issue-type"
+                                    disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                                    optionsList={allIssuesType}
+                                    setSelected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
+                                    placeholder={"Select Issue Type"}
+                                    value={labelOf(allIssuesType, testRun.autoTicketingDetails.issueType)}
+                                    preSelected={selectedOf(testRun.autoTicketingDetails.issueType)}
+                                />
+                            </>
+                        }
                         <DropdownSearch
                             optionsList={allSeverity}
                             placeholder={"Select Severity"}
@@ -331,11 +432,33 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 onChange={() => setTestRun(prev => ({ ...prev, doNotMarkIssuesAsFixed: !prev.doNotMarkIssuesAsFixed }))}
             />
             { (window?.STIGG_FEATURE_WISE_ALLOWED?.AUTOMATED_AGENTIC_TEST_RUN?.isGranted === true || window?.USER_NAME?.indexOf("@akto.io") !== -1) && (
-                <Checkbox
-                    label="Smart Automated Testing"
-                    checked={testRun.runAutomatedTests}
-                    onChange={(val) => setTestRun(prev => ({ ...prev, runAutomatedTests: val }))}
-                />
+                <VerticalStack gap="2">
+                    <Checkbox
+                        label="Smart Automated Testing"
+                        checked={testRun.runAutomatedTests}
+                        onChange={(val) => setTestRun(prev => ({ ...prev, runAutomatedTests: val }))}
+                    />
+                    {testRun.runAutomatedTests &&
+                        <HorizontalGrid columns={2}>
+                            <Dropdown
+                                id="smart-agent-dropdown"
+                                label="Smart agent"
+                                menuItems={smartAgentOptions}
+                                initial={testRun.smartAgentProfileId || DEFAULT_SMART_TESTING}
+                                selected={(value) => setTestRun(prev => ({ ...prev, smartAgentProfileId: value === DEFAULT_SMART_TESTING ? "" : value }))}
+                            />
+                        </HorizontalGrid>
+                    }
+                    {testRun.runAutomatedTests &&
+                        <TextField
+                            label="Custom prompt for Smart Automated Testing (optional)"
+                            multiline
+                            placeholder="e.g. Focus on auth bypass and IDOR on admin endpoints"
+                            value={testRun.automatedTestsCustomPrompt || ""}
+                            onChange={(automatedTestsCustomPrompt) => setTestRun(prev => ({ ...prev, automatedTestsCustomPrompt: automatedTestsCustomPrompt }))}
+                        />
+                    }
+                </VerticalStack>
             )}
             { (window?.STIGG_FEATURE_WISE_ALLOWED?.CLEAN_UP_TESTING_RESOURCES?.isGranted === true) && (
                 <Checkbox

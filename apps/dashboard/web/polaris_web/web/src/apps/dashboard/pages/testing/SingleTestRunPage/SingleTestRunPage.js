@@ -29,10 +29,12 @@ import {
   SettingsMinor,
   ViewMajor,
   CircleAlertMajor,
-  FileMinor
+  FileMinor,
+  MagicMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import observeApi from "../../observe/api";
+import observeFunc from "../../observe/transform";
 import func from '@/util/func';
 import { useParams } from 'react-router';
 import { useState, useEffect, useRef, useMemo, useReducer } from 'react';
@@ -49,19 +51,22 @@ import ReRunModal from "./ReRunModal";
 import TestingStore from "../testingStore";
 import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../TestRunResultPage/TestRunResultPage";
-import { isRunAutomatedTestsEnabled } from "../TestRunResultPage/smartTestingUtils";
+import { isRunAutomatedTestsEnabled, shouldShowSmartTestingExecutionTrace } from "../TestRunResultPage/smartTestingUtils";
+import SmartTestingLive from "./SmartTestingLive";
 import LocalStore from "../../../../main/LocalStorageStore";
 import { produce } from "immer"
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
 import TableStore from '../../../components/tables/TableStore'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+import issuesApi from '../../issues/api';
 import TestingRunEndpointsModal from './TestingRunEndpointsModal';
-import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import { getDashboardCategory, mapLabel, categoryToShortName } from '../../../../main/labelHelper';
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import { saveAs } from 'file-saver';
 import SeveritySelector from '../../issues/components/SeveritySelector';
 import { buildResponseCodeFilterChoices, getHttpStatusIssueList, HTTP_CODE_LABELS } from "../TestRunsPage/runStatusUtils";
+import { usePermissions, withPermissions } from "@/util/permissions";
 
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -129,14 +134,45 @@ let filterOptions = [
     title: mapLabel('API', getDashboardCategory()) + ' name',
     choices: [],
   },
+  {
+    key: 'aiVerdict',
+    label: 'AI verdict',
+    title: 'AI verdict',
+    choices: [
+      { label: 'False positive', value: 'FALSE_POSITIVE' },
+      { label: 'True positive', value: 'TRUE_POSITIVE' },
+      { label: 'Not verified', value: 'NOT_VERIFIED' }
+    ],
+  },
 ]
+
+// CSV export pages through fetchTestingRunResults in raw-result units (skip/limit count results, not
+// the grouped rows the table shows). The backend honours `limit` except for the Ignored tab, which
+// it fixes at 1000 (StartTestAction.fetchTestingRunResults).
+const EXPORT_PAGE_SIZE = 500
+const EXPORT_PAGE_SIZE_IGNORED = 1000
+const EXPORT_MAX_RESULTS = 50000
+
+// Turns the raw per-query-mode counts into the per-tab counts the page shows.
+function withDerivedCounts(rawCountMap) {
+  const counts = { ...rawCountMap }
+  let countOthers = 0
+  Object.keys(counts).forEach((x) => {
+    if (x !== 'ALL') {
+      countOthers += counts[x]
+    }
+  })
+  counts['SECURED'] = counts['ALL'] >= countOthers ? counts['ALL'] - countOthers : 0
+  counts['VULNERABLE'] = Math.abs(counts['VULNERABLE'] - counts['IGNORED_ISSUES'])
+  return counts
+}
 
 function SingleTestRunPage() {
 
-  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [], ignored_issues: [] })
   const [selectedTestRun, setSelectedTestRun] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const params = useParams()
+  const { canCall } = usePermissions()
   const [loading, setLoading] = useState(false);
   const [tempLoading, setTempLoading] = useState({ vulnerable: false, no_vulnerability_found: false, skipped: false, running: false, need_configurations: false, ignored_issues: false })
   const [selectedTab, setSelectedTab] = useState("vulnerable")
@@ -144,6 +180,7 @@ function SingleTestRunPage() {
   const [workflowTest, setWorkflowTest] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
   const [logsModalActive, setLogsModalActive] = useState(false)
+  const [liveActive, setLiveActive] = useState(false)
   const setErrorsObject = TestingStore((state) => state.setErrorsObject)
   const setTestingEndpointsApisList = TestingStore((state) => state.setTestingEndpointsApisList)
   const currentTestingRuns = []
@@ -179,6 +216,12 @@ function SingleTestRunPage() {
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
   const [copyUpdateTable, setCopyUpdateTable] = useState("");
   const [confirmationModal, setConfirmationModal] = useState(false);
+  const [aiVerifyModalActive, setAiVerifyModalActive] = useState(false);
+  // Summary already sent for AI verification from this page, so the button can't be clicked twice.
+  const [aiVerifyStartedFor, setAiVerifyStartedFor] = useState(null);
+  // Result hexIds to verify; empty = every vulnerable result of the run.
+  const [aiVerifyTargets, setAiVerifyTargets] = useState([]);
+  const [reopenInProgress, setReopenInProgress] = useState(false);
   const [severityModalActive, setSeverityModalActive] = useState(false);
   const [selectedTestResultItems, setSelectedTestResultItems] = useState([]);
   const [severityUpdateInProgress, setSeverityUpdateInProgress] = useState(false);
@@ -197,6 +240,7 @@ function SingleTestRunPage() {
   const [responseCodeFilterChoices, setResponseCodeFilterChoices] = useState([])
 
   const refreshId = useRef(null);
+  const exportInProgress = useRef(false);
   const hexId = params.hexId;
   const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
@@ -234,13 +278,6 @@ function SingleTestRunPage() {
     "domain_unreachable",
     "ignored_issues"
   ]
-
-  function fillTempData(data, key) {
-    setTestRunResultsText((prev) => {
-      prev[key] = data;
-      return { ...prev };
-    })
-  }
 
   // Pull the full per-status-code execution breakdown (403, 404, 429, 5xx, cloudflare, domain
   // unreachable, skipped, ...) from the same bulk endpoint the test runs list column uses, so the
@@ -441,6 +478,18 @@ function SingleTestRunPage() {
     }
   }
 
+  // A category filter plus an issue-name filter selects the union of both; sets filters.testFilter in place.
+  const mergeCategoryIntoTestFilter = (filters) => {
+    if (filters?.categoryFilter?.length > 0 && filters?.testFilter?.length > 0) {
+      let filterSubCategory = []
+      filters?.categoryFilter?.forEach((issue) => {
+        filterSubCategory = filterSubCategory.concat(store[issue])
+      })
+      filterSubCategory = [...filterSubCategory, ...filters?.testFilter]
+      filters.testFilter = [...filterSubCategory]
+    }
+  }
+
   const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
     let testRunResultsRes = []
     let localCountMap = testRunCountMap;
@@ -454,14 +503,7 @@ function SingleTestRunPage() {
     }
 
 
-    if (filters?.categoryFilter?.length > 0 && filters?.testFilter?.length > 0) {
-      let filterSubCategory = []
-      filters?.categoryFilter?.forEach((issue) => {
-        filterSubCategory = filterSubCategory.concat(store[issue])
-      })
-      filterSubCategory = [...filterSubCategory, ...filters?.testFilter]
-      filters.testFilter = [...filterSubCategory]
-    }
+    mergeCategoryIntoTestFilter(filters)
 
     let cicd = testingRunType === "CI_CD";
     const localSelectedTestRun = transform.prepareTestRun(testingRun, currentSummary, cicd, false);
@@ -481,8 +523,8 @@ function SingleTestRunPage() {
         limit,
         filters,
         queryValue
-      ).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults }) => {
-        testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults)
+      ).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults, linearIssuesMapForResults }) => {
+        testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults, linearIssuesMapForResults)
         if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
           errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
           setErrorsObject(errorEnums)
@@ -505,14 +547,7 @@ function SingleTestRunPage() {
         if (testCountMap !== null) {
           localCountMap = JSON.parse(JSON.stringify(testCountMap))
         }
-        let countOthers = 0;
-        Object.keys(localCountMap).forEach((x) => {
-          if (x !== 'ALL') {
-            countOthers += localCountMap[x]
-          }
-        })
-        localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
-        localCountMap['VULNERABLE'] = Math.abs(localCountMap['VULNERABLE'] - localCountMap['IGNORED_ISSUES']);
+        localCountMap = withDerivedCounts(localCountMap)
         const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
         setTestRunResultsCount(orderedValues)
         setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
@@ -528,7 +563,6 @@ function SingleTestRunPage() {
     }
     const key = tableTabMap[selectedTab]
     const total = localCountMap[key]
-    fillTempData(testRunResultsRes, selectedTab)
     return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: total }
   }
 
@@ -604,10 +638,75 @@ function SingleTestRunPage() {
     setSeverityModalActive(true);
   };
 
+  const showVerifyWithAi = !workflowTest && (testRunCountMap?.VULNERABLE || 0) > 0
+  const showSmartTestingLive = Boolean(currentSummary?.hexId)
+    && shouldShowSmartTestingExecutionTrace(testingRunResultSummariesObj?.testingRun?.runAutomatedTests)
+
+  // Reopens the issues behind the selected results in the Ignored Issues tab, the same as "Reopen"
+  // in the result flyout, then recounts this run so the results move back to Vulnerable.
+  const handleBulkReopen = async (resultHexIds) => {
+    if (reopenInProgress) return;
+    setReopenInProgress(true);
+    try {
+      const responses = await Promise.all(resultHexIds.map((hexId) =>
+        api.fetchIssueFromTestRunResultDetails(hexId).catch(() => null)
+      ));
+      const issueIds = [];
+      const seen = new Set();
+      responses.forEach((res) => {
+        const issue = res?.runIssues;
+        if (issue?.id && issue.testRunIssueStatus === "IGNORED") {
+          const key = JSON.stringify(issue.id);
+          if (!seen.has(key)) {
+            seen.add(key);
+            issueIds.push(issue.id);
+          }
+        }
+      });
+      if (issueIds.length === 0) {
+        func.setToast(true, true, "No ignored issues found for the selected results");
+        return;
+      }
+      await issuesApi.bulkUpdateIssueStatus(issueIds, "OPEN", "");
+      // The status update recounts each issue's latest run; recount this run too in case it's an older one.
+      await api.handleRefreshTableCount(currentSummary.hexId);
+      func.setToast(true, false, `${issueIds.length} issue${issueIds.length === 1 ? "" : "s"} re-opened`);
+      setTimeout(async () => {
+        await fetchTestingRunResultSummaries();
+        setUpdateTable(Date.now().toString());
+        setChartRefreshCounter(prev => prev + 1);
+      }, 1500);
+    } catch (e) {
+      // request() already shows the server's error as a toast
+    } finally {
+      setReopenInProgress(false);
+    }
+  };
+
   const promotedBulkActions = () => {
     let totalSelectedItemsSet = new Set(TableStore.getState().selectedItems.flat())
 
     return [
+      ...(selectedTab === 'ignored_issues' ? [{
+        content: `Reopen ${totalSelectedItemsSet.size} issue${totalSelectedItemsSet.size === 1 ? '' : 's'}`,
+        disabled: reopenInProgress,
+        onAction: () => {
+          if (totalSelectedItemsSet.size > 0) {
+            handleBulkReopen([...totalSelectedItemsSet])
+          }
+        },
+        requires: 'api/bulkUpdateIssueStatus',
+      }] : []),
+      ...(showVerifyWithAi && selectedTab === 'vulnerable' ? [{
+        content: `Verify ${totalSelectedItemsSet.size} with AI`,
+        disabled: aiVerifyStartedFor === currentSummary?.hexId,
+        onAction: () => {
+          if (totalSelectedItemsSet.size > 0) {
+            openAiVerifyModal([...totalSelectedItemsSet])
+          }
+        },
+        requires: 'api/verifyTestRunWithAi',
+      }] : []),
       {
         content: 'Update severity',
         onAction: () => {
@@ -615,6 +714,7 @@ function SingleTestRunPage() {
             openSeverityUpdateModal([...totalSelectedItemsSet]);
           }
         },
+        requires: 'api/bulkUpdateTestResultsSeverity',
       },
       {
         content: `Rerun ${totalSelectedItemsSet.size} test${totalSelectedItemsSet.size === 1 ? '' : 's'}`,
@@ -623,6 +723,7 @@ function SingleTestRunPage() {
             transform.rerunTest(selectedTestRun.id, null, false, [...totalSelectedItemsSet], selectedTestRun.testingRunResultSummaryHexId)
           }
         },
+        requires: 'api/startTest',
       },
       {
         content: 'Export selected Test Results as Markdown',
@@ -814,6 +915,85 @@ function SingleTestRunPage() {
     return (testingEndpoints.apisList?.length > 0) ? testingEndpoints.apisList[0].apiCollectionId : undefined;
   }
 
+  // Sort and filters of the current tab as the table has them persisted, for when the export is
+  // started from outside the table (the table passes its own when its CSV icon is used).
+  const buildExportContext = () => {
+    const stored = PersistStore.getState().filtersMap["/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab]
+    const filters = tableHeaders.reduce((map, h) => { map[h.filterKey || h.value] = []; return map }, {})
+    ;(stored?.filters || []).forEach((filter) => {
+      const value = filter.value
+      filters[filter.key] = Array.isArray(value) ? value : (value?.values ?? value)
+    })
+    const [sortKey, sortDirection] = (stored?.sort?.[0] || sortOptions[0].value).split(" ")
+    return { sortKey, sortOrder: sortDirection === 'asc' ? -1 : 1, filters, queryValue: undefined }
+  }
+
+  // Exports every result of the current tab, one CSV row per test result, honouring the active
+  // filters. Aborts without a file when a page fails or the run is over the cap; a count mismatch
+  // is reported instead of being presented as a complete export.
+  const exportTestRunResults = async (exportContext) => {
+    const summaryHexId = selectedTestRun?.testingRunResultSummaryHexId
+    if (!summaryHexId) {
+      func.setToast(true, true, "No test run results to export")
+      return
+    }
+    if (exportInProgress.current) return
+    exportInProgress.current = true
+    try {
+      const queryMode = tableTabMap[selectedTab]
+      const tabLabel = definedTableTabs[tableTabsOrder.indexOf(selectedTab)]
+      const { sortKey, sortOrder, filters: tableFilters, queryValue } = exportContext || buildExportContext()
+      const filters = structuredClone(tableFilters)
+      mergeCategoryIntoTestFilter(filters)
+
+      func.setToast(true, false, "Exporting CSV, please wait...")
+      // The raw count bounds the paging: the backend drops ignored issues from a vulnerable page
+      // after fetching it, so a short page doesn't mean the end. A missing count is unknown, not zero.
+      const rawCounts = await api.fetchTestRunResultsCount(summaryHexId, filters)
+      const counts = rawCounts && typeof rawCounts.ALL === 'number' ? withDerivedCounts(rawCounts) : null
+      const fetchBound = queryMode === 'SECURED' ? counts?.SECURED : rawCounts?.[queryMode]
+      if (!counts || typeof fetchBound !== 'number') {
+        throw new Error("Could not determine how many results to export")
+      }
+      if (fetchBound === 0) {
+        func.setToast(true, false, `No ${tabLabel.toLowerCase()} results to export`)
+        return
+      }
+      if (fetchBound > EXPORT_MAX_RESULTS) {
+        throw new Error(`${observeFunc.formatNumberWithCommas(fetchBound)} results is over the ${observeFunc.formatNumberWithCommas(EXPORT_MAX_RESULTS)} export limit. Apply filters to narrow it down.`)
+      }
+
+      const pageSize = queryMode === 'IGNORED_ISSUES' ? EXPORT_PAGE_SIZE_IGNORED : EXPORT_PAGE_SIZE
+      const seen = new Set()
+      const results = []
+      for (let skip = 0; skip < fetchBound; skip += pageSize) {
+        const res = await api.fetchTestingRunResults(summaryHexId, queryMode, sortKey, sortOrder, skip, pageSize, structuredClone(filters), queryValue)
+        if (!Array.isArray(res?.testingRunResults)) {
+          throw new Error("Could not fetch all test results for the export")
+        }
+        transform.prepareTestRunResults(hexId, res.testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, res.issuesDescriptionMap, res.jiraIssuesMapForResults, res.devrevIssuesMapForResults, res.linearIssuesMapForResults)
+          .forEach((result) => {
+            if (!seen.has(result.id)) {
+              seen.add(result.id)
+              results.push(result)
+            }
+          })
+      }
+
+      func.downloadAsCSV(transform.getTestRunResultsCsvRows(results, tabLabel), { name: `${selectedTestRun.name || "test_run"} - ${tabLabel}` })
+      const expected = counts[queryMode]
+      if (results.length === expected) {
+        func.setToast(true, false, `CSV exported successfully (${observeFunc.formatNumberWithCommas(results.length)} results)`)
+      } else {
+        func.setToast(true, true, `Exported ${observeFunc.formatNumberWithCommas(results.length)} of ${observeFunc.formatNumberWithCommas(expected)} results. Some results may be missing, try again.`)
+      }
+    } catch (e) {
+      func.setToast(true, true, e?.message || "CSV export failed")
+    } finally {
+      exportInProgress.current = false
+    }
+  }
+
   const [activeFromTesting, setActiveFromTesting] = useState(false)
 
   const [showTestingEndpointsModal, setShowTestingEndpointsModal] = useState(false)
@@ -833,7 +1013,7 @@ function SingleTestRunPage() {
         parentAdvanceSettingsConfig={conditions}
         useLocalSubCategoryData={useLocalSubCategoryData}
         testRunType={testingRunResultSummariesObj?.testingRunType}
-        disabled={window.USER_ROLE === "GUEST"}
+        disabled={!canCall('api/startTest')}
         shouldDisable={selectedTestRun.type === "CI_CD" || selectedTestRun.type === "RECURRING"}
       />
       <TestingRunEndpointsModal
@@ -873,6 +1053,7 @@ function SingleTestRunPage() {
           "selected": 1
         }}
         callFromOutside={updateTable}
+        onExportCsv={exportTestRunResults}
       />
       <Modal
         open={confirmationModal}
@@ -891,6 +1072,25 @@ function SingleTestRunPage() {
       >
         <Modal.Section>
           <Text>{"Are you sure you want to re-calculate issues count? This will recalculate the total number of issues based on the latest" + mapLabel('test results', getDashboardCategory()) + " and may affect the FIXED or IGNORED issues in the current testing run"}</Text>
+        </Modal.Section>
+      </Modal>
+      <Modal
+        open={aiVerifyModalActive}
+        onClose={() => setAiVerifyModalActive(false)}
+        title="Verify with AI"
+        primaryAction={{
+          content: 'Verify',
+          onAction: () => handleVerifyWithAi(currentSummary.hexId, aiVerifyTargets),
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            onAction: () => setAiVerifyModalActive(false),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <Text>{`AI will review ${aiVerifyTargets.length > 0 ? `the ${aiVerifyTargets.length} selected result${aiVerifyTargets.length === 1 ? '' : 's'}` : 'all vulnerable results of this test run'} and add its verdict and confidence to each issue's description. Issue statuses won't change, so you can review the verdicts and mark false positives.`}</Text>
         </Modal.Section>
       </Modal>
     </>
@@ -967,8 +1167,10 @@ function SingleTestRunPage() {
 
     await api.generatePDFReport(filtersObj, []).then((res) => {
       const responseId = res.split("=")[1];
-      const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
-      const redirectUrl = `/dashboard/testing/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+      const params = new URLSearchParams();
+      if (summaryMode === true) params.set('summaryMode', 'true');
+      params.set('category', categoryToShortName[getDashboardCategory()] || 'API');
+      const redirectUrl = `/dashboard/testing/summary/${responseId.split("}")[0]}?${params.toString()}`;
       window.open(redirectUrl, '_blank');
     })
   }
@@ -991,6 +1193,23 @@ function SingleTestRunPage() {
       setSecondaryPopover(false)
       setConfirmationModal(false)
     })
+  }
+
+  const handleVerifyWithAi = async (summaryHexId, resultHexIds) => {
+    setAiVerifyModalActive(false)
+    try {
+      await api.verifyTestRunWithAi(summaryHexId, resultHexIds)
+      setAiVerifyStartedFor(summaryHexId)
+      func.setToast(true, false, "AI verification started. Refresh in a few minutes to see the verdicts in the issue descriptions.")
+    } catch (e) {
+      // request() already shows the server's error (e.g. "Verification already running") as a toast
+    }
+  }
+
+  const openAiVerifyModal = (resultHexIds) => {
+    setSecondaryPopover(false)
+    setAiVerifyTargets(resultHexIds)
+    setAiVerifyModalActive(true)
   }
 
   const EmptyData = () => {
@@ -1123,7 +1342,7 @@ function SingleTestRunPage() {
                   <Tooltip
                     content={
                       <VerticalStack gap="2">
-                        <Text variant="bodyMd">API request error statistics breakdown:</Text>
+                        <Text variant="bodyMd">{mapLabel('API request', getDashboardCategory())} error statistics breakdown:</Text>
                         <VerticalStack gap="1">
                           {issues.map((issue) => (
                             <Text key={issue.key} variant="bodySm">{`- ${issue.label}: ${issue.countLabel}`}</Text>
@@ -1137,7 +1356,7 @@ function SingleTestRunPage() {
                     hasUnderline={false}
                   >
                     <HorizontalStack gap="1" align="center">
-                      <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>API error stats:</Text>
+                      <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>{mapLabel('API', getDashboardCategory())} error stats:</Text>
                     </HorizontalStack>
                   </Tooltip>
                   <HorizontalStack gap="2" align="center">
@@ -1179,10 +1398,6 @@ function SingleTestRunPage() {
         content: 'Export Test Results as Markdown',
         icon: ReportMinor,
         onAction: async () => {
-          // Fetch all results logic
-          let allResults = [];
-          // Reuse fetchTableData logic or similar but we need strict "All" for this run.
-          // We can use api.fetchTestingRunResults with a large limit.
           const { testingRunResultSummaryHexId } = selectedTestRun;
           if (!testingRunResultSummaryHexId) return;
 
@@ -1191,24 +1406,6 @@ function SingleTestRunPage() {
           // Since we don't have modifyDataForCSV here, I'll use a safe large limit approach for now.
 
           try {
-            // Fetching vulnerable results as primary interest, but user said "whole test results".
-            // So we might need to fetch multiple statuses if tabs are separate.
-            // Or just fetch everything? API usually filters by status.
-            // Let's assume user wants what's currently viewable or "all relevant".
-            // The table has tabs: Vulnerable, Need Config, Skipped, Secured, etc.
-            // Fetching ALL might be huge. I will focus on Vulnerable for "Export Test Results" 
-            // but user said "export whole test results".
-            // Let's try to fetch VULNERABLE as it's the most critical. 
-            // If they want EVERYTHING, I'd need to make multiple calls.
-            // Let's fetch VULNERABLE for now as it maps to "vulnerability report".
-            // Or I can chain requests for all tabs.
-
-            // For simplicity and performance, let's fetch VULNERABLE issues first.
-            // If the user wants ALL statuses, that's heavy.
-            // "Export vulnerability report" usually implies vulnerabilities.
-
-            // Wait, the existing "Export results as CSV" wasn't there.
-            // I'll fetch VULNERABLE results (limit 10000).
 
             const { testingRunResults } = await api.fetchTestingRunResults(
               testingRunResultSummaryHexId,
@@ -1257,12 +1454,14 @@ function SingleTestRunPage() {
       {
         content: mapLabel("More Tests", getDashboardCategory()),
         icon: PlusMinor,
-        onAction: () => { setActiveFromTesting(true) }
+        onAction: () => { setActiveFromTesting(true) },
+        requires: 'api/modifyTestingRunConfig'
       },
       {
         content: 'Configurations',
         icon: SettingsMinor,
-        onAction: () => { setShowEditableSettings(true); handleAddSettings() }
+        onAction: () => { setShowEditableSettings(true); handleAddSettings() },
+        requires: 'api/modifyTestingRunConfig'
       }
     ]
   })
@@ -1284,8 +1483,16 @@ function SingleTestRunPage() {
       {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,
-        onAction: () => { setConfirmationModal(true) }
+        onAction: () => { setConfirmationModal(true) },
+        requires: 'api/handleRefreshTableCount'
       },
+      ...(showVerifyWithAi ? [{
+        content: aiVerifyStartedFor === currentSummary?.hexId ? 'AI verification running' : 'Verify all with AI',
+        icon: MagicMinor,
+        disabled: aiVerifyStartedFor === currentSummary?.hexId,
+        onAction: () => openAiVerifyModal([]),
+        requires: 'api/verifyTestRunWithAi'
+      }] : []),
       ...(currentSummary?.hexId ? [{
         content: 'View logs',
         icon: FileMinor,
@@ -1302,7 +1509,7 @@ function SingleTestRunPage() {
     >
       <ActionList
         actionRole="menuitem"
-        sections={moreActionsList}
+        sections={withPermissions(moreActionsList)}
       />
 
     </Popover>
@@ -1312,13 +1519,20 @@ function SingleTestRunPage() {
     <>
       <PageWithMultipleCards
         title={headingComp}
-        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() =>
-          func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
-        }>Export results</Button></Box> : undefined}
-        secondaryActions={!workflowTest ? moreActionsComp : undefined}
+        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => exportTestRunResults()}>Export results</Button></Box> : undefined}
+        secondaryActions={!workflowTest ? (showSmartTestingLive ? (
+          <>
+            <Button onClick={() => setLiveActive(true)}>Live</Button>
+            {moreActionsComp}
+          </>
+        ) : moreActionsComp) : undefined}
         components={useComponents}
+        backUrl={"/dashboard/testing"}
       />
       <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false} />
+      {showSmartTestingLive ? (
+        <SmartTestingLive show={liveActive} setShow={setLiveActive} summaryHexId={currentSummary.hexId} />
+      ) : null}
       {currentSummary?.hexId ? (
         <TestRunLogs
           open={logsModalActive}

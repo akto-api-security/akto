@@ -10,13 +10,14 @@ export const buildComplianceMap = (suggested, accepted) =>
         return acc;
     }, {});
 
-const ComplianceMappingTags = ({ loading, complianceMap = {}, onRemove, onAdd }) => {
+const ComplianceMappingTags = ({ loading, complianceMap = {}, onRemove, onAdd, evaluated = true }) => {
     const [addActive, setAddActive] = useState(false);
     const [filterValue, setFilterValue] = useState("");
 
     const frameworks = Object.keys(complianceMap);
 
-    if (!loading && frameworks.length === 0 && !onAdd) return null;
+    // Say nothing until a suggestion has actually come back: "none map" is a result, not a default.
+    if (!loading && frameworks.length === 0 && (!evaluated || !onAdd)) return null;
 
     const availableFrameworks = getCompliances()
         .filter(frameworkName => !complianceMap[frameworkName])
@@ -24,7 +25,7 @@ const ComplianceMappingTags = ({ loading, complianceMap = {}, onRemove, onAdd })
 
     const addActivator = (
         <Button plain size="slim" icon={PlusMinor} onClick={() => setAddActive(x => !x)}>
-            Add
+            {frameworks.length > 0 ? "Add" : "Add framework"}
         </Button>
     );
 
@@ -41,6 +42,9 @@ const ComplianceMappingTags = ({ loading, complianceMap = {}, onRemove, onAdd })
                         <Text variant="bodySm" fontWeight="medium">Compliance frameworks supported by this guardrail:</Text>
                     )}
                     <HorizontalStack gap="2" wrap blockAlign="center">
+                        {frameworks.length === 0 && (
+                            <Text variant="bodySm" tone="subdued">No compliance framework maps to this guardrail.</Text>
+                        )}
                         {frameworks.map(frameworkName => (
                             <Tag key={frameworkName} onRemove={onRemove ? () => onRemove(frameworkName) : undefined}>
                                 <HorizontalStack gap="1" blockAlign="center">

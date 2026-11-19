@@ -11,6 +11,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/auth"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
+	"github.com/akto-api-security/guardrails-service/pkg/filecache"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/metrics"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
@@ -43,17 +44,37 @@ type ValidationHandler struct {
 	cfg              *config.Config
 	fileRegistry     *fileprocessor.Registry
 	metrics          *metrics.Accumulator
+	policyGate       policyGate
+	// fileCache remembers inspected, allowed files; nil turns it off. policyFingerprint scopes
+	// its entries to the policies that apply, so a policy change misses the cache.
+	fileCache         filecache.Store
+	policyFingerprint policyFingerprint
+	// validateFileChunk checks one chunk of a file's text (validator.Service.ValidateRequest).
+	validateFileChunk fileRequestValidator
 }
 
+// policyGate mirrors validator.Service.HasApplicablePolicies.
+type policyGate func(contextSource, requestHeaders, tag string) (bool, error)
+
+// policyFingerprint mirrors validator.Service.ApplicablePoliciesFingerprint.
+type policyFingerprint func(contextSource, requestHeaders, tag string) (string, error)
+
 // NewValidationHandler creates a new validation handler
-func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry, acc *metrics.Accumulator) *ValidationHandler {
-	return &ValidationHandler{
+func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry, acc *metrics.Accumulator, fileCache filecache.Store) *ValidationHandler {
+	h := &ValidationHandler{
 		validatorService: validatorService,
 		logger:           logger,
 		cfg:              cfg,
 		fileRegistry:     fileRegistry,
 		metrics:          acc,
+		fileCache:        fileCache,
 	}
+	if validatorService != nil {
+		h.policyGate = validatorService.HasApplicablePolicies
+		h.policyFingerprint = validatorService.ApplicablePoliciesFingerprint
+		h.validateFileChunk = validatorService.ValidateRequest
+	}
+	return h
 }
 
 // IngestData handles batch data ingestion and validation
@@ -146,6 +167,11 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 
 	applyAuthenticatedAccount(c, &req)
 
+	if req.ActivityID != "" {
+		h.checkHumanApprovalStatus(c, req.ActivityID)
+		return
+	}
+
 	if req.RequestPayload == "" {
 		h.logger.Error("ValidateRequest - missing requestPayload",
 			zap.Int64("latencyMs", time.Since(start).Milliseconds()))
@@ -164,7 +190,7 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 
 	// Extract session and request IDs from headers (falling back to the body's
 	// requestHeaders JSON for traffic forwarded via /api/http-proxy).
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders)
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders, req.RequestPayload)
 
 	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Request received for guardrailing | Path: %s | Method: %s | Account: %s | Session: %s | Payload: %.300s",
 		req.Path, req.Method, req.AktoAccountID, sessionID, req.RequestPayload))
@@ -191,7 +217,7 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	// Measure only the guardrail validation work for the P95 metric, excluding
 	// JSON binding, session extraction and logging overhead captured by `start`.
 	valStart := time.Now()
-	result, err := h.validatorService.ValidateRequest(c.Request.Context(), &req, sessionID, requestID)
+	result, activityID, err := h.validatorService.ValidateRequest(c.Request.Context(), &req, sessionID, requestID)
 	valLatency := time.Since(valStart)
 	if err != nil {
 		if h.metrics != nil && req.AktoAccountID != "" {
@@ -236,6 +262,18 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Request %s | Path: %s | Method: %s | Account: %s | Session: %s | Modified: %v | Payload: %.300s",
 		status, req.Path, req.Method, req.AktoAccountID, sessionID, result.Modified, req.RequestPayload))
 
+	if activityID != "" {
+		c.JSON(http.StatusOK, models.PendingApprovalResponse{
+			Allowed:    false,
+			Behaviour:  result.Behaviour,
+			Status:     "pending",
+			ActivityID: activityID,
+			Reason:     result.Reason,
+			Modified:   result.Modified,
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, result)
 }
 
@@ -260,7 +298,7 @@ func (h *ValidationHandler) ValidateRequestWithPolicy(c *gin.Context) {
 		zap.String("contextSource", req.ContextSource),
 		zap.String("policyName", req.Policy.Name))
 
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, "")
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, "", req.Payload)
 
 	// Default skipThreat to false if not provided
 	skipThreat := false
@@ -317,6 +355,11 @@ func (h *ValidationHandler) ReplayWithPolicy(c *gin.Context) {
 		BaselinePolicy *mcp.GuardrailsPolicy  `json:"baselinePolicy,omitempty"`
 		ContextSource  string                 `json:"contextSource,omitempty"`
 		Items          []validator.ReplayItem `json:"items" binding:"required,min=1"`
+		// IncludeDetectionDetails additionally populates category/subCategory/severity on each
+		// detected verdict, for a caller that persists a real malicious_events record from the
+		// replay (e.g. a backfill job) rather than just showing a detected/not-detected count.
+		// Omitted by the dashboard's compare feature, which sees identical behavior to before.
+		IncludeDetectionDetails bool `json:"includeDetectionDetails,omitempty"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -335,7 +378,7 @@ func (h *ValidationHandler) ReplayWithPolicy(c *gin.Context) {
 	}
 
 	verdicts, err := h.validatorService.ReplayWithPolicy(
-		c.Request.Context(), req.Items, req.Policy, req.BaselinePolicy, req.ContextSource)
+		c.Request.Context(), req.Items, req.Policy, req.BaselinePolicy, req.ContextSource, req.IncludeDetectionDetails)
 	if err != nil {
 		h.logger.Error("ReplayWithPolicy failed",
 			zap.String("policyName", req.Policy.Name),
@@ -390,6 +433,11 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 
 	applyAuthenticatedAccount(c, &req)
 
+	if req.ActivityID != "" {
+		h.checkHumanApprovalStatus(c, req.ActivityID)
+		return
+	}
+
 	// Response body: prefer responsePayload; legacy field "payload" still supported (see models.ValidateRequestParams.LegacyPayload).
 	responseBody := req.ResponsePayload
 	if responseBody == "" {
@@ -411,7 +459,7 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders)
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders, req.RequestPayload)
 
 	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Response received for guardrailing | Path: %s | Method: %s | Account: %s | Session: %s | Payload: %.300s",
 		req.Path, req.Method, req.AktoAccountID, sessionID, responseBody))
@@ -439,7 +487,7 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	// Measure only the guardrail validation work for the P95 metric, excluding
 	// JSON binding, session extraction and logging overhead captured by `start`.
 	valStart := time.Now()
-	result, err := h.validatorService.ValidateResponse(c.Request.Context(), &req, responseBody, sessionID, requestID)
+	result, activityID, err := h.validatorService.ValidateResponse(c.Request.Context(), &req, responseBody, sessionID, requestID)
 	valLatency := time.Since(valStart)
 	if err != nil {
 		if h.metrics != nil && req.AktoAccountID != "" {
@@ -484,7 +532,34 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Response %s | Path: %s | Method: %s | Account: %s | Session: %s | Modified: %v | Payload: %.300s",
 		responseStatus, req.Path, req.Method, req.AktoAccountID, sessionID, result.Modified, responseBody))
 
+	if activityID != "" {
+		c.JSON(http.StatusOK, models.PendingApprovalResponse{
+			Allowed:    false,
+			Behaviour:  result.Behaviour,
+			Status:     "pending",
+			ActivityID: activityID,
+			Reason:     result.Reason,
+			Modified:   result.Modified,
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, result)
+}
+
+// checkHumanApprovalStatus looks up a pending activity's status — reached via the same
+// /validate/request and /validate/response endpoints whenever activityId is set.
+func (h *ValidationHandler) checkHumanApprovalStatus(c *gin.Context, activityID string) {
+	resp, err := h.validatorService.CheckHumanApprovalStatus(c.Request.Context(), activityID)
+	if err != nil {
+		h.logger.Error("checkHumanApprovalStatus failed",
+			zap.String("activityId", activityID),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Poll failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // HealthCheck handles health check requests

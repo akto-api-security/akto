@@ -13,6 +13,7 @@ import sys
 import urllib.request
 from typing import Any, Dict, Union
 
+from akto_ingestion_utility import installer_headers, resolve_session_info
 from akto_machine_id import get_machine_id, get_username
 
 # Configure logging
@@ -145,7 +146,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.error(f"API CALL FAILED after {duration_ms}ms: {e}")
         raise
 
-def build_ingestion_payload(response_text: str) -> Dict[str, Any]:
+def build_ingestion_payload(response_text: str, session_info: dict = None) -> Dict[str, Any]:
     """Build the request body for data ingestion."""
     import time
 
@@ -162,11 +163,14 @@ def build_ingestion_payload(response_text: str) -> Dict[str, Any]:
     host = API_URL.replace("https://", "").replace("http://", "")
 
     # Build request headers as JSON string
-    request_headers = json.dumps({
+    req_headers = {
         "host": host,
         "x-cursor-hook": "afterAgentResponse",
         "content-type": "application/json"
-    })
+    }
+    if session_info:
+        req_headers.update(installer_headers(session_info))
+    request_headers = json.dumps(req_headers)
 
     # Build response headers as JSON string
     response_headers = json.dumps({
@@ -210,7 +214,7 @@ def build_ingestion_payload(response_text: str) -> Dict[str, Any]:
     }
 
 
-def send_ingestion_data(response_text: str):
+def send_ingestion_data(response_text: str, session_info: dict = None):
     if not response_text.strip():
         return
 
@@ -219,7 +223,7 @@ def send_ingestion_data(response_text: str):
         logger.debug(f"Response: {response_text[:500]}...")
 
     try:
-        request_body = build_ingestion_payload(response_text)
+        request_body = build_ingestion_payload(response_text, session_info)
         # response_guardrails=true asks Akto to evaluate response-side guardrails on the mirrored
         # response. afterAgentResponse is observe-only per Cursor docs, so we cannot block here —
         # but Akto can still alert server-side based on the verdict.
@@ -249,6 +253,7 @@ def main():
         sys.exit(0)
 
     response_text = input_data.get("text", "")
+    session_info = resolve_session_info(input_data, logger)
 
     if not response_text.strip():
         logger.warning("Empty response received")
@@ -257,7 +262,7 @@ def main():
 
     # Send to Akto for ingestion
     if AKTO_DATA_INGESTION_URL:
-        send_ingestion_data(response_text)
+        send_ingestion_data(response_text, session_info)
     else:
         logger.warning("AKTO_DATA_INGESTION_URL not set, skipping ingestion")
 

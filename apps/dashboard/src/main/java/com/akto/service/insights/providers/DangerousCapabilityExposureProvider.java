@@ -82,6 +82,7 @@ public class DangerousCapabilityExposureProvider extends AbstractInsightProvider
                 row.put("capability", verdict.capability);
                 row.put("mcpHost", hostName);
                 row.put("ungated", !gated);
+                row.put("example", truncate(sampleData, 200));
                 rows.add(row);
             }
         }
@@ -105,13 +106,29 @@ public class DangerousCapabilityExposureProvider extends AbstractInsightProvider
         r.setHeadline(!fullyClassified
                 ? InsightUtil.count(unclassified, "MCP tools") + " pending classification"
                 : dangerous == 0 ? "No dangerous-capability MCP tools detected"
-                : InsightUtil.count(dangerous, "dangerous tools") + ", " + ungated + " with no blocking guardrail");
+                : InsightUtil.count(dangerous, "dangerous tools") + ", " + InsightUtil.count(ungated, "with no blocking guardrail"));
+
+        if (dangerous > 0) {
+            r.setSeverity(ungated > 0 ? "CRITICAL" : "MEDIUM");
+            r.setConcern(InsightUtil.count(dangerous, "MCP tools") + " can take a dangerous action (file/system access, code execution, or similar) based on what they actually returned in a real sample."
+                    + (ungated > 0 ? " " + InsightUtil.count(ungated, "of them") + " have no blocking guardrail in front of them." : " All of them are currently covered by a blocking guardrail."));
+            r.setImpact("A dangerous tool with no blocking policy will execute whatever an agent (or a prompt-injected agent) asks it to, with no check in between — see the real sample response below for what it can actually do.");
+            r.setRemediation(ungated > 0
+                    ? "Apply a blocking guardrail requiring approval before these tools run, starting with the ungated ones."
+                    : "Guardrails are already in place — periodically re-review as new tools are added.");
+        }
 
         r.addEvidence(new InsightResult.Evidence("dangerous_tools", "Dangerous-capability tools",
-                Arrays.asList("tool", "capability", "mcpHost", "ungated"), rows, dangerous));
+                Arrays.asList("tool", "capability", "mcpHost", "ungated", "example"), rows, dangerous));
 
         r.addCta(new InsightResult.Cta("apply_policy", "Require approval on exec tools", "NAVIGATE", InsightRoutes.GUARDRAIL_POLICIES, new HashMap<>(), true));
         r.addCta(new InsightResult.Cta("view_assets", "View agentic assets", "NAVIGATE", InsightRoutes.AGENTIC_ASSETS, new HashMap<>(), false));
         return r;
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return null;
+        String oneLine = s.replaceAll("\\s+", " ").trim();
+        return oneLine.length() > max ? oneLine.substring(0, max) + "…" : oneLine;
     }
 }

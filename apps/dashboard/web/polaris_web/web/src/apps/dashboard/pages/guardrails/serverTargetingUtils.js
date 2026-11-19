@@ -50,7 +50,7 @@ export const resolveServerEntryKey = (entry, allCollections) => {
     return extractServiceName(rawName) || rawName;
 };
 
-export const splitAgentServersV2 = (rawEntries, allCollections) => {
+const splitAgentServersV2 = (rawEntries, allCollections) => {
     const llmKeySet = getLlmServiceKeySet(allCollections);
     const agents = [];
     const llms = [];
@@ -65,15 +65,23 @@ export const splitAgentServersV2 = (rawEntries, allCollections) => {
     return { agents, llms };
 };
 
+// V2 stores agents and LLMs separately; the legacy commingled field is only read for pre-split policies.
+export const splitPolicyServers = (policy, allCollections) => {
+    if (policy?.selectedLlmServersV2?.length > 0) {
+        return { agents: policy.selectedAgentServersV2 || [], llms: policy.selectedLlmServersV2 };
+    }
+    const raw = policy?.selectedAgentServersV2?.length > 0
+        ? policy.selectedAgentServersV2
+        : (policy?.selectedAgentServers || []).map(id => ({ id, name: id }));
+    return splitAgentServersV2(raw, allCollections);
+};
+
 export const getApplicableAgentKeys = (policy, allCollections, agentOptions) => {
     if (policy.applyToAllServers === true || policy.applyToAllServers == null) {
         return (agentOptions || []).map(o => o.value).filter(Boolean);
     }
 
-    const raw = policy.selectedAgentServersV2?.length > 0
-        ? policy.selectedAgentServersV2
-        : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
-    const { agents } = splitAgentServersV2(raw, allCollections);
+    const { agents } = splitPolicyServers(policy, allCollections);
 
     const keys = new Set();
     agents.forEach(entry => {

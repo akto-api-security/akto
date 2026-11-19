@@ -15,6 +15,7 @@ import {
 import api from './api'
 import "./billing.css"
 import func from "@/util/func"
+import { usePermissions } from "@/util/permissions"
 
 const PlanDetails = ({customerId}) => {
 
@@ -23,6 +24,8 @@ const PlanDetails = ({customerId}) => {
     let [isLoading, setIsLoading] = useState(true)
 
     const { stigg, refreshData } = useStiggContext();
+    // the plan picker can't be disabled, so a role that can't change the plan doesn't get it
+    const { canCall } = usePermissions()
 
     async function getToken(orgId) {
         setIsLoading(true)
@@ -60,7 +63,7 @@ const PlanDetails = ({customerId}) => {
                 </LegacyCard.Section>
             </LegacyCard>
 
-            <LegacyCard title="Available plans">
+            {canCall('api/provisionSubscription') && <LegacyCard title="Available plans">
                 <Divider />
                 <LegacyCard.Section><Box>
                     <Paywall
@@ -102,7 +105,7 @@ const PlanDetails = ({customerId}) => {
                 <LegacyCard.Section subdued>
                     For any help, please reach out to support@akto.io
                 </LegacyCard.Section>
-            </LegacyCard>
+            </LegacyCard>}
             </>
     }
     {isLoading && <div>Checking org...</div>}

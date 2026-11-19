@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { SESSION_COLUMN_DEFS } from "./columns";
 import api from "./api";
+import { lockedRowStyle } from "./LLMCellRenderers";
 
 const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false };
 
@@ -31,9 +32,12 @@ export default function SessionsView({ currDateRange, onOpenSession, initialFilt
                     topic:     mergeUnique(choices.topic,     initialFilters?.topic),
                     subTopic:  mergeUnique(choices.subTopic,  initialFilters?.subTopic),
                     serviceId: choices.serviceId || [],
+                    guardrailPolicy: mergeUnique(choices.guardrailPolicy, initialFilters?.guardrailPolicy),
+                    // Boolean column — fixed two-value domain, not sourced from fetchFilterChoices.
+                    hasActiveGuardrail: ["true", "false"],
                 };
                 setColumnDefs(SESSION_COLUMN_DEFS.map(col =>
-                    col.filterAllowed ? { ...col, filterParams: { values: merged[col.field] || [] } } : col
+                    col.filterAllowed ? { ...col, filterParams: { ...col.filterParams, values: merged[col.field] || [] } } : col
                 ));
 
                 // Apply AG Grid filter model so the filter icon lights up on those columns.
@@ -77,8 +81,6 @@ export default function SessionsView({ currDateRange, onOpenSession, initialFilt
         [onOpenSession]
     );
 
-    const getRowStyle = useCallback(() => ({ cursor: "pointer" }), []);
-
     // Re-key on date range change so AgGridTable remounts, resets its page to 0,
     // and triggers a fresh fetch with the new time window.
     const tableKey = `${currDateRange.period.since}~${currDateRange.period.until}`;
@@ -99,7 +101,7 @@ export default function SessionsView({ currDateRange, onOpenSession, initialFilt
             paginationPageSize={20}
             animateRows
             suppressCellFocus
-            getRowStyle={getRowStyle}
+            getRowStyle={lockedRowStyle}
             onRowClicked={handleRowClick}
             sideBar={{ toolPanels: ["columns", "filters"] }}
             onServerFetch={onServerFetch}

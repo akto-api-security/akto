@@ -105,6 +105,15 @@ type ReplayVerdict struct {
 	// Side is which side matched ("request" or "response"), set only when Detected.
 	Side       string `json:"side,omitempty"`
 	SkipReason string `json:"skipReason,omitempty"`
+	// Category/SubCategory/Severity are populated only when the caller sets
+	// includeDetectionDetails and the item is Detected — the same policy-name/rule/severity
+	// triple a live detection reports, mirroring buildMaliciousEvent's own fallback rules
+	// (mcp-endpoint-shield's threat_reporter.go). Left unset for every existing caller (the
+	// dashboard's compare feature), which never sets includeDetectionDetails and sees an
+	// identical verdict shape to before.
+	Category    string `json:"category,omitempty"`
+	SubCategory string `json:"subCategory,omitempty"`
+	Severity    string `json:"severity,omitempty"`
 }
 
 // preparedPolicy is a policy converted once and reused across every item in the batch.
@@ -141,7 +150,7 @@ func preparePolicy(p *mcp.GuardrailsPolicy, logger *zap.Logger) preparedPolicy {
 //
 //   - skipThreat is forced on, so replays never write malicious_events.
 //   - sessionID is left empty, which makes CheckAndHandleMaliciousSession,
-//     TrackRequestAndGenerateSummary and GetModifiedPayloadWithSummary no-ops. Do not "improve
+//     TrackRequestOnly and GetModifiedPayloadWithSummary no-ops. Do not "improve
 //     fidelity" by forwarding the original event's session headers: the first item that tripped
 //     the malicious-session check would short-circuit every later item to blocked.
 //   - server/device/approved-server filtering is skipped, because the question is whether the
@@ -152,16 +161,13 @@ func (s *Service) ReplayWithPolicy(
 	policy *mcp.GuardrailsPolicy,
 	baseline *mcp.GuardrailsPolicy,
 	contextSource string,
+	includeDetectionDetails bool,
 ) ([]ReplayVerdict, error) {
 	if policy == nil {
 		return nil, fmt.Errorf("policy is required")
 	}
 	if len(items) == 0 {
 		return []ReplayVerdict{}, nil
-	}
-
-	if s.schemaFetcher != nil {
-		s.schemaFetcher.RefreshIfNeeded()
 	}
 
 	prepared := preparePolicy(policy, s.logger)
@@ -201,7 +207,7 @@ func (s *Service) ReplayWithPolicy(
 	for i, item := range items {
 		i, item := i, item
 		g.Go(func() error {
-			verdicts[i] = s.compareOne(gctx, item, prepared, preparedBaseline, mcpAllowedHostList, contextSource)
+			verdicts[i] = s.compareOne(gctx, item, prepared, preparedBaseline, mcpAllowedHostList, contextSource, includeDetectionDetails)
 			return nil
 		})
 	}
@@ -226,6 +232,7 @@ func (s *Service) compareOne(
 	baseline *preparedPolicy,
 	mcpAllowedHostList []types.McpAllowedList,
 	contextSource string,
+	includeDetectionDetails bool,
 ) ReplayVerdict {
 	verdict := ReplayVerdict{ID: item.ID}
 
@@ -253,6 +260,20 @@ func (s *Service) compareOne(
 		if res != nil {
 			verdict.Behaviour = res.Behaviour
 			verdict.Reason = extractReasonFromBlockedResponse(res.BlockedResponse)
+			if includeDetectionDetails {
+				// Mirrors buildMaliciousEvent's own category/subCategory/severity fallback
+				// rules (mcp-endpoint-shield's threat_reporter.go) so a caller persisting a
+				// malicious_events record from this verdict matches a live detection's shape.
+				verdict.Category = res.Metadata.PolicyName
+				verdict.SubCategory = res.Metadata.RuleViolated
+				if verdict.SubCategory == "" {
+					verdict.SubCategory = verdict.Category
+				}
+				verdict.Severity = strings.TrimSpace(res.Metadata.Severity)
+				if verdict.Severity == "" {
+					verdict.Severity = "CRITICAL"
+				}
+			}
 		}
 	}
 
@@ -348,6 +369,9 @@ func (s *Service) replaySide(
 
 	valCtx := s.validationContextFromParams(
 		params, "", reqCtxPayload, respCtxPayload, "ReplayWithPolicy", mcpAllowedHostList, prepared.compiledRules)
+	// Replay asks whether the policy detects this payload, so an alert policy's verdict must come
+	// back rather than being detached into a background report (which replay skips anyway).
+	valCtx.InlineAlerts = true
 
 	procCtx, cancel := s.withReplayDeadline(ctx)
 	defer cancel()

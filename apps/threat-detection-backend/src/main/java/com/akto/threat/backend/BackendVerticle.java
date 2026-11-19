@@ -67,6 +67,7 @@ public class BackendVerticle extends AbstractVerticle {
       long lastWrite = FlushMessagesToDB.getLastSuccessfulMongoWriteEpochMs();
 
       long pollAgoSec = lastPoll == 0 ? -1 : (now - lastPoll) / 1000;
+      long pollWithRecordsAgoSec = lastPollWithRecords == 0 ? -1 : (now - lastPollWithRecords) / 1000;
       long writeAgoSec = lastWrite == 0 ? -1 : (now - lastWrite) / 1000;
       boolean receivingRecords = lastPollWithRecords > 0 && (now - lastPollWithRecords) <= thresholdMs;
 
@@ -89,7 +90,9 @@ public class BackendVerticle extends AbstractVerticle {
       JsonObject body = new JsonObject()
           .put("status", healthy ? "ok" : "unhealthy")
           .put("lastPollAgoSec", pollAgoSec)
+          .put("lastPollWithRecordsAgoSec", pollWithRecordsAgoSec)
           .put("lastWriteAgoSec", writeAgoSec)
+          .put("receivingRecords", receivingRecords)
           .put("thresholdSec", thresholdSec);
       if (!healthy) {
         body.put("reason", String.join(",", reasons));

@@ -7,10 +7,13 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import SampleData from '../../../components/shared/SampleData'
 import { DeleteMajor, CircleCancelMajor, CircleTickMajor } from "@shopify/polaris-icons"
+import { usePermissions, whenAllowed, NO_PERMISSION_REASON } from "@/util/permissions"
+import AllowedAction from '../../../components/shared/AllowedAction'
 
 function AdvancedTrafficFilters() {
     const [topLevelActive, setTopLevelActive] = useState(false);
     const [deleteSlash, setDeleteSlash] = useState(false)
+    const { canCall } = usePermissions()
     function MainComp () {
         const [currentTemplate, setCurrentTemplate] = useState({message: ""})
         const [ogData, setOgData] = useState({ message: "" })
@@ -34,9 +37,11 @@ function AdvancedTrafficFilters() {
                 }
                 
             })
-            await trafficFiltersRequest.getAdvancedFiltersPermissions().then((resp) => {
-                setPermissionsMap(resp)
-            })
+            if (canCall('api/getAccountSettingsForAdvancedFilters')) {
+                await trafficFiltersRequest.getAdvancedFiltersPermissions().then((resp) => {
+                    setPermissionsMap(resp)
+                })
+            }
         }
 
         useEffect(() => {
@@ -118,6 +123,9 @@ function AdvancedTrafficFilters() {
         }
 
         const tooltipText= currentState ? "Mark as Active" : "Mark as Deactive"
+        const canSaveFilter = canCall('api/addAdvancedFiltersForTraffic')
+        const canUpdateRetrospective = canCall('api/updateRetrospectiveFilterSettings')
+        const dryRunAction = topLevelActive ? 'api/cleanNonHostApiInfos' : (deleteSlash ? 'api/deleteOptionAndSlashApis' : 'api/dryRunAdvancedFilters')
 
         const titleComp = (
             <HorizontalStack align="space-between">
@@ -134,11 +142,15 @@ function AdvancedTrafficFilters() {
                                 checked={permissionsMap['allowFilterLogs']}
                                 label="Allow filtered urls in logs"
                                 onChange={() => handleCheckboxClicked('allowFilterLogs', !permissionsMap['allowFilterLogs'])}
+                                disabled={!canUpdateRetrospective}
+                                helpText={canUpdateRetrospective ? undefined : NO_PERMISSION_REASON}
                             />
                             <Checkbox
                                 label="Allow retrospective deletion"
                                 checked={permissionsMap['allowDeletionOfUrls']}
                                 onChange={() => handleCheckboxClicked('allowDeletionOfUrls', !permissionsMap['allowDeletionOfUrls'])}
+                                disabled={!canUpdateRetrospective}
+                                helpText={canUpdateRetrospective ? undefined : NO_PERMISSION_REASON}
                             />
                         </VerticalStack>
                     </Popover.Section>
@@ -152,9 +164,10 @@ function AdvancedTrafficFilters() {
                 title={titleComp} 
                 footerActionAlignment="right"
                 primaryFooterAction={{content: 'Save', onAction: () => setModalActive(true), 
-                    disabled: (currentTemplate?.message !== undefined && currentTemplate.message.length === 0) || (typeof (currentTemplate) === 'string' && currentTemplate.length === 0)
+                    disabled: (currentTemplate?.message !== undefined && currentTemplate.message.length === 0) || (typeof (currentTemplate) === 'string' && currentTemplate.length === 0),
+                    ...whenAllowed(canSaveFilter)
                 }}
-                secondaryFooterActions={[{content: 'Add new', onAction: () => resetFunc()}]}
+                secondaryFooterActions={[{content: 'Add new', onAction: () => resetFunc(), ...whenAllowed(canSaveFilter)}]}
             >
                 <LegacyCard.Section>
                     <DropdownSearch
@@ -176,16 +189,20 @@ function AdvancedTrafficFilters() {
                         <VerticalStack gap={"1"}>
                             <Box paddingInlineEnd={"4"}>
                                 <HorizontalStack align="end" gap={"2"}>
+                                    <AllowedAction allowed={canCall('api/changeStateOfFilter')}>
                                     <Button plain monochrome disabled={currentId.length === 0} onClick={() => changeStateOfFilter()}>
                                         <Tooltip content={tooltipText} dismissOnMouseOut>
                                             <Box><Icon source={currentState ? CircleTickMajor : CircleCancelMajor} /></Box>
                                         </Tooltip>
                                     </Button>
+                                    </AllowedAction>
+                                    <AllowedAction allowed={canCall('api/deleteAdvancedFilter')}>
                                     <Button plain destructive disabled={currentId.length === 0} onClick={() => handleDelete()}>
                                         <Tooltip content="Delete template" dismissOnMouseOut>
                                             <Box><Icon source={DeleteMajor} /></Box>
                                         </Tooltip>
                                     </Button>
+                                    </AllowedAction>
                                 </HorizontalStack>
                             </Box>
                             <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="240px" readOnly={false} getEditorData={setCurrentTemplate} />
@@ -196,8 +213,8 @@ function AdvancedTrafficFilters() {
             <Modal
                 open={modalActive || topLevelActive || deleteSlash}
                 onClose={() => {setModalActive(false); setTopLevelActive(false); setDeleteSlash(false)}}
-                primaryAction={{content: 'Save', onAction: () => {handleSave(currentTemplate); setModalActive(false)} , disabled: topLevelActive || deleteSlash}}
-                secondaryActions={(window.IS_SAAS !== "true" ||  window.USER_NAME.includes("akto"))? [{content: 'Dry run', onAction: () => handleDryRun(currentTemplate, false)},{content: 'Delete APIs matched', onAction: ()=> handleDryRun(currentTemplate, true) }]: []}
+                primaryAction={{content: 'Save', onAction: () => {handleSave(currentTemplate); setModalActive(false)} , disabled: topLevelActive || deleteSlash, ...whenAllowed(canSaveFilter)}}
+                secondaryActions={(window.IS_SAAS !== "true" ||  window.USER_NAME.includes("akto"))? [{content: 'Dry run', onAction: () => handleDryRun(currentTemplate, false), ...whenAllowed(canCall(dryRunAction))},{content: 'Delete APIs matched', onAction: ()=> handleDryRun(currentTemplate, true), ...whenAllowed(canCall(dryRunAction)) }]: []}
                 title={"Add advanced filters"}
             >
                 <Modal.Section>
@@ -224,8 +241,8 @@ function AdvancedTrafficFilters() {
             }
             isFirstPage={true}
             divider={true}
-            primaryAction={window.USER_NAME && window.USER_NAME.endsWith("@akto.io") ? <Button onClick={() => setTopLevelActive(true)}>Clean up</Button> : null}
-            secondaryActions={window.USER_NAME && window.USER_NAME.endsWith("@akto.io") ? <Button onClick={() => setDeleteSlash(true)}>Delete Options & Slash APIs</Button> : null}
+            primaryAction={window.USER_NAME && window.USER_NAME.endsWith("@akto.io") ? <AllowedAction allowed={canCall('api/cleanNonHostApiInfos')}><Button onClick={() => setTopLevelActive(true)}>Clean up</Button></AllowedAction> : null}
+            secondaryActions={window.USER_NAME && window.USER_NAME.endsWith("@akto.io") ? <AllowedAction allowed={canCall('api/deleteOptionAndSlashApis')}><Button onClick={() => setDeleteSlash(true)}>Delete Options & Slash APIs</Button></AllowedAction> : null}
         />
     )
 }

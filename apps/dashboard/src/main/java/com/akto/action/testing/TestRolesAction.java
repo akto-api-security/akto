@@ -36,6 +36,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.test_editor.execution.Executor;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -46,6 +47,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -111,9 +113,15 @@ public class TestRolesAction extends UserAction {
 
         RBAC.Role currentUserRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
         String userRole = (currentUserRole != null) ? currentUserRole.getName().toUpperCase(): RBAC.Role.MEMBER.toString();
+        // a custom role sees test roles scoped to it as well as those scoped to its base role
+        List<String> userScopeNames = new ArrayList<>(Arrays.asList(userRole));
+        String ownScopeName = scopeName(getSUser());
+        if (ownScopeName != null && !userScopeNames.contains(ownScopeName)) {
+            userScopeNames.add(ownScopeName);
+        }
         Bson testRoleQ = Filters.or(
             Filters.exists(TestRoles.SCOPE_ROLES, false), // case when scope_roles field does not exist
-            Filters.in(TestRoles.SCOPE_ROLES, userRole)   // case when user's role is in the scope_roles array
+            Filters.in(TestRoles.SCOPE_ROLES, userScopeNames)   // case when user's role is in the scope_roles array
         );        
 
         FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.accountId.get(),
@@ -122,6 +130,13 @@ public class TestRolesAction extends UserAction {
             testRoles = TestRolesDao.instance.findAll(Filters.empty());
         } else {
             testRoles = TestRolesDao.instance.findAll(testRoleQ);
+        }
+
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            editableTestRoleNames = new ArrayList<>();
+            for (TestRoles role : testRoles) {
+                if (isScopedTo(role, ownScopeName)) editableTestRoleNames.add(role.getName());
+            }
         }
 
         List<EndpointLogicalGroup> endpointLogicalGroups = EndpointLogicalGroupDao.instance.findAll(Filters.empty());
@@ -262,6 +277,40 @@ public class TestRolesAction extends UserAction {
         }
     }
 
+    /*
+     * Test roles are shared by the whole account. Users limited to specific collections (Argus) may change only the
+     * ones shared with their role through Scope Roles; everyone else is not limited here.
+     */
+    public static final String NOT_SHARED_WITH_ROLE = "You can change only test roles whose Scope Roles include your role. Ask an admin to add it.";
+
+    // test roles a limited user may change; null when the user isn't limited
+    @Getter
+    private List<String> editableTestRoleNames;
+
+    // the user's role as Scope Roles names it: a custom role's name, or a built-in role's label (e.g. SECURITY ENGINEER)
+    private static String scopeName(User user) {
+        if (user == null) return null;
+        RBAC rbac = RBACDao.getCurrentRBACForUser(user.getId(), Context.accountId.get());
+        String role = rbac == null ? null : RBACDao.instance.fetchRole(rbac);
+        if (role == null || role.trim().isEmpty()) return null;
+        RBAC.Role builtIn = RBAC.Role.fromName(role);
+        return builtIn != null ? builtIn.getName().toUpperCase() : role.trim().toUpperCase();
+    }
+
+    private static boolean isScopedTo(TestRoles role, String scopeName) {
+        return scopeName != null && role.getScopeRoles() != null
+                && role.getScopeRoles().stream().anyMatch(scopeName::equalsIgnoreCase);
+    }
+
+    private boolean canChange(TestRoles role) {
+        User user = getSUser();
+        if (!ArgusCollectionScope.isLimited(user) || isScopedTo(role, scopeName(user))) {
+            return true;
+        }
+        addActionError(NOT_SHARED_WITH_ROLE);
+        return false;
+    }
+
     private TestRoles getRole() {
         if (roleName == null) {
             addActionError("Test role id is empty");
@@ -303,6 +352,9 @@ public class TestRolesAction extends UserAction {
             addActionError("The role cannot be removed.");
             return ERROR.toUpperCase();
         }
+        if (!canChange(role)) {
+            return ERROR.toUpperCase();
+        }
 
         User user = getSUser();
         if(user == null) {
@@ -336,6 +388,9 @@ public class TestRolesAction extends UserAction {
         TestRoles role = getRole();
         if (role == null) {
             addActionError("Role doesn't exists");
+            return ERROR.toUpperCase();
+        }
+        if (!canChange(role)) {
             return ERROR.toUpperCase();
         }
 
@@ -391,6 +446,9 @@ public class TestRolesAction extends UserAction {
                 addActionError("Test role does not exist");
                 return ERROR.toUpperCase();
             }
+            if (!canChange(role)) {
+                return ERROR.toUpperCase();
+            }
             Bson roleFilter = Filters.eq(Constants.ID, role.getId());
             TestRolesDao.instance.updateOne(roleFilter,  Updates.set(TestRoles.SCOPE_ROLES, scopeRoles));
             Executor.clearRoleCache();
@@ -429,6 +487,13 @@ public class TestRolesAction extends UserAction {
                 createLogicalGroup(logicalGroupName, andConditions,orConditions,this.getSUser().getLogin());
         selectedRole = TestRolesDao.instance.createTestRole(roleName, logicalGroup.getId(), this.getSUser().getLogin());
         selectedRole.setEndpointLogicalGroup(logicalGroup);
+        // a limited user's new test role is shared only with their own role, so it reaches no other team unasked
+        String ownScopeName = scopeName(getSUser());
+        if (ArgusCollectionScope.isLimited(getSUser()) && ownScopeName != null) {
+            List<String> scope = new ArrayList<>(java.util.Collections.singletonList(ownScopeName));
+            TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, selectedRole.getId()), Updates.set(TestRoles.SCOPE_ROLES, scope));
+            selectedRole.setScopeRoles(scope);
+        }
         Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
@@ -448,7 +513,7 @@ public class TestRolesAction extends UserAction {
     @Audit(description = "User deleted an auth mechanism from a test role", resource = Resource.TEST_ROLE, operation = Operation.DELETE, metadataGenerators = {"getRoleName"})
     public String deleteAuthFromRole() {
         TestRoles role = getRole();
-        if (role == null) {
+        if (role == null || !canChange(role)) {
             return ERROR.toUpperCase();
         }
 
@@ -464,7 +529,7 @@ public class TestRolesAction extends UserAction {
 
     public String updateAuthInRole(){
         TestRoles role = getRole();
-        if (role == null) {
+        if (role == null || !canChange(role)) {
             return ERROR.toUpperCase();
         }
         if (!validateUrlRegex()) {
@@ -482,7 +547,7 @@ public class TestRolesAction extends UserAction {
 
     public String addAuthToRole() {
         TestRoles role = getRole();
-        if (role == null) {
+        if (role == null || !canChange(role)) {
             return ERROR.toUpperCase();
         }
         if (!validateUrlRegex()) {

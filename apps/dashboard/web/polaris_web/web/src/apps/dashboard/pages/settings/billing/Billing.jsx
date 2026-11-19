@@ -4,9 +4,6 @@ import {
   CustomerPortalProvider,
   CustomerUsageData,
   PaymentDetailsSection,
-  SubscriptionsOverview,
-  AddonsList,
-  Promotions,
   InvoicesSection
 } from '@stigg/react-sdk'
 
@@ -14,12 +11,15 @@ import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import billingApi from './api'
 import func from "@/util/func"
+import { usePermissions } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 import "./billing.css"
 
 function Billing() {
 
     const { stigg, refreshData } = useStiggContext();
+    const { canCall } = usePermissions()
 
     const searchParams = new URLSearchParams(document.location.search)
 
@@ -76,9 +76,11 @@ function Billing() {
                 <Box>
                     <Text variant="headingMd">Your plan</Text>
                 </Box>
-                <Button onClick={() => refreshUsageData()}>
-                    Sync usage data
-                </Button>
+                <AllowedAction allowed={canCall('api/refreshUsageDataForOrg')}>
+                    <Button onClick={() => refreshUsageData()}>
+                        Sync usage data
+                    </Button>
+                </AllowedAction>
             </HorizontalStack>
         </Box>
     )
@@ -87,9 +89,6 @@ function Billing() {
             <Box>
                 <CustomerPortalProvider>
                     <CustomerUsageData />
-                    <SubscriptionsOverview />
-                    <AddonsList/>
-                    <Promotions/>
                     <InvoicesSection/>
                 </CustomerPortalProvider>
             </Box>
@@ -160,7 +159,7 @@ function Billing() {
             </LegacyCard.Section>
         </LegacyCard>
 
-        {window.IS_SAAS === 'true'  && <LegacyCard title={planTitle}>
+        {window.IS_SAAS === 'false'  && <LegacyCard title={planTitle}>
             <Divider />
             <LegacyCard.Section  >
                 {planInfo}

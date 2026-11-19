@@ -25,6 +25,8 @@ import useThreatReportDownload from "../../../hooks/useThreatReportDownload";
 import { updateThreatFiltersStore } from "../../threat_detection/utils/threatFilters";
 import { redactSampleDataByKeywords } from "../../threat_detection/utils/redactSampleData";
 import { LABELS } from "../../threat_detection/constants";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 const getSortOptions = (category) => [
     { label: mapLabel('Number of endpoints', category), value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 3 },
@@ -51,6 +53,7 @@ const initialEventState = {
 };
 
 function ThreatCompliancePage() {
+    const { canCall } = usePermissions()
     const [loading, setLoading] = useState(true);
     const [moreActions, setMoreActions] = useState(false);
     const [complianceView, setComplianceView] = useState('SOC 2');
@@ -137,7 +140,7 @@ function ThreatCompliancePage() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges.find((r) => r.alias === 'last7days') || values.ranges[2]
+        func.getDefaultDateRange(values.ranges.find((r) => r.alias === 'last7days') || values.ranges[2])
     );
 
     const getTimeEpoch = (key) => {
@@ -279,7 +282,8 @@ function ThreatCompliancePage() {
                     sessionId: threatData.sessionId || '',
                     ruleViolated: threatData.ruleViolated || '-',
                     complianceMap: threatData.complianceMapData || {},
-                    metadata: threatData.metadata || ''
+                    metadata: threatData.metadata || '',
+                    remediation: threatData.remediation || ''
                 },
                 currentEventId: threatData.eventId || '',
                 currentEventStatus: threatData.status || '',
@@ -801,6 +805,7 @@ function ThreatCompliancePage() {
 
             return {
                 content: `${label} ${eventText}`,
+                requires: actionType === 'delete' ? 'api/deleteMaliciousEvents' : 'api/updateMaliciousEventStatus',
                 onAction: () => {
                     const message = actionType === 'delete'
                         ? `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`
@@ -948,9 +953,11 @@ function ThreatCompliancePage() {
             }
             secondaryActions={
                 <HorizontalStack gap={2}>
-                    <Button primary onClick={downloadThreatReport}>
-                        Export Threat Report
-                    </Button>
+                    <AllowedAction allowed={canCall('api/generateThreatReport')}>
+                        <Button primary onClick={downloadThreatReport}>
+                            Export Threat Report
+                        </Button>
+                    </AllowedAction>
                     <DateRangeFilter
                         initialDispatch={currDateRange}
                         dispatch={(dateObj) => dispatchCurrDateRange({

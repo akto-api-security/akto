@@ -1,0 +1,224 @@
+package com.akto.dao;
+
+import com.akto.dto.notifications.SensitiveDataAlertRule;
+import com.akto.dto.traffic.SensitiveDataCount;
+import com.mongodb.ErrorCategory;
+import com.mongodb.MongoWriteException;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.BulkWriteOptions;
+import com.mongodb.client.model.CreateCollectionOptions;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount> {
+
+    public static final String COLLECTION_NAME = "sensitive_data_counts";
+    public static final SensitiveDataCountDao instance = new SensitiveDataCountDao();
+
+    /**
+     * Margin over the longest allowed window. Covers a late flush for an old hour and the fact
+     * that Mongo's TTL monitor sweeps periodically rather than deleting exactly on expiry.
+     */
+    public static final int RETENTION_SAFETY_DAYS = 10;
+
+    /** Buckets are kept for the longest window a rule may use, plus margin. */
+    public static final int RETENTION_DAYS = SensitiveDataAlertRule.MAX_WINDOW_DAYS + RETENTION_SAFETY_DAYS;
+
+    /** Keys of requests already applied, so a retried request is not counted twice. */
+    public static final String APPLIED_REQUESTS_COLLECTION = "sensitive_data_count_requests";
+    public static final int APPLIED_REQUESTS_TTL_HOURS = 24;
+
+    /** Unique on both ends of a call, so two callers to one callee keep separate buckets. */
+    public static final String UNIQUE_INDEX = "subType_hour_apiCollectionId_senderCollectionId";
+
+    private SensitiveDataCountDao() {}
+
+    @Override
+    public String getCollName() {
+        return COLLECTION_NAME;
+    }
+
+    @Override
+    public Class<SensitiveDataCount> getClassT() {
+        return SensitiveDataCount.class;
+    }
+
+    /**
+     * The unique index is what the upsert matches on, and also serves the alert query: one type,
+     * hour >= start, grouped by collection. The fields are flat rather than a compound _id
+     * because an _id index cannot serve a range on one of its sub-fields.
+     */
+    public void createIndicesIfAbsent() {
+        createCollectionIfAbsent(getDBName(), getCollName(), new CreateCollectionOptions());
+
+        Bson key = Indexes.ascending(SensitiveDataCount.SUB_TYPE, SensitiveDataCount.HOUR,
+                SensitiveDataCount.API_COLLECTION_ID, SensitiveDataCount.SENDER_COLLECTION_ID);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), key,
+                new IndexOptions().name(UNIQUE_INDEX).unique(true));
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                Indexes.ascending(SensitiveDataCount.EXPIRE_AT),
+                new IndexOptions().name("expireAt_ttl").expireAfter(0L, TimeUnit.SECONDS));
+
+        createCollectionIfAbsent(getDBName(), APPLIED_REQUESTS_COLLECTION, new CreateCollectionOptions());
+        MCollection.createIndexIfAbsent(getDBName(), APPLIED_REQUESTS_COLLECTION, Indexes.ascending("createdAt"),
+                new IndexOptions().name("createdAt_ttl").expireAfter((long) APPLIED_REQUESTS_TTL_HOURS, TimeUnit.HOURS));
+    }
+
+    private MongoCollection<Document> appliedRequests() {
+        return clients[0].getDatabase(getDBName()).getCollection(APPLIED_REQUESTS_COLLECTION);
+    }
+
+    /**
+     * Applies the increments once per idempotency key: a retry of a request that already went through
+     * (say, one whose response timed out) is skipped. The key is recorded before applying and removed
+     * again if applying fails, so a failed request can still be retried.
+     */
+    public void bulkInc(String idempotencyKey, List<SensitiveDataCount> increments) {
+        if (idempotencyKey == null || idempotencyKey.isEmpty()) {
+            bulkInc(increments);
+            return;
+        }
+        try {
+            appliedRequests().insertOne(new Document("_id", idempotencyKey).append("createdAt", new Date()));
+        } catch (MongoWriteException e) {
+            if (e.getError().getCategory() == ErrorCategory.DUPLICATE_KEY) return;
+            throw e;
+        }
+        try {
+            bulkInc(increments);
+        } catch (RuntimeException e) {
+            appliedRequests().deleteOne(Filters.eq("_id", idempotencyKey));
+            throw e;
+        }
+    }
+
+    /**
+     * Events of one type per collection from {@code fromHour} on, keeping only the collections whose
+     * total is above {@code moreThan}.
+     */
+    public Map<Integer, Long> countsByCollectionAbove(String subType, int fromHour, long moreThan) {
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(Filters.and(
+                        Filters.eq(SensitiveDataCount.SUB_TYPE, subType),
+                        Filters.gte(SensitiveDataCount.HOUR, fromHour))),
+                Aggregates.group("$" + SensitiveDataCount.API_COLLECTION_ID,
+                        Accumulators.sum("total", "$" + SensitiveDataCount.COUNT)),
+                Aggregates.match(Filters.gt("total", moreThan)));
+
+        Map<Integer, Long> totals = new HashMap<>();
+        for (Document doc : getMCollection().aggregate(pipeline, Document.class)) {
+            Object id = doc.get("_id");
+            Object total = doc.get("total");
+            if (id instanceof Number && total instanceof Number) {
+                totals.put(((Number) id).intValue(), ((Number) total).longValue());
+            }
+        }
+        return totals;
+    }
+
+    /** One caller-to-callee pair's total for a type over a window. */
+    public static class Edge {
+        public final int senderCollectionId;
+        public final int apiCollectionId;
+        public final long count;
+
+        public Edge(int senderCollectionId, int apiCollectionId, long count) {
+            this.senderCollectionId = senderCollectionId;
+            this.apiCollectionId = apiCollectionId;
+            this.count = count;
+        }
+    }
+
+    /**
+     * Totals per (caller, callee) pair for one type from {@code fromHour} on.
+     *
+     * Both the per-sender and per-receiver views are summed from these in the alert, so the two
+     * always agree on the same underlying rows and every alert can name both ends of a call.
+     *
+     * Buckets with no identifiable caller are excluded. Those are inbound captures and traffic from
+     * unlabelled pods, plus everything written before the caller was recorded at all - a missing
+     * field, which is why this cannot be a plain {@code ne(..., 0)}: Mongo does not treat an absent
+     * field as equal to 0, so such a filter would let every pre-change bucket through and group it
+     * under a null sender.
+     */
+    public List<Edge> edgeCountsSince(String subType, int fromHour) {
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(Filters.and(
+                        Filters.eq(SensitiveDataCount.SUB_TYPE, subType),
+                        Filters.gte(SensitiveDataCount.HOUR, fromHour),
+                        Filters.nin(SensitiveDataCount.SENDER_COLLECTION_ID,
+                                Arrays.asList(SensitiveDataCount.UNKNOWN_COLLECTION_ID, null)))),
+                Aggregates.group(
+                        new Document(SensitiveDataCount.SENDER_COLLECTION_ID,
+                                "$" + SensitiveDataCount.SENDER_COLLECTION_ID)
+                                .append(SensitiveDataCount.API_COLLECTION_ID,
+                                        "$" + SensitiveDataCount.API_COLLECTION_ID),
+                        Accumulators.sum("total", "$" + SensitiveDataCount.COUNT)));
+
+        List<Edge> edges = new ArrayList<>();
+        for (Document doc : getMCollection().aggregate(pipeline, Document.class)) {
+            Object id = doc.get("_id");
+            Object total = doc.get("total");
+            if (!(id instanceof Document) || !(total instanceof Number)) continue;
+            Document key = (Document) id;
+            Object sender = key.get(SensitiveDataCount.SENDER_COLLECTION_ID);
+            Object receiver = key.get(SensitiveDataCount.API_COLLECTION_ID);
+            if (!(sender instanceof Number) || !(receiver instanceof Number)) continue;
+            edges.add(new Edge(((Number) sender).intValue(), ((Number) receiver).intValue(),
+                    ((Number) total).longValue()));
+        }
+        return edges;
+    }
+
+    /** Adds each increment to its hourly bucket, creating the bucket if it does not exist yet. */
+    public void bulkInc(List<SensitiveDataCount> increments) {
+        if (increments == null || increments.isEmpty()) return;
+
+        List<WriteModel<SensitiveDataCount>> writes = new ArrayList<>(increments.size());
+        for (SensitiveDataCount inc : increments) {
+            if (inc == null || inc.getSubType() == null || inc.getCount() <= 0) continue;
+
+            // Equality on every field of the unique index, which is what lets Mongo retry this
+            // upsert when two writers race to create the same bucket. Matching "0 or absent" with
+            // an $or would read the same but forfeit that retry, so buckets written before the
+            // caller existed are left alone rather than merged into - the reader excludes them.
+            Bson filter = Filters.and(
+                    Filters.eq(SensitiveDataCount.API_COLLECTION_ID, inc.getApiCollectionId()),
+                    Filters.eq(SensitiveDataCount.SENDER_COLLECTION_ID, inc.getSenderCollectionId()),
+                    Filters.eq(SensitiveDataCount.SUB_TYPE, inc.getSubType()),
+                    Filters.eq(SensitiveDataCount.HOUR, inc.getHour()));
+
+            // Expiry follows the bucket's own hour rather than when it was written, so a late
+            // flush for an old hour does not keep that hour around longer than the rest.
+            Date expireAt = new Date((inc.getHour() + TimeUnit.DAYS.toSeconds(RETENTION_DAYS)) * 1000L);
+
+            Bson update = Updates.combine(
+                    Updates.inc(SensitiveDataCount.COUNT, inc.getCount()),
+                    Updates.setOnInsert(SensitiveDataCount.SENDER_COLLECTION_ID, inc.getSenderCollectionId()),
+                    Updates.setOnInsert(SensitiveDataCount.EXPIRE_AT, expireAt));
+
+            writes.add(new UpdateOneModel<>(filter, update, new UpdateOptions().upsert(true)));
+        }
+        if (writes.isEmpty()) return;
+
+        getMCollection().bulkWrite(writes, new BulkWriteOptions().ordered(false));
+    }
+}

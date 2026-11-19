@@ -4,6 +4,7 @@ import { learnMoreObject } from "../../../main/onboardingData"
 import { getDashboardCategory } from "../../../main/labelHelper"
 import LearnPopoverComponent from "./LearnPopoverComponent";
 import func from  "@/util/func"
+import { withPermissions } from "@/util/permissions";
 import { useEffect, useRef } from "react";
 
 const PageWithMultipleCards = (props) => {
@@ -147,7 +148,7 @@ const PageWithMultipleCards = (props) => {
             titleMetadata={titleMetadata}
             subtitle={subtitle}
             backAction={getBackAction()}
-            primaryAction={primaryAction}
+            primaryAction={primaryAction ? withPermissions(primaryAction) : primaryAction}
             secondaryActions={useSecondaryActions}
             divider={divider}
         >

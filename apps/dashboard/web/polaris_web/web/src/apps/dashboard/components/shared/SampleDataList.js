@@ -10,7 +10,7 @@ import SampleDataComponent from './SampleDataComponent';
 import SampleData from './SampleData';
 import ValidationReasonBanner from './ValidationReasonBanner';
 import func from '../../../../util/func';
-import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper';
+import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from '../../../main/labelHelper';
 import transform from './customDiffEditor';
 import { filterLocatableSegments } from './vulnerabilityEvidence';
 
@@ -67,10 +67,35 @@ function SchemaValidationError({ sampleData}) {
     )
 }
 
-function VulnerabilityEvidence({ segments }) {
-    if (!Array.isArray(segments) || segments.length === 0) {
+// Detector-supplied explanation of why the event was flagged (metadata.reason, e.g. WeakAuthentication).
+// API Security only: guardrail events also carry metadata.reason and are shown in their own views.
+function DetectionReason({ sampleData }) {
+    if (!sampleData?.metadata || !isApiSecurityCategory()) {
         return null;
     }
+    let reason = '';
+    try {
+        reason = JSON.parse(sampleData.metadata)?.reason || '';
+    } catch (e) {
+        return null;
+    }
+    if (!reason) {
+        return null;
+    }
+
+    return (
+        <Banner title="Detection Reason" status="critical">
+            <Text variant="bodyMd">{reason}</Text>
+        </Banner>
+    )
+}
+
+function VulnerabilityEvidence({ segments: locatedSegments, evidenceLine }) {
+    if (!Array.isArray(locatedSegments) || locatedSegments.length === 0) {
+        return null;
+    }
+    const evidenceLocation = locatedSegments.some((s) => String(s?.location || 'RESPONSE').toUpperCase() !== 'REQUEST') ? 'RESPONSE' : 'REQUEST';
+    const segments = evidenceLine ? [{ location: evidenceLocation, phrase: evidenceLine }] : locatedSegments;
 
     const hasLowConfidence = SHOW_LOW_CONFIDENCE_HINT
         && segments.some((seg) => String(seg?.confidence || '').toLowerCase() === 'low');
@@ -128,18 +153,33 @@ function VulnerabilityEvidence({ segments }) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false, evidenceLine, onPageChange, isAPISampleData = false} = props;
+
+    const visibleSamples = useMemo(
+      () => {
+        const list = sampleData || []
+        if (!isAPISampleData) return list
+        return list.filter((sample) => !func.isUndecodedBrotliSample(sample))
+      },
+      [sampleData, isAPISampleData]
+    )
 
     const [page, setPage] = useState(0);
 
     useEffect(() => {
       setPage(0);
     }, [sampleData])
+
+    // Lets the parent show details of the sample on screen (e.g. one attempt of a grouped activity).
+    useEffect(() => {
+      onPageChange?.(page);
+    }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
   
-    const currentSample = sampleData[Math.min(page, sampleData.length - 1)];
+    const currentSample = visibleSamples[Math.min(page, visibleSamples.length - 1)];
     const parsedSample = func.parseWebSocketSampleMessage(currentSample?.message)
     const isWebSocket = isWebSocketProp === true || func.isWebSocketApiType(parsedSample?.type)
-    const panelTypes = isWebSocket ? ['events'] : ['request', 'response'];
+    // WebSocket too: frames sent to the server under request, the server's frames under response
+    const panelTypes = ['request', 'response'];
 
     // Verification contract (keystone): only ever show evidence that can actually
     // be located in the SAME text the editor renders. We validate REQUEST segments
@@ -171,11 +211,16 @@ function SampleDataList(props) {
         return { ...currentSample, vulnerabilitySegments: validated };
     }, [currentSample, isNewDiff, redactHeaders, metadata, isWebSocket]);
 
+    if ((sampleData || []).length > 0 && visibleSamples.length === 0) {
+        return null
+    }
+
     return (
       <VerticalStack gap="3">
+         {showDetectionReason ? <DetectionReason sampleData={currentSample} /> : null}
          <SchemaValidationError sampleData={currentSample} />
          {SHOW_VULNERABILITY_EVIDENCE ? (
-           <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} />
+           <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} evidenceLine={evidenceLine} />
          ) : null}
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">
@@ -186,20 +231,20 @@ function SampleDataList(props) {
           </HorizontalStack>
         <Pagination
                 label={
-                  sampleData?.length==0 ? 'No ' + mapLabel("Test runs", getDashboardCategory()) + " found" :
-                  `${page+1} of ${sampleData?.length}`
+                  visibleSamples.length==0 ? 'No ' + mapLabel("Test runs", getDashboardCategory()) + " found" :
+                  `${page+1} of ${visibleSamples.length}`
                 }
                 hasPrevious = {page > 0}
                 previousKeys={[Key.LeftArrow]}
                 onPrevious={() => {setPage((old) => (old-1))}}
-                hasNext = {sampleData?.length > (page+1)}
+                hasNext = {visibleSamples.length > (page+1)}
                 nextKeys={[Key.RightArrow]}
                 onNext={() => {setPage((old) => (old+1))}}
               />
         </HorizontalStack>
         <HorizontalGrid columns={vertical ? "1" : "2"} gap="2">
           {
-            sampleData[Math.min(page, sampleData.length - 1)]?.errorList != undefined ?
+            visibleSamples[Math.min(page, visibleSamples.length - 1)]?.errorList != undefined ?
               <Box key={"errorList"}>
                 <LegacyCard>
                   <Box id='error-editor-container'>
@@ -211,7 +256,7 @@ function SampleDataList(props) {
                       </Box>
                     </LegacyCard.Section>
                     <LegacyCard.Section flush>
-                      <SampleData data={{ original: sampleData[Math.min(page, sampleData.length - 1)]?.errorList }}
+                      <SampleData data={{ original: visibleSamples[Math.min(page, visibleSamples.length - 1)]?.errorList }}
                         language="yaml" minHeight={minHeight} wordWrap={false} />
                     </LegacyCard.Section>
                   </Box>
@@ -232,6 +277,7 @@ function SampleDataList(props) {
                       readOnly={true}
                       redactHeaders={redactHeaders}
                       isWebSocket={isWebSocket}
+                      onAddAsSearchFilter={onAddAsSearchFilter}
                     />
                   </LegacyCard>
                 </Box>

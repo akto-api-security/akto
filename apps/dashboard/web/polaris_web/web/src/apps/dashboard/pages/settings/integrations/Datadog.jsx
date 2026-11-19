@@ -4,8 +4,10 @@ import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import settingRequests from '../api';
 import func from '@/util/func'
+import { usePermissions, whenAllowed } from '@/util/permissions'
 
 function Datadog() {
+    const { canCall } = usePermissions()
     const [apiKey, setApiKey] = useState('');
     const [datadogSite, setDatadogSite] = useState('');
     const [enabled, setEnabled] = useState(false);
@@ -48,10 +50,10 @@ function Datadog() {
 
     const DatadogCard = (
         <LegacyCard
-            primaryFooterAction={{ content: 'Save', onAction: addDatadogIntegration }}
+            primaryFooterAction={{ content: 'Save', onAction: addDatadogIntegration, ...whenAllowed(canCall('api/addDatadogIntegration')) }}
             secondaryFooterActions={[
-                { content: 'Test Connection', onAction: testDatadogIntegration },
-                { content: 'Delete', destructive: true, onAction: deleteDatadogIntegration }
+                { content: 'Test Connection', onAction: testDatadogIntegration, ...whenAllowed(canCall('api/testDatadogIntegration')) },
+                { content: 'Delete', destructive: true, onAction: deleteDatadogIntegration, ...whenAllowed(canCall('api/deleteDatadogIntegration')) }
             ]}
         >
             <LegacyCard.Section>
@@ -85,7 +87,7 @@ function Datadog() {
     const cardContent = "Forward all HTTP requests and responses captured by Akto to Datadog as log entries for observability and tracing."
 
     return (
-        <IntegrationsLayout title="Datadog" cardContent={cardContent} component={DatadogCard} docsUrl="" />
+        <IntegrationsLayout title="Datadog" cardContent={cardContent} component={DatadogCard} docsUrl="" readOnly={!canCall('api/addDatadogIntegration')} />
     )
 }
 

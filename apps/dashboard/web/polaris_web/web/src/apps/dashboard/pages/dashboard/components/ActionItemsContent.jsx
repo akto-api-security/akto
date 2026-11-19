@@ -10,7 +10,6 @@ import issuesApi from '../../issues/api';
 import { createActionItem as createActionItemUtil } from '../../../../../util/createActionItem';
 import settingsModule from '../../settings/module';
 import ActionItemDetails from './ActionItemDetails';
-import { fetchAllActionItemsApiInfo } from './actionItemsTransform'; 
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const actionItemsHeaders = [
@@ -57,26 +56,6 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
     const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
     const [showFlyout, setShowFlyout] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
-    const [allApiInfo, setAllApiInfo] = useState(null);
-    const [apiInfoLoading, setApiInfoLoading] = useState(false);
-
-    useEffect(() => {
-        const fetchApiInfo = async () => {
-            setApiInfoLoading(true);
-            try {
-                const apiData = await fetchAllActionItemsApiInfo();
-                setAllApiInfo(apiData);
-            } catch (error) {
-                console.error('Error fetching API info:', error);
-                setAllApiInfo(null);
-            } finally {
-                setApiInfoLoading(false);
-            }
-        };
-
-        fetchApiInfo();
-    }, []); 
-
     const handleJiraIntegration = async (actionItem) => {
         const integrated = window.JIRA_INTEGRATED === 'true'
         if (!integrated) {
@@ -182,15 +161,15 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
 
             createActionItem('9', 'P2', 'Address misconfigured tests', `${misConfiguredTestsCount} misconfigured tests detected during scans`, "QA Team", "Medium", misConfiguredTestsCount, ACTION_ITEM_TYPES.ADDRESS_MISCONFIGURED_TESTS, jiraTicketUrlMap, handleJiraIntegration, "Improves test coverage and reduces missed vulnerabilities"),
 
-            createActionItem('10', 'P1', 'Remediate broken authentication issues', `${brokenAuthIssuesCount} authentication-related issues found across tested APIs`, "Development", "High", brokenAuthIssuesCount, ACTION_ITEM_TYPES.BROKEN_AUTHENTICATION_ISSUES, jiraTicketUrlMap, handleJiraIntegration, "Prevents unauthorized access and ensures proper session handling")
+            createActionItem('10', 'P1', 'Remediate broken authentication issues', `${brokenAuthIssuesCount} authentication-related issues found across tested ${mapLabel('APIs', getDashboardCategory())}`, "Development", "High", brokenAuthIssuesCount, ACTION_ITEM_TYPES.BROKEN_AUTHENTICATION_ISSUES, jiraTicketUrlMap, handleJiraIntegration, "Prevents unauthorized access and ensures proper session handling")
             ,
-            createActionItem('11', 'P2', 'Remediate frequently vulnerable endpoints', `${highValueIssuesCount} endpoint surfaced repeatedly in ${mapLabel('test results', getDashboardCategory())} - track and prioritize for remediation`, "Security Team", "Low", highValueIssuesCount, ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS, jiraTicketUrlMap, handleJiraIntegration, "Focuses remediation on APIs with recurring issues"),
+            createActionItem('11', 'P2', 'Remediate frequently vulnerable endpoints', `${highValueIssuesCount} endpoint surfaced repeatedly in ${mapLabel('test results', getDashboardCategory())} - track and prioritize for remediation`, "Security Team", "Low", highValueIssuesCount, ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS, jiraTicketUrlMap, handleJiraIntegration, "Focuses remediation on " + mapLabel('APIs', getDashboardCategory()) + " with recurring issues"),
 
             createActionItem('12', 'P2', 'Build remediation playbooks for common issues', `${urlsByIssuesTotalCount} common vulnerability types detected that can benefit from standardized remediation steps`, "Security & DevOps", "Low", urlsByIssuesTotalCount, ACTION_ITEM_TYPES.BUILD_REMEDIATION_PLAYBOOKS, jiraTicketUrlMap, handleJiraIntegration, "Reduces response time and improves fix consistency across teams"),
 
-            createActionItem('13', 'P1', 'Investigate verbose error messages or stack traces', `${vemVulnerableApisCount} APIs leaking debug information in responses.`, "Development", "Medium", vemVulnerableApisCount, ACTION_ITEM_TYPES.VERBOSE_ERROR_MESSAGES, jiraTicketUrlMap, handleJiraIntegration, "Can disclose sensitive implementation details to attackers"),
+            createActionItem('13', 'P1', 'Investigate verbose error messages or stack traces', `${vemVulnerableApisCount} ${mapLabel('APIs', getDashboardCategory())} leaking debug information in responses.`, "Development", "Medium", vemVulnerableApisCount, ACTION_ITEM_TYPES.VERBOSE_ERROR_MESSAGES, jiraTicketUrlMap, handleJiraIntegration, "Can disclose sensitive implementation details to attackers"),
 
-            createActionItem('14', 'P2', 'Verify security headers on API responses', `${mhhVulnerableApisCount} Ensure headers like HSTS, X-Frame-Options, etc. are present.`, "DevOps / Security", "Low", mhhVulnerableApisCount, ACTION_ITEM_TYPES.MISSING_SECURITY_HEADERS, jiraTicketUrlMap, handleJiraIntegration, "Hardens APIs against clickjacking and other browser-based attacks")
+            createActionItem('14', 'P2', 'Verify security headers on ' + mapLabel('API', getDashboardCategory()) + ' responses', `${mhhVulnerableApisCount} Ensure headers like HSTS, X-Frame-Options, etc. are present.`, "DevOps / Security", "Low", mhhVulnerableApisCount, ACTION_ITEM_TYPES.MISSING_SECURITY_HEADERS, jiraTicketUrlMap, handleJiraIntegration, "Hardens " + mapLabel('APIs', getDashboardCategory()) + " against clickjacking and other browser-based attacks")
         ];
 
         const filteredItems = items.filter(item => item.count > 0);
@@ -206,7 +185,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                 priority: 'P0',
                 staticTitle: 'Sensitive data without proper controls',
                 title: 'Sensitive data without proper controls',
-                description: `${sensitiveAndUnauthenticatedCount} APIs returning sensitive data without encryption or proper authorization`,
+                description: `${sensitiveAndUnauthenticatedCount} ${mapLabel('APIs', getDashboardCategory())} returning sensitive data without encryption or proper authorization`,
                 team: 'Security & Development',
                 effort: 'High',
                 count: sensitiveAndUnauthenticatedCount,
@@ -221,7 +200,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                 priority: 'P0',
                 staticTitle: 'Patch critical vulnerabilities immediately',
                 title: 'Patch critical vulnerabilities immediately',
-                description: `${vulnerableApiCount} API flagged with critical severity issues that need immediate attention`,
+                description: `${vulnerableApiCount} ${mapLabel('API', getDashboardCategory())} flagged with critical severity issues that need immediate attention`,
                 team: 'Security & Development',
                 effort: 'High',
                 count: vulnerableApiCount,
@@ -258,7 +237,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
         setModalActive(false);
         const { title, displayName, description, actionItemType } = selectedActionItem;
         // Use labels parameter if provided, otherwise fall back to state
-        const labelsToUse = labels !== undefined ? labels : labelsText;
+        const labelsToUse = labels !== undefined ? labels : "";
 
         issuesApi.createGeneralJiraTicket({
             title: title || displayName || 'Action Item',
@@ -314,8 +293,6 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                         item={selectedItem}
                         jiraTicketUrlMap={jiraTicketUrlMap}
                         onJiraButtonClick={handleJiraIntegration}
-                        allApiInfo={allApiInfo} 
-                        apiInfoLoading={apiInfoLoading} 
                     />
                 ]}
             />

@@ -1,6 +1,6 @@
 # Agent Guard
 
-LLM guardrail scanning: cascade models (Vertex or Azure AI Foundry) + local scanners + Presidio anonymization.
+LLM guardrail scanning: cascade models (Vertex, Azure AI Foundry or AWS Bedrock) + local scanners + Presidio anonymization.
 
 | Doc | Contents |
 |-----|----------|
@@ -39,15 +39,21 @@ curl -s -X POST localhost:8090/scan/batch \
   -H 'content-type: application/json' \
   -d '[{"scanner_name":"Secrets","text":"AKIAIOSFODNN7EXAMPLE"}]'
 
+# OCR an image (providers from OCR_MODEL_CONFIG_JSON, see ENV.md)
+{ printf '{"image_b64":"'; base64 -w0 screenshot.png; printf '"}'; } |
+  curl -s -X POST localhost:8090/ocr -H 'content-type: application/json' -d @-
+
 # Anonymize (via worker)
 curl -s -X POST localhost:8090/scan \
   -H 'content-type: application/json' \
   -d '{"scanner_name":"Anonymize","text":"email john@example.com"}'
 ```
 
-**Scanners:** `BanSubstrings`, `Secrets`, `TokenLimit` (local); `PromptInjection`, `BanTopics`, `Toxicity`, `Gibberish`, `BanCode` (cascade, needs Vertex or Azure Foundry creds); `Anonymize` (proxies to anonymizer).
+**Scanners:** `BanSubstrings`, `Secrets`, `TokenLimit` (local); `PromptInjection`, `BanTopics`, `Toxicity`, `Gibberish`, `BanCode` (cascade, needs Vertex, Azure Foundry or Bedrock creds); `Anonymize` (proxies to anonymizer).
 
-**Cascade model providers** (used in `modelConfigs` / `DEFAULT_MODEL_CONFIG_JSON`): `qwen3guard`, `gemma_vertexai`, `vertexai` (GCP Vertex dedicated endpoints); `qwen3guard_foundry`, `gemma_foundry`, `azure_foundry` (Azure AI Foundry managed-compute endpoints, OpenAI-compatible); `anthropic`, `openai`, `openai_compatible`. Foundry needs `*_FOUNDRY_BASE_URL` + `*_FOUNDRY_API_KEY` per provider (see [ENV.md](ENV.md)).
+**Cascade model providers** (used in `modelConfigs` / `DEFAULT_MODEL_CONFIG_JSON`): `qwen3guard`, `gemma_vertexai`, `vertexai` (GCP Vertex dedicated endpoints); `qwen3guard_foundry`, `gemma_foundry`, `azure_foundry` (Azure AI Foundry managed-compute endpoints, OpenAI-compatible); `anthropic`, `openai`, `openai_compatible`; `bedrock` (any AWS Bedrock model via the Converse API; Gemma 4 models are routed to Bedrock's `bedrock-mantle` endpoint). Foundry needs `*_FOUNDRY_BASE_URL` + `*_FOUNDRY_API_KEY` per provider; Bedrock needs `BEDROCK_REGION` plus `BEDROCK_API_KEY` or IAM keys (see [ENV.md](ENV.md)), e.g. `{"provider": "bedrock", "model": "us.anthropic.claude-haiku-4-5-20251001-v1:0", "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}`.
+
+**Tripwire** (`TRIPWIRE_ENABLED=true` + `TRIPWIRE_BASE_URL`): a prompt-injection classifier ([akto-api-security/Tripwire](https://github.com/akto-api-security/Tripwire)) that only observes: it never changes a verdict. It runs on every PromptInjection input scan from any source, whatever its `modelConfigs`, starting alongside the cascade, and the scan never waits for it. Its verdict is in `details.tripwire` if it answered before the verdict, and, with `storeAllResults`, in the stored model results once it answers (within 500 ms of the scan's start). With `TRIPWIRE_RESULTS_BLOB_URL` (an Azure Blob Storage container URL with a SAS token), every answer is also stored there as one JSON file: Tripwire's verdict next to the scan's, plus the prompt text when the two disagree (and the scan didn't fail open). The container therefore holds customer prompts: keep it in the customer's region, with tight access and a lifecycle rule. It is not a `modelConfigs` provider.
 
 **Anonymizer direct** (`:8093` if port exposed):
 

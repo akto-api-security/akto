@@ -10,7 +10,8 @@ import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import { getCategoriesBasedOnDashboardCategory } from '../../test_editor/tests_table/categoryUtil';
 import issuesTransform from '../transform.js';
 
-const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode, onBarClick, filterCollectionsId }) => {
+// subCategoryCounts: left out, the graph fetches its own; null while the page's own call is still loading, then its counts
+const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode, onBarClick, filterCollectionsId, subCategoryCounts }) => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
     const categoryMap = LocalStore(state => state.categoryMap);
     const dashboardCategory = getDashboardCategory();
@@ -30,9 +31,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         setCriticalFindingsData(data)
     }
 
-    const fetchGraphData = useCallback(async () => {
-        setShowTestingComponents(false)
-        const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp, filterCollectionsId)
+    const buildGraph = useCallback(async (subcategoryDataResp) => {
         const allowedCategories = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap);
         const filteredResp = Object.fromEntries(
             Object.entries(subcategoryDataResp).filter(([testId]) => {
@@ -61,7 +60,16 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         }
         convertSubCategoryInfo(tempResultSubCategoryMap)
         setShowTestingComponents(true)
-    }, [startTimestamp, endTimestamp, complianceMode, subCategoryMap, categoryMap, dashboardCategory, filterCollectionsId])
+    }, [complianceMode, subCategoryMap, categoryMap, dashboardCategory])
+
+    const fetchGraphData = useCallback(async () => {
+        if (subCategoryCounts !== undefined) {
+            if (subCategoryCounts !== null) await buildGraph(subCategoryCounts)
+            return
+        }
+        setShowTestingComponents(false)
+        await buildGraph(await testingApi.getSummaryInfo(startTimestamp, endTimestamp, filterCollectionsId))
+    }, [startTimestamp, endTimestamp, filterCollectionsId, subCategoryCounts, buildGraph])
 
     useEffect(() => {
         fetchGraphData()

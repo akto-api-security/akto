@@ -1,43 +1,69 @@
 package com.akto.service.insights;
 
+import com.akto.dto.rbac.RbacEnums.Feature;
 import lombok.Getter;
 
 /**
  * The Atlas Discovery insights — the original 10 agentic-AI-governance cards, plus 8
- * guardrail/violation cards merged in from feature/dashbaord/guardrail-insights. Category
- * nests here rather than in its own file — it only ever describes an InsightId.
+ * guardrail/violation cards merged in from feature/dashbaord/guardrail-insights — plus the
+ * API_POSTURE and TESTING_POSTURE groups added for the "Ask Akto" overlay. Category nests here
+ * rather than in its own file — it only ever describes an InsightId.
  */
 @Getter
 public enum InsightId {
-    MALICIOUS_COMPONENT_IN_USE("Malicious component in active use", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
+    MALICIOUS_COMPONENT_IN_USE("Malicious component in active use", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
     UNGOVERNED_AI_RATIO("Ungoverned AI ratio", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
     GUARDRAIL_COVERAGE_GAP("Guardrail coverage gap", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
-    SENSITIVE_DATA_DESTINATIONS("Where sensitive data is actually going", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
+    SENSITIVE_DATA_DESTINATIONS("Where sensitive data is actually going", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
     EXPOSURE_CONCENTRATION("Exposure concentration", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
-    PERSONAL_USE_OF_ENTERPRISE_AI("Enterprise AI used for personal purposes", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
-    OFF_DOMAIN_TOKEN_BURN("Off-domain token burn", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
-    DANGEROUS_CAPABILITY_EXPOSURE("Dangerous capability exposure", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
+    PERSONAL_USE_OF_ENTERPRISE_AI("Enterprise AI used for personal purposes", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
+    OFF_DOMAIN_TOKEN_BURN("Off-domain token burn", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
+    DANGEROUS_CAPABILITY_EXPOSURE("Dangerous capability exposure", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
     MCP_SPRAWL("Unapproved & local MCP sprawl", InsightId.Category.READ_ONLY, InsightId.Group.ATLAS_DISCOVERY),
     WHAT_CHANGED_THIS_WEEK("What changed this week", InsightId.Category.READ_ONLY, InsightId.Group.ATLAS_DISCOVERY),
 
     // — guardrail/violation insights (feature/dashbaord/guardrail-insights) —
-    ALERT_FATIGUE("Alert fatigue — same user, same policy, over and over", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    TEST_POLICIES_ON_PROD("Test policies running against production users", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    SKILL_EVALUATION_CONCENTRATION("One user, one class, flooding the queue", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    CREDENTIAL_EXPOSURE("Credentials and secrets — separated from PII", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    PROMPT_INJECTION_REPEATS("Prompt injection attempts, grouped by source", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    LIKELY_FALSE_POSITIVES("Likely false positives — flag as min risk, don't hide", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    ALERT_MODE_REAL_HITS("Policies in alert mode that are catching real things", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    POLICY_HYGIENE("Policy hygiene — dead policies and uncovered assets", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS);
+    ALERT_FATIGUE("Alert fatigue", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    TEST_POLICIES_ON_PROD("Test policies on production", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    EVALUATION_CONCENTRATION("Evaluation concentration", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
+    CREDENTIAL_EXPOSURE("Credential exposure", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
+    PROMPT_INJECTION_REPEATS("Prompt injection repeats", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    LIKELY_FALSE_POSITIVES("Likely false positives", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
+    ALERT_MODE_REAL_HITS("Alert-mode policies catching real hits", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    POLICY_HYGIENE("Policy hygiene", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    VIOLATIONS_PILING_UP("Open violations piling up on one agent", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    MALICIOUS_SKILLS_IN_USE("Malicious skills in use", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    RISKY_CONFIG_SETTINGS("Risky agent config settings", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    VIOLATION_SPIKE("Sudden rise in violations", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+
+    // — API posture insights (Ask Akto overlay) —
+    UNAUTHENTICATED_SENSITIVE_APIS("Unauthenticated APIs exposed", InsightId.Category.ACTIONABLE, InsightId.Group.API_POSTURE),
+    UNTESTED_HIGH_RISK_APIS("High-risk APIs never tested", InsightId.Category.ACTIONABLE, InsightId.Group.API_POSTURE),
+    SENSITIVE_DATA_HOTSPOTS("Sensitive data returned in responses", InsightId.Category.ACTIONABLE, InsightId.Group.API_POSTURE),
+
+    // — testing posture insights (Ask Akto overlay) —
+    AGING_OPEN_CRITICALS("Issues open longer than 30 days", InsightId.Category.ACTIONABLE, InsightId.Group.TESTING_POSTURE),
+    ISSUE_CONCENTRATION("Where open issues are concentrated", InsightId.Category.ACTIONABLE, InsightId.Group.TESTING_POSTURE),
+    ISSUE_RECURRENCE("Findings that keep recurring", InsightId.Category.ACTIONABLE, InsightId.Group.TESTING_POSTURE);
 
     private final String title;
     private final Category category;
     private final Group group;
+    // Static, hand-set "not ready" toggle — true only for an insight whose provider isn't wired up
+    // yet, same value for every account regardless of whether that account happens to have data.
+    // NOT for "this account has no data right now" — that's a real, checked result (see
+    // AbstractInsightProvider.skeleton, InsightResult.disabled), not an unimplemented insight.
+    private final boolean disabled;
 
     InsightId(String title, Category category, Group group) {
+        this(title, category, group, false);
+    }
+
+    InsightId(String title, Category category, Group group, boolean disabled) {
         this.title = title;
         this.category = category;
         this.group = group;
+        this.disabled = disabled;
     }
 
     /** How an insight is presented: ACTIONABLE cards carry CTAs, READ_ONLY cards are context only. */
@@ -47,10 +73,22 @@ public enum InsightId {
     }
 
     /** Which surface an insight belongs to — Atlas Discovery vs the guardrail/violations set
-     *  merged in from feature/dashbaord/guardrail-insights. Callers filter listInsights by this
-     *  so the two never mix in the same list; see InsightService.listInsights. */
+     *  merged in from feature/dashbaord/guardrail-insights. Callers filter listInsights by this so
+     *  groups never mix in the same list; see InsightService.listInsights. */
     public enum Group {
-        ATLAS_DISCOVERY,
-        GUARDRAIL_VIOLATIONS
+        ATLAS_DISCOVERY(Feature.API_COLLECTIONS),
+        GUARDRAIL_VIOLATIONS(Feature.API_COLLECTIONS),
+        API_POSTURE(Feature.API_COLLECTIONS),
+        TESTING_POSTURE(Feature.ISSUES);
+
+        private final Feature requiredFeature;
+
+        Group(Feature requiredFeature) {
+            this.requiredFeature = requiredFeature;
+        }
+
+        public Feature getRequiredFeature() {
+            return requiredFeature;
+        }
     }
 }

@@ -1,0 +1,30 @@
+name: Guardrails akto-gateway pin
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "apps/guardrails-service/**"
+      - ".github/scripts/check-akto-gateway-pin.sh"
+      - ".github/workflows/akto-guardrails-gateway-pin.yml"
+  push:
+    branches: [master]
+    paths:
+      - "apps/guardrails-service/**"
+      - ".github/scripts/check-akto-gateway-pin.sh"
+      - ".github/workflows/akto-guardrails-gateway-pin.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Pin matches akto-gateway HEAD
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check mcp-endpoint-shield pin
+        env:
+          GH_TOKEN: ${{ secrets.AKTO_GITHUB_TOKEN }}
+        run: bash .github/scripts/check-akto-gateway-pin.sh

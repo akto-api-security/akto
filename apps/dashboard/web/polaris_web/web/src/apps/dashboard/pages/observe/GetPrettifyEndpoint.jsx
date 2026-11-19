@@ -17,10 +17,10 @@ export const getMethod = (url, method, apiType) => {
         const path = String(url || "").split("?")[0];
         if(path.includes("/plugin/")){
             return "PLUGIN";
-        }else if(path.includes("tool")){
-            return "TOOL";
         }else if(path.includes("/config/")){
             return "CONFIG";
+        }else if(path.includes("tool")){
+            return "TOOL";
         }else if(path.includes("skill")){
             return "SKILL";
         }else if(path.includes("resource")){

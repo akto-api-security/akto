@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Badge, Box, Button, HorizontalStack, Text, DataTable } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, VerticalStack, Text, TextField, DataTable } from "@shopify/polaris";
 import { ArrowLeftMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import FlyLayout from "../../../components/layouts/FlyLayout";
@@ -11,9 +11,13 @@ import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip";
 import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 import TooltipText from "../../../components/shared/TooltipText";
 import api from "../api";
+import { saveAs } from "file-saver";
+import useTable from "@/apps/dashboard/components/tables/TableContext";
+import TableStore from "@/apps/dashboard/components/tables/TableStore";
+import useCollectionBulkActions from "../api_collections/useCollectionBulkActions";
+import { ChildRow, CollectionCheckbox, childCell, deviceRowId, expandGroupedSelection, useClearSelectionOnMount } from "../api_collections/groupedSelection";
 import func from "@/util/func";
 import transform from "../transform";
-import { fetchEndpointShieldUsernameMap } from "../api_collections/endpointShieldHelper";
 import SkillComponentsView from "./SkillComponentsView";
 import { fetchAgentMarkdownFromCollections } from "./PluginComponentsView";
 import { settledValue, logRejected } from "./constants";
@@ -31,12 +35,28 @@ import MisconfiguredBadge from "./MisconfiguredBadge";
  * not a flyout, per explicit direction.
  */
 
-const CHILD_COL_WIDTH = { name: "200px", riskScore: "80px", sensitive: "160px", traffic: "80px", discovered: "80px" };
+// "unknown"/unset reads as disabled — an unreported status isn't proof a plugin is active.
+const isPluginEnabled = (status) => String(status).toLowerCase() === "enabled";
 
-const PARENT_HEADERS = [
+// Plugin rows only — lets you tell a device's plugin status at a glance without expanding the row.
+const PLUGIN_STATUS_HEADER = {
+    title: "Status", text: "Status", value: "pluginStatusComp", textValue: "pluginStatus", boxWidth: "90px",
+};
+
+const PLUGIN_SCOPE_HEADER = {
+    title: "Scope", text: "Scope", value: "pluginScopeComp", textValue: "pluginScope", boxWidth: "90px",
+};
+
+const PLUGIN_LAST_SEEN_HEADER = {
+    title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time this plugin was seen on the device</Text>} title="Last seen" />,
+    text: "Last seen", value: "lastTraffic", numericValue: "lastSeenEpoch", sortActive: true, boxWidth: "80px",
+};
+
+const getParentHeaders = (rowType) => [
     { title: "", text: "", value: "collapsibleIcon", type: CellType.COLLAPSIBLE, boxWidth: "32px" },
     { title: "Endpoint ID", text: "Endpoint ID", value: "displayNameComp", textValue: "endpointId" },
     { title: "Username", text: "Username", value: "usernameComp", textValue: "username", boxWidth: "100px" },
+    ...(rowType === "plugin" ? [PLUGIN_STATUS_HEADER, PLUGIN_SCOPE_HEADER] : []),
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of this device is the maximum risk score across its own collections</Text>} title="Risk score" />,
         text: "Risk score", value: "riskScoreComp", textValue: "riskScore", numericValue: "riskScore",
@@ -47,7 +67,7 @@ const PARENT_HEADERS = [
         tooltipContent: <Text variant="bodySm">Types of sensitive data seen across this device's own collections</Text>,
         boxWidth: "160px",
     },
-    {
+    rowType === "plugin" ? PLUGIN_LAST_SEEN_HEADER : {
         title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time this device's traffic was seen</Text>} title="Last traffic seen" />,
         text: "Last traffic seen", value: "lastTraffic", numericValue: "lastSeenEpoch", sortActive: true, boxWidth: "80px",
     },
@@ -71,22 +91,72 @@ const SORT_OPTIONS = [
     { label: "Discovered", value: "startTs asc", directionLabel: "Oldest", sortKey: "startTs", columnIndex: 7 },
 ];
 
+const getSortOptions = (rowType) => rowType === "plugin"
+    ? SORT_OPTIONS.map(o => o.sortKey === "lastSeenEpoch" ? { ...o, label: "Last seen" } : o)
+    : SORT_OPTIONS;
+
 const ENDPOINT_TAGS_FILTER_DEF = { key: "endpointTags", label: "Endpoint tags", choices: [
     { label: "Contains personal account", value: "Contains personal account" },
     { label: "Local MCP Server", value: "Local MCP Server" },
     { label: "Misconfigured", value: "Misconfigured" },
     { label: "Malicious Skills", value: "Malicious Skills" },
+    { label: "Owner", value: "Owner" },
 ] };
+
+// McpClientRegistry canonical group keys the ai-agent-email filter is offered for. "claude1" is
+// Claude Desktop (the raw collection tag ai-agent=claude-desktop folds into it via
+// resolveClientKey); "claude2" would be Claude CLI. Scoped to Claude Desktop for now — add keys
+// here AND to AI_AGENT_EMAIL_GROUP_KEYS in AgenticObserveAction.java, which enforces the same scope
+// server-side so a stale URL can't apply this filter to another asset.
+const AI_AGENT_EMAIL_GROUP_KEYS = ["claude1"];
+
+// Free-text regex box for the ai-agent-email filter, supplied via GithubServerTable's renderFilter
+// escape hatch (same pattern as SusDataTable's risk-score control) so the shared table needs no
+// new filter type. Debounced because the table refetches on every appliedFilters change and
+// handleFilterStatusChange is not itself debounced — committing per keystroke would fire one
+// request per character typed.
+const AI_AGENT_EMAIL_DEBOUNCE_MS = 400;
+
+function AiAgentEmailFilterControl({ selected, onChange }) {
+    const committed = selected?.[0] || "";
+    const [draft, setDraft] = useState(committed);
+    // Resync when the value changes from outside this control (chip removed, "Clear all",
+    // a filters= URL restored on load).
+    useEffect(() => { setDraft(committed); }, [committed]);
+
+    const timerRef = useRef(null);
+    useEffect(() => () => clearTimeout(timerRef.current), []);
+
+    const handleChange = useCallback((value) => {
+        setDraft(value);
+        clearTimeout(timerRef.current);
+        const trimmed = value.trim();
+        timerRef.current = setTimeout(() => onChange(trimmed ? [trimmed] : []), AI_AGENT_EMAIL_DEBOUNCE_MS);
+    }, [onChange]);
+
+    return (
+        <TextField
+            label="AI agent email"
+            labelHidden
+            autoComplete="off"
+            value={draft}
+            onChange={handleChange}
+            placeholder="Regex, e.g. .*@gmail\.com$"
+            helpText="Matches anywhere in the email unless anchored with ^ or $"
+        />
+    );
+}
 
 const resourceName = { singular: "endpoint", plural: "endpoints" };
 
-// child.name is already the field the server picked (serviceName for agent/skill rows, the
-// calling source's id for service/llm rows — see AgenticObserveAction.groupCollectionsByEndpointId's
-// useServiceName branch) — no per-type column title to pick here, matching AgentEndpointTreeTable's
-// own ChildrenTable, which never renders its childHeaders' titles either (headings=[] throughout,
-// the parent GithubRow header row is the only visible header).
-function ChildrenTable({ children, rowType, misconfiguredChildId, onOpenBundle }) {
+// Rows under an expanded device: one row of the device table per collection (with its own
+// checkbox), plus the config row, cell for cell with the device row's headings. child.name is
+// already the field the server picked (serviceName for agent/skill rows, the calling source's id
+// for service/llm rows — see AgenticObserveAction.groupCollectionsByEndpointId's useServiceName branch).
+function ChildrenTable({ parentRowId, children, rowType, misconfiguredChildId, onOpenBundle }) {
     const navigate = useNavigate();
+    const { selectedItems } = useTable();
+    const headings = getParentHeaders(rowType);
 
     const handleChildClick = useCallback((child) => {
         // Plugin rows: the child IS the plugin's own metadata endpoint — open the bundled
@@ -103,73 +173,75 @@ function ChildrenTable({ children, rowType, misconfiguredChildId, onOpenBundle }
         navigate(`/dashboard/observe/inventory/${misconfiguredChildId}?agentic_view=config`);
     }, [navigate, misconfiguredChildId]);
 
-    const configRow = useMemo(() => {
-        if (!misconfiguredChildId) return null;
-        return [
-            <div key="spacer-config" style={{ width: "32px", minWidth: "32px" }} />,
-            <div key="name-config" style={{ cursor: "pointer", width: CHILD_COL_WIDTH.name }} onClick={handleConfigClick}>
+    const configRow = misconfiguredChildId ? (
+        <ChildRow
+            key="config"
+            onClick={handleConfigClick}
+            cells={headings.map((header) => childCell(header, header.value === "displayNameComp" ? (
                 <HorizontalStack gap="1" align="start" wrap={false}>
                     <Text variant="bodyMd" as="span">config</Text>
                     <MisconfiguredBadge />
                 </HorizontalStack>
-            </div>,
-            <div key="config-empty-risk" style={{ cursor: "pointer", width: CHILD_COL_WIDTH.riskScore }} onClick={handleConfigClick} />,
-            <div key="config-empty-sensitive" style={{ cursor: "pointer", width: CHILD_COL_WIDTH.sensitive }} onClick={handleConfigClick} />,
-            <div key="config-empty-traffic" style={{ cursor: "pointer", width: CHILD_COL_WIDTH.traffic }} onClick={handleConfigClick} />,
-            <div key="config-empty-discovered" style={{ cursor: "pointer", width: CHILD_COL_WIDTH.discovered }} onClick={handleConfigClick} />,
-        ];
-    }, [misconfiguredChildId, handleConfigClick]);
+            ) : null))}
+        />
+    ) : null;
 
-    const rows = useMemo(() => (children || []).map((child) => {
+    const childRows = (children || []).map((child) => {
         const childRiskScore = child.riskScore || 0;
         const displayValue = child.name || "-";
-        return [
-            <div key={`spacer-${child.id}`} style={{ width: "32px", minWidth: "32px" }} />,
-            <div key={`name-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.name }} onClick={() => handleChildClick(child)}>
-                <HorizontalStack gap="1" align="start" wrap={false}>
-                    <Box maxWidth="200px"><TooltipText tooltip={displayValue} text={displayValue} /></Box>
-                    {child.type && <Badge size="small">{child.type}</Badge>}
-                    {(child.skillCount || 0) > 0 && (
-                        <Badge size="small" status="info">{`${child.skillCount} ${child.skillCount === 1 ? "skill" : "skills"}`}</Badge>
-                    )}
-                    {child.owningPluginName && <Badge size="small" status="info">{`Plugin: ${child.owningPluginName}`}</Badge>}
-                    {child.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
-                    {child.hasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
-                    {child.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
-                </HorizontalStack>
-            </div>,
-            <div key={`risk-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.riskScore }} onClick={() => handleChildClick(child)}>
-                {transform.wrapRiskScoreTooltip(
-                    <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
-                    childRiskScore, child.baseRiskScore, child.baseRiskScoreReason
-                )}
-            </div>,
-            <div key={`sensitive-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.sensitive }} onClick={() => handleChildClick(child)}>
-                {transform.prettifySubtypes(child.sensitiveInRespTypes || [])}
-            </div>,
-            <div key={`traffic-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.traffic }} onClick={() => handleChildClick(child)}>
-                {func.prettifyEpoch(child.lastSeenEpoch || 0)}
-            </div>,
-            <div key={`discovered-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.discovered }} onClick={() => handleChildClick(child)}>
-                {func.prettifyEpoch(child.startTs || 0)}
-            </div>,
-        ];
-    }), [children, handleChildClick]);
+        const contentFor = (header) => {
+            switch (header.value) {
+                case "collapsibleIcon":
+                    return <CollectionCheckbox collectionId={child.id} parentRowId={parentRowId} />;
+                case "displayNameComp":
+                    return (
+                        <HorizontalStack gap="1" align="start" wrap={false}>
+                            <Box maxWidth="200px"><TooltipText tooltip={displayValue} text={displayValue} /></Box>
+                            {child.type && <Badge size="small">{child.type}</Badge>}
+                            {(child.skillCount || 0) > 0 && (
+                                <Badge size="small" status="info">{`${child.skillCount} ${child.skillCount === 1 ? "skill" : "skills"}`}</Badge>
+                            )}
+                            {child.owningPluginName && <Badge size="small" status="info">{`Plugin: ${child.owningPluginName}`}</Badge>}
+                            {child.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
+                            {child.hasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
+                            {child.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
+                        </HorizontalStack>
+                    );
+                case "pluginStatusComp":
+                    return (
+                        <Badge size="small" status={isPluginEnabled(child.pluginStatus) ? "success" : "warning"}>
+                            {isPluginEnabled(child.pluginStatus) ? "enabled" : "disabled"}
+                        </Badge>
+                    );
+                case "pluginScopeComp":
+                    return child.pluginScope || "-";
+                case "riskScoreComp":
+                    return transform.wrapRiskScoreTooltip(
+                        <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
+                        childRiskScore, child.baseRiskScore, child.baseRiskScoreReason,
+                        child.riskScoreFactors
+                    );
+                case "sensitiveSubTypes":
+                    return transform.prettifySubtypes(child.sensitiveInRespTypes || []);
+                case "lastTraffic":
+                    return func.prettifyEpoch(child.lastSeenEpoch || 0);
+                case "discovered":
+                    return func.prettifyEpoch(child.startTs || 0);
+                default:
+                    return null;
+            }
+        };
+        return (
+            <ChildRow
+                key={`child-${child.id}`}
+                selected={selectedItems.includes(parentRowId) || selectedItems.includes(child.id)}
+                onClick={() => handleChildClick(child)}
+                cells={headings.map((header) => childCell(header, contentFor(header), true))}
+            />
+        );
+    });
 
-    const columnContentTypes = useMemo(() => ["text", "text", "text", "text", "text", "text"], []);
-
-    return (
-        <td colSpan={PARENT_HEADERS.length} style={{ padding: "0px !important" }} className="control-row">
-            <Box width="100%">
-                <DataTable
-                    rows={configRow ? [configRow, ...rows] : rows}
-                    hasZebraStripingOnData
-                    headings={[]}
-                    columnContentTypes={columnContentTypes}
-                />
-            </Box>
-        </td>
-    );
+    return <>{configRow}{childRows}</>;
 }
 
 function PluginBundleContent({ bundle, pluginCollectionId, navigate }) {
@@ -248,6 +320,7 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
         ...(row.hasLocalMcpServer ? ["Local MCP Server"] : []),
         ...(row.hasMisconfiguredConfig ? ["Misconfigured"] : []),
         ...(row.hasMaliciousSkill ? ["Malicious Skills"] : []),
+        ...(row.hasOwnerTag ? ["Owner"] : []),
     ];
     const children = row.children || [];
     const misconfiguredChildId = row.hasMisconfiguredConfig
@@ -256,6 +329,8 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
 
     return {
         ...row,
+        // Selecting the device selects all its collections (see groupedSelection)
+        id: deviceRowId(row.endpointId),
         name: `endpoint-${row.endpointId}`,
         displayNameComp: (
             <HorizontalStack gap="1" align="start" wrap={false}>
@@ -267,6 +342,10 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
                 {row.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
                 {row.hasMisconfiguredConfig && <MisconfiguredBadge />}
                 {row.hasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
+                {row.hasOwnerTag && <Badge size="small" status="success">Owner</Badge>}
+                {row.hasOwnerTag && row.environmentName && (
+                    <Badge size="small" status="info">{`Env: ${row.environmentName}`}</Badge>
+                )}
             </HorizontalStack>
         ),
         usernameComp: (
@@ -274,7 +353,17 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
                 <TooltipText tooltip={row.username || "-"} text={row.username || "-"} />
             </Box>
         ),
-        riskScoreComp: <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
+        pluginStatusComp: rowType === "plugin" ? (
+            <Badge size="small" status={isPluginEnabled(row.pluginStatus) ? "success" : "warning"}>
+                {isPluginEnabled(row.pluginStatus) ? "enabled" : "disabled"}
+            </Badge>
+        ) : "-",
+        pluginScopeComp: rowType === "plugin" ? (row.pluginScope || "-") : "-",
+        riskScoreComp: transform.wrapRiskScoreTooltip(
+            <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
+            riskScore, row.baseRiskScore, row.baseRiskScoreReason,
+            row.riskScoreFactors
+        ),
         sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || []),
         lastTraffic: func.prettifyEpoch(row.lastSeenEpoch || 0),
         discovered: func.prettifyEpoch(row.startTs || 0),
@@ -282,6 +371,7 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
         isTerminal: false,
         collapsibleRow: (
             <ChildrenTable
+                parentRowId={deviceRowId(row.endpointId)}
                 children={children}
                 rowType={rowType}
                 misconfiguredChildId={misconfiguredChildId}
@@ -303,13 +393,31 @@ export default function AgenticAssetDevicesPage() {
     // "<Type> - <Name>" template + TitleWithInfo's info icon) — that page and this one are the
     // two places this exact asset's device breakdown is shown, so the header should read the same
     // regardless of which one a click landed on.
-    const pageTitle = useMemo(() => (
-        <TitleWithInfo
-            tooltipContent={`Viewing devices for ${assetType || "asset"} ${assetName}`}
-            titleText={assetType ? `${assetType} - ${assetName}` : assetName}
-            docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
-        />
-    ), [assetType, assetName]);
+    const [description, setDescription] = useState("");
+    const [assetRisk, setAssetRisk] = useState({ score: null, factors: [] });
+
+    const pageTitle = useMemo(() => {
+        const titleLabel = assetType ? `${assetType} - ${assetName}` : assetName;
+        const riskBadge = assetRisk.score
+            ? transform.wrapRiskScoreTooltip(
+                <Badge status={transform.getStatus(assetRisk.score)} size="small">{assetRisk.score}</Badge>,
+                assetRisk.score, null, null, assetRisk.factors
+            )
+            : null;
+        return (
+            <VerticalStack gap="1">
+                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                    <TitleWithInfo
+                        tooltipContent={`Viewing devices for ${assetType || "asset"} ${assetName}`}
+                        titleText={titleLabel}
+                        docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
+                    />
+                    {riskBadge}
+                </HorizontalStack>
+                {description && <Text variant="bodyMd">{description}</Text>}
+            </VerticalStack>
+        );
+    }, [assetType, assetName, description, assetRisk]);
 
     // Same "Explore mode" primaryAction ApiCollections.jsx always shows next to its title —
     // generic query-explorer shortcut, not scoped to this asset, kept only for header parity.
@@ -323,7 +431,10 @@ export default function AgenticAssetDevicesPage() {
     // resolves, so the "loading" feedback lives on this page instead of freezing the previous one.
     const [loading, setLoading] = useState(true);
     const collectionIdsRef = useRef([]);
-    const enrichRef = useRef({ usernameMap: {} });
+    // Device rows seen so far, by id — bulk actions act on every collection grouped under a selected device.
+    const rowsByIdRef = useRef(new Map());
+    // collection id -> { device, child }, for the bulk actions' per-collection lookups
+    const childByIdRef = useRef(new Map());
     const [refreshKey, setRefreshKey] = useState(0);
     // Plugin rows only — the MCP servers/skills this plugin bundles, so old-UI can list them with a
     // direct redirect link (same server-side data new-UI's PluginComponentsView table shows).
@@ -356,19 +467,19 @@ export default function AgenticAssetDevicesPage() {
                 // of them for one asset's own devices. fetchAgenticAssetEndpointsPage computes those
                 // three server-side, scoped to apiCollectionIds, instead of requiring this page to
                 // pull the whole account's map just to read a few entries back out of it.
-                // usernameMap still comes from here since Endpoint Shield's device registry isn't
-                // collection-scoped (it's keyed by physical device, already small account-wide).
-                // allSettled: a usernameMap failure must not also lose detail.collectionIds, which is
-                // this page's entire collection scope.
-                const [usernameSettled, detailSettled] = await Promise.allSettled([
-                    fetchEndpointShieldUsernameMap(),
+                // Usernames are resolved server-side now, so this page no longer fetches that map.
+                const [detailSettled] = await Promise.allSettled([
                     api.fetchAgenticAssetDetail({ groupKey, rowType }),
                 ]);
                 if (cancelled) return;
-                logRejected("AgenticAssetDevicesPage mount", { usernameMap: usernameSettled, detail: detailSettled });
-                enrichRef.current = { usernameMap: settledValue(usernameSettled, {}) };
+                logRejected("AgenticAssetDevicesPage mount", { detail: detailSettled });
                 const detail = settledValue(detailSettled, {});
                 collectionIdsRef.current = detail?.collectionIds || [];
+                setDescription(detail?.description || "");
+                setAssetRisk({
+                    score: detail?.riskScore ?? null,
+                    factors: detail?.riskScoreFactors || [],
+                });
                 setPluginBundle(rowType === "plugin" ? {
                     mcpServers: detail?.pluginMcpServers || [],
                     mcpServerCollectionIds: detail?.pluginMcpServerCollectionIds || {},
@@ -377,7 +488,13 @@ export default function AgenticAssetDevicesPage() {
                 } : null);
                 setOwningPluginName(rowType !== "plugin" ? (detail?.owningPluginName || null) : null);
             } catch {
-                if (!cancelled) { collectionIdsRef.current = []; setPluginBundle(null); setOwningPluginName(null); }
+                if (!cancelled) {
+                    collectionIdsRef.current = [];
+                    setDescription("");
+                    setAssetRisk({ score: null, factors: [] });
+                    setPluginBundle(null);
+                    setOwningPluginName(null);
+                }
             } finally {
                 if (!cancelled) { setLoading(false); setRefreshKey((k) => k + 1); }
             }
@@ -386,22 +503,31 @@ export default function AgenticAssetDevicesPage() {
     }, [groupKey, rowType]);
 
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
-        const { usernameMap } = enrichRef.current;
         const mongoSortOrder = sortOrder === -1 ? 1 : -1;
         const filters = {};
         if (filtersObj?.endpointTags?.length) filters.endpointTags = filtersObj.endpointTags;
         if (filtersObj?.endpointId?.length) filters.endpointId = filtersObj.endpointId;
         if (filtersObj?.username?.length) filters.username = filtersObj.username;
+        // Gated the same way filtersDef is. GithubServerTable persists applied filters under a key
+        // derived from the pathname only (this route is static — the asset lives in the query
+        // string), so a filter applied on one asset is replayed on the next. Without this guard we
+        // would keep sending aiAgentEmail after navigating to an asset that never offered it.
+        if (filtersObj?.aiAgentEmail?.length && rowType === "agent" && AI_AGENT_EMAIL_GROUP_KEYS.includes(groupKey)) {
+            filters.aiAgentEmail = filtersObj.aiAgentEmail;
+        }
         const res = await api.fetchAgenticAssetEndpointsPage({
             apiCollectionIds: collectionIdsRef.current,
             rowType,
             groupKey,
             skip, limit, sortKey: sortKey || "riskScore", sortOrder: mongoSortOrder, queryValue,
-            usernameMap,
             filters: Object.keys(filters).length ? filters : undefined,
         });
         updateFilterChoicesIfChanged(res.distinctEndpointIds || [], res.distinctUsernames || []);
         const rows = (res.endpoints || []).map((row) => shapeEndpointRow(row, { rowType, onOpenBundle: () => setShowBundleFlyout(true) }));
+        rows.forEach((row) => {
+            rowsByIdRef.current.set(row.id, row);
+            (row.children || []).forEach((child) => childByIdRef.current.set(child.id, { device: row, child }));
+        });
         return { value: rows, total: res.total || 0 };
     }, [rowType, groupKey, updateFilterChoicesIfChanged]);
 
@@ -413,10 +539,69 @@ export default function AgenticAssetDevicesPage() {
         if (filterChoices.usernames.length) {
             defs.push({ key: "username", label: "Username", choices: filterChoices.usernames.map((v) => ({ label: v, value: v })) });
         }
+        // Free-text regex over the collection's ai-agent-email tag. Offered only for the asset
+        // groups in AI_AGENT_EMAIL_GROUP_KEYS (Claude Desktop today) — on every other asset page
+        // the chip is simply not rendered. choices:[] because renderFilter supplies the control.
+        if (rowType === "agent" && AI_AGENT_EMAIL_GROUP_KEYS.includes(groupKey)) {
+            defs.push({
+                key: "aiAgentEmail",
+                label: "AI agent email",
+                title: "AI agent email",
+                choices: [],
+                renderFilter: ({ selected, onChange }) => (
+                    <AiAgentEmailFilterControl selected={selected} onChange={onChange} />
+                ),
+            });
+        }
         return defs;
-    }, [filterChoices]);
+    }, [filterChoices, rowType, groupKey]);
+
+    useClearSelectionOnMount();
+    const { selectItems } = useTable();
+
+    const collectionIdsOfDevice = (id) => (rowsByIdRef.current.get(id)?.children || []).map((c) => c.id);
+    const findChild = (collectionId) => childByIdRef.current.get(collectionId) || null;
+
+    const { collectionActions, setTagsAction } = useCollectionBulkActions({
+        rowOf: (id) => findChild(id)?.child,
+        getTags: () => Object.fromEntries([...childByIdRef.current.values()].map(({ child }) => [child.id, child.envType || []])),
+        onDone: () => {
+            selectItems([]);
+            TableStore.getState().setSelectedItems([]);
+            // Remounts the table, which refetches the devices
+            rowsByIdRef.current = new Map();
+            childByIdRef.current = new Map();
+            setRefreshKey((k) => k + 1);
+        },
+    });
+
+    const exportCsv = (collectionIds) => {
+        const wrap = (value) => '"' + String(value ?? "-").replace(/"/g, '""') + '"';
+        let csv = ["Collection ID", "Endpoint ID", "Username", "Name", "Type", "Risk score", "Last traffic seen", "Discovered"].join(",") + "\r\n";
+        collectionIds.forEach((id) => {
+            const found = findChild(id);
+            if (!found) return;
+            const { device, child } = found;
+            csv += [child.id, device.endpointId, device.username, child.name, child.type, child.riskScore || 0,
+                func.prettifyEpoch(child.lastSeenEpoch || 0), func.prettifyEpoch(child.startTs || 0)].map(wrap).join(",") + "\r\n";
+        });
+        saveAs(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${assetName} collections.csv`);
+        func.setToast(true, false, "CSV exported successfully");
+    };
+
+    const promotedBulkActions = (selectedIds) => {
+        const collectionIds = expandGroupedSelection(selectedIds, collectionIdsOfDevice);
+        if (collectionIds.length === 0) return [];
+        return [
+            { content: "Export as CSV", onAction: () => exportCsv(collectionIds) },
+            ...collectionActions(collectionIds),
+            setTagsAction(collectionIds),
+        ];
+    };
 
     const disambiguateLabel = useCallback((key, value) => func.convertToDisambiguateLabelObj(value, null, 2), []);
+    const parentHeaders = useMemo(() => getParentHeaders(rowType), [rowType]);
+    const sortOptions = useMemo(() => getSortOptions(rowType), [rowType]);
 
     if (loading) {
         return (
@@ -446,12 +631,15 @@ export default function AgenticAssetDevicesPage() {
                         key={`asset-endpoints-${groupKey}-${rowType}-${refreshKey}`}
                         fetchData={fetchTableData}
                         pageLimit={20}
-                        sortOptions={SORT_OPTIONS}
+                        sortOptions={sortOptions}
                         resourceName={resourceName}
                         filters={filtersDef}
-                        headers={PARENT_HEADERS}
-                        selectable={false}
-                        headings={PARENT_HEADERS}
+                        headers={parentHeaders}
+                        selectable={true}
+                        isMultipleItemsSelected={true}
+                        selectAllAddsRowIds={true}
+                        promotedBulkActions={promotedBulkActions}
+                        headings={parentHeaders}
                         useNewRow={true}
                         condensedHeight={true}
                         disambiguateLabel={disambiguateLabel}

@@ -1,9 +1,11 @@
 package com.akto.filters;
 
 import com.akto.dao.context.Context;
+import com.akto.data_actor.ClientActor;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.log.LoggerMaker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
@@ -16,6 +18,7 @@ import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -26,6 +29,18 @@ public class AuthFilter implements Filter {
     // Tokens that must never be allowed to authenticate, regardless of signature validity.
     // Loaded from the comma-separated AKTO_DI_REVOKED_TOKENS env var (JWTs never contain commas).
     private static final Set<String> REVOKED_TOKENS = loadRevokedTokens();
+
+    // The account this deployment serves: the accountId claim of its own DATABASE_ABSTRACTOR_SERVICE_TOKEN,
+    // or null when that token is absent (then tokens of any account are accepted, as before).
+    private static final Integer DEPLOYMENT_ACCOUNT_ID = ClientActor.getAbstractorAccountIdFromEnvOrNull();
+
+    /**
+     * Every account's tokens are signed with the same key, so a valid signature alone would let one account's
+     * token in to another account's deployment: the token must also be for the account this deployment serves.
+     */
+    static boolean isForThisDeployment(int tokenAccountId, Integer deploymentAccountId) {
+        return deploymentAccountId == null || deploymentAccountId == tokenAccountId;
+    }
 
     private static Set<String> loadRevokedTokens() {
         Set<String> tokens = new HashSet<>();
@@ -39,6 +54,16 @@ public class AuthFilter implements Filter {
             }
         }
         return tokens;
+    }
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private static void writeUnauthorized(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setHeader("WWW-Authenticate", "Bearer");
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        MAPPER.writeValue(response.getWriter(), Collections.singletonMap("actionErrors", Collections.singletonList(message)));
     }
 
     @Override
@@ -81,15 +106,13 @@ public class AuthFilter implements Filter {
         String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
 
         if (accessTokenFromRequest == null || accessTokenFromRequest.trim().isEmpty()) {
-            logger.error("No authorization header found in the request: {}", accessTokenFromRequest);
-        } else {
-            logger.error("Authorization header found in the request: {}", accessTokenFromRequest);
+            logger.error("No authorization header found in the request");
         }
 
         // Reject revoked tokens up front, regardless of the AKTO_DI_AUTHENTICATE setting.
         if (accessTokenFromRequest != null && REVOKED_TOKENS.contains(accessTokenFromRequest.trim())) {
             logger.warn("Blocked request using a revoked token");
-            httpServletResponse.sendError(401);
+            writeUnauthorized(httpServletResponse, "The access token has been revoked");
             return;
         }
 
@@ -107,10 +130,21 @@ public class AuthFilter implements Filter {
             } else {
                 claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
             }
-            Context.accountId.set((int) claims.getBody().get("accountId"));
+            int tokenAccountId = (int) claims.getBody().get("accountId");
+            if (!isForThisDeployment(tokenAccountId, DEPLOYMENT_ACCOUNT_ID)) {
+                logger.error("Rejected a token for account {} on the deployment of account {}",
+                        tokenAccountId, DEPLOYMENT_ACCOUNT_ID);
+                writeUnauthorized(httpServletResponse, "The access token is not valid for this deployment");
+                return;
+            }
+            Context.accountId.set(tokenAccountId);
         } catch (Exception e) {
             logger.error("Authentication failed: {}", e.getMessage());
-            httpServletResponse.sendError(401);
+            if (accessTokenFromRequest == null || accessTokenFromRequest.trim().isEmpty()) {
+                writeUnauthorized(httpServletResponse, "The Authorization header is missing");
+            } else {
+                writeUnauthorized(httpServletResponse, "The access token is invalid or expired");
+            }
             return;
         }
         chain.doFilter(servletRequest, servletResponse);

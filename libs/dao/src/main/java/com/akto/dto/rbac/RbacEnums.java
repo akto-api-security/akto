@@ -17,7 +17,8 @@ public class RbacEnums {
         USER,
         AI,
         THREAT_PROTECTION,
-        PII_DATA;
+        PII_DATA,
+        TEST_SCRIPTS;
     
         public static AccessGroups[] getAccessGroups() {
             return values();
@@ -52,7 +53,11 @@ public class RbacEnums {
         ADMIN_ACTIONS(AccessGroups.ADMIN),
         USER_ACTIONS(AccessGroups.USER),
         AI_AGENTS(AccessGroups.AI),
-        THREAT_PROTECTION(AccessGroups.THREAT_PROTECTION);
+        THREAT_PROTECTION(AccessGroups.THREAT_PROTECTION),
+        // threat detection configuration, retention and account-wide threat actions; defaults to THREAT_PROTECTION access
+        THREAT_SETTINGS(AccessGroups.THREAT_PROTECTION),
+        // pre/post request scripts; admins edit by default, other roles read unless a custom role changes it
+        TEST_SCRIPTS(AccessGroups.TEST_SCRIPTS);
 
         private final AccessGroups accessGroup;
 
@@ -69,6 +74,13 @@ public class RbacEnums {
                     .filter(feature -> feature.getAccessGroup() == accessGroup)
                     .collect(Collectors.toList());
         }
+    }
+
+    /* Extra check for users limited to specific collections (Advanced RBAC), set per action in struts.xml */
+    public enum CollectionScope {
+        ACCOUNT_WIDE,   // Argus account-wide setting: blocked for them
+        OWN_COLLECTION, // Argus: the requested collection / trace must be one of theirs
+        ALL_COLLECTIONS // any product: users, roles and SSO, only for users with access to all collections
     }
 
     public enum ReadWriteAccess {

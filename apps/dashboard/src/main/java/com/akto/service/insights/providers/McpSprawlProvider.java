@@ -42,6 +42,11 @@ public class McpSprawlProvider extends AbstractInsightProvider {
         List<ApiCollection> flagged = new ArrayList<>();
         for (ApiCollection c : bundle.collections) {
             if (c.isDeactivated()) continue;
+            // Scope to actual MCP servers only. serviceNameOf/isLocalMcp are hostname-shape/tag
+            // checks that also fire for browser-based LLM chat accounts and SaaS agents (any
+            // agentic collection, not just MCP) — without this guard, all of those got swept
+            // into "unapproved MCP sprawl" too, wildly inflating the flagged count.
+            if (!c.isMcpCollection()) continue;
             boolean local = InsightUtil.isLocalMcp(c);
             String serviceName = InsightUtil.serviceNameOf(c);
             boolean unapproved = serviceName != null && !approvedApprovedLower.contains(serviceName.toLowerCase(Locale.ROOT));
@@ -69,8 +74,8 @@ public class McpSprawlProvider extends AbstractInsightProvider {
                 Map<String, Object> row = new HashMap<>();
                 row.put("host", c.getHostName());
                 row.put("firstSeen", c.getStartTs());
+                row.put("user", username != null ? username : "unknown");
                 row.put("team", team != null ? team : "untagged");
-                row.put("dormant", isDormant);
                 rows.add(row);
             }
         }
@@ -85,14 +90,22 @@ public class McpSprawlProvider extends AbstractInsightProvider {
             r.addDataGap(new InsightResult.Gap("TEAM_TAGS", "NO_ROWS", "No devices carry a 'team' tag; team breakdown is unavailable."));
         }
         r.setHeadline(flagged.isEmpty() ? "No local or unapproved MCP servers found"
-                : InsightUtil.count(flagged.size(), "local/unapproved MCP servers") + " found, " + dormant + " dormant");
+                : InsightUtil.count(flagged.size(), "local/unapproved MCP servers") + " found, " + InsightUtil.count(dormant, "dormant"));
+
+        if (!flagged.isEmpty()) {
+            r.setSeverity(dormant > 0 ? "MEDIUM" : "LOW");
+            r.setConcern(InsightUtil.count(flagged.size(), "MCP servers") + " are either running locally on a device or weren't approved through your allowlist/audit process."
+                    + (dormant > 0 ? " " + InsightUtil.count(dormant, "of them") + " haven't been active in 90+ days." : ""));
+            r.setImpact("Local and unapproved servers sit outside your normal review process — nobody vetted what they can access, and dormant ones are an easy thing to lose track of entirely.");
+            r.setRemediation("For each server below: if it's legitimate, add it to the allowlist (or mark it Approved in the audit); otherwise remove it from the device."
+                    + (dormant > 0 ? " Dormant ones with no known owner should be removed outright." : ""));
+        }
 
         r.addEvidence(new InsightResult.Evidence("sprawl", "Local/unapproved MCP servers",
-                java.util.Arrays.asList("host", "firstSeen", "team", "dormant"), rows, flagged.size()));
+                java.util.Arrays.asList("host", "firstSeen", "user", "team"), rows, flagged.size()));
 
         Map<String, Object> assetsParams = new HashMap<>();
         r.addCta(new InsightResult.Cta("view_agentic_assets", "View agentic assets", "NAVIGATE", InsightRoutes.AGENTIC_ASSETS, assetsParams, true));
-        r.addCta(new InsightResult.Cta("view_endpoint_shield", "View Endpoint Shield", "NAVIGATE", InsightRoutes.ENDPOINT_SHIELD, new HashMap<>(), false));
         return r;
     }
 

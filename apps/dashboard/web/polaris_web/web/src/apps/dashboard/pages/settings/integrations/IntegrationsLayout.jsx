@@ -1,11 +1,12 @@
 import React from 'react'
-import { LegacyCard } from '@shopify/polaris'
+import { Banner, LegacyCard } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 
 function IntegrationsLayout(props) {
 
 
   const components = [      
+      ...(props.readOnly ? [<Banner status="info" key="readOnlyBanner">You can view this integration, but your role can't change it.</Banner>] : []),
       <LegacyCard title="About the Integration" sectioned key="aboutSection">
         {(typeof (props.cardContent) === 'string') ? <p>{props.cardContent}</p> : props.cardContent}
       </LegacyCard>,

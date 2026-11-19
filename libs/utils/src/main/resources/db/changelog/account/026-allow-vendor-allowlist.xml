@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collection + indexes for AllowVendorAllowlistDao.createIndicesIfAbsent (collName:
+        allowvendorallowlist). Vendor approvals (Vendors tab, Shadow AI score, sanctioned vs
+        unapproved split) moved here from mcp_allowlist, which now holds MCP-server entries only.
+        Index names match MCollection.generateIndexName so the DAO's own createIndexIfAbsent
+        treats them as present. Existing __vendor__ rows in mcp_allowlist are not migrated.
+    -->
+
+    <changeSet id="026-account-create-allow-vendor-allowlist" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="allowvendorallowlist"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="allowvendorallowlist"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="allowvendorallowlist"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="026-account-allow-vendor-allowlist-registry-id-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="allowvendorallowlist"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="allowvendorallowlist">
+            <mongodb:keys>{ "registryId": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "registryId_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="allowvendorallowlist">
+                <mongodb:keys>{ "registryId": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="026-account-allow-vendor-allowlist-created-at-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="allowvendorallowlist"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="allowvendorallowlist">
+            <mongodb:keys>{ "createdAt": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "createdAt_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="allowvendorallowlist">
+                <mongodb:keys>{ "createdAt": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="026-account-allow-vendor-allowlist-name-registry-id-unique-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="allowvendorallowlist"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="allowvendorallowlist">
+            <mongodb:keys>{ "name": -1, "registryId": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "name-registryId_-1", "unique": true }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="allowvendorallowlist">
+                <mongodb:keys>{ "name": -1, "registryId": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

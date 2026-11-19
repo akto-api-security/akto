@@ -72,18 +72,7 @@ public class DistributionStreamConsumer implements Runnable {
         }
         this.bucketRangeArgs = ranges.toArray(new String[0]);
 
-        try {
-            sync.xgroupCreate(
-                XReadArgs.StreamOffset.from(RedisKeyInfo.THREAT_INPUT_STREAM, "0-0"),
-                GROUP_NAME,
-                XGroupCreateArgs.Builder.mkstream()
-            );
-            logger.infoAndAddToDb("Created consumer group: " + GROUP_NAME + " on " + RedisKeyInfo.THREAT_INPUT_STREAM);
-        } catch (Exception e) {
-            if (!e.getMessage().contains("BUSYGROUP")) {
-                logger.errorAndAddToDb(e, "Error creating consumer group");
-            }
-        }
+        createConsumerGroup("0-0");
 
         logger.infoAndAddToDb("DistributionStreamConsumer initialized: " + consumerId);
     }
@@ -106,6 +95,9 @@ public class DistributionStreamConsumer implements Runnable {
                 }
             } catch (Exception e) {
                 logger.errorAndAddToDb(e, "Error reading from threat stream (xreadgroup)");
+                if (e.getMessage() != null && e.getMessage().contains("NOGROUP")) {
+                    recreateConsumerGroup();
+                }
                 handleConnectionError();
                 continue;
             }
@@ -142,6 +134,31 @@ public class DistributionStreamConsumer implements Runnable {
             }
         }
         logger.infoAndAddToDb("DistributionStreamConsumer stopped: " + consumerId);
+    }
+
+    private void createConsumerGroup(String startId) {
+        try {
+            connection.sync().xgroupCreate(
+                XReadArgs.StreamOffset.from(RedisKeyInfo.THREAT_INPUT_STREAM, startId),
+                GROUP_NAME,
+                XGroupCreateArgs.Builder.mkstream()
+            );
+            logger.infoAndAddToDb("Created consumer group: " + GROUP_NAME + " on " + RedisKeyInfo.THREAT_INPUT_STREAM + " from " + startId);
+        } catch (Exception e) {
+            if (e.getMessage() == null || !e.getMessage().contains("BUSYGROUP")) {
+                logger.errorAndAddToDb(e, "Error creating consumer group");
+            }
+        }
+    }
+
+    private void recreateConsumerGroup() {
+        try {
+            boolean streamExists = connection.sync().exists(RedisKeyInfo.THREAT_INPUT_STREAM) > 0;
+            logger.warnAndAddToDb("Consumer group missing, recreating. streamExists=" + streamExists);
+            createConsumerGroup(streamExists ? "$" : "0-0");
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error recreating consumer group");
+        }
     }
 
     private void handleConnectionError() {

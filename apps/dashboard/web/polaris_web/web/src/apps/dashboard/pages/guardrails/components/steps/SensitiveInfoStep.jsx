@@ -7,10 +7,10 @@ import {
     TextField,
     HorizontalStack,
     Checkbox,
-    RangeSlider,
     Spinner,
     Tooltip,
-    Icon
+    Icon,
+    Banner
 } from '@shopify/polaris';
 import { DeleteMajor, InfoMinor } from '@shopify/polaris-icons';
 import { useState, useEffect } from 'react';
@@ -84,12 +84,31 @@ export const SensitiveInfoConfig = {
             filters.push('Secrets detection');
         }
 
-        if (enableAnonymize) {
-            filters.push('Sensitive data anonymization');
-        }
-
         return filters.length > 0 ? filters.join(", ") : null;
     }
+};
+
+const modeOf = (row) => String(row?.behavior || "block").toLowerCase();
+
+const ModeConflictBanner = ({ subjectFor }) => {
+    const redaction = subjectFor("mask");
+
+    if (redaction.text === "") {
+        return null;
+    }
+
+    return (
+        <Banner status="warning">
+            <VerticalStack gap="1">
+                <Text variant="bodyMd">
+                    Prompts are never blocked for PII types marked for redaction. The PII types will be redacted from the prompt.
+                </Text>
+                <Text variant="bodyMd">
+                    File uploads are always blocked if they contain PII types marked for redaction.
+                </Text>
+            </VerticalStack>
+        </Banner>
+    );
 };
 
 const SensitiveInfoStep = ({
@@ -109,13 +128,9 @@ const SensitiveInfoStep = ({
     // Secrets detection
     enableSecrets,
     setEnableSecrets,
-    secretsConfidenceScore,
-    setSecretsConfidenceScore,
     // Anonymize
     enableAnonymize,
-    setEnableAnonymize,
-    anonymizeConfidenceScore,
-    setAnonymizeConfidenceScore
+    setEnableAnonymize
 }) => {
     // State for dynamically fetched PII types
     const [availablePiiTypes, setAvailablePiiTypes] = useState([]);
@@ -182,9 +197,27 @@ const SensitiveInfoStep = ({
         fetchSensitiveDataTypes();
     }, []);
 
+    const piiSubjectFor = (mode) => {
+        const names = piiTypes.filter((p) => modeOf(p) === mode).map((p) => p.type).filter(Boolean);
+        const shown = names.slice(0, 3);
+        const hidden = names.length - shown.length;
+        return {
+            text: names.length > 0 ? `PII ${shown.join(", ")}${hidden > 0 ? `, +${hidden} more` : ""}` : "",
+            verb: names.length === 1 ? "has" : "have"
+        };
+    };
+    const regexSubjectFor = (mode) => {
+        const count = regexPatterns.filter((r) => modeOf(r) === mode).length;
+        return {
+            text: count > 0 ? `${count} regex pattern${count === 1 ? "" : "s"}` : "",
+            verb: count === 1 ? "has" : "have"
+        };
+    };
+
+    // Labels only — the stored values stay "block"/"mask", which the engine depends on.
     const behaviorOptions = [
-        { label: "Block", value: "block" },
-        { label: "Mask", value: "mask" }
+        { label: "Enable detection", value: "block" },
+        { label: "Enable redaction", value: "mask" }
     ];
 
     return (
@@ -209,7 +242,7 @@ const SensitiveInfoStep = ({
                         }
                         checked={enablePiiTypes}
                         onChange={setEnablePiiTypes}
-                        helpText="Specify the types of PII to be filtered and the desired guardrail behavior."
+                        helpText="Specify the types of PII to be filtered and the desired guardrail mode."
                     />
                     {enablePiiTypes && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
@@ -251,6 +284,8 @@ const SensitiveInfoStep = ({
                                     </div>
                                 )}
 
+                                <ModeConflictBanner subjectFor={piiSubjectFor} />
+
                                 {piiTypes.length > 0 && (
                                     <Box style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
                                         <DataTable
@@ -268,7 +303,7 @@ const SensitiveInfoStep = ({
                                                         </span>
                                                     </Tooltip>
                                                 </HorizontalStack>,
-                                                'Guardrail behavior',
+                                                'Guardrail mode',
                                                 'Actions'
                                             ]}
                                             verticalAlign="middle"
@@ -375,11 +410,13 @@ const SensitiveInfoStep = ({
                                     </Button>
                                 </HorizontalStack>
 
+                                <ModeConflictBanner subjectFor={regexSubjectFor} />
+
                                 {regexPatterns.length > 0 && (
                                     <Box style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
                                         <DataTable
                                             columnContentTypes={['text', 'text', 'text']}
-                                            headings={['Regex pattern', 'Guardrail behavior', 'Actions']}
+                                            headings={['Regex pattern', 'Guardrail mode', 'Actions']}
                                             rows={regexPatterns.map((regex, index) => [
                                                 regex.pattern || 'Invalid pattern',
                                                 <Dropdown
@@ -420,6 +457,7 @@ const SensitiveInfoStep = ({
                                 <ControlInfoIcon
                                     {...SENSITIVE_INFO_DESCRIPTIONS.secretsDetection}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => setEnableSecrets(true)}
                                 />
                             </HorizontalStack>
                         }
@@ -427,71 +465,8 @@ const SensitiveInfoStep = ({
                         onChange={setEnableSecrets}
                         helpText="Detect and block secrets, API keys, passwords, and other sensitive information in user inputs."
                     />
-                    {enableSecrets && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <HorizontalStack gap="1" blockAlign="center">
-                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                    <ControlInfoIcon
-                                        {...SENSITIVE_INFO_DESCRIPTIONS.secretsConfidenceThreshold}
-                                        onTryPrompt={onTryPrompt}
-                                    />
-                                </HorizontalStack>
-                                <RangeSlider
-                                    label=""
-                                    value={secretsConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setSecretsConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting secrets."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
                 </Box>
 
-                {/* Sensitive Data Anonymization */}
-                <Box>
-                    <Checkbox
-                        label={
-                            <HorizontalStack gap="1" blockAlign="center">
-                                <RuleLabelWithTag name="Enable sensitive data anonymization" threats={RULE_OWASP_THREATS.anonymize} />
-                                <ControlInfoIcon
-                                    {...SENSITIVE_INFO_DESCRIPTIONS.anonymize}
-                                    onTryPrompt={onTryPrompt}
-                                />
-                            </HorizontalStack>
-                        }
-                        checked={enableAnonymize}
-                        onChange={setEnableAnonymize}
-                        helpText="Detect and automatically anonymize sensitive data (emails, credit cards, phone numbers, SSN, etc.) in user inputs by replacing them with placeholders like [REDACTED_EMAIL_1]. Original values are stored securely for later restoration if needed."
-                    />
-                    {enableAnonymize && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <HorizontalStack gap="1" blockAlign="center">
-                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                    <ControlInfoIcon
-                                        {...SENSITIVE_INFO_DESCRIPTIONS.anonymizeConfidenceThreshold}
-                                        onTryPrompt={onTryPrompt}
-                                    />
-                                </HorizontalStack>
-                                <RangeSlider
-                                    label=""
-                                    value={anonymizeConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setAnonymizeConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting sensitive data that should be anonymized."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
-                </Box>
             </VerticalStack>
         </VerticalStack>
     );

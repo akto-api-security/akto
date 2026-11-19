@@ -4,9 +4,11 @@ import PasswordTextField from "@/apps/dashboard/components/layouts/PasswordTextF
 import { useEffect, useState } from "react"
 import settingFunctions from "../module"
 import func from "@/util/func"
+import { usePermissions, whenAllowed } from "@/util/permissions"
 
 function OpenTelemetry() {
 
+    const { canCall } = usePermissions()
     const [endpoint, setEndpoint] = useState('')
     const [apiKey, setApiKey] = useState('')
     const [headerName, setHeaderName] = useState('')
@@ -93,12 +95,14 @@ function OpenTelemetry() {
                 content: isSaving ? 'Saving...' : 'Save',
                 onAction: addOpenTelemetryIntegration,
                 disabled: isSaveDisabled(),
-                loading: isSaving
+                loading: isSaving,
+                ...whenAllowed(canCall('api/addOpenTelemetryIntegration'))
             }}
             secondaryFooterActions={[{
                 content: 'Remove',
                 onAction: removeOpenTelemetryIntegration,
-                disabled: !isRemoveable || isSaving
+                disabled: !isRemoveable || isSaving,
+                ...whenAllowed(canCall('api/removeOpenTelemetryIntegration'))
             }]}
         >
             <LegacyCard.Section>
@@ -142,6 +146,7 @@ function OpenTelemetry() {
             cardContent={cardContent}
             component={openTelemetryCard}
             docsUrl="https://docs.akto.io/integrations/opentelemetry"
+            readOnly={!canCall('api/addOpenTelemetryIntegration')}
         />
     )
 }

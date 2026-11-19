@@ -1,24 +1,42 @@
-import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip, Avatar, Spinner } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Badge, Banner, Button, ActionList, Icon, List, Popover, Tooltip, Avatar, Spinner } from "@shopify/polaris"
 import { useRef, useMemo, useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
-import { CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor, ExportMinor, RefreshMinor, ChevronLeftMinor, ChevronRightMinor } from '@shopify/polaris-icons'
+import { CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor, ExportMinor, RefreshMinor, ChevronLeftMinor, ChevronRightMinor, CircleTickMajor } from '@shopify/polaris-icons'
 import InlineEditableText from "../../../components/shared/InlineEditableText"
+import ShowListInBadge from "../../../components/shared/ShowListInBadge"
 import func from "@/util/func"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE, isExtensionAgent, hasFailedDeployment, installIdToEpoch, getDeploymentAttempt } from "../api_collections/endpointShieldHelper";
 import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
 import settingRequests from "../../settings/api";
 import DetailGrid from "../agentic/DetailGrid";
+import DiagnosticsTab from "./DiagnosticsTab";
+import { usePermissions } from "@/util/permissions";
 
 const ANIMATION_DURATION = 0.2;
+// Badge status per level. DEBUG maps to no status on purpose — the neutral grey badge
+// is what separates it from INFO — so the lookup below must not collapse it into the
+// 'info' fallback, which is only there for a level we do not know.
 const LOG_LEVEL_TONES = {
+    DEBUG: undefined,
     INFO: 'info',
+    WARN: 'warning',
     WARNING: 'warning',
-    ERROR: 'critical'
+    ERROR: 'critical',
+    CRITICAL: 'critical'
 };
+// Minimum-severity filter (getAgentLogs `level`): each option includes every
+// level above it. '' = no filter.
+const LOG_LEVEL_FILTER_OPTIONS = [
+    { label: 'All levels', value: '' },
+    { label: 'Critical', value: 'critical' },
+    { label: 'Error & above', value: 'error' },
+    { label: 'Warning & above', value: 'warn' },
+    { label: 'Info & above', value: 'info' },
+];
 const ICON_SIZE = { maxWidth: "1rem", maxHeight: "1rem" };
 const LOG_TIMESTAMP_WIDTH = "140px";
 const LOG_LEVEL_WIDTH = "50px";
@@ -91,6 +109,13 @@ const DEVICE_INFO_SECTIONS = [
         title: "Agent",
         fields: [
             { label: "Shield Version", key: "agentVersion" },
+            { label: "Last Deployment", key: "installStartedTs", format: (v, agent) => {
+                const attempt = getDeploymentAttempt(agent);
+                if (!attempt) return null;
+                return `${func.epochToDateTime(attempt.startedTs)} · ${attempt.outcome || 'unknown'}`;
+            } },
+            { label: "Deployed Version", key: "installVersion" },
+            { label: "First Seen",     key: "firstSeen",     format: (v) => v ? func.epochToDateTime(v) : null },
         ],
     },
 ];
@@ -147,10 +172,46 @@ const mcpServersHeaders = [
     createSimpleHeader("Last Updated", "lastSeenFormatted")
 ];
 
+// Vulnerability scanning for installed apps is still being validated (NVD-backed CPE matching can
+// misidentify apps sharing a name with an unrelated product) — restricted to this account until it's
+// ready for general rollout.
+const VULN_STATUS_ENABLED_ACCOUNT_ID = 1785654409;
+
 const installedAppsHeaders = [
     createSimpleHeader("App Name", "name"),
     createSimpleHeader("Version", "version"),
 ];
+
+const vulnStatusHeader = {
+    ...createSimpleHeader("Vulnerability Status", "vulnComp"),
+    title: (
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
+            <Text as="span">Vulnerability Status</Text>
+            <Badge size="small" status="info">Beta</Badge>
+        </HorizontalStack>
+    ),
+};
+
+const installedAppsHeadersWithVulnStatus = [
+    vulnStatusHeader,
+    ...installedAppsHeaders,
+];
+
+// vuln is an InstalledAppVulnerability ({ misconfiguredApp, vulnIds }) from
+// checkInstalledAppVulnerabilities, keyed by "name#version". The apps table itself renders
+// immediately from selectedAgent; this column alone trails behind while the check is in flight —
+// checking is true until that fetch settles, vuln stays null/undefined until this row's result lands.
+const getAppVulnStatusComp = (vuln, checking) => {
+    if (!vuln) return checking ? <Spinner size="small" accessibilityLabel="Checking for known vulnerabilities" /> : null;
+    if (vuln.misconfiguredApp) {
+        return <ShowListInBadge itemsArr={vuln.vulnIds} maxItems={3} status="critical" useTooltip={true} />;
+    }
+    return (
+        <Tooltip content="No known vulnerabilities found" dismissOnMouseOut>
+            <Icon source={CircleTickMajor} color="success" />
+        </Tooltip>
+    );
+};
 
 function AgentDetails({
     show,
@@ -163,7 +224,9 @@ function AgentDetails({
     endTimestamp,
 }) {
     const navigate = useNavigate();
+    const { canCall } = usePermissions();
     const copyRef = useRef(null);
+    const isVulnStatusEnabled = window?.ACTIVE_ACCOUNT === VULN_STATUS_ENABLED_ACCOUNT_ID;
 
     const [loading, setLoading] = useState(false);
     const [tabLoading, setTabLoading] = useState(false);
@@ -177,9 +240,22 @@ function AgentDetails({
     const [totalCount, setTotalCount] = useState(0);
     const [selectedLogSource, setSelectedLogSource] = useState('installation-logs');
     const logSourceRef = useRef('installation-logs');
+    // Minimum log level shown ('' = all). A failed install's Install tab is
+    // 1-2.5k rows; the handful that explain the failure are the error ones.
+    const [minLevel, setMinLevel] = useState('');
+    const minLevelRef = useRef('');
+    const [levelPopoverActive, setLevelPopoverActive] = useState(false);
+    // Lets the failure banner open the Logs tab (see LayoutWithTabs selectedTabId).
+    const [selectedTab, setSelectedTab] = useState({ id: null, nonce: 0 });
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
+    const [appVulnerabilities, setAppVulnerabilities] = useState({}); // "name#version" -> InstalledAppVulnerability
+    const [appVulnLoading, setAppVulnLoading] = useState(false);
+    // GithubSimpleTable wraps `data` in a fetchData callback that GithubServerTable only re-invokes on
+    // sort/filter/page changes or when this callFromOutside value changes — not on every parent re-render
+    // — so without bumping it, the table keeps showing its initial (pre-fetch) snapshot forever.
+    const [appVulnRefreshKey, setAppVulnRefreshKey] = useState(0);
 
     const fetchPage = useCallback(async (afterId, updateTotal = false) => {
         if (!selectedAgent) return;
@@ -189,12 +265,14 @@ function AgentDetails({
                 selectedAgent.agentId, startTimestamp, endTimestamp,
                 logSourceRef.current,
                 afterId,
-                PAGE_SIZE
+                PAGE_SIZE,
+                minLevelRef.current || null
             );
             const transformed = (res.agentLogs || []).map(log => ({
                 hexId: log.hexId,
                 timestamp: log.timestamp,
-                level: log.level || 'INFO',
+                // Senders differ in case (agent "ERROR", installers "error").
+                level: (log.level || 'INFO').toUpperCase(),
                 message: log.log || log.message
             }));
             setCurrentPageLogs(transformed);
@@ -218,6 +296,29 @@ function AgentDetails({
         setCurrentPageLogs([]);
         await fetchPage(null, true);
     }, [selectedAgent, fetchPage]);
+
+    const handleMinLevelChange = useCallback(async (value) => {
+        setLevelPopoverActive(false);
+        if (minLevelRef.current === value) return;
+        minLevelRef.current = value;
+        setMinLevel(value);
+        if (!selectedAgent) return;
+        setPageStack([null]);
+        setPageIndex(0);
+        setCurrentPageLogs([]);
+        await fetchPage(null, true);
+    }, [selectedAgent, fetchPage]);
+
+    // Failure banner action: Install logs at "Error & above", on the Logs tab.
+    const showInstallErrors = useCallback(() => {
+        logSourceRef.current = 'installation-logs';
+        setSelectedLogSource('installation-logs');
+        minLevelRef.current = 'error';
+        setMinLevel('error');
+        setPageStack([null]);
+        setPageIndex(0);
+        setSelectedTab(prev => ({ id: 'agent-logs', nonce: prev.nonce + 1 }));
+    }, []);
 
     const handleRefresh = useCallback(async () => {
         setPageStack([null]);
@@ -248,7 +349,8 @@ function AgentDetails({
         try {
             const res = await settingRequests.exportAgentLogs(
                 selectedAgent.agentId, startTimestamp, endTimestamp,
-                logSourceRef.current
+                logSourceRef.current,
+                minLevelRef.current || null
             );
             const logs = res.agentLogs || [];
             if (logs.length === 0) return;
@@ -259,7 +361,7 @@ function AgentDetails({
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${logSourceRef.current}-${selectedAgent.agentId}.log`;
+            a.download = `${logSourceRef.current}${minLevelRef.current ? `-${minLevelRef.current}-and-above` : ''}-${selectedAgent.agentId}.log`;
             a.click();
             URL.revokeObjectURL(url);
         } catch (error) {
@@ -277,7 +379,19 @@ function AgentDetails({
 
     // Reset state when agent changes and fetch data for the default first tab (MCP Servers).
     useEffect(() => {
-        if (!selectedAgent || !show) return;
+        if (!selectedAgent || !show) {
+            // Closing has to clear the log view as well. The panel's children unmount, so
+            // on the next open LayoutWithTabs mounts and acts on selectedTabId before this
+            // effect runs (child effects flush first) — left stale after "View error logs",
+            // it would reopen on the Logs tab and fetch error-only rows while the level
+            // chip, reset a moment later, reads "All levels".
+            setSelectedTab(prev => (prev.id === null && prev.nonce === 0 ? prev : { id: null, nonce: 0 }));
+            setSelectedLogSource('installation-logs');
+            logSourceRef.current = 'installation-logs';
+            setMinLevel('');
+            minLevelRef.current = '';
+            return;
+        }
 
         setMcpServers([]);
         setCurrentPageLogs([]);
@@ -288,9 +402,15 @@ function AgentDetails({
         setTotalCount(0);
         setSelectedLogSource('installation-logs');
         logSourceRef.current = 'installation-logs';
+        setMinLevel('');
+        minLevelRef.current = '';
+        setSelectedTab({ id: null, nonce: 0 });
         setDescription("");
         setEditableDescription("");
         setIsEditingDescription(false);
+        setAppVulnerabilities({});
+        setAppVulnLoading(false);
+        setAppVulnRefreshKey(0);
 
         setLoading(true);
         settingRequests.getMcpServersByAgent(selectedAgent.agentId, selectedAgent.hostname)
@@ -322,10 +442,30 @@ function AgentDetails({
                 await fetchPage(null, true);
                 break;
             }
+            case 'installed-apps': {
+                if (!isVulnStatusEnabled) break;
+                // Apps table renders immediately from selectedAgent — don't gate it behind this fetch.
+                // Only the per-row Status cell (getAppVulnStatusComp) waits on appVulnLoading.
+                const appsToCheck = (selectedAgent.installedApps || [])
+                    .map(app => ({ name: sanitizeAppText(app.name), version: app.version ? sanitizeAppText(app.version) : '' }))
+                    .filter(app => app.name && app.version);
+                if (appsToCheck.length === 0) break;
+                setAppVulnLoading(true);
+                try {
+                    const res = await settingRequests.checkInstalledAppVulnerabilities(appsToCheck);
+                    setAppVulnerabilities(res);
+                } catch {
+                    setAppVulnerabilities({});
+                } finally {
+                    setAppVulnLoading(false);
+                    setAppVulnRefreshKey(k => k + 1);
+                }
+                break;
+            }
             default:
                 break;
         }
-    }, [selectedAgent, fetchPage]);
+    }, [selectedAgent, fetchPage, isVulnStatusEnabled]);
 
     const mcpServersTableData = useMemo(() =>
         mcpServers.map(server => ({
@@ -336,14 +476,25 @@ function AgentDetails({
             collectionName: server.collectionName
         })), [mcpServers]);
 
-    const installedAppsTableData = useMemo(() =>
-        [...(selectedAgent?.installedApps || [])]
-            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-            .map(app => ({
-                name: sanitizeAppText(app.name) || '\u2014',
-                version: app.version ? sanitizeAppText(app.version) : '\u2014',
-            })),
-    [selectedAgent]);
+    const installedAppsTableData = useMemo(() => {
+        const enriched = (selectedAgent?.installedApps || []).map(app => {
+            const name = sanitizeAppText(app.name);
+            const version = app.version ? sanitizeAppText(app.version) : '';
+            const vuln = (name && version) ? appVulnerabilities[`${name}#${version}`] : null;
+            return { name, version, vuln };
+        });
+
+        return enriched
+            .sort((a, b) => {
+                const vulnRank = (b.vuln?.misconfiguredApp ? 1 : 0) - (a.vuln?.misconfiguredApp ? 1 : 0);
+                return vulnRank !== 0 ? vulnRank : (a.name || '').localeCompare(b.name || '');
+            })
+            .map(({ name, version, vuln }) => ({
+                name: name || '\u2014',
+                version: version || '\u2014',
+                vulnComp: getAppVulnStatusComp(vuln, appVulnLoading),
+            }));
+    }, [selectedAgent, appVulnerabilities, appVulnLoading]);
 
     const handleServerClick = useCallback((server) => {
         const collection = allCollections.find(col =>
@@ -362,6 +513,7 @@ function AgentDetails({
             { label: 'Install', value: 'installation-logs' },
             { label: 'Agent', value: 'agent-logs' },
             { label: 'Proxy', value: 'proxy-logs' },
+            { label: 'System Proxy', value: 'system-proxy-logs' },
         ];
 
         const controls = (
@@ -378,7 +530,32 @@ function AgentDetails({
                         </Button>
                     ))}
                 </HorizontalStack>
-                <HorizontalStack gap="1">
+                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                    <Popover
+                        active={levelPopoverActive}
+                        onClose={() => setLevelPopoverActive(false)}
+                        preferredAlignment="right"
+                        activator={
+                            <Button
+                                size="micro"
+                                disclosure
+                                pressed={!!minLevel}
+                                disabled={logsLoading}
+                                onClick={() => setLevelPopoverActive(active => !active)}
+                            >
+                                {`Level: ${LOG_LEVEL_FILTER_OPTIONS.find(o => o.value === minLevel)?.label || 'All levels'}`}
+                            </Button>
+                        }
+                    >
+                        <ActionList
+                            actionRole="menuitemradio"
+                            items={LOG_LEVEL_FILTER_OPTIONS.map(({ label, value }) => ({
+                                content: label,
+                                active: minLevel === value,
+                                onAction: () => handleMinLevelChange(value),
+                            }))}
+                        />
+                    </Popover>
                     <Button
                         size="micro"
                         icon={RefreshMinor}
@@ -417,7 +594,7 @@ function AgentDetails({
         } else if (currentPageLogs.length === 0) {
             logBody = (
                 <Box padding="8">
-                    <Text variant="bodyMd" color="subdued" alignment="center">No logs found for this time window.</Text>
+                    <Text variant="bodyMd" color="subdued" alignment="center">{minLevel ? `No logs at ${LOG_LEVEL_FILTER_OPTIONS.find(o => o.value === minLevel)?.label.toLowerCase()} for this time window.` : "No logs found for this time window."}</Text>
                 </Box>
             );
         } else {
@@ -439,7 +616,7 @@ function AgentDetails({
                                         </Text>
                                     </Box>
                                     <Box minWidth={LOG_LEVEL_WIDTH}>
-                                        <Badge size="small" tone={LOG_LEVEL_TONES[log.level] || 'info'}>
+                                        <Badge size="small" status={log.level in LOG_LEVEL_TONES ? LOG_LEVEL_TONES[log.level] : 'info'}>
                                             {log.level}
                                         </Badge>
                                     </Box>
@@ -528,6 +705,23 @@ function AgentDetails({
         panelID: 'agent-logs-panel',
     };
 
+    const configureEnvFields = useMemo(() => {
+        if (!selectedAgent) return allowedEnvFields;
+        const isExtension = isExtensionAgent(selectedAgent.deviceId, selectedAgent.agentVersion);
+        return (allowedEnvFields || []).filter((field) => {
+            if (isExtension && (field.key === "ENABLE_AUTO_UPDATE" || field.key === "UPDATE_TO_LATEST_VERSION")) return false;
+            return true;
+        });
+    }, [allowedEnvFields, selectedAgent]);
+
+    // The device's diagnostic history (installer, agent setup, on-demand reports).
+    const DiagnosticsTabDef = {
+        id: 'diagnostics',
+        content: 'Diagnostics',
+        component: <DiagnosticsTab agent={selectedAgent} />,
+        panelID: 'diagnostics-panel',
+    };
+
     const ConfigureTab = {
         id: 'configure',
         content: 'Configure',
@@ -537,8 +731,9 @@ function AgentDetails({
                     title="Environment Variables"
                     description="Configure environment variables for this agent. Changes will be picked up on the next poll cycle."
                     module={selectedAgent?._moduleData}
-                    allowedEnvFields={allowedEnvFields}
+                    allowedEnvFields={configureEnvFields}
                     onSaveEnv={onSaveEnv}
+                    readOnly={!canCall('api/updateModuleEnvAndReboot')}
                 />
             </Box>
         ),
@@ -564,9 +759,10 @@ function AgentDetails({
                 <GithubSimpleTable
                     key="installed-apps-table"
                     data={installedAppsTableData}
+                    callFromOutside={appVulnRefreshKey}
                     resourceName={{ singular: "app", plural: "apps" }}
-                    headers={installedAppsHeaders}
-                    headings={installedAppsHeaders}
+                    headers={isVulnStatusEnabled ? installedAppsHeadersWithVulnStatus : installedAppsHeaders}
+                    headings={isVulnStatusEnabled ? installedAppsHeadersWithVulnStatus : installedAppsHeaders}
                     useNewRow={true}
                     condensedHeight={true}
                     hideQueryField={true}
@@ -578,7 +774,54 @@ function AgentDetails({
         panelID: 'installed-apps-panel',
     };
 
-   
+    // Failure summary the installer sends with a failed installStatus. Shown at
+    // the top of the panel so the cause is visible without reading the logs.
+    // installOutcome is the installer's verdict for the latest attempt and is never
+    // overwritten by the agent — so a failed deploy still shows when an older agent
+    // keeps running (e.g. a corrupt pkg left the previous install in place).
+    const installFailureBanner = hasFailedDeployment(selectedAgent) ? (() => {
+        // Kept to what a reader acts on: what failed, the specific causes, and
+        // when. The exit code and install-run id stay in the logs ("View error
+        // logs"), where they are used to correlate a run.
+        const findings = (selectedAgent.installFindings || []).slice(0, 3);
+        // The diagnostic's verdict describes the device as it is now. It adds
+        // nothing when the device is healthy (e.g. a failed deploy that left the
+        // previous install running — the reason already says so).
+        const deviceState = selectedAgent.installDiagnosis && !/^HEALTHY\b/.test(selectedAgent.installDiagnosis)
+            ? selectedAgent.installDiagnosis : null;
+        const attemptedAt = selectedAgent.installStartedTs || installIdToEpoch(selectedAgent.installId);
+        return (
+            <Box paddingBlockStart="3" key="install-failure">
+                <Banner
+                    status="critical"
+                    title="Last deployment failed"
+                    action={{ content: 'View error logs', onAction: showInstallErrors }}
+                    secondaryAction={{
+                        content: 'View diagnostic report',
+                        onAction: () => setSelectedTab(prev => ({ id: 'diagnostics', nonce: prev.nonce + 1 })),
+                    }}
+                >
+                    <VerticalStack gap="2">
+                        <Text as="p">
+                            {selectedAgent.installFailureReason || 'The installer reported a failure. Open the error logs for details.'}
+                        </Text>
+                        {findings.length > 0 ? (
+                            <List type="bullet">
+                                {findings.map((finding, i) => <List.Item key={i}>{finding}</List.Item>)}
+                            </List>
+                        ) : null}
+                        {deviceState ? (
+                            <Text as="p"><Text as="span" fontWeight="semibold">Device state: </Text>{deviceState}</Text>
+                        ) : null}
+                        {attemptedAt ? (
+                            <Text as="p" variant="bodySm" color="subdued">{`Attempted ${func.prettifyEpoch(attemptedAt)}`}</Text>
+                        ) : null}
+                    </VerticalStack>
+                </Banner>
+            </Box>
+        );
+    })() : null;
+
     if (!selectedAgent) return null;
 
     return (
@@ -640,12 +883,15 @@ function AgentDetails({
                         </Box>
                     </VerticalStack>
                 </HorizontalStack>,
+                installFailureBanner,
                 <LayoutWithTabs
                     key="tabs"
-                    tabs={[McpServersTab, DeviceTab, AppsTab, AgentLogsTab, ConfigureTab]}
+                    tabs={[McpServersTab, DeviceTab, AppsTab, AgentLogsTab, DiagnosticsTabDef, ConfigureTab]}
                     currTab={handleTabChange}
+                    selectedTabId={selectedTab.id}
+                    selectedTabNonce={selectedTab.nonce}
                 />
-            ]}
+            ].filter(Boolean)}
         />
     );
 }

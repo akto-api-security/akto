@@ -68,7 +68,7 @@ public class WindowBasedThresholdNotifier {
     boolean isDistinctMode = rule.getCondition().getDistinctIdentifier() != null;
 
     if (isDistinctMode) {
-      return shouldNotifyDistinct(aggKey, binId, rule, shouldIncrement, breachFilterPassed, identity);
+      return checkDistinct(aggKey, maliciousEvent, rule, shouldIncrement, breachFilterPassed, identity) != null;
     }
 
     String cacheKey = aggKey + "|" + binId;
@@ -94,9 +94,11 @@ public class WindowBasedThresholdNotifier {
     return false;
   }
 
-  private boolean shouldNotifyDistinct(String aggKey, int binId, Rule rule, boolean shouldIncrement, boolean breachFilterPassed, String identity) {
+  /** Returns the distinct members in the window when the threshold is breached, else null. */
+  public Set<String> checkDistinct(String aggKey, SampleMaliciousRequest maliciousEvent, Rule rule, boolean shouldIncrement, boolean breachFilterPassed, String identity) {
+    int binId = (int) maliciousEvent.getTimestamp() / 60;
     if (identity == null || identity.isEmpty()) {
-      return false;
+      return null;
     }
 
     String setKeyPrefix = "dset|" + aggKey;
@@ -107,7 +109,7 @@ public class WindowBasedThresholdNotifier {
     }
 
     if (!breachFilterPassed) {
-      return false;
+      return null;
     }
 
     // Union distinct members across all bins in window
@@ -121,10 +123,10 @@ public class WindowBasedThresholdNotifier {
 
     if (distinctMembers.size() >= rule.getCondition().getDistinctIdentifier().getCount()) {
       this.cache.resetSet(currentBinKey);
-      return true;
+      return distinctMembers;
     }
 
-    return false;
+    return null;
   }
 
   public List<Bin> getBins(String aggKey, int binStart, int binEnd) {

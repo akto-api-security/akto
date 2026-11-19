@@ -1,23 +1,30 @@
 package com.akto.gateway;
 
 import com.akto.log.LoggerMaker;
-import com.akto.utils.SlackUtils;
+import com.akto.utils.OperationalAlerts;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.binder.okhttp3.OkHttpMetricsEventListener;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import okhttp3.MediaType;
+import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 
 public class GuardrailsClient {
 
@@ -32,26 +39,52 @@ public class GuardrailsClient {
 
     private static final OkHttpClient HTTP_CLIENT = buildHttpClient(TIMEOUT_MS);
 
+    public static final String VALIDATE_FILE_ENDPOINT = "/api/validate/file";
+
+    // File validation extracts text and runs guardrails over every chunk, so it takes seconds
+    // to minutes, not the inline 3s. Matches the browser extension's 150s wait by default.
+    private static final int FILE_TIMEOUT_MS = resolveTimeoutMs("GUARDRAILS_FILE_CLIENT_TIMEOUT_MS", 150_000);
+
     private final String guardrailsServiceUrl;
+    private final OkHttpClient httpClient;
+    private final OkHttpClient fileHttpClient;
+    private final BiConsumer<String, String> alerts;
 
     public GuardrailsClient() {
-        this.guardrailsServiceUrl = loadServiceUrlFromEnv();
+        this(loadServiceUrlFromEnv(), HTTP_CLIENT, OperationalAlerts::send);
         loggerMaker.infoAndAddToDb("GuardrailsClient initialized - URL: {}", guardrailsServiceUrl);
     }
 
     public GuardrailsClient(String serviceUrl, int timeout) {
+        this(serviceUrl, HTTP_CLIENT, OperationalAlerts::send);
+    }
+
+    GuardrailsClient(String serviceUrl, OkHttpClient httpClient, BiConsumer<String, String> alerts) {
         this.guardrailsServiceUrl = serviceUrl;
+        this.httpClient = httpClient;
+        // Derived, not separately built: shares the dispatcher, pool, metrics listener and any
+        // test interceptors, and only widens the timeouts.
+        this.fileHttpClient = httpClient.newBuilder()
+                .readTimeout(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .writeTimeout(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .callTimeout(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .build();
+        this.alerts = alerts;
     }
 
     private static int resolveTimeoutMs() {
-        String raw = System.getenv("GUARDRAILS_CLIENT_TIMEOUT_MS");
+        return resolveTimeoutMs("GUARDRAILS_CLIENT_TIMEOUT_MS", 3_000);
+    }
+
+    private static int resolveTimeoutMs(String envKey, int defaultMs) {
+        String raw = System.getenv(envKey);
         if (raw == null || raw.trim().isEmpty()) {
-            return 3_000;
+            return defaultMs;
         }
         try {
             return Math.max(500, Integer.parseInt(raw.trim()));
         } catch (NumberFormatException e) {
-            return 3_000;
+            return defaultMs;
         }
     }
 
@@ -63,8 +96,31 @@ public class GuardrailsClient {
                 .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                // Client-level metrics: Micrometer times/counts every call automatically, so no
+                // instrumentation leaks into callValidate. Tags method/uri/status/outcome give
+                // latency (p50/p95/p99), throughput, and transport failures (status=IO_ERROR = the
+                // fail-open-on-timeout case). uri is the bounded endpoint path; recorded on the
+                // global registry, which the data-ingestion-service Prometheus registry is bound to.
+                // One shared metric name for every outbound HTTP client (akto.http.client.requests),
+                // distinguished by the "client" tag - so all external calls share dashboards/alerts
+                // instead of each client minting its own metric name.
+                //   client     - names the dependency (here "guardrails"); other clients reuse the
+                //                 same name with client="abstractor", client="http_ingest", ...
+                //   account.id - deployment account parsed once from the JWT in
+                //                DATABASE_ABSTRACTOR_SERVICE_TOKEN (OperationalAlerts.deploymentAccountId,
+                //                "unknown" if absent); a per-process constant, so cardinality 1.
+                .eventListener(OkHttpMetricsEventListener
+                        .builder(Metrics.globalRegistry, EXTERNAL_HTTP_CLIENT_METRIC)
+                        .tags(Tags.of("client", "guardrails",
+                                "account.id", OperationalAlerts.deploymentAccountId()))
+                        .uriMapper(req -> req.url().encodedPath())
+                        .includeHostTag(false)
+                        .build())
                 .build();
     }
+
+    /** Shared metric name for all outbound HTTP clients; the "client" tag names the dependency. */
+    public static final String EXTERNAL_HTTP_CLIENT_METRIC = "akto.http.client.requests";
 
     private static Dispatcher buildDispatcher() {
         Dispatcher dispatcher = new Dispatcher();
@@ -92,19 +148,71 @@ public class GuardrailsClient {
         return false;
     }
 
-    @SuppressWarnings("unchecked")
     public Map<String, Object> callValidate(Map<String, Object> request, String endpoint) {
+        return execute(endpoint, request, httpClient,
+                () -> RequestBody.create(objectMapper.writeValueAsString(request), JSON));
+    }
+
+    /**
+     * Multipart call to guardrails-service {@code /api/validate/file}. Each file goes as a
+     * {@code file} part, each URL as a {@code url} field, and every non-null entry of
+     * {@code fields} as a text field. Uses the longer file timeout (extraction plus a
+     * guardrail pass per chunk) and the same fail-open handling as the JSON validators.
+     */
+    public Map<String, Object> callValidateFile(Map<String, String> fields, List<FilePart> files, List<String> urls) {
+        return execute(VALIDATE_FILE_ENDPOINT, fields, fileHttpClient,
+                () -> buildFileBody(fields, files, urls));
+    }
+
+    private static RequestBody buildFileBody(Map<String, String> fields, List<FilePart> files, List<String> urls) {
+        MultipartBody.Builder builder = new MultipartBody.Builder().setType(MultipartBody.FORM);
+        for (Map.Entry<String, String> field : fields.entrySet()) {
+            if (field.getValue() != null) {
+                builder.addFormDataPart(field.getKey(), field.getValue());
+            }
+        }
+        for (FilePart part : files) {
+            MediaType type = part.contentType == null ? null : MediaType.parse(part.contentType);
+            builder.addFormDataPart("file", part.fileName, RequestBody.create(part.file, type));
+        }
+        for (String url : urls) {
+            builder.addFormDataPart("url", url);
+        }
+        return builder.build();
+    }
+
+    /** One uploaded file to forward: its bytes on disk plus the name/type the caller sent. */
+    public static final class FilePart {
+        private final File file;
+        private final String fileName;
+        private final String contentType;
+
+        public FilePart(File file, String fileName, String contentType) {
+            this.file = file;
+            this.fileName = fileName;
+            this.contentType = contentType;
+        }
+    }
+
+    @FunctionalInterface
+    private interface BodySupplier {
+        RequestBody get() throws Exception;
+    }
+
+    /** {@code context} is the caller's request data, read only for path/method/account in logs. */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> execute(String endpoint, Map<String, ?> context, OkHttpClient client, BodySupplier bodySupplier) {
+        // Single result reference assigned on every return path, so the decision counter is
+        // recorded exactly once (in finally) regardless of which branch we exit through.
+        Map<String, Object> result = null;
         try {
-            String jsonRequest = objectMapper.writeValueAsString(request);
             String url = guardrailsServiceUrl + endpoint;
 
             loggerMaker.infoAndAddToDb("Calling guardrails service at: {}", url);
 
-            RequestBody body = RequestBody.create(jsonRequest, JSON);
             Request.Builder requestBuilder = new Request.Builder()
                     .url(url)
-                    .post(body)
-                    .addHeader("Content-Type", "application/json");
+                    .post(bodySupplier.get());
 
             String authToken = loadGuardrailsAuthToken();
             if (authToken == null || authToken.trim().isEmpty()) {
@@ -115,43 +223,131 @@ public class GuardrailsClient {
 
             Request httpRequest = requestBuilder.build();
 
-            try (Response response = HTTP_CLIENT.newCall(httpRequest).execute()) {
+            try (Response response = client.newCall(httpRequest).execute()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
 
                 loggerMaker.infoAndAddToDb("Guardrails response (status {}): {}", response.code(), responseBody);
 
                 if (response.isSuccessful()) {
                     try {
-                        return objectMapper.readValue(responseBody, Map.class);
+                        result = objectMapper.readValue(responseBody, Map.class);
+                        return result;
                     } catch (Exception parseEx) {
                         loggerMaker.warnAndAddToDb(
                             "Guardrails response not parseable, failing open - path: {}, error: {}",
-                            request.get("path"), parseEx.getMessage());
-                        return buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
+                            context.get("path"), parseEx.getMessage());
+                        result = buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
+                        return result;
                     }
                 }
                 loggerMaker.warnAndAddToDb(
                     "Guardrails service returned error status {}, failing open - path: {}",
-                    response.code(), request.get("path"));
-                return buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
+                    response.code(), context.get("path"));
+                result = buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
+                return result;
             }
 
         } catch (Exception e) {
             if (isFailOpenTransportError(e)) {
-                // Expected under load: return the same allow verdict shape as success; do not
-                // treat as a client-facing failure or spam Slack on every timeout.
+                // Preserve fail-open behavior; notifications are asynchronous and rate limited.
                 loggerMaker.warnAndAddToDb(
                     "Guardrails unavailable ({}), failing open - path: {}, method: {}, account: {}",
-                    e.getMessage(), request.get("path"), request.get("method"), request.get("akto_account_id"));
-                return buildFailOpenResponse(e.getMessage());
+                    e.getMessage(), context.get("path"), context.get("method"), context.get("akto_account_id"));
+            } else {
+                loggerMaker.errorAndAddToDb(e, "Unexpected error calling guardrails service: {}", e.getMessage());
             }
-            loggerMaker.errorAndAddToDb(e, "Unexpected error calling guardrails service: {}", e.getMessage());
-            String alertMsg = "[guardrails] Service call failed - path: " + request.get("path")
-                + ", method: " + request.get("method")
-                + ", account: " + request.get("akto_account_id")
-                + ", error: " + e.getMessage();
-            SlackUtils.sendAlert(alertMsg);
-            return buildFailOpenResponse(e.getMessage());
+
+            alertServiceUnreachable(endpoint, e);
+            result = buildFailOpenResponse(e.getMessage());
+            return result;
+        } finally {
+            recordDecision(endpoint, result);
+        }
+    }
+
+    /** Guardrails validation counter, tagged by decision (Prometheus: akto_guardrails_validations_total). */
+    public static final String GUARDRAILS_VALIDATIONS_METRIC = "akto.guardrails.validations";
+
+    /**
+     * Records exactly one guardrails decision per callValidate. Every verdict in the platform flows
+     * through callValidate (http-proxy, the webhooks and Gateway), so this single point covers them
+     * all. Wrapped in try/catch so a metrics failure can never break or slow the validation path.
+     */
+    private static void recordDecision(String endpoint, Map<String, Object> result) {
+        try {
+            Metrics.globalRegistry.counter(GUARDRAILS_VALIDATIONS_METRIC,
+                    "endpoint", endpoint,
+                    "decision", classifyDecision(result),
+                    "modified", Boolean.toString(isModified(result)),
+                    "account.id", OperationalAlerts.deploymentAccountId()
+            ).increment();
+        } catch (Exception ignore) {
+            // metrics must never affect the guardrails call path
+        }
+    }
+
+    /** True when guardrails changed the payload (redaction). Absent/missing -> false. */
+    private static boolean isModified(Map<String, Object> result) {
+        Object modified = field(result, "Modified", "modified");
+        return modified != null && toBool(modified);
+    }
+
+    /**
+     * fail_open wins whenever no real verdict was produced (buildFailOpenResponse sets failOpen=true,
+     * and also Allowed=true - so this must be checked first). Otherwise the verdict is read from both
+     * key casings, mirroring Gateway.isAllowed. A real response that carries no verdict field is
+     * reported as "unknown" - never assumed allowed, so an answered-but-verdictless response is not
+     * miscounted as an allow.
+     */
+    private static String classifyDecision(Map<String, Object> result) {
+        if (result == null || isFailOpen(result)) {
+            return "fail_open";
+        }
+        Object verdict = field(result, "Allowed", "allowed");
+        if (verdict == null) {
+            return "unknown";
+        }
+        return toBool(verdict) ? "allowed" : "blocked";
+    }
+
+    private static boolean isFailOpen(Map<String, Object> result) {
+        Object failOpen = field(result, "failOpen", "failOpen");
+        return failOpen != null && toBool(failOpen);
+    }
+
+    /**
+     * Single point where the guardrails response contract is read: returns the first non-null value
+     * among the given keys (handles both casings), null-safe on the map and every key. If the API
+     * response shape changes, adjust the key list here rather than across call sites.
+     */
+    private static Object field(Map<String, Object> result, String... keys) {
+        if (result == null) {
+            return null;
+        }
+        for (String key : keys) {
+            Object value = result.get(key);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    /** Lenient boolean: a real Boolean, else parsed from its string form. Never throws. */
+    private static boolean toBool(Object value) {
+        return (value instanceof Boolean) ? (Boolean) value : Boolean.parseBoolean(String.valueOf(value));
+    }
+
+    /** Endpoint and exception type only: never request data, which may carry customer payloads. */
+    private void alertServiceUnreachable(String endpoint, Exception cause) {
+        String account = OperationalAlerts.deploymentAccountId();
+        try {
+            alerts.accept("guardrails:" + account + ":" + endpoint,
+                    "Guardrails service unreachable; traffic was allowed without a verdict"
+                    + "\nAccount: " + account + "\nEndpoint: " + OperationalAlerts.label(endpoint)
+                    + "\nFailure: " + cause.getClass().getSimpleName());
+        } catch (Exception alertError) {
+            loggerMaker.warn("Could not enqueue guardrails unreachable alert");
         }
     }
 

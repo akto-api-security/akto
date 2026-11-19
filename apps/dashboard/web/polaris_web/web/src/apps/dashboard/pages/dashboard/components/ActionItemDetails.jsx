@@ -6,7 +6,7 @@ import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
 import FlyoutTable from './FlyoutTable';
 import IssuesBySubCategoryFlyout from './IssuesBySubCategoryFlyout';
 
-function ActionItemDetails({ item, jiraTicketUrlMap = {}, onJiraButtonClick, allApiInfo, apiInfoLoading }) {
+function ActionItemDetails({ item, jiraTicketUrlMap = {}, onJiraButtonClick }) {
     if (!item) return null;
 
     const itemData = item?.actionItemObj || item;
@@ -86,13 +86,11 @@ function ActionItemDetails({ item, jiraTicketUrlMap = {}, onJiraButtonClick, all
                 </Text>
             </Box>
             {itemData?.actionItemType === 'BUILD_REMEDIATION_PLAYBOOKS' ? (
-                <IssuesBySubCategoryFlyout urlsByIssues={allApiInfo?.urlsByIssues} />
+                <IssuesBySubCategoryFlyout />
             ) : (
-                <FlyoutTable 
-                    actionItemType={itemData?.actionItemType} 
+                <FlyoutTable
+                    actionItemType={itemData?.actionItemType}
                     count={itemData?.count}
-                    allApiInfo={allApiInfo} 
-                    apiInfoLoading={apiInfoLoading} 
                 />
             )}
         </VerticalStack>

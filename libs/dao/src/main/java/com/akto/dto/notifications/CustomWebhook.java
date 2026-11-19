@@ -5,6 +5,7 @@ import org.bson.codecs.pojo.annotations.BsonId;
 import com.akto.dto.type.URLMethods.Method;
 
 import java.util.List;
+import java.util.Map;
 
 public class CustomWebhook {
 
@@ -39,6 +40,14 @@ public class CustomWebhook {
     private WebhookType webhookType;
     public static final String WEBHOOK_TYPE = "webhookType";
 
+    /** Rules for {@link WebhookOptions#SENSITIVE_DATA_THRESHOLD_ALERTS}, one per data type. */
+    public static final String SENSITIVE_DATA_ALERT_RULES = "sensitiveDataAlertRules";
+    private List<SensitiveDataAlertRule> sensitiveDataAlertRules;
+
+    /** When each "subType|apiCollectionId" pair last alerted, so it alerts once per window. */
+    public static final String SENSITIVE_DATA_ALERTED_AT = "sensitiveDataAlertedAt";
+    private Map<String, Integer> sensitiveDataAlertedAt;
+
     public enum WebhookType {
         DEFAULT, MICROSOFT_TEAMS, GMAIL
     }
@@ -59,7 +68,8 @@ public class CustomWebhook {
         TESTING_RUN_RESULTS("Testing run results", "${AKTO.changes_info.apiTestingRunResults}"),
         // optionReplaceString not being used for Traffic alerts.
         TRAFFIC_ALERTS("Traffic alerts", "${AKTO.changes_info.apiTrafficAlerts}"),
-        PENDING_TESTS_ALERTS("Pending tests alerts", "${AKTO.changes_info.apiPendingTestsAlerts}");
+        PENDING_TESTS_ALERTS("Pending tests alerts", "${AKTO.changes_info.apiPendingTestsAlerts}"),
+        SENSITIVE_DATA_THRESHOLD_ALERTS("Sensitive data threshold alerts", "${AKTO.changes_info.sensitiveDataThresholdAlerts}");
 
         final String optionName;
         final String optionReplaceString;
@@ -256,5 +266,21 @@ public class CustomWebhook {
 
     public void setDashboardUrl(String dashboardUrl) {
         this.dashboardUrl = dashboardUrl;
+    }
+
+    public List<SensitiveDataAlertRule> getSensitiveDataAlertRules() {
+        return sensitiveDataAlertRules;
+    }
+
+    public void setSensitiveDataAlertRules(List<SensitiveDataAlertRule> sensitiveDataAlertRules) {
+        this.sensitiveDataAlertRules = sensitiveDataAlertRules;
+    }
+
+    public Map<String, Integer> getSensitiveDataAlertedAt() {
+        return sensitiveDataAlertedAt;
+    }
+
+    public void setSensitiveDataAlertedAt(Map<String, Integer> sensitiveDataAlertedAt) {
+        this.sensitiveDataAlertedAt = sensitiveDataAlertedAt;
     }
 }

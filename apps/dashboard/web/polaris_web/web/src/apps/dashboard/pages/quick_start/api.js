@@ -25,18 +25,18 @@ const api = {
         })
     },
 
-    importDataFromPostmanFile(postmanCollectionFile, allowReplay, miniTestingName) {
+    importDataFromPostmanFile(postmanCollectionFile, allowReplay, miniTestingName, forceCreateCollection) {
         return request({
             url: '/api/importDataFromPostmanFile',
             method: 'post',
-            data: {postmanCollectionFile, allowReplay, miniTestingName}
+            data: {postmanCollectionFile, allowReplay, miniTestingName, forceCreateCollection}
         })
     },
-    importPostmanWorkspace(workspace_id, allowReplay, api_key, miniTestingName) {
+    importPostmanWorkspace(workspace_id, allowReplay, api_key, miniTestingName, forceCreateCollection) {
         return request({
             url: '/api/importPostmanWorkspace',
             method: 'post',
-            data: {workspace_id, allowReplay, api_key, miniTestingName}
+            data: {workspace_id, allowReplay, api_key, miniTestingName, forceCreateCollection}
         })
     },
 
@@ -138,6 +138,14 @@ const api = {
         })
     },
 
+    createAuthToken(name, scope, expiryTimeInMonth) {
+        return request({
+            url: '/api/createAuthToken',
+            method: 'post',
+            data: {name, scope, expiryTimeInMonth}
+        })
+    },
+
     fetchModuleTypes() {
         return request({
             url: '/api/fetchModuleTypes',
@@ -195,11 +203,11 @@ const api = {
         })
     },
 
-    initiateMCPScan(serverUrl, authKey, authValue, dashboardUrl) {
+    initiateMCPScan(serverUrl, authKey, authValue, dashboardUrl, testRoleHexId, miniTestingName) {
         return request({
             url: '/api/initiateMCPScan',
             method: 'post',
-            data: {serverUrl, authKey, authValue, dashboardUrl}
+            data: {serverUrl, authKey, authValue, dashboardUrl, testRoleHexId, miniTestingName}
         })
     },
 
@@ -216,11 +224,19 @@ const api = {
         })
     },
 
-    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders) {
+    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName, httpMethod) {
         return request({
             url: '/api/importFromUrl',
             method: 'post',
-            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders}
+            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName, method: httpMethod}
+        })
+    },
+
+    fetchAgentImportStatus(uploadId) {
+        return request({
+            url: '/api/fetchAgentImportStatus',
+            method: 'post',
+            data: {uploadId}
         })
     },
 
@@ -369,6 +385,30 @@ const api = {
     removeSentinelOneIntegration() {
         return request({
             url: '/api/removeSentinelOneIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchAtlasS3ExportIntegration() {
+        return request({
+            url: '/api/fetchAtlasS3ExportIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAtlasS3ExportIntegration(bucketName, region, prefix, authType, roleArn, accessKeyId, secretAccessKey) {
+        return request({
+            url: '/api/addAtlasS3ExportIntegration',
+            method: 'post',
+            data: { bucketName, region, prefix, authType, roleArn, accessKeyId, secretAccessKey }
+        })
+    },
+
+    removeAtlasS3ExportIntegration() {
+        return request({
+            url: '/api/removeAtlasS3ExportIntegration',
             method: 'post',
             data: {}
         })

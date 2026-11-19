@@ -1,67 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
+import React, { useCallback, useMemo } from 'react';
+import GithubServerTable from "@/apps/dashboard/components/tables/GithubServerTable";
+import api from "../api";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import { Box, HorizontalStack } from "@shopify/polaris";
 import TooltipText from "@/apps/dashboard/components/shared/TooltipText";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import LocalStore from "@/apps/main/LocalStorageStore";
 
-function IssuesBySubCategoryFlyout({ urlsByIssues }) {
-  const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState([]);
+const PAGE_SIZE = 10;
 
-  useEffect(() => {
-    let isMounted = true;
-    (() => {
-      setLoading(true);
-      try {
-        const testSubCategories = urlsByIssues?.testSubCategories || [];
-
-        const processed = testSubCategories.map((entry, idx) => {
-          const subCategory = entry?._id?.testSubCategory || "-";
-          const subCategoryPretty = LocalStore.getState()?.subCategoryMap?.[subCategory]?.testName || subCategory;
-          const endpoints = Array.isArray(entry?.apiInfoKeySet) ? entry.apiInfoKeySet : [];
-
-          return {
-            id: `${subCategory}-${idx}`,
-            name: subCategory,
-            subCategory: (
-              <Box maxWidth="420px">
-                <TooltipText tooltip={subCategoryPretty} text={subCategoryPretty} />
-              </Box>
-            ),
-            endpoints,
-            collapsibleRow: getCollapsibleRow(endpoints),
-          };
-        });
-
-        if (isMounted) setRows(processed);
-      } catch (e) {
-        if (isMounted) setRows([]);
-        console.error("Error preparing urls by issues:", e);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const headers = useMemo(
-    () => [
-      { title: '', type: CellType.COLLAPSIBLE },
-      { text: "Test Subcategory", title: "Test Subcategory", value: "subCategory", isText: CellType.TEXT, maxWidth: "420px" },
-    ],
-    []
-  );
-
-  const resourceName = useMemo(
-    () => ({ singular: "test subcategory", plural: "test subcategories" }),
-    []
-  );
-
+// the test sub categories more than one api has an open issue for, a page at a time
+function IssuesBySubCategoryFlyout() {
   const getCollapsibleRow = (endpoints = []) => {
     return (
       <tr>
@@ -90,25 +39,62 @@ function IssuesBySubCategoryFlyout({ urlsByIssues }) {
     );
   };
 
+  const fetchData = useCallback(async (sortKey, sortOrder, skip, limit) => {
+    try {
+      const resp = await api.fetchPostureActionItems('URLS_BY_ISSUE', skip, limit);
+      const value = (resp?.subCategories || []).map((entry, idx) => {
+        const subCategory = entry?.testSubCategory || "-";
+        const subCategoryPretty = LocalStore.getState()?.subCategoryMap?.[subCategory]?.testName || subCategory;
+        const endpoints = entry?.endpoints || [];
+        return {
+          id: `${subCategory}-${skip + idx}`,
+          name: subCategory,
+          subCategory: (
+            <Box maxWidth="420px">
+              <TooltipText tooltip={subCategoryPretty} text={subCategoryPretty} />
+            </Box>
+          ),
+          endpoints,
+          collapsibleRow: getCollapsibleRow(endpoints),
+        };
+      });
+      return { value, total: resp?.total || 0 };
+    } catch (e) {
+      console.error("Error loading urls by issues:", e);
+      return { value: [], total: 0 };
+    }
+  }, []);
+
+  const headers = useMemo(
+    () => [
+      { title: '', type: CellType.COLLAPSIBLE },
+      { text: "Test Subcategory", title: "Test Subcategory", value: "subCategory", isText: CellType.TEXT, maxWidth: "420px" },
+    ],
+    []
+  );
+
+  const resourceName = useMemo(
+    () => ({ singular: "test subcategory", plural: "test subcategories" }),
+    []
+  );
+
   return (
-    <GithubSimpleTable
-      data={rows}
+    <GithubServerTable
       resourceName={resourceName}
       headers={headers}
       headings={headers}
+      fetchData={fetchData}
+      pageLimit={PAGE_SIZE}
+      hidePageSizeSelector
+      sortOptions={[]}
+      filters={[]}
+      selectable={false}
       useNewRow={true}
       condensedHeight={true}
       hideQueryField={true}
-      pageLimit={10}
-      showFooter={true}
-      loading={loading}
-      treeView={false}
-      emptyStateMarkup={null}
-      emptyStateMessage="No test subcategories found"
+      skipUrlFilters
     />
   );
 }
 
 export default IssuesBySubCategoryFlyout;
-
-

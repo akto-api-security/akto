@@ -12,7 +12,6 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -25,6 +24,8 @@ import org.bson.conversions.Bson;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.log.LoggerMaker;
+import com.akto.service.collections.IssuesSnapshotResponse;
+import com.akto.service.collections.IssuesSnapshotService;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.ConnectionInfo;
@@ -60,71 +61,14 @@ public class DashboardAction extends UserAction {
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
-    private long totalIssuesCount = 0;
-    private long oldOpenCount = 0;
-    public String findTotalIssues() {
-        Set<Integer> demoCollections = new HashSet<>();
-        demoCollections.addAll(deactivatedCollections);
+    @Getter
+    private IssuesSnapshotResponse issuesSnapshot;
 
-        if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
-
-        // Query 1: OPEN issues before endTimeStamp excluding deactivated
-        // Optimized: (total OPEN with timestamp) - (deactivated OPEN with timestamp)
-        long query1Start = System.currentTimeMillis();
-        Bson baseFilter1 = Filters.and(
-            Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-            Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
-        );
-        Bson dashboardFilter1 = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilter1);
-        totalIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(dashboardFilter1);
-        long query1Time = System.currentTimeMillis() - query1Start;
-        loggerMaker.warnAndAddToDb("Query1 (OPEN issues count): result=" + totalIssuesCount + ", time=" + query1Time + "ms, endTimeStamp=" + endTimeStamp, LogDb.DASHBOARD);
-
-        if (!demoCollections.isEmpty()) {
-            long query2Start = System.currentTimeMillis();
-            Bson baseFilter2 = Filters.and(
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
-            );
-            Bson dashboardFilter2 = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilter2);
-            long excluded = TestingRunIssuesDao.instance.getMCollection().countDocuments(dashboardFilter2);
-            long query2Time = System.currentTimeMillis() - query2Start;
-            loggerMaker.warnAndAddToDb("Query2 (OPEN deactivated count): result=" + excluded + ", time=" + query2Time + "ms, demoCollectionsSize=" + demoCollections.size(), LogDb.DASHBOARD);
-            totalIssuesCount -= excluded;
-        }
-
-        // Query 2: NOT IGNORED issues (OPEN + FIXED) before startTimeStamp excluding deactivated
-        // Optimized: (total OPEN+FIXED with timestamp) - (deactivated OPEN+FIXED with timestamp)
-        long query3Start = System.currentTimeMillis();
-        Bson baseFilter3 = Filters.and(
-            Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
-                Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
-            Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp)
-        );
-        Bson dashboardFilter3 = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilter3);
-        oldOpenCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(dashboardFilter3);
-        long query3Time = System.currentTimeMillis() - query3Start;
-        loggerMaker.warnAndAddToDb("Query3 (OPEN+FIXED issues count): result=" + oldOpenCount + ", time=" + query3Time + "ms, startTimeStamp=" + startTimeStamp, LogDb.DASHBOARD);
-
-        if (!demoCollections.isEmpty()) {
-            long query4Start = System.currentTimeMillis();
-            Bson baseFilter4 = Filters.and(
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
-                    Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
-                Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
-            );
-            Bson dashboardFilter4 = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilter4);
-            long excluded = TestingRunIssuesDao.instance.getMCollection().countDocuments(dashboardFilter4);
-            long query4Time = System.currentTimeMillis() - query4Start;
-            loggerMaker.warnAndAddToDb("Query4 (OPEN+FIXED deactivated count): result=" + excluded + ", time=" + query4Time + "ms, demoCollectionsSize=" + demoCollections.size(), LogDb.DASHBOARD);
-            oldOpenCount -= excluded;
-        }
-
+    /** The issue and test numbers of the home dashboard (startTimeStamp / endTimeStamp: the range); see IssuesSnapshotService. */
+    public String fetchIssuesSnapshot() {
+        this.issuesSnapshot = new IssuesSnapshotService().fetch(startTimeStamp, endTimeStamp);
         return SUCCESS.toUpperCase();
     }
-
 
     private List<HistoricalData> finalHistoricalData = new ArrayList<>();
     private List<HistoricalData> initialHistoricalData = new ArrayList<>();
@@ -480,41 +424,6 @@ public class DashboardAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String fetchAPIInfosForMissingData(){
-        response = new BasicDBObject();
-        if (AccountSettingsDao.isEndpointInfoViewEnabled()) {
-            Map<String, Integer> missing = EndpointInfoViewDao.instance.countMissingFields(this.endTimeStamp);
-            response.put("totalMissing", 0);
-            response.put("redundantApiInfoKeys", 0);
-            response.put("authNotCalculated", missing.getOrDefault("authNotCalculated", 0));
-            response.put("accessTypeNotCalculated", missing.getOrDefault("accessTypeNotCalculated", 0));
-            response.put("apiTypeMissing", missing.getOrDefault("apiTypeMissing", 0));
-            return Action.SUCCESS.toUpperCase();
-        }
-        Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID);
-        Map<Integer, BasicDBObject> missingInfoMap = ApiInfoDao.instance.getApisListMissingInApiInfoDao(filter, this.startTimeStamp, this.endTimeStamp);
-        int totalMissing = 0;
-        int apiTypeMissing = 0;
-        int authNotCalculated = 0;
-        int accessTypeNotCalculated = 0;
-        int redundantApis = 0;
-        for(BasicDBObject value: missingInfoMap.values()) {
-            totalMissing += ((Set<?>) value.get("missingApiInfoKeysInSti")).size();
-            apiTypeMissing += ((List<?>) value.get("missingApiInfoKeysInSamples")).size();
-            authNotCalculated += ((List<?>) value.get("missingApiInfoKeysForAuth")).size();
-            accessTypeNotCalculated += ((List<?>) value.get("missingApiInfoKeysForAccessType")).size();
-            redundantApis += ((List<?>) value.get("redundantApiInfoKeys")).size();
-        }
-
-        response.put("totalMissing", totalMissing);
-        response.put("apiTypeMissing", apiTypeMissing);
-        response.put("authNotCalculated", authNotCalculated);
-        response.put("accessTypeNotCalculated", accessTypeNotCalculated);
-        response.put("redundantApiInfoKeys", redundantApis);
-
-        return Action.SUCCESS.toUpperCase();
-    }
-
     public int getStartTimeStamp() {
         return startTimeStamp;
     }
@@ -577,14 +486,6 @@ public class DashboardAction extends UserAction {
 
     public Map<String, Integer> getTrendData() {
         return trendData;
-    }
-
-    public long getTotalIssuesCount() {
-        return totalIssuesCount;
-    }
-
-    public long getOldOpenCount() {
-        return oldOpenCount;
     }
 
     public List<HistoricalData> getFinalHistoricalData() {

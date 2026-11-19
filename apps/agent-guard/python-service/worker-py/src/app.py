@@ -7,13 +7,18 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 import cascade_backpressure
 import metrics_push
 import providers
+import reachback
 import scan_diag
+from constants import get_default_config, get_enrichment_config
+from model_map import build_arbiter
+from ocr import handle_ocr
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
@@ -37,6 +42,12 @@ class ScanRequest(BaseModel):
     # never part of the instruction/data split run over `text` (the user
     # prompt). Omitted requests fall back to segmenting `text` alone.
     system_prompt: str = ""
+    enrichment: str = ""
+
+
+class GuardrailsLLMRequest(BaseModel):
+    prompt: str
+    model: str = ""
 
 
 @asynccontextmanager
@@ -146,3 +157,80 @@ async def scan(body: ScanRequest):
 @app.post("/scan/batch")
 async def scan_batch(body: list[ScanRequest]):
     return [await scan_payload(item.model_dump(), schedule_fn=_schedule_background) for item in body]
+
+
+@app.post("/guardrails/llm")
+async def guardrails_llm(body: GuardrailsLLMRequest):
+    """Single-provider prompt-in/text-out passthrough for the gateway's PII/custom-guardrail
+    block+redact decisions — bypasses ModelMapScanner's cascade entirely, one provider call.
+    Primary = the FINAL_ARBITER entry of the model config (DEFAULT_MODEL_CONFIG_JSON, else the built-in default).
+    Backup = its FINAL_ARBITER_BACKUP entry, tried when the primary fails; no such entry = no backup.
+    """
+    return await _run_guardrails_llm(body, relaxed=False)
+
+
+@app.post("/guardrails/llm/async")
+async def guardrails_llm_async(body: GuardrailsLLMRequest):
+    """Same as /guardrails/llm for the enrichment calls that run after the block has been returned
+    (reason, evidence, remediation): a larger reply ceiling, since nobody is waiting on them. Runs on
+    ENRICHMENT_MODEL_CONFIG_JSON when set, so this load stays off the core guardrails model; unset,
+    it uses the core model exactly as /guardrails/llm does."""
+    return await _run_guardrails_llm(body, relaxed=True, enrichment=True)
+
+
+@app.post("/guardrails/llm/session")
+async def guardrails_llm_session(body: GuardrailsLLMRequest):
+    """The session risk summary. Also runs after the turn, so it gets the larger reply ceiling, but
+    the summary feeds the next turn's verdict, so it always stays on the core model."""
+    return await _run_guardrails_llm(body, relaxed=True)
+
+
+@app.post("/ocr")
+async def ocr(request: Request):
+    """Text from an image ({"image_b64": ...}) via the providers in OCR_MODEL_CONFIG_JSON, in order (see ocr.py).
+    Takes the raw request so an oversized body is refused before it is read, the same as on the worker."""
+    status, result = await handle_ocr(request.headers.get("content-length"), request.body)
+    return JSONResponse(status_code=status, content=result)
+
+
+@app.post("/reachback/test")
+async def reachback_test(body: dict[str, Any]):
+    """Demo: forward an OpenAI chat-completions body as-is to a model behind the reach-back
+    gateway (Azure AD token + mTLS) and return the gateway's JSON reply under "response".
+    Failures return 502 with the stage that failed: token / connect / http."""
+    missing = reachback.missing_settings()
+    if missing:
+        raise HTTPException(status_code=503, detail=f"reach-back not configured; missing {missing}")
+    try:
+        return await reachback.chat(body)
+    except reachback.ReachbackError as exc:
+        return JSONResponse(status_code=502, content=exc.as_dict())
+
+
+async def _run_guardrails_llm(body: GuardrailsLLMRequest, relaxed: bool, enrichment: bool = False):
+    start = time.perf_counter()
+    logger.debug(f"[GuardrailsLLM] request received: model={body.model!r} prompt_len={len(body.prompt)}")
+    config = get_enrichment_config() if enrichment else None
+    source = "enrichment" if config else "default"
+    config = config or get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
+    provider = build_arbiter(config["modelConfigs"], body.model)
+    if provider is None:
+        logger.warning(f"[GuardrailsLLM] not configured (no usable FINAL_ARBITER entry in the {source} model config)")
+        raise HTTPException(
+            status_code=503,
+            detail="guardrails LLM not configured (no usable FINAL_ARBITER entry in the model config)",
+        )
+    try:
+        with providers.relaxed_limits(relaxed):
+            content = await provider.complete(body.prompt)
+    except Exception as exc:
+        failed_ms = (time.perf_counter() - start) * 1000
+        logger.warning(f"[GuardrailsLLM] call failed: {exc!r} ms={failed_ms:.0f}")
+        raise HTTPException(status_code=502, detail=f"guardrails LLM call failed: {exc!r}") from exc
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    logger.debug(f"[GuardrailsLLM] response: {content!r}")
+    logger.info(
+        f"[GuardrailsLLM] provider={provider.name} source={source} prompt_len={len(body.prompt)} "
+        f"relaxed={relaxed} response_len={len(content)} ms={elapsed_ms:.0f}"
+    )
+    return {"content": content}

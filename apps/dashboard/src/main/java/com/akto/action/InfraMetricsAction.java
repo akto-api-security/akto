@@ -22,6 +22,8 @@ import org.bson.Document;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,11 +34,82 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class, LogDb.DASHBOARD);;
 
+    private static final String BEARER_PREFIX = "Bearer ";
+
+    // Metrics config is resolved once at class load: env vars are fixed for the process
+    // lifetime, so there is no point re-reading them on every /metrics request. Names match
+    // the platform-wide convention used by the other services (writes-producer/consumer etc).
+    //   PROMETHEUS_METRICS_ENABLED - "true" exposes /metrics (a configured token also implies
+    //                                exposed, for backward compatibility).
+    //   METRICS_AUTH_ENABLED       - "true"/unset enforces Bearer auth (default); "false" disables it.
+    //   METRICS_AUTH_TOKEN         - the expected Bearer credential; required when auth is enabled.
+    private static final String METRICS_AUTH_TOKEN = System.getenv("METRICS_AUTH_TOKEN");
+    private static final boolean HAS_TOKEN = METRICS_AUTH_TOKEN != null && !METRICS_AUTH_TOKEN.trim().isEmpty();
+    private static final boolean METRICS_EXPOSED = isTrue(System.getenv("PROMETHEUS_METRICS_ENABLED")) || HAS_TOKEN;
+    private static final boolean METRICS_AUTH_ENABLED = !isFalse(System.getenv("METRICS_AUTH_ENABLED"));
+
+    /**
+     * Prometheus scrape endpoint (/metrics). Emits pure Prometheus text exposition.
+     *
+     * Controls (names match the platform-wide convention):
+     *   PROMETHEUS_METRICS_ENABLED - "true" serves the endpoint. Backward compatible: a configured
+     *                                METRICS_AUTH_TOKEN also implies exposed, so existing setups
+     *                                that only set the token keep working unchanged.
+     *   METRICS_AUTH_ENABLED       - "true"/unset enforces Bearer auth (default); "false" disables it.
+     *   METRICS_AUTH_TOKEN         - required when auth is enabled; the expected Bearer credential.
+     *
+     * When auth is enabled but no token is configured the endpoint fails closed (404)
+     * rather than exposing metrics unauthenticated.
+     */
     @Override
     public String execute() throws Exception {
-        // todo: move this once we have proper way to scrape metrics
-        // InfraMetricsListener.registry.scrape(servletResponse.getWriter());
+        // 1) endpoint must be exposed (explicit flag, or a configured token for back-compat)
+        if (!METRICS_EXPOSED) {
+            servletResponse.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return null;
+        }
+
+        // 2) auth is enforced unless explicitly disabled
+        if (METRICS_AUTH_ENABLED) {
+            if (!HAS_TOKEN) {
+                // auth on but nothing to check against -> fail closed, never serve open
+                loggerMaker.errorAndAddToDb("METRICS_AUTH_ENABLED is on but METRICS_AUTH_TOKEN"
+                        + " is unset; refusing to expose /metrics", LogDb.DASHBOARD);
+                servletResponse.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                return null;
+            }
+
+            String presentedToken = null;
+            String authHeader = servletRequest.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+                presentedToken = authHeader.substring(BEARER_PREFIX.length()).trim();
+            }
+
+            if (presentedToken == null || !constantTimeEquals(METRICS_AUTH_TOKEN, presentedToken)) {
+                servletResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return null;
+            }
+        }
+
+        servletResponse.setContentType("text/plain; version=0.0.4; charset=utf-8");
+        PrintWriter out = servletResponse.getWriter();
+        InfraMetricsListener.registry.scrape(out);
+        out.flush();
+        out.close();
         return null;
+    }
+
+    private static boolean isTrue(String v) {
+        return v != null && "true".equalsIgnoreCase(v.trim());
+    }
+
+    private static boolean isFalse(String v) {
+        return v != null && "false".equalsIgnoreCase(v.trim());
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null) return false;
+        return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 
     private static final ExecutorService executorService = Executors.newFixedThreadPool(2);

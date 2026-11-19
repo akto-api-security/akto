@@ -51,7 +51,8 @@ export default {
         });
         return resp;
     },
-    async updateAuditData(hexId, remarks, approvalData = null, hexIds = null, cascadeHostCollectionIds = null, mcpServerForAllAgents = null) {
+    // scope: who a block applies to (see BlockScopeModal); empty = everyone.
+    async updateAuditData(hexId, remarks, approvalData = null, hexIds = null, cascadeHostCollectionIds = null, mcpServerForAllAgents = null, scope = {}) {
         const data = { hexId };
         if (Array.isArray(hexIds) && hexIds.length > 0) {
             data.hexIds = hexIds;
@@ -66,6 +67,7 @@ export default {
             data.approvalData = approvalData;
         } else {
             data.remarks = remarks;
+            Object.assign(data, scope);
         }
 
         const resp = await request({
@@ -83,6 +85,52 @@ export default {
             url: '/api/addMcpAllowlistEntry',
             method: 'post',
             data: { mcpServerUrls: urls },
+        });
+    },
+
+    // Vendors tab — vendor names observed in endpoint-shield traffic, each with its traffic
+    // count and current approval state (approval shares the same mcp_allowlist collection as
+    // MCP servers, so an approved vendor also counts toward RiskScoreCalculator's vendor-risk
+    // sub-score on the posture page).
+    async fetchVendorAudit() {
+        const resp = await request({
+            url: '/api/fetchVendorAllowlistAudit',
+            method: 'post',
+            data: {},
+        });
+        return resp?.vendorAudit || [];
+    },
+    // LLMs / AI Agents tab: 'browser-llm' (default) or 'ai-agent' rows, shaped like fetchAuditData.
+    async fetchLlmAuditData(sortKey, sortOrder, skip, limit, filters, searchString, auditType) {
+        return request({
+            url: '/api/fetchLlmAuditData',
+            method: 'post',
+            data: { sortKey, sortOrder, skip, limit, filters, searchString, auditType },
+        });
+    },
+    // ids are record hexIds, or agent names for 'ai-agent'; scope is who a block applies to (empty = everyone).
+    async updateLlmAuditData(ids, remarks, auditType, scope = {}) {
+        return request({
+            url: '/api/updateLlmAuditData',
+            method: 'post',
+            data: { ...(auditType === 'ai-agent' ? { resourceNames: ids } : { hexIds: ids }), remarks, auditType, ...scope },
+        });
+    },
+    async addVendorAllowlistEntries(vendorNames) {
+        const list = Array.isArray(vendorNames) ? vendorNames : [vendorNames];
+        const names = [...new Set(list.map((v) => String(v ?? '').trim()).filter(Boolean))];
+        if (!names.length) return null;
+        return request({
+            url: '/api/addVendorAllowlistEntry',
+            method: 'post',
+            data: { vendorNames: names },
+        });
+    },
+    async removeVendorAllowlistEntry(vendorName) {
+        return request({
+            url: '/api/removeVendorAllowlistEntry',
+            method: 'post',
+            data: { vendorName },
         });
     },
 
@@ -225,13 +273,6 @@ export default {
         return resp
     },
 
-    async getAllCollections() {
-        return await request({
-            url: '/api/getAllCollections',
-            method: 'post',
-            data: {}
-        })
-    },
     async getAllCollectionsBasic() {
         return await request({
             url: '/api/getAllCollectionsBasic',
@@ -258,11 +299,13 @@ export default {
     // maliciousSkillKeys is NOT sent — AgenticObserveAction computes/caches it itself now
     // (getOrBuildSkillData) instead of requiring the whole account-wide set (14,218 entries /
     // ~500KB+ on Atlas Scale Test) to be re-POSTed on every paginated request.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = {}) {
+    // aiInventory: the AI inventory (new layout) — adds tool search and per-row tools, status,
+    // employees and category. Left off by the legacy Endpoints page.
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName, aiInventory, firstSeenStart, firstSeenEnd } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName, aiInventory, firstSeenStart, firstSeenEnd },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0, distinctUsernames: resp?.distinctUsernames || [] }
     },
@@ -270,20 +313,20 @@ export default {
     // deviceCount+deviceSample) for exactly ONE group — fetched only when a user opens that asset's flyout, not
     // shipped for every row of every fetchAgenticAssetsSummary page (that used to make a single
     // 50-row page 16MB, mostly from raw per-device breakdowns on rows with hundreds of devices).
-    // trafficMap/riskScoreMap/userAnalysisFlatMap enrich the one asset's own device list the same
-    // way fetchAgenticAssetsSummary's rows used to — needed by the Overview tab's topology graph.
+    // trafficMap/riskScoreMap enrich this one asset's device list — needed by the Overview tab's topology graph.
     // skillCount (not the full skill-name list) is all the Overview tab's topology graph needs —
     // the Components tab re-derives its own full skill listing independently when opened (see
     // AgenticObserveAction.fetchAgenticAssetDetail's own comment), so the names were dead weight.
-    async fetchAgenticAssetDetail({ groupKey, rowType, trafficMap, riskScoreMap, userAnalysisFlatMap } = {}) {
+    async fetchAgenticAssetDetail({ groupKey, rowType, trafficMap, riskScoreMap, startTimestamp, endTimestamp } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetDetail',
             method: 'post',
-            data: { groupKey, rowType, trafficMap, riskScoreMap, userAnalysisFlatMap },
+            data: { groupKey, rowType, trafficMap, riskScoreMap, startTimestamp, endTimestamp },
         })
         return {
             hostNames: resp?.assetHostNames || [],
             collectionIds: resp?.assetCollectionIds || [],
+            description: resp?.assetDescription || "",
             skillCount: resp?.assetSkillCount || 0,
             pluginNames: resp?.assetPluginNames || [],
             pluginVersion: resp?.assetPluginVersion || null,
@@ -323,17 +366,47 @@ export default {
             hasInlineLlm: resp?.assetHasInlineLlm || false,
             inlineToolNames: resp?.assetInlineToolNames || [],
             mcpComponentCount: resp?.assetMcpComponentCount || 0,
+            // Asset-level risk badge next to "AI Agent - Cursor" on the legacy devices page.
+            ...(resp?.assetRiskScore != null ? {
+                riskScore: resp.assetRiskScore,
+                riskScoreFactors: resp?.assetRiskScoreFactors || [],
+            } : {}),
         }
     },
+    // Batch form of fetchAgenticAssetDetail, scoped to just mcpServers/mcpServerCollectionIds/
+    // skillCount/pluginNames — the device flyout's context graph needs this for every AI Agent
+    // shown on a device (can be 10+), and firing fetchAgenticAssetDetail once per agent would mean
+    // that many concurrent requests just to draw one graph (see AgenticObserveAction.
+    // fetchAgenticAssetDetailsBatch's own comment). Returns a Map<groupKey, detail>.
+    async fetchAgenticAssetDetailsBatch({ groupKeys, rowType, trafficMap, riskScoreMap } = {}) {
+        if (!groupKeys?.length) return new Map();
+        const resp = await request({
+            url: '/api/fetchAgenticAssetDetailsBatch',
+            method: 'post',
+            data: { groupKeys, rowType, trafficMap, riskScoreMap },
+        })
+        const byGroupKey = resp?.detailsByGroupKey || {};
+        const out = new Map();
+        Object.entries(byGroupKey).forEach(([key, d]) => {
+            out.set(key, {
+                mcpServers: d?.mcpServers || [],
+                mcpServerCollectionIds: d?.mcpServerCollectionIds || {},
+                // Subset of mcpServers that are actually LLMs (gen-ai/browser-llm tagged), so the
+                // graph can label them "LLM" instead of lumping everything under "MCP Server".
+                llmServers: d?.llmServers || [],
+                skillCount: d?.skillCount || 0,
+                pluginNames: d?.pluginNames || [],
+            });
+        });
+        return out;
+    },
     // Server-side paginated device list for ONE asset's flyout Devices tab — scoped to just
-    // that asset's own apiCollectionIds (cheap), not the whole account. usernameMap is the
-    // same Endpoint Shield map already fetched once for the main grid (fetchEndpointShieldUserMetadata),
-    // reused here so search/sort can work against the resolved person's name, not just deviceId.
-    async fetchAgenticAssetDevicesPage({ apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap } = {}) {
+    // that asset's own apiCollectionIds (cheap), not the whole account. Usernames resolve server-side now.
+    async fetchAgenticAssetDevicesPage({ apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetDevicesPage',
             method: 'post',
-            data: { apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap },
+            data: { apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp },
         })
         return { devices: resp?.devices || [], total: resp?.total || 0 }
     },
@@ -347,11 +420,11 @@ export default {
     // point requiring the client to fetch/repost a whole-account map for a handful of entries.
     // groupKey names the asset being drilled into — plugin rows need it so their child row can be the
     // plugin itself rather than the agent collection it was discovered on.
-    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters } = {}) {
+    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, filters } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetEndpointsPage',
             method: 'post',
-            data: { apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
+            data: { apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, filters },
         })
         return {
             endpoints: resp?.endpoints || [],
@@ -376,16 +449,17 @@ export default {
     // pass as fetchAgenticAssetsSummary, aggregated rather than paginated. Also returns trend/delta
     // for the Agentic Assets + Violations cards and the Top Used Applications / Top Assets with
     // Violations lists — all derived server-side from data already fetched at mount, no new fetch.
-    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap } = {}) {
+    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsStats',
             method: 'post',
-            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap },
+            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName },
         })
         return {
             totalAssets: resp?.totalAssets || 0,
             totalEndpoints: resp?.totalEndpoints || 0,
             countsByType: resp?.countsByType || {},
+            countsByCategory: resp?.countsByCategory || {},
             monthLabels: resp?.monthLabels || [],
             assetSparkline: resp?.assetSparkline || [],
             assetDelta: resp?.assetDelta || 0,
@@ -397,21 +471,21 @@ export default {
     },
     // Paginated, sorted, searchable user/device rows for Users-and-Devices / Endpoints — same
     // lightweight-summary-first-then-slice shape as fetchAgenticAssetsSummary. groupBy: "user"|"device".
-    async fetchUsersAndDevicesSummary({ groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap, tagsByUsername } = {}) {
+    async fetchUsersAndDevicesSummary({ groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap } = {}) {
         const resp = await request({
             url: '/api/fetchUsersAndDevicesSummary',
             method: 'post',
-            data: { groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap, tagsByUsername },
+            data: { groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
     // Tab-header counts ("Users (N)" / "Devices (N)") for Users-and-Devices / Endpoints, each tab's
     // "Agentic assets" total, plus distinct device-tag keys for the Tags filter/"Edit device tags" modal.
-    async fetchUsersAndDevicesStats({ trafficMap, riskScoreMap, usernameMap, userMetadataMap, tagsByUsername } = {}) {
+    async fetchUsersAndDevicesStats({ trafficMap, riskScoreMap } = {}) {
         const resp = await request({
             url: '/api/fetchUsersAndDevicesStats',
             method: 'post',
-            data: { trafficMap, riskScoreMap, usernameMap, userMetadataMap, tagsByUsername },
+            data: { trafficMap, riskScoreMap },
         })
         return {
             usersCount: resp?.usersCount || 0,
@@ -424,21 +498,21 @@ export default {
     },
     // Paginated top-level device rows for Endpoints' tree grid, or (when parentDeviceId is set) one
     // device's (device,service) children — see AgenticObserveAction.fetchDeviceEndpointsSummary.
-    async fetchDeviceEndpointsSummary({ parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername } = {}) {
+    async fetchDeviceEndpointsSummary({ parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, violationsByCollectionId, filters } = {}) {
         const resp = await request({
             url: '/api/fetchDeviceEndpointsSummary',
             method: 'post',
-            data: { parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername },
+            data: { parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, violationsByCollectionId, filters },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
     // Endpoints header stats: trend charts, deltas, Browsers/Endpoints/Users totals — see
     // AgenticObserveAction.fetchDeviceEndpointsStats.
-    async fetchDeviceEndpointsStats({ usernameMap, deviceMetadataMap, startTimestamp, endTimestamp } = {}) {
+    async fetchDeviceEndpointsStats({ startTimestamp, endTimestamp } = {}) {
         const resp = await request({
             url: '/api/fetchDeviceEndpointsStats',
             method: 'post',
-            data: { usernameMap, deviceMetadataMap, startTimestamp, endTimestamp },
+            data: { startTimestamp, endTimestamp },
         })
         return {
             deviceCount: resp?.deviceCount || 0,
@@ -942,29 +1016,29 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens = -1, runAutomatedTests = false) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens = -1, runAutomatedTests = false, automatedTestsCustomPrompt, scriptSelection = {}) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests}
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests, automatedTestsCustomPrompt, ...scriptSelection}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests = false) {
+    scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests = false, automatedTestsCustomPrompt, scriptSelection = {}) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionIds, type: "MULTI_COLLECTION", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests}
+            data: { apiCollectionIds, type: "MULTI_COLLECTION", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests, automatedTestsCustomPrompt, ...scriptSelection}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens = -1, runAutomatedTests = false) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens = -1, runAutomatedTests = false, automatedTestsCustomPrompt, scriptSelection = {}) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests, automatedTestsCustomPrompt, ...scriptSelection}
         }).then((resp) => {
             return resp
         })
@@ -1359,15 +1433,12 @@ export default {
         })
     },
 
-    async getApiSequences(apiCollectionId) {
-        const resp = await request({
-            url: '/api/getApiSequences',
+    async fetchSessionSteps(apiCollectionId, path) {
+        return await request({
+            url: '/api/fetchSessionSteps',
             method: 'post',
-            data: {
-                apiCollectionId: apiCollectionId
-            }
+            data: { apiCollectionId, path }
         })
-        return resp
     },
 
     async fetchMcpToolsApiCalls(apiCollectionId) {

@@ -1,4 +1,4 @@
-import { CustomersMinor, AutomationMajor, MagicMajor } from "@shopify/polaris-icons";
+import { CustomersMinor, AutomationMajor, MagicMajor, GlobeMajor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import WebhookIcon from "@/../public/webhooks_logo.svg";
 
@@ -33,6 +33,10 @@ export const getNodeCategoryFromType = (type) => {
     return { category: 'rag', type: 'RAG', description: 'Retrieval Augmented Generation' };
   }
 
+  if (typeLower.includes('gateway')) {
+    return { category: 'gateway', type: 'Gateway', description: 'Gateway' };
+  }
+
   if (typeLower.includes('api') || typeLower.includes('http')) {
     return { category: 'api', type: 'API', description: 'API Call' };
   }
@@ -60,6 +64,8 @@ export const getComponentColors = (category) => {
       return { borderColor: '#f59e0b', backgroundColor: '#fffbeb' }; // Amber
     case 'rag':
       return { borderColor: '#06b6d4', backgroundColor: '#ecfeff' }; // Cyan
+    case 'gateway':
+      return { borderColor: '#6366f1', backgroundColor: '#eef2ff' }; // Indigo
     case 'api':
       return { borderColor: '#8b5cf6', backgroundColor: '#f5f3ff' }; // Purple
     case 'ai-model':
@@ -102,6 +108,8 @@ export const getComponentIcon = (category) => {
       return CustomersMinor;
     case 'ai-model':
       return MagicMajor;
+    case 'gateway':
+      return GlobeMajor;
     case "mcp":
     case 'arcade-mcp':
       return MCPIcon;

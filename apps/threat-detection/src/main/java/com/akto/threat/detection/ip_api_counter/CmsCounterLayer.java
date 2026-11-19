@@ -10,6 +10,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
 import io.lettuce.core.RedisClient;
+import io.lettuce.core.RedisNoScriptException;
 import io.lettuce.core.ScriptOutputType;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
@@ -29,8 +30,10 @@ public class CmsCounterLayer {
     private static final String PARAM_CMS_KEY_PREFIX = "paramCms|";
 
     private final StatefulRedisConnection<String, String> connection;
-    private final String incrementAndQuerySha;
-    private final String rangeQuerySha;
+    private final String incrementAndQueryScript;
+    private final String rangeQueryScript;
+    private volatile String incrementAndQuerySha;
+    private volatile String rangeQuerySha;
     private final String keyPrefix;
     private final LoggerMaker logger;
 
@@ -41,9 +44,9 @@ public class CmsCounterLayer {
         this.keyPrefix = keyPrefix;
         this.logger = new LoggerMaker(CmsCounterLayer.class, LogDb.THREAT_DETECTION);
 
-        RedisCommands<String, String> sync = connection.sync();
-        this.incrementAndQuerySha = sync.scriptLoad(loadLuaScript("lua/cms_increment_and_query.lua"));
-        this.rangeQuerySha = sync.scriptLoad(loadLuaScript("lua/cms_range_query.lua"));
+        this.incrementAndQueryScript = loadLuaScript("lua/cms_increment_and_query.lua");
+        this.rangeQueryScript = loadLuaScript("lua/cms_range_query.lua");
+        loadScripts();
 
         logger.infoAndAddToDb("CmsCounterLayer initialized with prefix: " + keyPrefix);
     }
@@ -90,9 +93,7 @@ public class CmsCounterLayer {
         };
 
         try {
-            Long result = connection.sync().evalsha(
-                incrementAndQuerySha, ScriptOutputType.INTEGER, keys, argv
-            );
+            Long result = evalshaReloadingOnNoScript(true, keys, argv);
             return result != null ? result : 0L;
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error in incrementAndQueryRange for " + itemKey);
@@ -119,14 +120,34 @@ public class CmsCounterLayer {
         String[] argv = new String[]{itemKey};
 
         try {
-            Long result = connection.sync().evalsha(
-                rangeQuerySha, ScriptOutputType.INTEGER, keys, argv
-            );
+            Long result = evalshaReloadingOnNoScript(false, keys, argv);
             return result != null ? result : 0L;
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error in estimateCountInRange for " + itemKey);
             return 0L;
         }
+    }
+
+    private void loadScripts() {
+        RedisCommands<String, String> sync = connection.sync();
+        this.incrementAndQuerySha = sync.scriptLoad(incrementAndQueryScript);
+        this.rangeQuerySha = sync.scriptLoad(rangeQueryScript);
+    }
+
+    private Long evalshaReloadingOnNoScript(boolean increment, String[] keys, String[] argv) {
+        try {
+            return evalsha(increment, keys, argv);
+        } catch (RedisNoScriptException e) {
+            logger.warnAndAddToDb("Reloading CMS Lua scripts after NOSCRIPT, prefix: " + keyPrefix);
+            loadScripts();
+            return evalsha(increment, keys, argv);
+        }
+    }
+
+    private Long evalsha(boolean increment, String[] keys, String[] argv) {
+        return connection.sync().evalsha(
+            increment ? incrementAndQuerySha : rangeQuerySha, ScriptOutputType.INTEGER, keys, argv
+        );
     }
 
     private static String loadLuaScript(String resourcePath) {

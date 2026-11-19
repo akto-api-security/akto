@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard } from '@shopify/polaris'
+import { LegacyCard, Banner } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
@@ -15,6 +15,7 @@ import AuthComponent from "./AuthComponent";
 import SavedParamComponent from "./SavedParamComponent";
 import { HARDCODED } from "./TestRoleConstants";
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import { usePermissions } from '@/util/permissions';
 
 const selectOptions = [
   {
@@ -54,7 +55,15 @@ function TestRoleSettings() {
   const isDataInSearch = searchParams.get("name")
   const isNew = !isDataInState && !isDataInSearch
   const pageTitle = isNew ? "Add " + mapLabel("test", getDashboardCategory()) + " role" : "Configure " + mapLabel("test", getDashboardCategory()) + " role"
+  const { canCallAll } = usePermissions()
   const [initialItems, setInitialItems] = useState({ name: "" });
+  // test roles a user limited to collections may change (shared with their role); null when not limited
+  const [editableTestRoleNames, setEditableTestRoleNames] = useState(null)
+  useEffect(() => {
+    api.fetchTestRoles().then((res) => setEditableTestRoleNames(res?.editableTestRoleNames || null)).catch(() => {})
+  }, [])
+  const sharedWithRole = isNew || !editableTestRoleNames || editableTestRoleNames.includes(initialItems.name || searchParams.get("name"))
+  const canSave = sharedWithRole && canCallAll(isNew ? 'api/addTestRoles' : 'api/updateTestRoles', ...(func.checkForFeatureSaas("TEST_ROLE_SCOPE_ROLES") ? ['api/saveTestRoleMeta'] : []))
   const [conditions, dispatchConditions] = useReducer(
     produce((draft, action) => conditionsReducer(draft, action)),
     []);
@@ -152,7 +161,7 @@ function TestRoleSettings() {
     } else {
       resetFunc(initialItems)
     }
-  }, [refresh])
+  }, [refresh, isDataInSearch])
 
   useEffect(() => {
     if (func.deepComparison(conditions, transform.createConditions(initialItems.endpoints))) {
@@ -171,7 +180,7 @@ function TestRoleSettings() {
   }, [scopeRoles]);
 
   const compareFunc = () => {
-    return !change
+    return !change || !canSave
   }
 
   const testRoleMetaInfo = async () => {
@@ -189,66 +198,51 @@ function TestRoleSettings() {
     });
   }
 
-  const saveAction = async (updatedAuth = false, authWithCondLists = null) => {
+  // The URL (?name=) is the source of truth for which role is open, so a reload, shared link or lost
+  // history.state still lands on the same role. A bare navigate(null, {state}) drops the query string.
+  const syncUrlAndRefresh = () => {
+    if (isDataInSearch) {
+      setRefresh(prev => !prev)
+      return
+    }
+    const params = new URLSearchParams(searchParams)
+    params.set("name", roleName)
+    // Adding ?name= flips isDataInSearch, which re-runs the fetch effect below
+    navigate({ search: params.toString() }, { replace: true })
+  }
+
+  // authWithCondLists is unused now: the auth change is already persisted, and the refetch below reloads it
+  const saveAction = async (updatedAuth = false) => {
     let andConditions = transform.filterContainsConditions(conditions, "AND");
     let orConditions = transform.filterContainsConditions(conditions, "OR");
     if((roleName !== 'ATTACKER_TOKEN_ALL' && roleName !== 'MCP_AUTHENTICATION_ROLE' && !(andConditions || orConditions)) ||
       roleName.length === 0
     ) {
       func.setToast(true, true, "Please select valid values for a test role");
-    } else {
-      if (isNew) {
-        api.addTestRoles(roleName, andConditions, orConditions).then((res) => {
-            func.setToast(true, false, "Test role added")
-            setChange(false);
-            navigate(null, {
-              state: {
-                name: roleName,
-                endpoints: {
-                  andConditions: andConditions,
-                  orConditions: orConditions,
-                },
-                scopeRoles: scopeRoles
-              },
-              replace: true,
-            })
-            testRoleMetaInfo();
-          }
-        )
-          .catch((err) => {
-            func.setToast(true, true, "Unable to add test role");
-
-          });
-      } else {
-        await api.updateTestRoles(roleName, andConditions, orConditions).then((res) => {
-            setChange(false);
-            navigate(null, {
-              state: {
-                name: roleName,
-                endpoints: {
-                  andConditions: andConditions,
-                  orConditions: orConditions,
-                },
-                authWithCondList: authWithCondLists || getAuthWithCondList(),
-                scopeRoles: scopeRoles
-              },
-              replace: true,
-            });
-            testRoleMetaInfo();
-          })
-          .catch((err) => {
-            func.setToast(true, true, "Unable to update test role");
-            console.log("Error in updating test role", err);
-          });
-        if (!updatedAuth) {
-          func.setToast(true, false, "Test role updated successfully.");
-        }
-      }
+      return;
     }
 
-    setTimeout(() => {
-      setRefresh(!refresh)
-    },200)
+    try {
+      if (isNew) {
+        await api.addTestRoles(roleName, andConditions, orConditions)
+      } else {
+        await api.updateTestRoles(roleName, andConditions, orConditions)
+      }
+    } catch (err) {
+      func.setToast(true, true, isNew ? "Unable to add test role" : "Unable to update test role");
+      console.log("Error in saving test role", err);
+      return;
+    }
+
+    if (isNew) {
+      func.setToast(true, false, "Test role added")
+    } else if (!updatedAuth) {
+      func.setToast(true, false, "Test role updated successfully.");
+    }
+    await testRoleMetaInfo();
+    setChange(false);
+    // Refetch only after the writes above completed, so the form never reloads stale data
+    syncUrlAndRefresh();
   }
 
   const handleTextChange = (val) => {
@@ -351,12 +345,16 @@ function TestRoleSettings() {
     />
   );
 
-  let components = [
+  // another team's test role: its auth details aren't shown
+  let components = sharedWithRole ? [
     descriptionCard,
     conditionsCard,
     authComponent,
     savedParamComponent,
-  ];
+  ] : [descriptionCard, conditionsCard];
+  if (!canSave) {
+    components = [<Banner key="read-only" status="info">{sharedWithRole ? "Read-only: your role can't save changes to test roles. Ask an admin if you need it." : "Read-only: This test role isn't shared with your role. Ask an admin to add your role to its Scope Roles."}</Banner>, ...components]
+  }
 
   return (
     <DetailsPage

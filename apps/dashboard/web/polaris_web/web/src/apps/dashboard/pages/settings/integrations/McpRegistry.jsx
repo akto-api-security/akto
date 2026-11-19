@@ -5,9 +5,12 @@ import { DeleteMinor } from '@shopify/polaris-icons'
 import "../settings.css"
 import func from "@/util/func"
 import api from '../api'
+import { usePermissions } from "@/util/permissions"
+import AllowedAction from '../../../components/shared/AllowedAction'
 
 function McpRegistry() {
 
+    const { canCall } = usePermissions()
     const defaultRegistryUrl = 'https://registry.modelcontextprotocol.io/v0/servers';
     const MAX_REGISTRIES = 10;
     const MAX_URL_LENGTH = 500;
@@ -303,12 +306,14 @@ function McpRegistry() {
                         <Text variant="headingMd" as="h2">MCP Registry Configuration</Text>
                         <HorizontalStack gap="2">
                             {!registries.some(r => !r.isDefault) && (
+                                <AllowedAction allowed={canCall('api/addMcpRegistry')}>
                                 <Button
                                     onClick={() => setShowAddForm(!showAddForm)}
                                     disabled={saving}
                                 >
                                     {showAddForm ? 'Cancel' : 'Add URL'}
                                 </Button>
+                                </AllowedAction>
                             )}
                             {/* <Button
                                 onClick={resetToDefault}
@@ -389,9 +394,11 @@ function McpRegistry() {
                                         </VerticalStack>
 
                                         <HorizontalStack gap="2">
+                                            <AllowedAction allowed={canCall('api/addMcpRegistry')}>
                                             <Button primary onClick={addRegistry} loading={adding} disabled={adding}>
                                                 Add Registry
                                             </Button>
+                                            </AllowedAction>
                                             <Button onClick={() => {
                                                 setShowAddForm(false);
                                                 setNewRegistryUrl('');
@@ -414,6 +421,7 @@ function McpRegistry() {
                                                     {registry.url}
                                                 </Text>
                                                 {!registry.isDefault && (
+                                                    <AllowedAction allowed={canCall('api/deleteMcpRegistry')}>
                                                     <Button
                                                         plain
                                                         destructive
@@ -423,11 +431,13 @@ function McpRegistry() {
                                                     >
                                                         Remove
                                                     </Button>
+                                                    </AllowedAction>
                                                 )}
                                             </HorizontalStack>
 
                                             {!registry.isDefault && (
                                                 <HorizontalStack gap="2">
+                                                    <AllowedAction allowed={canCall('api/syncMcpRegistry')}>
                                                     <Button
                                                         onClick={() => syncRegistry(registry.hexId)}
                                                         loading={syncingId === registry.hexId}
@@ -437,6 +447,8 @@ function McpRegistry() {
                                                     >
                                                         Sync now
                                                     </Button>
+                                                    </AllowedAction>
+                                                    <AllowedAction allowed={canCall('api/fetchMcpAllowlistEntries')}>
                                                     <Button
                                                         onClick={() => viewEndpoints(registry.hexId)}
                                                         loading={endpointsLoadingId === registry.hexId}
@@ -445,6 +457,7 @@ function McpRegistry() {
                                                     >
                                                         {expandedEndpointsId === registry.hexId ? 'Hide endpoints' : 'View endpoints'}
                                                     </Button>
+                                                    </AllowedAction>
                                                 </HorizontalStack>
                                             )}
 
@@ -541,6 +554,7 @@ function McpRegistry() {
             cardContent={cardContent}
             component={component}
             docsUrl="https://registry.modelcontextprotocol.io/docs"
+            readOnly={!canCall('api/addMcpRegistry')}
         />
     );
 }

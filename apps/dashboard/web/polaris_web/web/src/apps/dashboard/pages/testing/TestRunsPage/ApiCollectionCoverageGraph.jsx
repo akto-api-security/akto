@@ -128,7 +128,7 @@ const ApiCollectionCoverageGraph = ({ apiCollectionIds }) => {
       title={mapLabel("API Collection Coverage", getDashboardCategory())}
       subTitleComponent={
         showTestingComponents ? 
-          <Text alignment='center' color='subdued'>No collections found with API endpoints.</Text> : 
+          <Text alignment='center' color='subdued'>No collections found with {mapLabel('API endpoints', getDashboardCategory())}.</Text> : 
           <Text alignment='center' color='subdued'>Loading...</Text>
       } 
     />

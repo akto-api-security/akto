@@ -5,8 +5,13 @@ import com.akto.jobs.executors.AIAgentConnectorConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.util.Constants;
+import com.akto.utils.AktoMetadataDirective;
+import com.akto.utils.LitellmAgentEndpointRewrite;
+import com.akto.utils.LitellmDeviceHeartbeat;
+import com.akto.utils.LitellmUserRegistry;
+import com.akto.utils.LitellmVerdictView;
 import com.akto.utils.McpCollectionResolver;
-import com.akto.utils.SlackUtils;
+import com.akto.utils.VxlanPolicyDirective;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -56,10 +61,17 @@ public class HttpProxyAction extends ActionSupport {
     private String daemonset_id;
     private String enabled_graph;
     private String contextSource;
+    // When set, checks a pending Human Approval activity's status instead of validating.
+    private String activityId;
+    // Raw request from endpoint shield, used for account-type detection.
+    private String fullRequest;
+    // LiteLLM guardrail entry's JSON; its policy_name picks the policies to enforce.
+    private String akto_metadata;
 
     private Map<String, Object> data;
     private boolean success;
     private String message;
+    private long latencyMs;
 
     public String httpProxy() {
         long start = System.currentTimeMillis();
@@ -69,6 +81,19 @@ public class HttpProxyAction extends ActionSupport {
                 path, method, akto_account_id, guardrails, response_guardrails, ingest_data, contextSource);
 
             Map<String, Object> requestData = buildRequestData();
+            // Before the rewrite: a directive's ENDPOINT context source moves the traffic to Atlas.
+            VxlanPolicyDirective.apply(requestData);
+            AktoMetadataDirective.apply(requestData);
+            String litellmUserEmail = LitellmAgentEndpointRewrite.apply(requestData);
+            if ("true".equalsIgnoreCase(ingest_data)) {
+                // Once per user per process, and only on ingest calls, so verdicts stay fast.
+                LitellmUserRegistry.register(litellmUserEmail);
+                if (litellmUserEmail != null) {
+                    // Throttled per device; names the user on the dashboard's device views.
+                    LitellmDeviceHeartbeat.beat(LitellmAgentEndpointRewrite.deviceId(requestData), litellmUserEmail);
+                }
+            }
+            LitellmVerdictView.apply(requestData);
             applyMcpHostRewrite(requestData);
             Map<String, Object> result = gateway.processHttpProxy(requestData);
 
@@ -76,12 +101,11 @@ public class HttpProxyAction extends ActionSupport {
             message = (String) result.get("message");
             data = result;
 
-            long latencyMs = System.currentTimeMillis() - start;
+            latencyMs = System.currentTimeMillis() - start;
             if (!success) {
                 String errorMsg = "[http-proxy] API failed - path: " + path + ", method: " + method
                     + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + message;
                 loggerMaker.errorAndAddToDb(errorMsg);
-                sendSlackAlert(errorMsg);
             } else {
                 loggerMaker.infoAndAddToDb("[http-proxy] API completed - path: {}, method: {}, account: {}, latencyMs: {}",
                     path, method, akto_account_id, latencyMs);
@@ -90,11 +114,10 @@ public class HttpProxyAction extends ActionSupport {
             return success ? Action.SUCCESS.toUpperCase() : Action.ERROR.toUpperCase();
 
         } catch (Exception e) {
-            long latencyMs = System.currentTimeMillis() - start;
+            latencyMs = System.currentTimeMillis() - start;
             String errorMsg = "[http-proxy] Unexpected error - path: " + path + ", method: " + method
                 + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + e.getMessage();
             loggerMaker.errorAndAddToDb(errorMsg);
-            sendSlackAlert(errorMsg);
             success = false;
             message = "Unexpected error: " + e.getMessage();
             data = new HashMap<>();
@@ -103,12 +126,7 @@ public class HttpProxyAction extends ActionSupport {
         }
     }
 
-    private void sendSlackAlert(String errorMsg) {
-        String alertText = errorMsg + ", requestData: " + buildRequestData().toString();
-        SlackUtils.sendAlert(alertText);
-    }
-
-    private String normalizeHostInRequestHeaders(String headers) {
+    static String normalizeHostInRequestHeaders(String headers) {
         if (headers == null || headers.isEmpty()) return headers;
         try {
             BasicDBObject headersObj = BasicDBObject.parse(headers);
@@ -208,6 +226,9 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("enabled_graph", enabled_graph);
         requestData.put("contextSource", contextSource);
         requestData.put("client_hook", client_hook);
+        requestData.put("activityId", activityId);
+        requestData.put("fullRequest", fullRequest);
+        requestData.put(AktoMetadataDirective.FIELD, akto_metadata);
 
         return requestData;
     }

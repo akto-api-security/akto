@@ -1710,6 +1710,55 @@ public class ClientActor extends DataActor {
     };
 
     @Override
+    public List<ApiSequences> fetchSequenceRules() {
+        return fetchApiSequencesList("fetchSequenceRules");
+    }
+
+    // Paged like fetchApiRateLimits: per order, follow the lastSeqKey cursor until cyborg returns none
+    public List<ApiSequences> fetchKnownSequenceSteps() {
+        List<ApiSequences> rows = new ArrayList<>();
+        for (int order = 0; order <= 1; order++) {
+            BasicDBObject payload = new BasicDBObject("sequenceOrder", order);
+            for (int page = 0; page < 1000; page++) {
+                BasicDBObject response = postApiSequencesList("fetchKnownSequenceSteps", payload, rows);
+                Object lastSeqKey = response == null ? null : response.get("lastSeqKey");
+                if (lastSeqKey == null) break;
+                payload.put("lastSeqKey", lastSeqKey);
+            }
+        }
+        return rows;
+    }
+
+    private List<ApiSequences> fetchApiSequencesList(String action) {
+        List<ApiSequences> rows = new ArrayList<>();
+        postApiSequencesList(action, new BasicDBObject(), rows);
+        return rows;
+    }
+
+    // Adds the response's apiSequencesList to rows; returns the parsed response, or null on failure
+    private BasicDBObject postApiSequencesList(String action, BasicDBObject payload, List<ApiSequences> rows) {
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/" + action, "", "POST", payload.toJson(), buildHeaders(), "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb(null, "invalid response in " + action, LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject parsed = BasicDBObject.parse(responsePayload);
+            BasicDBList objList = (BasicDBList) parsed.get("apiSequencesList");
+            if (objList != null) {
+                for (Object obj : objList) {
+                    rows.add(objectMapper.readValue(((BasicDBObject) obj).toJson(), ApiSequences.class));
+                }
+            }
+            return parsed;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in " + action, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
     public List<ApiSequences> fetchApiSequences() {
         List<ApiSequences> apiSequences = new ArrayList<>();
         Map<String, List<String>> headers = buildHeaders();

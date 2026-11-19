@@ -10,6 +10,7 @@
 #
 # Controlled by flags in config.env:
 #   ENABLE_HOOKS_COPILOT_CLI=true  -- installs all three hooks
+#   AKTO_HEARTBEAT_ENABLED=true    -- registers the device with the abstractor (default off)
 #                                    (userPromptSubmitted, preToolUse, postToolUse)
 #
 # Mirrors: mcp-endpoint-shield/misc/windows/install_github_cli_hooks.ps1 (master branch, full hook set)

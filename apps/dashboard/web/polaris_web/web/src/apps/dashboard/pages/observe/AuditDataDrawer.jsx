@@ -24,6 +24,7 @@ import GithubSimpleTable from "../../components/tables/GithubSimpleTable"
 import { CellType } from "../../components/tables/rows/GithubRow"
 import GithubCell from "../../components/tables/cells/GithubCell"
 import { getServerActionFlags, getRegistryOverride } from "./auditServerActionFlags"
+import { usePermissions, withPermissions } from "@/util/permissions"
 
 const childResourceName = { singular: "item", plural: "items" }
 
@@ -49,6 +50,7 @@ const remarksTone = (remarks) => {
     if (remarks === "Rejected") return "critical"
     if (remarks === "Approved") return "success"
     if (remarks === "Conditionally Approved") return "attention"
+    if (remarks === "Under review") return "attention"
     return undefined
 }
 
@@ -102,6 +104,7 @@ function AuditDataDrawer({
     startTimestamp,
     endTimestamp,
     onRequestConditional,
+    onRequestBlock,
     onAfterUpdate,
     onAddToAllowlist,
     isEndpointSecurity,
@@ -110,9 +113,11 @@ function AuditDataDrawer({
     const [loadingChildren, setLoadingChildren] = useState(false)
     const [busy, setBusy] = useState(false)
     const [registryConfigured, setRegistryConfigured] = useState(false)
+    const { canCall } = usePermissions()
+    const canReadRegistries = canCall('api/fetchMcpRegistries')
 
     useEffect(() => {
-        if (!show || !isEndpointSecurity) return
+        if (!show || !isEndpointSecurity || !canReadRegistries) return
         let cancelled = false
         ;(async () => {
             try {
@@ -125,7 +130,7 @@ function AuditDataDrawer({
             }
         })()
         return () => { cancelled = true }
-    }, [show, isEndpointSecurity])
+    }, [show, isEndpointSecurity, canReadRegistries])
 
     const fetchChildren = useCallback(async () => {
         if (!auditItem) return
@@ -162,13 +167,14 @@ function AuditDataDrawer({
         ? auditItem.groupedHostCollectionIds
         : null
 
-    const updateServer = async (remarks) => {
+    // scope: who a block applies to (see BlockScopeModal); empty = everyone.
+    const updateServer = async (remarks, scope = {}) => {
         if (!auditItem) return
         setBusy(true)
         try {
             await api.updateAuditData(
                 auditItem.hexId, remarks, null,
-                auditItem.groupedHexIds, cascadeIds, null
+                auditItem.groupedHexIds, cascadeIds, null, scope
             )
             func.setToast(true, false, `Server ${remarks === "Approved" ? "allowed" : remarks === "Rejected" ? "blocked" : "updated"}`)
             if (typeof onAfterUpdate === "function") onAfterUpdate("server")
@@ -179,7 +185,7 @@ function AuditDataDrawer({
         }
     }
 
-    const blockForAllAgents = async () => {
+    const blockForAllAgents = async (scope = {}) => {
         if (!auditItem) return
         const serverName = auditItem.mcpServerName && auditItem.mcpServerName !== "-" ? auditItem.mcpServerName : null
         if (!serverName) {
@@ -190,7 +196,7 @@ function AuditDataDrawer({
         try {
             await api.updateAuditData(
                 auditItem.hexId, "Rejected", null,
-                auditItem.groupedHexIds, cascadeIds, serverName
+                auditItem.groupedHexIds, cascadeIds, serverName, scope
             )
             func.setToast(true, false, "Server blocked for all agents")
             if (typeof onAfterUpdate === "function") onAfterUpdate("server")
@@ -234,13 +240,14 @@ function AuditDataDrawer({
 
     // GithubSimpleTable owns the selection state and passes the selected ids in.
     const promotedBulkActions = (selectedHexIds) => ([
-        { content: "Allow", onAction: () => updateSelectedChildren("Approved", selectedHexIds) },
+        { content: "Allow", onAction: () => updateSelectedChildren("Approved", selectedHexIds), requires: 'api/updateAuditData' },
         {
             content: "Block",
             onAction: () => updateSelectedChildren("Rejected", selectedHexIds),
             destructive: true,
+            requires: 'api/updateAuditData',
         },
-        { content: "Conditionally allow", onAction: () => requestChildrenConditional(selectedHexIds) },
+        { content: "Conditionally allow", onAction: () => requestChildrenConditional(selectedHexIds), requires: 'api/updateAuditData' },
     ])
 
     // Registry-precedence override: when registry is configured but parent server
@@ -259,7 +266,7 @@ function AuditDataDrawer({
             ? <Text variant="bodySm" color="critical">{parentOverride.remarks}</Text>
             : (child?.remarks
                 ? <Text variant="bodySm">{child.remarks}</Text>
-                : <Text variant="bodySm">Approved</Text>),
+                : <Text variant="bodySm">{child?.markedBy ? "Under review" : "Unapproved"}</Text>),
         markedBy: parentOverride ? parentOverride.markedBy : (child.markedBy || "-"),
     }))
 
@@ -268,22 +275,31 @@ function AuditDataDrawer({
         addHandlerAvailable: typeof onAddToAllowlist === "function",
     })
 
-    const serverActionItems = [
+    const serverDisplayName = auditItem?.mcpServerName && auditItem.mcpServerName !== "-" ? auditItem.mcpServerName : "this server"
+    const serverActionItems = withPermissions([
         {
             content: "Allow this server",
             onAction: () => updateServer("Approved"),
             disabled: !flags.allow,
+            requires: 'api/updateAuditData',
         },
         {
             content: "Block this server",
             destructive: true,
-            onAction: () => updateServer("Rejected"),
+            // Blocks go through the parent's Block dialog, which asks who the block applies to.
+            onAction: () => typeof onRequestBlock === "function"
+                ? onRequestBlock(serverDisplayName, (scope) => updateServer("Rejected", scope))
+                : updateServer("Rejected"),
             disabled: !flags.block,
+            requires: 'api/updateAuditData',
         },
         {
             content: "Block for all agents",
             destructive: true,
-            onAction: () => blockForAllAgents(),
+            onAction: () => typeof onRequestBlock === "function"
+                ? onRequestBlock(serverDisplayName, (scope) => blockForAllAgents(scope), true)
+                : blockForAllAgents(),
+            requires: 'api/updateAuditData',
         },
         {
             content: "Conditionally allow this server",
@@ -293,15 +309,18 @@ function AuditDataDrawer({
                 }
             },
             disabled: !flags.conditional,
+            requires: 'api/updateAuditData',
         },
-        {
+        // depends on the MCP registry setting, which the role may not be able to read
+        canReadRegistries && {
             content: "Add to MCP registry",
             onAction: () => {
                 if (typeof onAddToAllowlist === "function") onAddToAllowlist(auditItem)
             },
             disabled: !flags.add,
+            requires: 'api/addMcpAllowlistEntry',
         },
-    ]
+    ].filter(Boolean))
 
     const childrenSection = (
         <Box>
@@ -344,7 +363,7 @@ function AuditDataDrawer({
     const auditCellData = auditItem ? {
         resourceName: auditItem.resourceName,
         typeBadge: [auditItem.type].filter(Boolean),
-        remarksBadge: [parentOverride ? parentOverride.remarks : (auditItem.remarks || "Approved")],
+        remarksBadge: [parentOverride ? parentOverride.remarks : (auditItem.remarks || (auditItem.markedBy ? "Under review" : "Unapproved"))],
         lastDetected: auditItem.lastDetected ? func.prettifyEpoch(auditItem.lastDetected) : "-",
         updatedTimestamp: auditItem.updatedTimestamp ? func.prettifyEpoch(auditItem.updatedTimestamp) : "-",
         markedBy: parentOverride ? parentOverride.markedBy : (auditItem.markedBy || "-"),

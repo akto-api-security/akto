@@ -15,8 +15,9 @@ import SessionStore from '../../../../main/SessionStore';
 import IssuesStore from '../../../pages/issues/issuesStore';
 import Dropdown from '../Dropdown';
 import Wrapped2025 from './Wrapped2025';
-import { shortNameToCategory } from '../../../../main/labelHelper';
+import { isEndpointSecurityCategory, shortNameToCategory } from '../../../../main/labelHelper';
 import insightsApi from '@/apps/dashboard/pages/observe/agentic/insights/insightsApi';
+import AskOverlayButton from '@/apps/dashboard/pages/dashboard/ask/AskOverlayButton';
 import { INSIGHT_GROUP, INSIGHT_GROUP_LABEL, INSIGHT_GROUP_ROUTE, INSIGHT_DEEP_LINK_PARAM } from '@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers';
 
 const INSIGHT_POPOVER_GROUPS = [INSIGHT_GROUP.ATLAS_DISCOVERY, INSIGHT_GROUP.GUARDRAIL_VIOLATIONS];
@@ -204,7 +205,7 @@ export default function Header() {
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const { agenticSecurityGranted, endpointSecurityGranted, dastGranted, mcpSecurityGranted } = func.getStiggFeatureGrants();
-    const dashboardInsightsGranted = func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
+    const dashboardInsightsGranted = func.checkLocal() || func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
@@ -229,9 +230,11 @@ export default function Header() {
     // Only hide API Security / DAST for Argus/Atlas-only users.
     // API users still see DAST (Stigg may disable it), and always see Argus/Atlas.
     const hiddenDashboardCategories = useMemo(() => {
+        // DAST is visible only to allow-listed users/domains (see func.isDastAllowedUser)
+        const dastHidden = func.isDastAllowedUser() ? [] : ["DAST"];
         const mapping = window.SCOPE_ROLE_MAPPING;
         if (func.checkLocal() || !mapping || Object.keys(mapping).length === 0) {
-            return [];
+            return dastHidden;
         }
         const hasAccess = (scope) => {
             const role = mapping[scope];
@@ -242,14 +245,14 @@ export default function Header() {
         if (!hasApiOrDast && hasArgusOrAtlas) {
             return ["API Security", "DAST"];
         }
-        return [];
+        return dastHidden;
     }, []);
 
     const firstAccessibleCategory = useMemo(() => {
         const mapping = window.SCOPE_ROLE_MAPPING || {};
         const scope = Object.keys(mapping).find(key => {
             const role = mapping[key];
-            return role && role !== "NO_ACCESS" && role !== "NO ACCESS";
+            return role && role !== "NO_ACCESS" && role !== "NO ACCESS" && !(key === "DAST" && !func.isDastAllowedUser());
         });
         return shortNameToCategory[scope] || "API Security";
     }, []);
@@ -465,7 +468,10 @@ export default function Header() {
                 </div>
             </div> */}
 
-            {dashboardInsightsGranted && (
+            {/* Same entitlement the overlay's own endpoints check (usageInterceptor DASHBOARD_INSIGHTS). */}
+            <AskOverlayButton />
+
+            {dashboardInsightsGranted && isEndpointSecurityCategory() && (
                 <Popover
                     active={insightsPopoverActive}
                     onClose={handleCloseInsightsPopover}

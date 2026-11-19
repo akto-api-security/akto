@@ -8,25 +8,62 @@ const api = {
         })
     },
 
-    findTotalIssues: async (startTimeStamp, endTimeStamp) => {
+    // the api numbers of the range: charts, action item counts, missing data (see PostureSnapshotService)
+    fetchPostureSnapshot: async (startTimestamp, endTimestamp, force) => {
         return await request({
-            url: '/api/findTotalIssues',
+            url: '/api/fetchPostureSnapshot',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, force: !!force }
+        })
+    },
+
+    // the issue and test numbers of the range (see IssuesSnapshotService)
+    fetchIssuesSnapshot: async (startTimeStamp, endTimeStamp) => {
+        return await request({
+            url: '/api/fetchIssuesSnapshot',
             method: 'post',
             data: { startTimeStamp, endTimeStamp }
+        })
+    },
+
+    fetchMcpPostureCounts: async () => {
+        return await request({
+            url: '/api/fetchMcpPostureCounts',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    // one page of an MCP list widget: section is RECENT_ALERTS or TOP_APPLICATIONS
+    fetchMcpPostureData: async (section, skip, limit) => {
+        return await request({
+            url: '/api/fetchMcpPostureData',
+            method: 'post',
+            data: { section, skip, limit }
+        })
+    },
+
+    // api calls of the MCP or GUARDRAIL collections, summed per time bucket
+    fetchTaggedApiCallSeries: async (tag, startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchTaggedApiCallSeries',
+            method: 'post',
+            data: { tag, startTimestamp, endTimestamp }
+        })
+    },
+
+    // one page of the list behind an action item (see PostureActionItemsService.Type)
+    fetchPostureActionItems: async (itemType, skip, limit) => {
+        return await request({
+            url: '/api/fetchPostureActionItems',
+            method: 'post',
+            data: { itemType, skip, limit }
         })
     },
 
     fetchEndpointsCount: async (startTimestamp, endTimestamp) => {
         return await request({
             url: '/api/fetchEndpointsCount',
-            method: 'post',
-            data: { startTimestamp, endTimestamp }
-        })
-    },
-
-    fetchApiStats: async (startTimestamp, endTimestamp) => {
-        return await request({
-            url: '/api/fetchApiStats',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })
@@ -65,14 +102,6 @@ const api = {
         })
     },
 
-    fetchMcpdata: async (filterType) => {
-        return await request({
-            url: '/api/fetchMcpdata',
-            method: 'post',
-            data: { filterType }
-        })
-    },
-
     getIntegratedConnections: async () => {
         return await request({
             url: '/api/getIntegratedConnectionsInfo',
@@ -88,133 +117,6 @@ const api = {
             data: {
                 connectionSkipped: skippedConnection
             }
-        })
-    },
-
-    getApiInfoForMissingData: async (startTimeStamp, endTimeStamp) => {
-        return request({
-            url: '/api/getAPIInfosForMissingData',
-            method: 'post',
-            data: {
-                startTimeStamp,
-                endTimeStamp
-            }
-        })
-    },
-
-    fetchSensitiveAndUnauthenticatedValue: async (showApiInfo) => {
-        return await request({
-            url: '/api/getSensitiveAndUnauthenticatedValue',
-            method: 'post',
-            data: { showApiInfo}
-        })
-    },
-
-    fetchHighRiskThirdPartyValue: async (showApiInfo) => {
-        return await request({
-            url: '/api/getHighRiskThirdPartyValue',
-            method: 'post',
-            data: { showApiInfo}
-        })
-    },
-
-    fetchShadowApisValue: async (showApiInfo) => {
-        return await request({
-            url: '/api/getShadowApis',
-            method: 'post',
-            data: { showApiInfo}
-        })
-    },
-    fetchUnauthenticatedApis: async (showApiInfo) => {
-        return await request({
-            url: '/api/fetchAllUnauthenticatedApis',
-            method: 'post',
-            data: { showApiInfo }
-        })
-    },
-
-    fetchActionItemsApiInfo: async (filterType) => {
-        return await request({
-            url: '/api/fetchActionItemsApiInfo',
-            method: 'post',
-            data: { filterType }
-        })
-    },
-
-    getNotTestedAPICount: async (showApiInfo) => {
-        return await request({
-            url: '/api/getNotTestedAPICount',
-            method: 'post',
-            data: { showApiInfo }
-        })
-    },
-
-    getOnlyOnceTestedAPICount: async (showApiInfo) => {
-        return await request({
-            url: '/api/getOnlyOnceTestedAPICount',
-            method: 'post',
-            data: { showApiInfo }
-        })
-    },
-
-    getMisConfiguredTestsCount: async (showApiInfo) => {
-        return await request({
-            url: '/api/getMisConfiguredTestsCount',
-            method: 'post',
-            data: { showApiInfo }
-        })
-    },
-
-    getVulnerableApiCount: async (showApiInfo) => {
-        return await request({
-            url: '/api/getBUACategoryCount',
-            method: 'post',
-            data: {
-                filterSeverity: ["CRITICAL"],
-                filterStatus: ["OPEN"],
-                showApiInfo
-            }
-        })
-    },
-
-    fetchBrokenAuthenticationIssues: async (filterSubCategory, showApiInfo) => {
-        return await request({
-            url: '/api/getBUACategoryCount',
-            method: 'post',
-            data: {
-                filterStatus: ["OPEN"],
-                filterSubCategory,
-                showApiInfo
-            }
-        })
-    },
-
-    fetchIssuesByApis: async (params) => {
-        let data = {};
-        if (typeof params === 'boolean') {
-            data = { showIssues: params };
-        } else if (typeof params === 'object' && params !== null) {
-            data = {
-                showIssues: params.showIssues || false,
-                categoryTypes: Array.isArray(params.categoryTypes)
-                    ? params.categoryTypes
-                    : (params.categoryType ? [params.categoryType] : null)
-            };
-        }
-        
-        return await request({
-            url: '/api/fetchIssuesByApis',
-            method: 'post',
-            data
-        })
-    },
-
-    fetchUrlsByIssues: async (showTestSubCategories) => {
-        const data = (typeof showTestSubCategories === 'boolean') ? { showTestSubCategories } : {};
-        return await request({
-            url: '/api/fetchUrlsByIssues',
-            method: 'post',
-            data
         })
     },
 
@@ -294,7 +196,123 @@ const api = {
                 endTimestamp
             }
         })
-    }
+    },
+
+    fetchArgusPostureSummary: async (startTimestamp, endTimestamp, environment) => {
+        return await request({
+            url: '/api/fetchArgusPostureSummary',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp,
+                environment
+            }
+        })
+    },
+
+    fetchArgusPostureChanges: async (startTimestamp, endTimestamp, environment) => {
+        return await request({
+            url: '/api/fetchArgusPostureChanges',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, environment }
+        })
+    },
+
+    // Same window as the changes call, so the backend loads its shared data once for both.
+    fetchArgusDiscoveryOverview: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusDiscoveryOverview',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+    },
+
+    // The 5 Argus posture insight cards — fast, Java-only data, no LLM call.
+    fetchArgusPostureInsights: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusPostureInsights',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    // Meant to be called after fetchArgusPostureInsights has already rendered — this one does a
+    // real LLM call per card on a cache miss, so it must never block the card data itself.
+    fetchArgusPostureInsightSummaries: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusPostureInsightSummaries',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    triggerArgusPostureRegenerate: async () => {
+        return await request({ url: '/api/triggerArgusPostureRegenerate', method: 'post', data: {} })
+    },
+
+    fetchArgusPostureRegenerateStatus: async () => {
+        return await request({ url: '/api/fetchArgusPostureRegenerateStatus', method: 'post', data: {} })
+    },
+
+    fetchArgusAgentDetail: async (collectionId, finding) => {
+        return await request({
+            url: '/api/fetchArgusAgentDetail',
+            method: 'post',
+            data: { collectionId, finding: finding || '' }
+        })
+    },
+    fetchArgusPostureDrill: async (drillId, path, startTimestamp, endTimestamp, environment, skip, limit) => {
+        return await request({
+            url: '/api/fetchArgusPostureDrill',
+            method: 'post',
+            data: {
+                drillId,
+                path: path || '',
+                startTimestamp,
+                endTimestamp,
+                environment,
+                skip: skip || 0,
+                limit: limit || 20
+            }
+        })
+    },
+
+    fetchPostureSummary: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchPostureSummary',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    // One page of one panel's drilldown flyout — see PostureService#fetchDrill's own javadoc.
+    // The risk score breakdown (formerly its own fetchRiskScoreBreakdown call) is now just
+    // drillId=PostureService.DRILL_RISK_SCORE on this same endpoint.
+    // `path` is empty/undefined for the root (group) level, or one prior level's row id to drill
+    // into its members.
+    fetchPostureDrill: async (drillId, path, startTimestamp, endTimestamp, skip, limit) => {
+        return await request({
+            url: '/api/fetchPostureDrill',
+            method: 'post',
+            data: {
+                drillId,
+                path: path || '',
+                startTimestamp,
+                endTimestamp,
+                skip: skip || 0,
+                limit: limit || 20
+            }
+        })
+    },
 }
 
 export default api;

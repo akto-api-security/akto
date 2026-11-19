@@ -20,6 +20,10 @@ public class DashboardThreatActor {
   @Setter
   private String latestMetadata;
 
+  @Getter
+  @Setter
+  private String status;
+
   public DashboardThreatActor(
       String id,
       String objectId,
@@ -30,7 +34,8 @@ public class DashboardThreatActor {
       String country,
       String latestAttack,
       String latestApiHost,
-      String latestMetadata) {
+      String latestMetadata,
+      String status) {
 
     this.id = id;
     this.objectId = objectId;
@@ -42,6 +47,7 @@ public class DashboardThreatActor {
     this.latestAttack = latestAttack;
     this.latestApiHost = latestApiHost;
     this.latestMetadata = latestMetadata;
+    this.status = status;
   }
 
   public String getId() {

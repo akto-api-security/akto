@@ -6,10 +6,13 @@ import func from "@/util/func";
 import { useEffect } from 'react';
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable';
 import { useState } from 'react';
+import { usePermissions } from '@/util/permissions';
+import AllowedAction from '../../../components/shared/AllowedAction';
 
 function TestRoleAccessMatrix() {
     const location = useLocation()
     const [name, setName] = useState(location?.state?.name || null);
+    const { canCall } = usePermissions()
 
     const [roleToUrls, setRoleToUrls] = useState([])
 
@@ -88,8 +91,8 @@ function TestRoleAccessMatrix() {
             divider={true}
             secondaryActions={
                 [
-                    <Button key="deleteAccessMatrix" onClick={handleDeleteAccessMatrix}>Delete access matrix</Button>,
-                    <Button key="createAccessMatrix" primary onClick={handleCreateAccessMatrix}>Create access matrix</Button>
+                    <AllowedAction key="deleteAccessMatrix" allowed={canCall('api/deleteAccessMatrix')}><Button onClick={handleDeleteAccessMatrix}>Delete access matrix</Button></AllowedAction>,
+                    <AllowedAction key="createAccessMatrix" allowed={canCall('api/createMultipleAccessMatrixTasks')}><Button primary onClick={handleCreateAccessMatrix}>Create access matrix</Button></AllowedAction>
                 ]}
         />
     )

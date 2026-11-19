@@ -30,7 +30,7 @@ public class TestingUtils {
     private TestingUtils() {
     }
 
-    private static TestingIssuesId getTestingIssueIdFromRunResult(TestingRunResult runResult) {
+    public static TestingIssuesId getTestingIssueIdFromRunResult(TestingRunResult runResult) {
         return new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
             runResult.getTestSubType());
     }

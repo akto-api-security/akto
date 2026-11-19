@@ -37,6 +37,32 @@ message ListMaliciousRequestsResponse {
       string dest_country = 24;  // Destination country code (where the request is going to)
       string session_id = 25;  // Session identifier for tracking user sessions
       repeated threat_detection.message.malicious_event.v1.OwaspCategory owasp_categories = 26;
+      string remediation = 27;  // Markdown/text remediation steps
+      string evidence_line = 28;  // Verbatim line of the prompt that triggered the violation (scrubbed)
+      string human_response = 29;  // PENDING, APPROVED, BLOCKED
+      // Grouped activity rows (repeated Bedrock prompt from one caller): this row is the latest event.
+      string group_key = 30;  // no longer sent; kept so a dashboard and threat backend on different versions still parse each other
+      int32 group_count = 31;  // events in the activity; 0 for events that can't be grouped (no Bedrock ARN)
+      int64 group_first_detected_at = 32;
+      repeated string group_event_ids = 33;  // every event in the activity, for actions on the whole row
+      repeated string group_filter_ids = 34;  // distinct policies the activity's events tripped
+      // Guardrail case management (events marked for review): owner, notes and the history of status/owner/notes changes.
+      string case_owner = 35;  // login of the account member the case is assigned to; empty = unassigned
+      string case_notes = 36;
+      repeated CaseActivity case_timeline = 37;  // oldest first
+      string behaviour = 38;
+      int64 first_triaged_at = 39;
+    }
+    // One entry of an event's case history. activity_type says which of status, owner and notes the entry is
+    // about; the others are empty. STATUS: status = the new status. OWNER: owner = the new owner (empty when
+    // unassigned). NOTES: notes = the notes as saved (empty when cleared).
+    message CaseActivity {
+      int64 timestamp = 1;
+      string updated_by = 2;  // login of the user who made the change
+      string activity_type = 3;
+      string owner = 4;
+      string notes = 5;
+      string status = 6;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -75,6 +101,13 @@ message ListMaliciousRequestsRequest {
       // matching collection of their own — attributed via device id instead. See match_claude_config.
       repeated string claude_device_ids = 19;
       optional bool match_claude_config = 20;  // true: match ANY claude-config host (the queried asset IS a Claude agent)
+      optional string risk_score_filter_type = 21 [json_name = "riskScoreFilterType"];  // equals, greaterThan, lessThan
+      optional double risk_score_filter_value = 22 [json_name = "riskScoreFilterValue"];
+      optional bool ungroup_activities = 23;  // list repeated Bedrock activities one event per row
+      repeated string agentic_types = 24;  // Prompt, Tool, Skill, Resource, Config — derived from the endpoint
+      repeated string behaviours = 25;  // block, alert, flag — read from the event metadata
+      repeated string case_owners = 26;  // case owner logins; "__unassigned__" matches events with no owner
+      optional bool has_case_notes = 27;  // true: only events with case notes; false: only events without
     }
 
     // The number of alerts to return
@@ -82,6 +115,39 @@ message ListMaliciousRequestsRequest {
     uint32 limit = 2;
     map<string, int32> sort = 3;
     Filter filter = 4;
+    optional bool minimal_fields = 5;
+}
+
+// Batched, cursor-paginated fetch of the raw request/response payload (latestApiOrig) behind a set
+// of guardrail-policy violations — used to feed real traffic to an LLM for compliance sub-clause
+// attribution (see PostureService#frameworkReadiness / ComplianceClauseScanService on the dashboard
+// side). ListMaliciousRequestsRequest cannot serve this: its response hard-codes payload to "" for
+// every row (MaliciousEventService#listMaliciousRequests), and a filterId/payload field could not be
+// safely added to that existing request — JsonFormat.parser() throws on an unrecognized field, so an
+// un-redeployed dashboard talking to an already-redeployed backend (or vice versa) would silently
+// flatline every caller of that endpoint, not just this one. A new message pair confines that risk:
+// a stale caller simply gets a 404 on this path, surfaced as a data gap instead of empty results.
+message ListGuardrailViolationPayloadsRequest {
+  repeated string filter_ids = 1;                         // guardrail policy names (== event filterId)
+  optional TimeRangeFilter detected_at_time_range = 2;
+  optional string cursor = 3;                              // last-seen _id (hex ObjectId); empty = first page
+  uint32 limit = 4;                                        // 0/unset -> server default; server also caps the max
+  // false/unset (default): walk oldest-first (_id ascending) — what an exhaustive scan that must
+  // not miss a row wants, and what ComplianceClauseScanService uses. true: walk newest-first
+  // (_id descending), for a caller that only wants the most recent violations quickly. Flips both
+  // the sort AND the cursor comparison operator — see MaliciousEventService#listGuardrailViolationPayloads.
+  optional bool newest_first = 5;
+}
+
+message ListGuardrailViolationPayloadsResponse {
+  message ViolationPayload {
+    string ref_id = 1;
+    string filter_id = 2;
+    uint64 detected_at = 3;
+    string orig = 4;      // decoded request/response sample (HttpResponseParams.getSampleStringFromProtoString)
+    string cursor = 5;    // this row's _id (hex ObjectId) — pass back as the next page's cursor
+  }
+  repeated ViolationPayload payloads = 1;
 }
 
 message FetchAlertFiltersRequest {
@@ -136,6 +202,7 @@ message ListThreatActorResponse {
     string latest_api_host = 9;
     string latest_metadata = 10;
     optional string object_id = 11;  // MongoDB ObjectId hex string for cursor-based pagination
+    string status = 12;
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;
@@ -146,6 +213,7 @@ message FetchMaliciousEventsRequest {
   string event_type = 2;
   string actor = 3;
   string filter_id = 4;
+  repeated string event_ids = 5;  // the events of a grouped activity row, shown as its attempts
 }
 
 message FetchMaliciousEventsResponse {
@@ -153,8 +221,32 @@ message FetchMaliciousEventsResponse {
     string orig = 1;
     uint64 ts = 2;
     string metadata = 3;
+    // The event's own details, so each attempt of a grouped activity can be shown as itself.
+    string event_id = 4;
+    string ref_id = 5;
+    string filter_id = 6;
+    string severity = 7;
+    string endpoint = 8;
+    string method = 9;
+    string evidence_line = 10;
+    string remediation = 11;
+    string status = 12;
+    // The event's case (see ListMaliciousRequestsResponse.MaliciousEvent), so a flyout opened from a link or after
+    // a reload, with no table row behind it, still shows the owner, notes and history.
+    string case_owner = 13;
+    string case_notes = 14;
+    repeated ListMaliciousRequestsResponse.CaseActivity case_timeline = 15;
   }
   repeated MaliciousPayloadsResponse malicious_payloads_response = 1;
+}
+
+// Limits an aggregation to some agents' events, matched like ListMaliciousRequestsRequest.Filter's
+// hosts / loose_host_keys / claude_device_ids (ORed). Set for users limited to specific collections;
+// when set with every list empty, nothing matches.
+message HostScope {
+  repeated string hosts = 1;
+  repeated string loose_host_keys = 2;
+  repeated string claude_device_ids = 3;
 }
 
 message ListThreatApiRequest {
@@ -169,6 +261,7 @@ message ListThreatApiRequest {
   uint32 limit = 2;
   map<string, int32> sort = 3;
   Filter filter = 4;
+  optional HostScope host_scope = 5;
 }
 
 message ListThreatApiResponse {
@@ -189,6 +282,7 @@ message ThreatActorByCountryRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
+  optional HostScope host_scope = 4;
 }
 
 message ThreatActorByCountryResponse {
@@ -205,6 +299,7 @@ message ThreatCategoryWiseCountRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   string status = 4;
+  optional HostScope host_scope = 5;
 }
 
 message ThreatActorFilterRequest {
@@ -232,6 +327,7 @@ message ThreatSeverityWiseCountRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   string status = 4;
+  optional HostScope host_scope = 5;
 }
 
 message ThreatSeverityWiseCountResponse {
@@ -247,6 +343,7 @@ message DailyActorsCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
+  optional HostScope host_scope = 4;
 }
 
 message DailyActorsCountResponse {
@@ -270,6 +367,7 @@ message ThreatActivityTimelineRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
+  optional HostScope host_scope = 4;
 }
 
 message ThreatActivityTimelineResponse {
@@ -321,6 +419,12 @@ message UpdateMaliciousEventStatusRequest {
 
   optional string status = 4;  // The new status to set
   optional string jira_ticket_url = 5;  // Jira ticket URL to associate with the event(s)
+  optional string human_response = 6;  // PENDING, APPROVED, BLOCKED — Human Approval tab
+  // Case management. Absent = leave as is; present but empty = clear. Every change that takes effect is
+  // added to the event's case timeline under updated_by.
+  optional string case_owner = 7;
+  optional string case_notes = 8;
+  optional string updated_by = 9;  // login of the user making the change
 }
 
 message UpdateMaliciousEventStatusResponse {
@@ -438,6 +542,8 @@ message FetchTopNDataRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   uint32 limit = 4;
+  optional string status = 5; // Narrow top hosts to one status (e.g. ACTIVE); omitted counts every status
+  optional HostScope host_scope = 6;
 }
 
 message FetchTopNDataResponse {
@@ -488,6 +594,7 @@ message FetchHostSeverityCountsResponse {
 message FetchSkillSeverityCountsRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  optional HostScope host_scope = 3;
 }
 
 message FetchSkillSeverityCountsResponse {
@@ -506,6 +613,7 @@ message FetchDashboardTopDataRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
   uint32 limit = 3;
+  optional HostScope host_scope = 4;
 }
 
 message FetchDashboardTopDataResponse {
@@ -556,4 +664,51 @@ message ActorCountsFromActorInfoRequest {
 message ActorCountsFromActorInfoResponse {
   int32 critical_actors = 1;  // Actors with isCritical=true (HIGH or CRITICAL severity)
   int32 active_actors = 2;    // Actors with status=ACTIVE
+}
+
+// Guardrail overview panels. One request shape for all of them: the same filter the violations list
+// takes (time range included), so a panel counts exactly the events the list shows for that filter,
+// plus paging for the panels that list rows.
+message GuardrailOverviewRequest {
+  ListMaliciousRequestsRequest.Filter filter = 1;
+  optional uint32 skip = 2;
+  optional uint32 limit = 3;
+  optional HostScope host_scope = 4;
+}
+
+message FetchGuardrailActionCountsResponse {
+  message ActionCounts {
+    uint32 blocked = 1;   // behaviour "block"
+    uint32 alerted = 2;   // behaviour "alert"
+    uint32 flagged = 3;   // "warn", "approval", "flag", or no behaviour recorded
+  }
+  message DayCounts {
+    uint32 ts = 1;  // start of the UTC day, in seconds
+    ActionCounts counts = 2;
+  }
+  repeated DayCounts days = 1;  // every day of the range, empty days included
+  ActionCounts total = 2;
+}
+
+message FetchGuardrailPolicyCountsResponse {
+  message PolicyCount {
+    string policy = 1;  // the policy name, which is the event's filter id
+    uint32 count = 2;
+  }
+  repeated PolicyCount policies = 1;  // the requested page, most events first
+  uint32 total = 2;                   // policies with any event, before paging
+}
+
+message FetchGuardrailHostPolicyCountsResponse {
+  message HostPolicyCount {
+    string host = 1;
+    string policy = 2;
+    uint32 count = 3;
+  }
+  repeated HostPolicyCount rows = 1;  // most events first, capped
+}
+
+message FetchGuardrailTriageTimeResponse {
+  uint32 median_seconds = 1;  // from detection to the first status or owner change of the case
+  uint32 triaged = 2;         // events that were triaged, which the median is taken over
 }

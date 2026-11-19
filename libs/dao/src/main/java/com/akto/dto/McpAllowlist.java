@@ -32,6 +32,14 @@ public class McpAllowlist {
     private Source source;
     public static final String SOURCE = "source";
 
+    // Plain string, not an enum — defaults to MCP_SERVER (not null) so rows written before this
+    // field existed — every row in this collection until now — read back as MCP_SERVER rather
+    // than needing a migration.
+    private String entryType = ENTRY_TYPE_MCP_SERVER;
+    public static final String ENTRY_TYPE = "entryType";
+    public static final String ENTRY_TYPE_MCP_SERVER = "MCP_SERVER";
+    public static final String ENTRY_TYPE_VENDOR = "VENDOR";
+
     @Getter
     @AllArgsConstructor
     public enum Source {

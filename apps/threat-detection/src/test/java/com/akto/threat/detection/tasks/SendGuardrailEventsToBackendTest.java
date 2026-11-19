@@ -5,8 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
+import static com.akto.threat.detection.tasks.SendGuardrailEventsToBackend.ENRICHMENT_UPDATE;
+import static com.akto.threat.detection.tasks.SendGuardrailEventsToBackend.MESSAGE_TYPE_HEADER;
 
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.kafka.KafkaConfig;
@@ -18,16 +21,20 @@ import com.akto.threat.detection.constants.KafkaTopic;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.MockConsumer;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.apache.kafka.common.record.TimestampType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -47,7 +54,11 @@ public class SendGuardrailEventsToBackendTest {
       "{\"maliciousEvent\":{\"actor\":\"1.2.3.4\",\"filterId\":\"PromptInjection\","
           + "\"latestApiEndpoint\":\"/mcp/tools/call\",\"category\":\"PromptInjection\","
           + "\"subCategory\":\"DirectInjection\",\"severity\":\"CRITICAL\","
-          + "\"sessionId\":\"sess-1\"}}";
+          + "\"sessionId\":\"sess-1\",\"refId\":\"ref-1\"}}";
+
+  /** An enrichment update for VALID_EVENT, as guardrails-service buffers it. */
+  private static final String ENRICHMENT_BODY =
+      "{\"refId\":\"ref-1\",\"remediation\":\"rotate the key\"}";
 
   private SendGuardrailEventsToBackend task;
   private MockConsumer<String, byte[]> consumer;
@@ -174,6 +185,83 @@ public class SendGuardrailEventsToBackendTest {
     }
   }
 
+  /**
+   * guardrails-service gains fields before this image is upgraded. A field this
+   * build's proto does not know must still be forwarded, not dropped here.
+   */
+  @Test
+  public void forwardsEventWithFieldUnknownToThisBuild() {
+    String withNewerField = VALID_EVENT.replace("\"sessionId\"", "\"fieldFromNewerGuardrails\":\"x\",\"sessionId\"");
+    try (MockedStatic<ApiExecutor> api = mockStatic(ApiExecutor.class)) {
+      stubResponse(api, 202, "");
+
+      task.processRecords(recordsOf(withNewerField));
+
+      api.verify(() -> ApiExecutor.sendRequest(any(), anyBoolean(), eq(null), anyBoolean(), eq(null)));
+      assertEquals(1L, consumer.committed(Collections.singleton(PARTITION)).get(PARTITION).offset());
+    }
+  }
+
+  /** An enrichment update goes to update_remediation, not record_malicious_event. */
+  @Test
+  public void routesEnrichmentUpdateToUpdateRemediation() {
+    try (MockedStatic<ApiExecutor> api = mockStatic(ApiExecutor.class)) {
+      stubResponse(api, 200, "");
+
+      task.processRecords(batch(Arrays.asList(record(0, ENRICHMENT_BODY, ENRICHMENT_UPDATE))));
+
+      api.verify(
+          () ->
+              ApiExecutor.sendRequest(
+                  argThat(r -> r.getUrl().endsWith("/api/threat_detection/update_remediation")),
+                  anyBoolean(),
+                  eq(null),
+                  anyBoolean(),
+                  eq(null)));
+      assertEquals(1L, consumer.committed(Collections.singleton(PARTITION)).get(PARTITION).offset());
+    }
+  }
+
+  /**
+   * The backend inserts events asynchronously, so an update right behind an
+   * event this task just delivered can 404 for a moment. That must be retried,
+   * not dropped, or the enrichment is lost.
+   */
+  @Test
+  public void retriesEnrichmentWhileItsDeliveredEventIsNotVisibleYet() {
+    try (MockedStatic<ApiExecutor> api = mockStatic(ApiExecutor.class)) {
+      api.when(() -> ApiExecutor.sendRequest(any(), anyBoolean(), eq(null), anyBoolean(), eq(null)))
+          .thenReturn(response(202, ""))
+          .thenReturn(response(404, "Event not found"));
+
+      task.processRecords(
+          batch(
+              Arrays.asList(
+                  record(0, VALID_EVENT, null), record(1, ENRICHMENT_BODY, ENRICHMENT_UPDATE))));
+
+      assertEquals(
+          1L,
+          consumer.committed(Collections.singleton(PARTITION)).get(PARTITION).offset(),
+          "the event is committed, the update is not");
+      assertEquals(1L, consumer.position(PARTITION), "must rewind to the update");
+    }
+  }
+
+  /**
+   * A 404 for an event this task never delivered (dropped, or never buffered
+   * here) will not resolve. Retrying would stall the partition, so drop it.
+   */
+  @Test
+  public void dropsEnrichmentForUnknownEvent() {
+    try (MockedStatic<ApiExecutor> api = mockStatic(ApiExecutor.class)) {
+      stubResponse(api, 404, "Event not found");
+
+      task.processRecords(batch(Arrays.asList(record(0, ENRICHMENT_BODY, ENRICHMENT_UPDATE))));
+
+      assertEquals(1L, consumer.committed(Collections.singleton(PARTITION)).get(PARTITION).offset());
+    }
+  }
+
   /** A transport failure is retryable, not a rejection. */
   @Test
   public void treatsTransportFailureAsRetryable() {
@@ -200,13 +288,27 @@ public class SendGuardrailEventsToBackendTest {
   private ConsumerRecords<String, byte[]> recordsOf(String... bodies) {
     List<ConsumerRecord<String, byte[]>> list = new ArrayList<>();
     for (int i = 0; i < bodies.length; i++) {
-      list.add(
-          new ConsumerRecord<>(
-              TOPIC, 0, i, "key-" + i, bodies[i].getBytes(StandardCharsets.UTF_8)));
+      list.add(record(i, bodies[i], null));
     }
+    return batch(list);
+  }
+
+  /** A buffered message; a null type leaves the header off, as for an event. */
+  private ConsumerRecord<String, byte[]> record(int offset, String body, String type) {
+    RecordHeaders headers = new RecordHeaders();
+    if (type != null) {
+      headers.add(MESSAGE_TYPE_HEADER, type.getBytes(StandardCharsets.UTF_8));
+    }
+    return new ConsumerRecord<>(
+        TOPIC, 0, offset, ConsumerRecord.NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE,
+        ConsumerRecord.NULL_SIZE, ConsumerRecord.NULL_SIZE, "key-" + offset,
+        body.getBytes(StandardCharsets.UTF_8), headers, Optional.empty());
+  }
+
+  private ConsumerRecords<String, byte[]> batch(List<ConsumerRecord<String, byte[]>> list) {
     // Seek to the end of what we are handing over, mirroring what a real poll()
     // leaves behind - so a rewind is observable as a position change.
-    consumer.seek(PARTITION, bodies.length);
+    consumer.seek(PARTITION, list.size());
     return new ConsumerRecords<>(Collections.singletonMap(PARTITION, list));
   }
 }

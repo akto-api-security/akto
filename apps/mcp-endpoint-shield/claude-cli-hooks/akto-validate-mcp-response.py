@@ -13,7 +13,7 @@ from urllib.parse import quote
 from typing import Any, Dict, Set, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
-from akto_ingestion_utility import installer_headers, resolve_session_info
+from akto_ingestion_utility import installer_headers, invoked_by_claude_code, resolve_session_info
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
@@ -344,12 +344,27 @@ def call_guardrails(
         return True, "", ""
 
 
+def _strip_jsonrpc_envelope(value: Any) -> Any:
+    try:
+        if isinstance(value, str):
+            parsed = json.loads(value)
+            if isinstance(parsed, dict) and "jsonrpc" in parsed and "id" in parsed:
+                stripped = {k: v for k, v in parsed.items() if k not in ("jsonrpc", "id")}
+                return json.dumps(stripped, sort_keys=True, ensure_ascii=False)
+            return value
+        if isinstance(value, dict) and "jsonrpc" in value and "id" in value:
+            return {k: v for k, v in value.items() if k not in ("jsonrpc", "id")}
+        return value
+    except Exception:
+        return value
+
+
 def posttool_fingerprint(
     tool_input: Any,
 ) -> str:
     canonical = json.dumps(
         {
-            "i": tool_input,
+            "i": _strip_jsonrpc_envelope(tool_input),
         },
         sort_keys=True,
         ensure_ascii=False,
@@ -537,6 +552,9 @@ def send_ingestion_data(
 
 def main():
     logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+    if not invoked_by_claude_code():
+        logger.info("Not launched by Claude Code (e.g. Cursor running Claude hooks), skipping")
+        sys.exit(0)
 
     try:
         input_data = json.load(sys.stdin)

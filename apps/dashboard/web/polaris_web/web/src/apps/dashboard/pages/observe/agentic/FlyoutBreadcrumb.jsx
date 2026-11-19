@@ -2,6 +2,7 @@ import React from "react";
 import { Box, HorizontalStack, VerticalStack, Text, Link, Button, Divider } from "@shopify/polaris";
 import { MobileCancelMajor } from "@shopify/polaris-icons";
 import { RiskPill } from "./AgenticCellRenderers";
+import observeFunc from "../transform";
 
 // ─── FlyoutBreadcrumb ─────────────────────────────────────────────────────────
 // Shared breadcrumb header used across DeviceFlyout and AgenticAssetFlyout.
@@ -14,7 +15,7 @@ import { RiskPill } from "./AgenticCellRenderers";
 //   subtitle — Optional text rendered as its own row below the breadcrumb, still above the divider
 //              (e.g. an asset's description).
 
-export default function FlyoutBreadcrumb({ items = [], onClose, children, subtitle }) {
+export default function FlyoutBreadcrumb({ items = [], onClose, children, subtitle, asTitle }) {
     return (
         <>
             <Box
@@ -36,18 +37,23 @@ export default function FlyoutBreadcrumb({ items = [], onClose, children, subtit
                                                 {item.label}
                                             </Link>
                                         ) : (
-                                            <Text variant="bodySm" fontWeight={isLast ? "semibold" : "regular"}>
+                                            <Text variant={asTitle ? "headingMd" : "bodySm"} fontWeight={isLast || asTitle ? "semibold" : "regular"}>
                                                 {item.label}
                                             </Text>
                                         )}
-                                        {item.badge != null && <RiskPill score={item.badge} />}
+                                        {item.badge != null && observeFunc.wrapRiskScoreTooltip(
+                                            <RiskPill score={item.badge} />,
+                                            item.badge, null, null, item.badgeFactors,
+                                        )}
                                     </React.Fragment>
                                 );
                             })}
                             {children}
                         </HorizontalStack>
                         {onClose && (
-                            <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
+                            <Box position="relative" zIndex="1">
+                                <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
+                            </Box>
                         )}
                     </HorizontalStack>
                     {subtitle && <Text variant="bodySm">{subtitle}</Text>}

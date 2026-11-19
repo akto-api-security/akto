@@ -1,4 +1,4 @@
-import { useMemo, useReducer, useState } from "react";
+import { useMemo, useReducer, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Box, HorizontalStack, Popover, ActionList, Button, Icon } from '@shopify/polaris';
 import {FileMinor} from '@shopify/polaris-icons';
@@ -17,6 +17,7 @@ import { LABELS } from "../threat_detection/constants";
 import SusDataTable from "../threat_detection/components/SusDataTable";
 import NormalSampleDetails from "../threat_detection/components/NormalSampleDetails";
 import { extractBehaviour } from "../threat_detection/utils/formatUtils";
+import { downloadMaliciousEventsAsJson, downloadMaliciousEventsAsCsv } from "../threat_detection/utils/exportEvents";
 
 // Apply ?category= before the first render — same as GuardrailPolicies.jsx. A link opened in a new
 // tab has no PersistStore session, so without this the page would load the wrong category.
@@ -53,7 +54,10 @@ function GuardrailDetection() {
     const [sampleData, setSampleData] = useState({})
     const [currentEventId, setCurrentEventId] = useState(null)
     const [currentEventStatus, setCurrentEventStatus] = useState(null)
+    const [currentHumanResponse, setCurrentHumanResponse] = useState(null)
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
+    const applyPayloadSearchRef = useRef(() => {});
+    const applyExportRef = useRef(async () => ({ maliciousEvents: [] }));
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
@@ -74,6 +78,7 @@ function GuardrailDetection() {
             setSampleData(data)
             setCurrentEventId(data.id)
             setCurrentEventStatus(data.status)
+            setCurrentHumanResponse(data.humanResponse)
             setMoreInfoData({
                 url: data.url,
                 method: data.method,
@@ -86,7 +91,13 @@ function GuardrailDetection() {
                 // For the "Approve server" action on approval-behaviour guardrail events.
                 // Prefer the precomputed row field (data.metadata passthrough is dropped by the table).
                 behaviour: data.behaviourRaw || extractBehaviour(data.metadata),
+                refId: data.refId,
                 host: data.host,
+                // The case (events marked for review): this page opens the flyout from the row, with no payload fetch.
+                caseOwner: data.caseOwner,
+                caseNotes: data.caseNotes,
+                caseTimeline: data.caseTimeline,
+                detectedAt: data.timestamp,
             })
         } else {
             setShowDetails(!showDetails)
@@ -96,11 +107,13 @@ function GuardrailDetection() {
 
     const components =  [
         <SusDataTable
-            key={`guardrail-data-table-${triggerTableRefresh}`}
             currDateRange={currDateRange}
             rowClicked={rowClicked}
             triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
+            refreshNonce={triggerTableRefresh}
             label={LABELS.GUARDRAIL}
+            onRegisterPayloadSearch={(fn) => { applyPayloadSearchRef.current = fn; }}
+            onRegisterExport={(fn) => { applyExportRef.current = fn; }}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}
@@ -118,9 +131,23 @@ function GuardrailDetection() {
                 threatFiltersMap={threatFiltersMap}
                 eventId={currentEventId}
                 eventStatus={currentEventStatus}
+                humanResponse={currentHumanResponse}
                 onStatusUpdate={handleStatusUpdate}
+                onAddAsSearchFilter={(text, side, line) => applyPayloadSearchRef.current?.(text, side, line)}
             />
     ]
+
+    // Both reuse the exact filters/tab/search currently applied on the table (registered by
+    // SusDataTable via onRegisterExport), instead of dumping every event regardless of filters.
+    const exportJson = async () => {
+        const res = await applyExportRef.current();
+        downloadMaliciousEventsAsJson(res?.maliciousEvents, `guardrail_events_${res?.tab || 'active'}.json`);
+    }
+
+    const exportCsv = async () => {
+        const res = await applyExportRef.current();
+        downloadMaliciousEventsAsCsv(res?.maliciousEvents, `guardrail_events_${res?.tab || 'active'}`);
+    }
 
     const secondaryActionsComp = (
         <HorizontalStack gap={2}>
@@ -140,11 +167,15 @@ function GuardrailDetection() {
                         sections={
                             [
                                 {
-                                    title: 'Export',
                                     items: [
                                         {
-                                            content: 'Export',
-                                            onAction: () => {},
+                                            content: 'Export as JSON',
+                                            onAction: () => exportJson(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
+                                        {
+                                            content: 'Export as CSV',
+                                            onAction: () => exportCsv(),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         }
                                     ]

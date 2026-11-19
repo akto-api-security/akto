@@ -10,6 +10,8 @@ import TestEditorStore from "../testEditorStore";
 import testEditorRequests from "../api";
 
 import func from "@/util/func";
+import { usePermissions, NO_PERMISSION_REASON } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 import { editor } from "monaco-editor/esm/vs/editor/editor.api"
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
@@ -31,6 +33,7 @@ import editorSetup from "./editor_config/editorSetup";
 import keywords from "./editor_config/keywords"
 
 const YamlEditor = ({ fetchAllTests }) => {
+    const { canCall } = usePermissions()
     const navigate = useNavigate()
     const ref = useRef(null)
 
@@ -154,12 +157,14 @@ const YamlEditor = ({ fetchAllTests }) => {
                     <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
                         <Button icon={ClipboardMinor} plain onClick={copyTestName} />
                     </Tooltip>  
-                    <Tooltip content={`Set as ${selectedTest.inactive ? "active" : "inactive" }`} dismissOnMouseOut preferredPosition="below">
-                        <Button icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} />
+                    <Tooltip content={canCall('api/setTestInactive') ? `Set as ${selectedTest.inactive ? "active" : "inactive" }` : NO_PERMISSION_REASON} dismissOnMouseOut preferredPosition="below">
+                        <Button icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} disabled={!canCall('api/setTestInactive')} />
                     </Tooltip>  
                 </HorizontalStack>
         
-                <Button id={"save-button"} disabled={!isEdited} onClick={handleSave} size="slim">Save</Button>
+                <AllowedAction allowed={canCall('api/saveTestEditorFile')}>
+                    <Button id={"save-button"} disabled={!isEdited} onClick={handleSave} size="slim">Save</Button>
+                </AllowedAction>
             </div>
 
             <Divider />

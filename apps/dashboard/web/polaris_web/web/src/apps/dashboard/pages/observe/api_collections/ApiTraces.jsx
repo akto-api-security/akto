@@ -5,6 +5,7 @@ import ReactFlow, { Background, Controls } from 'react-flow-renderer';
 import TraceSpanNode from "./TraceSpanNode";
 import TraceSpanEdge from "./TraceSpanEdge";
 import api from "../api";
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const nodeTypes = { traceSpanNode: TraceSpanNode };
 const edgeTypes = { traceSpanEdge: TraceSpanEdge };
@@ -166,7 +167,7 @@ function ApiTraces(props) {
                     heading="No traces found"
                     image="/public/images/emptystate-files.png"
                 >
-                    <p>There are no execution traces available for this API collection yet.</p>
+                    <p>There are no execution traces available for this {mapLabel('API', getDashboardCategory())} collection yet.</p>
                 </EmptyState>
             </Box>
         );

@@ -49,6 +49,10 @@ public class Constants {
     public static final String AKTO_NODE_ID = "x-akto-node";
     public static final String AKTO_REMOVE_AUTH= "x-akto-remove-auth";
     public static final String AKTO_DECRYPT_HEADER= "x-akto-decode";
+    // test role of a request mini-testing sends for the dashboard; mini-testing applies the role and removes the header
+    public static final String AKTO_TEST_ROLE_ID_HEADER = "x-akto-test-role-id";
+    // response header carrying the auth headers mini-testing applied for that role back to the dashboard
+    public static final String AKTO_APPLIED_AUTH_HEADER = "x-akto-applied-auth";
 
     public static final String LOCAL_KAFKA_BROKER_URL = System.getenv("KAFKA_BROKER_URL") != null ? System.getenv("KAFKA_BROKER_URL") : "localhost:29092"; // run kafka process with name kafka1 in docker
     public static final String TEST_RESULTS_TOPIC_NAME = "akto.test.messages";
@@ -82,17 +86,28 @@ public class Constants {
     public static final String AKTO_COPILOT_BOT_SCHEMA_TAG = "bot-schemaname";
     public static final String AKTO_COPILOT_BOT_NAME_TAG = "bot-name";
     public static final String AKTO_COPILOT_BOT_ENVIRONMENT_TAG = "bot-environment-id";
+    public static final String AKTO_COPILOT_BOT_ENVIRONMENT_NAME_TAG = "bot-environment-name";
     public static final String AKTO_COPILOT_BOT_PUBLISHED_STATE_TAG = "bot-published-state";
     public static final String AKTO_COPILOT_SOURCE_VALUE = "COPILOT_STUDIO";
     public static final String AKTO_COPILOT_CONVERSATION_URL_PREFIX = "/copilot/conversation";
     public static final String COPILOT_STUDIO_AI_AGENT_NAME = "copilot-studio";
     public static final String AKTO_COPILOT_INVENTORY_TAG = "copilot-inventory";
+    /** Set only on the resolved owner's own sample/collection, to drive an "Owner" badge. */
+    public static final String AKTO_AI_AGENT_OWNER_TAG = "agent-owner";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
     public static final String AKTO_AGENT_PROXY_TAG = "agent-proxy";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
     public static final String AKTO_BROWSER_LLM_TAG = "browser-llm";
     public static final String AKTO_MCP_CLIENT_TAG = "mcp-client";
     public static final String AKTO_AI_AGENT_TAG = "ai-agent";
+    /**
+     * Marks a collection whose service was seen CALLING an AI asset, written by mini-runtime on
+     * outbound traffic.
+     *
+     * Deliberately not AKTO_AI_AGENT_TAG ("ai-agent"): that names the agent itself, which is the
+     * opposite side of the call.
+     */
+    public static final String AKTO_AI_AGENT_CALLER_TAG = "ai-agent-caller";
     public static final String AKTO_BROWSER_LLM_AGENT_TAG = "browser-llm-agent";
     public static final String AKTO_SKILL_TAG = "skill";
     public static final String AKTO_SAAS_AGENT_TAG = "saas-agent";
@@ -120,6 +135,7 @@ public class Constants {
     public static final String HOST_HEADER = "Host";
     public static final String AKTO_ENDPOINT_SOURCE_TAG = "source";
     public static final String AKTO_ENDPOINT_SOURCE_VALUE = "ENDPOINT";
+    public static final String AKTO_ENV_TYPE_TAG = "envType";
     public static final String AKTO_WIZ_SOURCE_VALUE = "wiz";
     public static final String FAVICON_SOURCE_URL ="https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://";
 

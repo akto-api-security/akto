@@ -1,6 +1,5 @@
 package com.akto.utils.crons;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -9,9 +8,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.AccountTask;
-import com.mongodb.ConnectionString;
-import com.mongodb.ReadPreference;
-import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -52,18 +48,19 @@ public class EndpointInfoViewCron {
 
     public static void refreshView() {
         AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        if (settings == null || !settings.isEnableEndpointInfoView()) return;
+        // if (settings == null || !settings.isEnableEndpointInfoView()) return;
 
-        int configuredThreshold = settings.getViewRefreshThresholdSeconds();
-        int threshold = configuredThreshold > 0 ? configuredThreshold
-                : (isAccountActiveRecently() ? ACTIVE_THRESHOLD : INACTIVE_THRESHOLD);
-        if (!tryAcquire(threshold)) return;
+        // int configuredThreshold = settings.getViewRefreshThresholdSeconds();
+        // int threshold = configuredThreshold > 0 ? configuredThreshold
+        //         : (isAccountActiveRecently() ? ACTIVE_THRESHOLD : INACTIVE_THRESHOLD);
+        // if (!tryAcquire(threshold)) return;
 
-        try {
-            doRefresh();
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Error refreshing view for account " + Context.accountId.get());
-        }
+        // try {
+        //     doRefresh();
+        // } catch (Exception e) {
+        //     logger.errorAndAddToDb(e, "Error refreshing view for account " + Context.accountId.get());
+        // }
+        return;
     }
 
     private static void doRefresh() {
@@ -227,7 +224,15 @@ public class EndpointInfoViewCron {
                 .append("severityScore", ifNull("$$new.severityScore", "$severityScore"))
                 .append("lastTested", ifNull("$$new.lastTested", "$lastTested"))
                 .append("lastSeen", ifNull("$$new.lastSeen", "$lastSeen"))
-                .append("discoveredTimestamp", ifNull("$$new.discoveredTimestamp", "$discoveredTimestamp"))
+                // ifNull is not enough here: api_info can hold discoveredTimestamp 0 (written by
+                // the merge path via $setOnInsert), and 0 is not null, so it would overwrite the
+                // correct sti-derived minimum with a zero. only let api_info win when it has a
+                // real value.
+                .append("discoveredTimestamp", new Document("$cond", Arrays.asList(
+                        new Document("$gt", Arrays.asList(
+                                new Document("$ifNull", Arrays.asList("$$new.discoveredTimestamp", 0)), 0)),
+                        "$$new.discoveredTimestamp",
+                        "$discoveredTimestamp")))
                 .append("apiType", ifNull("$$new.apiType", "$apiType"))
                 .append("actualAuthType", "$$new.actualAuthType")
                 .append("actualAccessType", "$$new.actualAccessType")
@@ -285,7 +290,19 @@ public class EndpointInfoViewCron {
                                         new Document("$or", Arrays.asList(
                                                 new Document("$eq", Arrays.asList("$hasHostHeader", true)),
                                                 new Document("$eq", Arrays.asList("$$new.hasHostHeader", true)))),
-                                        true, false))))
+                                        true, false)))
+                                // keep the earliest discovery we have ever seen. a doc already
+                                // holding 0 (or nothing) has no usable value, so take the new one
+                                // rather than $min-ing against a zero and pinning it there.
+                                .append("discoveredTimestamp", new Document("$cond", Arrays.asList(
+                                        new Document("$gt", Arrays.asList(
+                                                new Document("$ifNull", Arrays.asList("$discoveredTimestamp", 0)), 0)),
+                                        new Document("$min", Arrays.asList(
+                                                "$discoveredTimestamp", "$$new.discoveredTimestamp")),
+                                        "$$new.discoveredTimestamp")))
+                                .append("lastSeen", new Document("$max", Arrays.asList(
+                                        new Document("$ifNull", Arrays.asList("$lastSeen", 0)),
+                                        "$$new.lastSeen"))))
                 ))
                 .append("whenNotMatched", "insert"));
 
@@ -296,7 +313,13 @@ public class EndpointInfoViewCron {
                 Aggregates.group(compoundId,
                         Accumulators.addToSet("sensitiveSubTypes", sensitiveCondition),
                         Accumulators.sum("paramCount", 1),
-                        Accumulators.max("hasHostHeader", hasHostHeaderCondition)),
+                        Accumulators.max("hasHostHeader", hasHostHeaderCondition),
+                        // without these an endpoint inserted by this merge lands with no timestamps
+                        // and stays that way until the next 24h full rebuild, unless an api_info doc
+                        // happens to exist to donate them. endpoints with sti but no api_info doc
+                        // are exactly the case that never gets one.
+                        Accumulators.min("discoveredTimestamp", "$timestamp"),
+                        Accumulators.max("lastSeen", "$timestamp")),
                 Aggregates.addFields(
                         new Field<>("apiCollectionId", "$_id.apiCollectionId"),
                         new Field<>("url", "$_id.url"),

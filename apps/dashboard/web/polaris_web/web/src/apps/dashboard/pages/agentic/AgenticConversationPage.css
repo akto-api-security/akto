@@ -67,19 +67,6 @@
     box-shadow: none !important;
 }
 
-.agentic-history-modal-search .Polaris-TextField {
-    background: #E4E5E7;
-}
-
-.agentic-history-modal-search .Polaris-TextField__Backdrop::before,
-.agentic-history-modal-search .Polaris-TextField__Backdrop::after {
-    border: none !important;
-    box-shadow: none !important;
-}
-
-.agentic-history-modal-search .Polaris-TextField__Backdrop {
-    background-color: #E4E5E7 !important;
-}
 .shimmer-container {
     position: relative;
     overflow: hidden;

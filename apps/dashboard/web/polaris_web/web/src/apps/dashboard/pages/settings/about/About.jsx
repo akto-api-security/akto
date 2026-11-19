@@ -11,6 +11,9 @@ import TextFieldWithInfo from '../../../components/shared/TextFieldWithInfo'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import { handleIpsChange } from '../../../components/shared/ipUtils'
 import UpdateIpsComponent from '../../../components/shared/UpdateIpsComponent'
+import AllowedAction from '../../../components/shared/AllowedAction'
+import { usePermissions } from '@/util/permissions'
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 export const timezonesAvailable = [
     { label: "Baker Island Time (BIT) UTC-12:00", value: "Etc/GMT+12" },
@@ -61,7 +64,7 @@ export function ToggleComponent({text, onToggle, initial, disabled}){
                 <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true} disabled={disabled}>
                     True
                 </Button>
-                <Button size="slim" onClick={() => onToggle(false)} pressed={initial === false}>
+                <Button size="slim" onClick={() => onToggle(false)} pressed={initial === false} disabled={disabled}>
                     False
                 </Button>
             </ButtonGroup>
@@ -70,6 +73,8 @@ export function ToggleComponent({text, onToggle, initial, disabled}){
 }
 
 function About() {
+
+    const { canCall, loaded } = usePermissions()
 
     const trafficAlertDurations= [
         {label : "1 hour", value: 60*60*1},
@@ -107,6 +112,8 @@ function About() {
     const [disableMalEventButton, setDisableMalEventButton] = useState(false)
     const [resetAccessTypeModal, setResetAccessTypeModal] = useState(false)
     const [disableResetAccessTypeButton, setDisableResetAccessTypeButton] = useState(false)
+    const [groupActivitiesModal, setGroupActivitiesModal] = useState(false)
+    const [disableGroupActivitiesButton, setDisableGroupActivitiesButton] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -163,10 +170,10 @@ function About() {
     }
 
     useEffect(()=>{
-        if(window.USER_ROLE === 'ADMIN') {
+        if(loaded && window.USER_ROLE === 'ADMIN' && canCall('api/fetchAdminSettings')) {
             fetchDetails()
         }
-    },[])
+    },[loaded, canCall])
 
     function TitleComponent ({title,description}) {
         return(
@@ -207,6 +214,7 @@ function About() {
                     setSelected={(val) => {handleSaveSettings("timezone", val); setCurrentTimeZone(val)}}
                     value={currentTimeZone}
                     sliceMaxVal={40}
+                    disabled={!canCall('api/modifyAccountSettings')}
                 />
             </HorizontalGrid>
             {objArr.map((item)=>(
@@ -407,6 +415,17 @@ function About() {
         })
     }
 
+    const handleGroupActivities = async() => {
+        setGroupActivitiesModal(false)
+        setDisableGroupActivitiesButton(true)
+        await settingRequests.backfillActivityGroupKeys().then((res) => {
+            func.setToast(true, false, `Grouped ${res?.backfilledGroupKeys || 0} existing guardrail activities.`)
+        }).catch(() => {
+            func.setToast(true, true, "Failed to group existing guardrail activities. Please try again.")
+        })
+        setDisableGroupActivitiesButton(false)
+    }
+
     const handleResetCollectionAccessTypes = async() => {
         setResetAccessTypeModal(false)
         setDisableResetAccessTypeButton(true)
@@ -538,6 +557,7 @@ function About() {
                     value={`${selectedUrlList.length} url type selected`}
                     allowMultiple
                     isNested={true}
+                    disabled={!canCall('api/updateUrlSettings')}
                 />
             </Box>
             <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} disabled={window.USER_ROLE !== "ADMIN"}/>
@@ -548,6 +568,7 @@ function About() {
                 <VerticalStack gap={2}>
                     <Text>Sample PDF Download</Text>
                     <Box width='200px'>
+                        <AllowedAction allowed={canCall('api/downloadSamplePdf')}>
                         <Button onClick={async () => {
                             await settingRequests.downloadSamplePdf().then((res) => {
                                 if(res?.status?.toLowerCase() === 'completed') {
@@ -555,13 +576,16 @@ function About() {
                                 }
                             })
                         }}>Download</Button>
+                        </AllowedAction>
                     </Box>
                 </VerticalStack>
             }
             <VerticalStack gap={2}>
                 <Text color='subdued' variant='bodyMd'>Delete all malicious events</Text>
                 <Box width='80px'>
-                    <Button disabled={disableMalEventButton} onClick={() => setDeleteMaliciousEventsModal(true)}>Delete</Button>
+                    <AllowedAction allowed={canCall('api/deleteAllMaliciousEvents')}>
+                        <Button disabled={disableMalEventButton} onClick={() => setDeleteMaliciousEventsModal(true)}>Delete</Button>
+                    </AllowedAction>
                 </Box>
             </VerticalStack>
 
@@ -591,7 +615,9 @@ function About() {
             <VerticalStack gap={2}>
                 <Text color='subdued' variant='bodyMd'>Reset Collection Access Type</Text>
                 <Box width='80px'>
-                    <Button disabled={disableResetAccessTypeButton} onClick={() => setResetAccessTypeModal(true)}>Reset</Button>
+                    <AllowedAction allowed={canCall('api/resetCollectionAccessTypes')}>
+                        <Button disabled={disableResetAccessTypeButton} onClick={() => setResetAccessTypeModal(true)}>Reset</Button>
+                    </AllowedAction>
                 </Box>
             </VerticalStack>
 
@@ -610,8 +636,40 @@ function About() {
             >
                 <Modal.Section>
                     <VerticalStack>
-                        <Text>This will recalculate the access type for all collections based on their APIs.</Text>
+                        <Text>This will recalculate the access type for all collections based on their {mapLabel('APIs', getDashboardCategory())}.</Text>
                         <Text>Are you sure you want to proceed?</Text>
+                    </VerticalStack>
+                </Modal.Section>
+            </Modal>
+
+            {window?.USER_NAME?.toLowerCase()?.includes("@akto.io") &&
+                <VerticalStack gap={2}>
+                    <Text color='subdued' variant='bodyMd'>Group existing guardrail activities</Text>
+                    <Box width='80px'>
+                        <AllowedAction allowed={canCall('api/backfillActivityGroupKeys')}>
+                            <Button disabled={disableGroupActivitiesButton} onClick={() => setGroupActivitiesModal(true)}>Group</Button>
+                        </AllowedAction>
+                    </Box>
+                </VerticalStack>
+            }
+
+            <Modal
+                open={groupActivitiesModal}
+                primaryAction={{
+                    content: "Yes, Group",
+                    onAction: handleGroupActivities
+                }}
+                secondaryActions={[{
+                    content: "Cancel",
+                    onAction: () => {setGroupActivitiesModal(false)}
+                }]}
+                title="Group existing guardrail activities"
+                onClose={() => {setGroupActivitiesModal(false)}}
+            >
+                <Modal.Section>
+                    <VerticalStack>
+                        <Text>Guardrail activities stored before grouping was enabled will be grouped like new ones: the same prompt from the same Bedrock caller, with up to 20 minutes between them, shows as one activity.</Text>
+                        <Text>Activities that are already grouped are not changed. Are you sure you want to proceed?</Text>
                     </VerticalStack>
                 </Modal.Section>
             </Modal>
@@ -628,7 +686,7 @@ function About() {
                             <HorizontalGrid gap={2} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={key} text={key}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={trafficFiltersMap[key]} text={trafficFiltersMap[key]}/>
-                                <Button plain icon={DeleteMajor} onClick={() => deleteFilterHeader(key)}/>
+                                <AllowedAction allowed={canCall('api/addFilterHeaderValueMap')}><Button plain icon={DeleteMajor} onClick={() => deleteFilterHeader(key)}/></AllowedAction>
                             </HorizontalGrid>
                         )
                     })}
@@ -651,7 +709,7 @@ function About() {
                     value={headerValue}
                     setValue={setHeaderValue}
                 />
-            {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><Button onClick={saveFilterHeader} size="medium" primary>Save</Button></Box> : null}
+            {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><AllowedAction allowed={canCall('api/addFilterHeaderValueMap')}><Button onClick={saveFilterHeader} size="medium" primary>Save</Button></AllowedAction></Box> : null}
             </HorizontalGrid>
         </VerticalStack>
     )
@@ -669,7 +727,7 @@ function About() {
                             <HorizontalGrid gap={2} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={headerLine} text={headerLine}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={newName} text={newName}/>
-                                <Button plain icon={DeleteMajor} onClick={() => deleteApiCollectionNameMapper(regex)}/>
+                                <AllowedAction allowed={canCall('api/deleteApiCollectionNameMapper')}><Button plain icon={DeleteMajor} onClick={() => deleteApiCollectionNameMapper(regex)}/></AllowedAction>
                             </HorizontalGrid>
                         )
                     })}
@@ -700,7 +758,7 @@ function About() {
                     value={replaceNewCollectionName}
                     setValue={setReplaceNewCollectionName}
                 />
-            {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><Button onClick={addApiCollectionNameMapper} size="medium" primary>Save</Button></Box> : null}
+            {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><AllowedAction allowed={canCall('api/addApiCollectionNameMapper')}><Button onClick={addApiCollectionNameMapper} size="medium" primary>Save</Button></AllowedAction></Box> : null}
             </HorizontalGrid>
         </VerticalStack>
     )
@@ -726,13 +784,14 @@ function About() {
                                               selected={handleSelect}
                                               menuItems={setupOptions}
                                               initial={setupType}
+                                              disabled={!canCall('api/updateSetupType')}
                                           />
                                       </Box>
                                   </VerticalStack>
-                                  <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
-                                  <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
-                                  <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
-                                  <ToggleComponent text={"Auto-delete empty collections"} initial={enableEmptyCollectionCleanup} onToggle={handleEmptyCollectionCleanup} />
+                                  <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} disabled={!canCall('api/toggleRedactFeature')} />
+                                  <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} disabled={!canCall('api/toggleNewMergingEnabled')} />
+                                  <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} disabled={!canCall('api/toggleTelemetry')} />
+                                  <ToggleComponent text={"Auto-delete empty collections"} initial={enableEmptyCollectionCleanup} onToggle={handleEmptyCollectionCleanup} disabled={!canCall('api/toggleEmptyCollectionCleanup')} />
                                   {redundantUrlComp}
                                   {compulsoryDescriptionComponent}
                                   {logSettingsComponent}
@@ -743,6 +802,7 @@ function About() {
                                               selected={handleSelectTraffic}
                                               menuItems={trafficAlertDurations}
                                               initial={trafficThreshold}
+                                              disabled={!canCall('api/updateTrafficAlertThresholdSeconds')}
                                           />
                                       </Box>
                                   </VerticalStack>
@@ -771,7 +831,7 @@ function About() {
 
 
     const components = [accountInfoComponent, 
-                        !func.checkLocal() ? <UpdateIpsComponent 
+                        !func.checkLocal() && canCall('api/updatePrivateCidrIps') ? <UpdateIpsComponent 
                             key={"cidr"} 
                             description={"We use these CIDRs to mark the endpoints as PRIVATE"} 
                             title={"Private CIDRs list"}
@@ -779,10 +839,10 @@ function About() {
                             ipsList={privateCidrList}
                             onSubmit={(val) => handleCidrIpsChange(val,true,"cidr")}
                             onRemove={(val) => handleCidrIpsChange(val, false, "cidr")}
-                            onApply={() => applyIps()}
+                            onApply={canCall('api/applyAccessType') ? () => applyIps() : undefined}
                             type={"cidr"}
                         /> : null,
-                        !func.checkLocal() ? <UpdateIpsComponent
+                        !func.checkLocal() && canCall('api/updatePartnerIps') ? <UpdateIpsComponent
                             key={"partner"}
                             description={"We use these IPs to mark the endpoints as PARTNER"} 
                             title={"Third parties IPs list"}
@@ -790,7 +850,7 @@ function About() {
                             ipsList={partnerIpsList}
                             onSubmit={(val) => handleCidrIpsChange(val,true,"partner")}
                             onRemove={(val) => handleCidrIpsChange(val, false, "partner")}
-                            onApply={() => applyIps()}
+                            onApply={canCall('api/applyAccessType') ? () => applyIps() : undefined}
                             type={"partner"}
                         /> : null,
                         <Modal

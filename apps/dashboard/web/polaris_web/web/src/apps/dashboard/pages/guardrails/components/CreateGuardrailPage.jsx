@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import {
     Text,
@@ -15,10 +15,11 @@ import {
     SettingsMajor
 } from "@shopify/polaris-icons";
 import PersistStore from '../../../../main/PersistStore';
+import homeFunctions from '../../home/module';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import ViolationReplayPanel from './ViolationReplayPanel';
 import guardrailApi from '../api';
-import settingsApi from '../../settings/api';
+import { useAgenticUserOptions, orgUuidFromUserId } from './targeting/useAgenticUserOptions';
 import {
     transformPolicyForBackend,
     SEVERITY,
@@ -32,8 +33,10 @@ import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from './enterpriseLicenseComplia
 import { groupCollectionsByAgent, groupCollectionsByService, groupCollectionsByLLM, extractServiceName } from '../../observe/agentic/constants';
 import { findAssetTag } from '../../observe/agentic/mcpClientHelper';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
-import { isVisibilityOnly, buildAgentFilterOptions, getClientTagVariants, resolveClientKey } from '../serverTargetingUtils';
+import { isVisibilityOnly, buildAgentFilterOptions, getClientTagVariants, resolveClientKey, splitPolicyServers } from '../serverTargetingUtils';
 import func from "@/util/func";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
@@ -47,6 +50,8 @@ import {
     CodeDetectionConfig,
     CustomGuardrailsStep,
     CustomGuardrailsConfig,
+    RogueAgentsStep,
+    RogueAgentsConfig,
     UsageGuardrailsStep,
     UsageGuardrailsConfig,
     AnomalyDetectionStep,
@@ -62,20 +67,17 @@ import {
     ExceptionsStep,
     ExceptionsConfig
 } from './steps';
+import {
+    PREDEFINED_CUSTOM_PROMPTS,
+    composeLlmPrompt,
+    splitPresetFromPrompt
+} from './predefinedCustomPrompts';
 import "./createGuardrailPage.css";
 
 // Store service keys so new devices are covered automatically via service-key matching in enforcement.
 const expandGroupsToV2 = (selectedKeys) =>
     (selectedKeys || []).filter(key => key).map(key => ({ id: key, name: key }));
 
-// deviceId is the agent's device label, "{hostname}-{first8ofMachineID}" — the unique,
-// stable part is the segment after the LAST hyphen (the hostname itself may contain hyphens).
-// Falls back to a plain prefix slice for any value that doesn't follow that format.
-const deviceIdSuffix = (deviceId) => {
-    if (!deviceId) return '';
-    const idx = deviceId.lastIndexOf('-');
-    return idx >= 0 ? deviceId.slice(idx + 1) : deviceId.slice(0, 8);
-};
 
 // Agents: expand each selected canonical group key (e.g. 'claude2') into every raw wire-level
 // tag value it aliases. The guardrails-service matches on the raw client-type segment the client
@@ -85,10 +87,15 @@ const expandAgentGroupsToV2 = (selectedKeys) =>
         getClientTagVariants(key).map(rawValue => ({ id: rawValue, name: rawValue }))
     );
 
+// A collection can carry both a mode=inline and a mode=observe tag at once (e.g. it saw
+// traffic through both paths at different times) — prefer inline when both are present.
+const hasModeTag = (c, value) => c.envType?.some(t => t.keyName === 'mode' && t.value === value);
+const isCollectionInline = (c) => hasModeTag(c, 'inline') || !hasModeTag(c, 'observe');
+
 const groupToOption = (g) => ({
     label: g.groupName,
     value: g.groupKey,
-    isInline: g.collections.some(c => !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe'))
+    isInline: g.collections.some(isCollectionInline)
 });
 
 // Converts stored V2 server entries back to the option-value keys used by the dropdowns.
@@ -134,23 +141,13 @@ const buildRedactionRules = (enabled, rules) => {
         .map(r => ({
             enabled: true,
             userPrompt: r.userPrompt.trim(),
-            confidenceScore: r.confidenceScore ?? 0.5
+            confidenceScore: r.confidenceScore ?? 0.5,
+            compliance: r.compliance && Object.keys(r.compliance).length > 0 ? r.compliance : undefined
         }));
 };
 
-const getLlmServiceKeySet = (allCollections) => {
-    const keys = new Set();
-    (allCollections || []).forEach(c => {
-        if (c.envType?.some(e => e.keyName === 'browser-llm')) {
-            const rawName = c.hostName || c.displayName || '';
-            const svcKey = extractServiceName(rawName) || rawName;
-            if (svcKey) keys.add(svcKey);
-        }
-    });
-    return keys;
-};
-
 const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false, initialStep = 1 }) => {
+    const { canCall } = usePermissions();
     // Step management
     const [currentStep, setCurrentStep] = useState(initialStep);
     const [loading, setLoading] = useState(false);
@@ -183,11 +180,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
     const [harmfulCategoriesSettings, setHarmfulCategoriesSettings] = useState({
-        hate: "HIGH",
-        insults: "HIGH",
-        sexual: "HIGH",
-        violence: "HIGH",
-        misconduct: "HIGH",
+        hate: "none",
+        insults: "none",
+        sexual: "none",
+        violence: "none",
+        misconduct: "none",
         useForResponses: false
     });
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
@@ -203,6 +200,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         custom: []
     });
     const [newCustomWord, setNewCustomWord] = useState("");
+    const [enableMultiLingualBlock, setEnableMultiLingualBlock] = useState(false);
 
     // Step 4: Sensitive Information Guardrails
     const [enablePiiTypes, setEnablePiiTypes] = useState(false);
@@ -221,9 +219,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableBanCode, setEnableBanCode] = useState(false);
     const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
 
+
     // Step 6: Custom Guardrails
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
+    const [presetPrompts, setPresetPrompts] = useState({});
+    const selectedTemplateIds = Object.keys(presetPrompts);
+    // The preset's prompt is applied on save/test without being shown in the detection instruction box.
+    const effectiveLlmPrompt = composeLlmPrompt(enableLlmPrompt ? llmPrompt : "", presetPrompts);
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
     const [llmCompliance, setLlmCompliance] = useState({});
     const [enableLlmRedaction, setEnableLlmRedaction] = useState(false);
@@ -246,10 +249,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableMaliciousTools, setEnableMaliciousTools] = useState(true);
     const [enableToolNameDescriptionMismatch, setEnableToolNameDescriptionMismatch] = useState(true);
 
-    // Step 11: Blocked hosts/paths (block-only)
+    // Step 11: Blocked hosts/paths (block list, or allow-list when blockedHostsAllowOnly)
     // Host + path suggestions are sourced from the browser extension configs.
     const [blockedHosts, setBlockedHosts] = useState([]);
+    const [blockedHostsAllowOnly, setBlockedHostsAllowOnly] = useState(false);
     const [blockPersonalAccounts, setBlockPersonalAccounts] = useState(false);
+    const [blockPublicShare, setBlockPublicShare] = useState(false);
     const [browserConfigs, setBrowserConfigs] = useState([]);
 
     // Step 13: Exceptions — phrases excluded from evaluation before this policy's detectors run
@@ -263,6 +268,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [applyOnResponse, setApplyOnResponse] = useState(false);
     const [applyOnRequest, setApplyOnRequest] = useState(false);
     const [policyBehaviour, setPolicyBehaviour] = useState(GUARDRAIL_BEHAVIOUR.BLOCK);
+    // Include/Exclude toggle, independent per list above — false (default) is an allow-list, back-compat with existing policies
+    const [negatedAgentServers, setNegatedAgentServers] = useState(false);
+    const [negatedMcpServers, setNegatedMcpServers] = useState(false);
+    const [negatedLlmServers, setNegatedLlmServers] = useState(false);
 
     // Step 12: User targeting
     const [applyToAllUsers, setApplyToAllUsers] = useState(true);
@@ -270,10 +279,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // AgenticUsers (group, role, team, department, ...) is targetable, not just a fixed set.
     const [targetTags, setTargetTags] = useState({});
     const [targetDeviceIds, setTargetDeviceIds] = useState([]);
+    // Explicitly-picked identities ("Users" targeting, beta) — kept fully independent of
+    // targetDeviceIds, which is device-id-only and drives applyToDeviceIds resolution server-side.
+    // A Users pick is never written into targetDeviceIds; it's matched downstream by email via
+    // userMetadata instead (see GuardrailPoliciesAction#createGuardrailPolicy).
+    const [targetUserNames, setTargetUserNames] = useState([]);
+    // Include/Exclude toggles. negatedTargetTags is keyed per tag key (they AND together, so one
+    // flag can't negate just one); Device and User each have one row, so plain booleans.
+    const [negatedTargetTags, setNegatedTargetTags] = useState({});
+    const [negatedTargetDeviceIds, setNegatedTargetDeviceIds] = useState(false);
+    const [negatedTargetUserNames, setNegatedTargetUserNames] = useState(false);
     const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
+    const [skipEnterpriseAccounts, setSkipEnterpriseAccounts] = useState(false);
 
-    const [agenticUsers, setAgenticUsers] = useState([]);
-    const [usersLoading, setUsersLoading] = useState(false);
 
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
@@ -283,60 +301,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
+    const setAllCollections = PersistStore(state => state.setAllCollections);
 
-    // Every device-tag key/value pair seen across AgenticUsers — powers the dynamic
-    // tag-key picker below (any key is targetable, e.g. group, role, team, department).
-    const availableTagKeyValues = useMemo(() => {
-        const map = new Map();
-        (agenticUsers || []).forEach(u => {
-            (u.deviceTags || []).forEach(t => {
-                if (!t?.key || !t.value) return;
-                if (!map.has(t.key)) map.set(t.key, new Set());
-                map.get(t.key).add(t.value);
-            });
-        });
-        return Array.from(map.entries())
-            .map(([key, values]) => ({ key, values: Array.from(values).sort() }))
-            .sort((a, b) => a.key.localeCompare(b.key));
-    }, [agenticUsers]);
+    const { usersLoading, availableTagKeyValues, availableUsers, availableDevices, deviceValueToIdentity, matchingDeviceRows } = useAgenticUserOptions({
+        applyToAllUsers, targetTags, negatedTargetTags, targetDeviceIds, negatedTargetDeviceIds,
+    });
 
-    // One dropdown option per device (not per username) — usernames can repeat across devices
-    // (or even across different people), so the device ID is the actual selectable/stored value.
-    // Devices with no ID (agenticUsers[].devices already excludes them, see ModuleInfoDao) are
-    // never in this list, so there's nothing un-targetable to show.
-    const availableDevices = useMemo(() => {
-        const options = [];
-        (agenticUsers || []).forEach(u => {
-            (u.devices || []).forEach(deviceId => {
-                if (!deviceId) return;
-                options.push({ label: `${u.userName || u.userEmail} · ${deviceIdSuffix(deviceId)}`, value: deviceId });
-            });
-        });
-        return options.sort((a, b) => a.label.localeCompare(b.label));
-    }, [agenticUsers]);
-
-    // Flatten agenticUsers[].devices into per-device rows, then filter by the same
-    // AND-across-type / OR-within-type semantics used server-side to resolve applyToDeviceIds —
-    // this is what powers the live "applies to N devices" preview in the wizard.
-    const matchingDeviceRows = useMemo(() => {
-        const rows = [];
-        (agenticUsers || []).forEach(u => {
-            (u.devices || []).forEach(deviceId => {
-                rows.push({ deviceId, username: u.userName, tags: u.deviceTags || [] });
-            });
-        });
-        if (applyToAllUsers) return rows;
-        const tagKeys = Object.keys(targetTags || {}).filter(k => (targetTags[k] || []).length > 0);
-        const deviceSet = new Set(targetDeviceIds);
-        if (tagKeys.length === 0 && deviceSet.size === 0) return [];
-        return rows.filter(r => {
-            const matchesAllTagKeys = tagKeys.every(k => {
-                const valueSet = new Set(targetTags[k]);
-                return r.tags.some(t => t.key === k && valueSet.has(t.value));
-            });
-            return matchesAllTagKeys && (deviceSet.size === 0 || deviceSet.has(r.deviceId));
-        });
-    }, [agenticUsers, applyToAllUsers, targetTags, targetDeviceIds]);
 
     // Create validation state object
     const getStoredStateData = () => ({
@@ -361,6 +331,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableSentiment,
         sentimentConfidenceScore,
         wordFilters,
+        enableMultiLingualBlock,
         // Step 4
         enablePiiTypes,
         piiTypes,
@@ -375,6 +346,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         codeFilterLevel,
         enableBanCode,
         banCodeConfidenceScore,
+        // Predefined custom prompts
+        selectedTemplateIds,
         // Step 6
         enableLlmPrompt,
         llmPrompt,
@@ -397,6 +370,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolNameDescriptionMismatch,
         // Step 11
         blockedHosts,
+        blockedHostsAllowOnly,
+        blockPublicShare,
+        blockPersonalAccounts,
         // Step 13
         ignorePhrases,
         // Step 10
@@ -404,6 +380,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         selectedMcpServers,
         selectedAgentServers,
         selectedBrowserLlms,
+        negatedAgentServers,
+        negatedMcpServers,
+        negatedLlmServers,
         mcpServers,
         agentServers,
         browserLlmServers,
@@ -413,14 +392,22 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         applyToAllUsers,
         targetTags,
         targetDeviceIds,
+        targetUserNames,
+        negatedTargetTags,
+        negatedTargetDeviceIds,
+        negatedTargetUserNames,
         enterpriseLicenseComplianceCategories,
+        skipEnterpriseAccounts,
+        // A negated row with zero values is a deliberate "apply to everything" scope, not an unfinished one
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
+            !negatedAgentServers && !negatedMcpServers && !negatedLlmServers &&
             (selectedMcpServers || []).length === 0 &&
             (selectedAgentServers || []).length === 0 &&
             (selectedBrowserLlms || []).length === 0,
         userScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllUsers &&
             Object.values(targetTags || {}).every(values => !(values || []).length) &&
-            (targetDeviceIds || []).length === 0,
+            (targetDeviceIds || []).length === 0 &&
+            (targetUserNames || []).length === 0,
     });
 
     const getStepsWithSummary = () => {
@@ -465,6 +452,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 ...CustomGuardrailsConfig.validate(storedStateData)
             },
             {
+                number: RogueAgentsConfig.number,
+                title: RogueAgentsConfig.title,
+                summary: RogueAgentsConfig.getSummary(storedStateData),
+                ...RogueAgentsConfig.validate(storedStateData)
+            },
+            {
                 number: UsageGuardrailsConfig.number,
                 title: UsageGuardrailsConfig.title,
                 summary: UsageGuardrailsConfig.getSummary(storedStateData),
@@ -480,7 +473,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 number: EnterpriseLicenseComplianceConfig.number,
                 title: EnterpriseLicenseComplianceConfig.title,
                 summary: EnterpriseLicenseComplianceConfig.getSummary(storedStateData),
-                beta: true,
                 ...EnterpriseLicenseComplianceConfig.validate(storedStateData)
             }
         ];
@@ -494,12 +486,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             });
         }
 
-        steps.push({
-            number: BlockedHostsConfig.number,
-            title: BlockedHostsConfig.title,
-            summary: BlockedHostsConfig.getSummary(storedStateData),
-            ...BlockedHostsConfig.validate(storedStateData)
-        });
+        if (isEndpointSecurityCategory()) {
+            steps.push({
+                number: BlockedHostsConfig.number,
+                title: BlockedHostsConfig.title,
+                summary: BlockedHostsConfig.getSummary(storedStateData),
+                ...BlockedHostsConfig.validate(storedStateData)
+            });
+        }
 
         steps.push({
             number: ExceptionsConfig.number,
@@ -538,11 +532,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     useEffect(() => {
         if (allCollections && allCollections.length > 0) {
             filterCollections();
-        } else {
-            setMcpServers([]);
-            setAgentServers([]);
-            setCollectionsLoading(false);
+            return;
         }
+        setMcpServers([]);
+        setAgentServers([]);
+        setBrowserLlmServers([]);
+        let isActive = true;
+        setCollectionsLoading(true);
+        homeFunctions.getAllCollections()
+            .then(collections => { if (isActive && collections?.length > 0) setAllCollections(collections); })
+            .catch(() => func.setToast(true, true, "Failed to load agentic assets"))
+            .finally(() => { if (isActive) setCollectionsLoading(false); });
+        return () => { isActive = false; };
     }, [allCollections]);
 
     // Load browser extension configs - these supply host + path autosuggestions
@@ -562,25 +563,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return () => { isActive = false; };
     }, []);
 
-    // Fetch agentic users to populate team/role/device targeting options (Atlas only). This is
-    // the single source of truth for every "users" display in the wizard — availableDevices and
-    // matchingDeviceRows below are both derived from it, so the "Apply to all" and "Select Device
-    // Tags & Users" popovers always show the same per-device, suffixed data.
-    useEffect(() => {
-        if (!isEndpointSecurityCategory()) return;
-        let isActive = true;
-        (async () => {
-            setUsersLoading(true);
-            try {
-                const agenticUsersResp = await settingsApi.fetchAgenticUsers().catch(() => ({}));
-                if (!isActive) return;
-                setAgenticUsers(agenticUsersResp?.agenticUsers || []);
-            } finally {
-                if (isActive) setUsersLoading(false);
-            }
-        })();
-        return () => { isActive = false; };
-    }, []);
 
     // Auto-scroll to bottom when new messages are added
     useEffect(() => {
@@ -619,7 +601,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     return {
                         label: name,
                         value: name,
-                        isInline: !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                        isInline: isCollectionInline(c)
                     };
                 };
                 const dedup = (opts) => [...new Map(opts.map(o => [o.value, o])).values()].filter(o => o.value);
@@ -629,7 +611,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     ...opt,
                     isInline: genAiCollections.some(c =>
                         (c.hostName || c.displayName || c.name || '') === opt.value
-                        && !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                        && isCollectionInline(c)
                     )
                 })));
                 setBrowserLlmServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'browser-llm')).map(toOption)));
@@ -657,11 +639,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setDeniedTopics([]);
         setEnableHarmfulCategories(false);
         setHarmfulCategoriesSettings({
-            hate: "HIGH",
-            insults: "HIGH",
-            sexual: "HIGH",
-            violence: "HIGH",
-            misconduct: "HIGH",
+            hate: "none",
+            insults: "none",
+            sexual: "none",
+            violence: "none",
+            misconduct: "none",
             useForResponses: false
         });
         setEnableBasePromptRule(false);
@@ -675,6 +657,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             custom: []
         });
         setNewCustomWord("");
+        setEnableMultiLingualBlock(false);
         setEnablePiiTypes(false);
         setPiiTypes([]);
         setEnableRegexPatterns(false);
@@ -690,6 +673,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setBanCodeConfidenceScore(0.7);
         setEnableLlmPrompt(false);
         setLlmPrompt("");
+        setPresetPrompts({});
         setLlmConfidenceScore(0.5);
         setLlmCompliance({});
         setEnableLlmRedaction(false);
@@ -710,14 +694,20 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setSelectedAgentServers([]);
         setSelectedBrowserLlms([]);
         setBlockedHosts([]);
+        setBlockedHostsAllowOnly(false);
         setBlockPersonalAccounts(false);
+        setBlockPublicShare(false);
         setIgnorePhrases([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
+        setNegatedAgentServers(false);
+        setNegatedMcpServers(false);
+        setNegatedLlmServers(false);
         setApplyToAllUsers(true);
         setTargetTags({});
         setEnterpriseLicenseComplianceCategories([]);
+        setSkipEnterpriseAccounts(false);
     };
 
     const populateFormForEdit = (policy) => {
@@ -801,8 +791,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableRegexPatterns(hasRegexPatterns);
 
         // LLM prompt
-        setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
-        setLlmPrompt(policy.llmRule?.userPrompt || "");
+        const savedLlmPrompt = policy.llmRule?.userPrompt || "";
+        const { presetPrompts: savedPresetPrompts, customPrompt: savedCustomPrompt } = splitPresetFromPrompt(savedLlmPrompt);
+        setPresetPrompts(policy.llmRule?.enabled ? savedPresetPrompts : {});
+        setEnableLlmPrompt(policy.llmRule?.enabled && !!savedCustomPrompt);
+        setLlmPrompt(savedCustomPrompt);
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
         setLlmCompliance(policy.llmRule?.compliance || {});
 
@@ -811,7 +804,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         const savedRedactionRules = (policy.redactionRules || []).map(r => ({
             enabled: r.enabled !== false,
             userPrompt: r.userPrompt || "",
-            confidenceScore: r.confidenceScore ?? 0.5
+            confidenceScore: r.confidenceScore ?? 0.5,
+            compliance: r.compliance || {}
         }));
         setRedactionRules(savedRedactionRules);
         setEnableLlmRedaction(savedRedactionRules.some(r => r.enabled && r.userPrompt.trim()));
@@ -857,37 +851,25 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             : (policy.selectedMcpServers || []).map(name => ({ id: name, name }));
         setSelectedMcpServers(reverseToServiceKeys(storedMcpV2, allCollections));
 
-        // selectedAgentServersV2 stores both gen-ai and browser-llm entries.
-        // Split them back into their respective dropdowns.
-        const rawAgentServersV2 = policy.selectedAgentServersV2?.length > 0
-            ? policy.selectedAgentServersV2
-            : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
-
-        // Compute llmServiceKeySet for both Atlas and Argus — needed to classify new-format
-        // V2 entries where the id is a service key (not a numeric collection id).
-        const llmServiceKeySet = getLlmServiceKeySet(allCollections);
-        const rawAgentEntries = [];
-        const rawLlmEntries = [];
-        rawAgentServersV2.forEach(s => {
-            const col = allCollections?.find(c => c.id?.toString() === s.id?.toString());
-            const isBrowserLlm = col
-                ? col.envType?.some(e => e.keyName === 'browser-llm')
-                : llmServiceKeySet.has(s.name || '');
-            if (isBrowserLlm) rawLlmEntries.push(s);
-            else rawAgentEntries.push(s);
-        });
+        // Agent and LLM lists are stored separately; pre-split policies get reclassified.
+        const { agents: rawAgentEntries, llms: rawLlmEntries } = splitPolicyServers(policy, allCollections);
 
         setSelectedAgentServers(reverseAgentKeys(rawAgentEntries, allCollections));
         setSelectedBrowserLlms(reverseToServiceKeys(rawLlmEntries, allCollections));
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
         setApplyToAllServers(policy.applyToAllServers ?? true);
+        setNegatedAgentServers(policy.negatedAgentServers || false);
+        setNegatedMcpServers(policy.negatedMcpServers || false);
+        setNegatedLlmServers(policy.negatedLlmServers || false);
 
         // Blocked hosts (block-only glob patterns: { pattern })
         setBlockedHosts((policy.blockedHosts || []).map(entry => ({
             pattern: entry.pattern || ""
         })));
+        setBlockedHostsAllowOnly(policy.blockedHostsAllowOnly || false);
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
+        setBlockPublicShare(policy.blockPublicShare || false);
 
         setIgnorePhrases((policy.ignorePhrases || []).map(entry => ({
             phrase: entry.phrase || "",
@@ -897,10 +879,24 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
         const loadedTargetTags = policy.targetTags || {};
         const hasAnyTag = Object.values(loadedTargetTags).some(values => (values || []).length > 0);
-        setApplyToAllUsers(!hasAnyTag && !policy.targetDeviceIds?.length);
+        // targetUserNames is never persisted (backend derives userMetadata from it on save, then
+        // discards it) — userMetadata is the durable record instead, so reconstruct the "Users"
+        // selection from it rather than reading targetUserNames back off the policy. The value has
+        // to be rebuilt the same way availableUsers builds it — userId for an org-scoped row, else
+        // userName — or an org pick reopens as the plain all-orgs row and silently loses its org on
+        // the next save.
+        const loadedTargetUserNames = (policy.userMetadata || [])
+            .map(u => (orgUuidFromUserId(u.userId) ? u.userId : u.userName))
+            .filter(Boolean);
+        setApplyToAllUsers(!hasAnyTag && !policy.targetDeviceIds?.length && !loadedTargetUserNames.length);
         setTargetTags(loadedTargetTags);
         setTargetDeviceIds(policy.targetDeviceIds || []);
+        setTargetUserNames(loadedTargetUserNames);
+        setNegatedTargetTags(policy.negatedTargetTags || {});
+        setNegatedTargetDeviceIds(policy.negatedTargetDeviceIds || false);
+        setNegatedTargetUserNames(policy.negatedTargetUserNames || false);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
+        setSkipEnterpriseAccounts(policy.skipEnterpriseAccounts || false);
     };
 
     const handleClose = () => {
@@ -926,10 +922,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setLoading(true);
         try {
             const transformedMcpServers = expandGroupsToV2(selectedMcpServers);
-            const transformedAgentServers = [
-                ...expandAgentGroupsToV2(selectedAgentServers),
-                ...expandGroupsToV2(selectedBrowserLlms)
-            ];
+            // Agent and LLM written as separate lists so each can be matched/negated independently
+            const transformedAgentServers = expandAgentGroupsToV2(selectedAgentServers);
+            const transformedLlmServers = expandGroupsToV2(selectedBrowserLlms);
 
             // Drop empty rows and normalize the glob patterns before persisting.
             const cleanedBlockedHosts = (blockedHosts || [])
@@ -984,8 +979,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         behavior: r.behavior.toLowerCase()
                     })) : [],
                 llmRule: {
-                    enabled: enableLlmPrompt && !!llmPrompt.trim(),
-                    userPrompt: llmPrompt.trim(),
+                    enabled: !!effectiveLlmPrompt,
+                    userPrompt: effectiveLlmPrompt,
                     confidenceScore: llmConfidenceScore,
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 },
@@ -1026,12 +1021,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
                 applyToAllServers,
+                negatedAgentServers,
+                negatedMcpServers,
+                negatedLlmServers,
                 selectedMcpServers: selectedMcpServers,
                 selectedAgentServers: [...selectedAgentServers, ...selectedBrowserLlms],
                 selectedMcpServersV2: transformedMcpServers,
                 selectedAgentServersV2: transformedAgentServers,
+                selectedLlmServersV2: transformedLlmServers,
                 blockedHosts: cleanedBlockedHosts,
+                blockedHostsAllowOnly,
                 blockPersonalAccounts,
+                blockPublicShare,
                 ignorePhrases: cleanedIgnorePhrases,
                 applyOnResponse,
                 applyOnRequest,
@@ -1039,7 +1040,32 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     Object.entries(targetTags).filter(([, values]) => (values || []).length > 0)
                 ),
                 targetDeviceIds: applyToAllUsers ? [] : targetDeviceIds,
+                // Explicit "Users" picks (beta) — kept fully separate from targetDeviceIds; never
+                // resolved into applyToDeviceIds, only into userMetadata below (matched downstream
+                // by email).
+                targetUserNames: applyToAllUsers ? [] : targetUserNames,
+                // Include/Exclude toggles — filtered to the keys actually present in targetTags so
+                // a stale entry from a deleted/renamed row doesn't linger in the saved map.
+                negatedTargetTags: applyToAllUsers ? {} : Object.fromEntries(
+                    Object.entries(negatedTargetTags || {}).filter(([key]) => targetTags[key]?.length > 0)
+                ),
+                negatedTargetDeviceIds: applyToAllUsers ? false : negatedTargetDeviceIds,
+                negatedTargetUserNames: applyToAllUsers ? false : negatedTargetUserNames,
+                // Identities behind the selected targets — both the devices picked via
+                // targetDeviceIds and the identities picked directly via targetUserNames — deduped
+                // by userId (falling back to userName when an identity has no userId). Resolved
+                // here since we already have the email/userId loaded, rather than making the
+                // backend guess it from raw values.
+                userMetadata: applyToAllUsers ? [] : Array.from(
+                    new Map(
+                        [...targetDeviceIds, ...targetUserNames]
+                            .map(value => deviceValueToIdentity.get(value))
+                            .filter(Boolean)
+                            .map(identity => [identity.userId || identity.userName, identity])
+                    ).values()
+                ),
                 enterpriseLicenseComplianceCategories,
+                skipEnterpriseAccounts,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
@@ -1056,6 +1082,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const handleStepClick = (stepNumber) => {
         setCurrentStep(stepNumber);
     };
+
+    const togglePredefinedTemplate = (id) => {
+        const template = PREDEFINED_CUSTOM_PROMPTS.find((t) => t.id === id);
+        if (!template) return;
+        if (id in presetPrompts) {
+            const { [id]: _removed, ...rest } = presetPrompts;
+            setPresetPrompts(rest);
+        } else {
+            setPresetPrompts({ ...presetPrompts, [id]: template.prompt });
+        }
+    };
+
+    const changePresetPrompt = (id, text) => setPresetPrompts((prev) => ({ ...prev, [id]: text }));
 
     const renderStepContent = (stepNumber) => {
         switch (stepNumber) {
@@ -1080,8 +1119,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         onTryPrompt={handleSamplePayloadClick}
                         enablePromptAttacks={enablePromptAttacks}
                         setEnablePromptAttacks={setEnablePromptAttacks}
-                        promptAttackLevel={promptAttackLevel}
-                        setPromptAttackLevel={setPromptAttackLevel}
                         enableContextPoisoning={enableContextPoisoning}
                         setEnableContextPoisoning={setEnableContextPoisoning}
                         enableDeniedTopics={enableDeniedTopics}
@@ -1096,8 +1133,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setHarmfulCategoriesSettings={setHarmfulCategoriesSettings}
                         enableBasePromptRule={enableBasePromptRule}
                         setEnableBasePromptRule={setEnableBasePromptRule}
-                        basePromptConfidenceScore={basePromptConfidenceScore}
-                        setBasePromptConfidenceScore={setBasePromptConfidenceScore}
                         enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                     />
                 );
@@ -1107,16 +1142,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         onTryPrompt={handleSamplePayloadClick}
                         enableGibberishDetection={enableGibberishDetection}
                         setEnableGibberishDetection={setEnableGibberishDetection}
-                        gibberishConfidenceScore={gibberishConfidenceScore}
-                        setGibberishConfidenceScore={setGibberishConfidenceScore}
                         enableSentiment={enableSentiment}
                         setEnableSentiment={setEnableSentiment}
-                        sentimentConfidenceScore={sentimentConfidenceScore}
-                        setSentimentConfidenceScore={setSentimentConfidenceScore}
                         wordFilters={wordFilters}
                         setWordFilters={setWordFilters}
                         newCustomWord={newCustomWord}
                         setNewCustomWord={setNewCustomWord}
+                        enableMultiLingualBlock={enableMultiLingualBlock}
+                        setEnableMultiLingualBlock={setEnableMultiLingualBlock}
                     />
                 );
             case 4:
@@ -1135,12 +1168,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setNewRegexPattern={setNewRegexPattern}
                         enableSecrets={enableSecrets}
                         setEnableSecrets={setEnableSecrets}
-                        secretsConfidenceScore={secretsConfidenceScore}
-                        setSecretsConfidenceScore={setSecretsConfidenceScore}
                         enableAnonymize={enableAnonymize}
                         setEnableAnonymize={setEnableAnonymize}
-                        anonymizeConfidenceScore={anonymizeConfidenceScore}
-                        setAnonymizeConfidenceScore={setAnonymizeConfidenceScore}
                     />
                 );
             case 5:
@@ -1149,12 +1178,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         onTryPrompt={handleSamplePayloadClick}
                         enableCodeFilter={enableCodeFilter}
                         setEnableCodeFilter={setEnableCodeFilter}
-                        codeFilterLevel={codeFilterLevel}
-                        setCodeFilterLevel={setCodeFilterLevel}
                         enableBanCode={enableBanCode}
                         setEnableBanCode={setEnableBanCode}
-                        banCodeConfidenceScore={banCodeConfidenceScore}
-                        setBanCodeConfidenceScore={setBanCodeConfidenceScore}
                     />
                 );
             case 6:
@@ -1165,8 +1190,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableLlmPrompt={setEnableLlmPrompt}
                         llmRule={llmPrompt}
                         setLlmRule={setLlmPrompt}
-                        llmConfidenceScore={llmConfidenceScore}
-                        setLlmConfidenceScore={setLlmConfidenceScore}
                         llmCompliance={llmCompliance}
                         setLlmCompliance={setLlmCompliance}
                         enableLlmRedaction={enableLlmRedaction}
@@ -1177,8 +1200,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableExternalModel={setEnableExternalModel}
                         url={url}
                         setUrl={setUrl}
-                        confidenceScore={confidenceScore}
-                        setConfidenceScore={setConfidenceScore}
+                    />
+                );
+            case 14:
+                return (
+                    <RogueAgentsStep
+                        selectedTemplateIds={selectedTemplateIds}
+                        onToggleTemplate={togglePredefinedTemplate}
+                        presetPrompts={presetPrompts}
+                        onChangePresetPrompt={changePresetPrompt}
                     />
                 );
             case 7:
@@ -1224,8 +1254,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <BlockedHostsStep
                         blockedHosts={blockedHosts}
                         setBlockedHosts={setBlockedHosts}
+                        blockedHostsAllowOnly={blockedHostsAllowOnly}
+                        setBlockedHostsAllowOnly={setBlockedHostsAllowOnly}
                         blockPersonalAccounts={blockPersonalAccounts}
                         setBlockPersonalAccounts={setBlockPersonalAccounts}
+                        blockPublicShare={blockPublicShare}
+                        setBlockPublicShare={setBlockPublicShare}
                         hostSuggestions={hostSuggestions}
                     />
                 );
@@ -1241,6 +1275,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setSelectedAgentServers={setSelectedAgentServers}
                         selectedBrowserLlms={selectedBrowserLlms}
                         setSelectedBrowserLlms={setSelectedBrowserLlms}
+                        negatedAgentServers={negatedAgentServers}
+                        setNegatedAgentServers={setNegatedAgentServers}
+                        negatedMcpServers={negatedMcpServers}
+                        setNegatedMcpServers={setNegatedMcpServers}
+                        negatedLlmServers={negatedLlmServers}
+                        setNegatedLlmServers={setNegatedLlmServers}
                         applyOnResponse={applyOnResponse}
                         setApplyOnResponse={setApplyOnResponse}
                         applyOnRequest={applyOnRequest}
@@ -1255,15 +1295,26 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setTargetTags={setTargetTags}
                         targetDeviceIds={targetDeviceIds}
                         setTargetDeviceIds={setTargetDeviceIds}
+                        targetUserNames={targetUserNames}
+                        setTargetUserNames={setTargetUserNames}
+                        negatedTargetTags={negatedTargetTags}
+                        setNegatedTargetTags={setNegatedTargetTags}
+                        negatedTargetDeviceIds={negatedTargetDeviceIds}
+                        setNegatedTargetDeviceIds={setNegatedTargetDeviceIds}
+                        negatedTargetUserNames={negatedTargetUserNames}
+                        setNegatedTargetUserNames={setNegatedTargetUserNames}
                         availableTagKeyValues={availableTagKeyValues}
                         availableDevices={availableDevices}
+                        availableUsers={availableUsers}
                         matchingDeviceRows={matchingDeviceRows}
                         usersLoading={usersLoading}
                         applyToAllUsers={applyToAllUsers}
                         setApplyToAllUsers={setApplyToAllUsers}
-                        deviceList={availableDevices}
+                        deviceList={availableUsers}
                         showConditionError={leftSteps.has(ServerSettingsConfig.number)}
                         showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
+                        skipEnterpriseAccounts={skipEnterpriseAccounts}
+                        setSkipEnterpriseAccounts={setSkipEnterpriseAccounts}
                     />
                 );
             case 13:
@@ -1300,12 +1351,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Helper function to build policy data for playground testing
     const buildPlaygroundPolicyData = () => {
         const b = normalizeBehaviourValue(policyBehaviour);
-        const regexPatternsV2 = regexPatterns
-            .filter(r => r && r.pattern && r.behavior)
-            .map(r => ({
-                pattern: r.pattern,
-                behavior: r.behavior.toLowerCase()
-            }));
+        const regexPatternsV2 = enableRegexPatterns
+            ? regexPatterns
+                .filter(r => r && r.pattern && r.behavior)
+                .map(r => ({
+                    pattern: r.pattern,
+                    behavior: r.behavior.toLowerCase()
+                }))
+            : [];
 
         return {
             name: name || "Playground Test Policy",
@@ -1325,15 +1378,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                   ]
                 : [],
             wordFilters: wordFilters,
-            piiFilters: piiTypes,
-            regexPatterns: regexPatterns
-                .filter(r => r && r.pattern)
-                .map(r => r.pattern),
+            piiFilters: enablePiiTypes ? piiTypes : [],
+            regexPatterns: enableRegexPatterns
+                ? regexPatterns
+                    .filter(r => r && r.pattern)
+                    .map(r => r.pattern)
+                : [],
             regexPatternsV2,
-            ...(enableLlmPrompt && llmPrompt?.trim() ? {
+            ...(effectiveLlmPrompt ? {
                 llmRule: {
                     enabled: true,
-                    userPrompt: llmPrompt.trim(),
+                    userPrompt: effectiveLlmPrompt,
                     confidenceScore: llmConfidenceScore,
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 }
@@ -1359,12 +1414,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             url: enableExternalModel ? (url || null) : null,
             confidenceScore: enableExternalModel ? confidenceScore : null,
             applyToAllServers: applyToAllServers,
+            negatedAgentServers: negatedAgentServers,
+            negatedMcpServers: negatedMcpServers,
+            negatedLlmServers: negatedLlmServers,
             selectedMcpServers: selectedMcpServers,
             selectedAgentServers: selectedAgentServers,
             blockedHosts: (blockedHosts || [])
                 .filter(entry => entry && (entry.pattern || "").trim())
                 .map(entry => ({ pattern: entry.pattern.trim() })),
+            blockedHostsAllowOnly,
             blockPersonalAccounts,
+            blockPublicShare,
             ignorePhrases: (ignorePhrases || [])
                 .filter(entry => entry && (entry.phrase || "").trim())
                 .map(entry => ({
@@ -1454,7 +1514,51 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     ];
 
-    const handleSamplePayloadClick = (payload) => {
+    // Auto-configures the rule an example demonstrates so "Try now" reliably triggers it.
+    const EXAMPLE_SETUP = {
+        piiEmail: () => {
+            if (!enablePiiTypes) setEnablePiiTypes(true);
+            setPiiTypes(prev => (prev.some(p => p.type === 'email')
+                ? prev
+                : [...prev, { type: 'email', behavior: 'block', domainCount: 0, minMatchCount: 1 }]));
+        },
+        regexSSN: () => {
+            const pattern = '\\d{3}-\\d{2}-\\d{4}';
+            if (!enableRegexPatterns) setEnableRegexPatterns(true);
+            setRegexPatterns(prev => (prev.some(r => r.pattern === pattern)
+                ? prev
+                : [...prev, { pattern, behavior: 'block' }]));
+        },
+        harmfulCategoriesHate: () => {
+            if (!enableHarmfulCategories) setEnableHarmfulCategories(true);
+            if (harmfulCategoriesSettings.hate !== 'HIGH') {
+                setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, hate: 'HIGH' });
+            }
+        },
+        llmRedactNames: () => {
+            if (!enableLlmRedaction) setEnableLlmRedaction(true);
+            const instruction = "Redact customer full names and home addresses";
+            setRedactionRules(prev => {
+                if (prev.length === 0) {
+                    return [{ enabled: true, userPrompt: instruction, confidenceScore: 0.5 }];
+                }
+                if (!(prev[0].userPrompt || "").trim()) {
+                    const next = [...prev];
+                    next[0] = { ...next[0], enabled: true, userPrompt: instruction };
+                    return next;
+                }
+                return prev;
+            });
+        },
+        tokenLimitLow: () => {
+            // Length is approximated from character count; lower the threshold so the example crosses it.
+            if (!enableTokenLimit) setEnableTokenLimit(true);
+            if (tokenLimitThreshold > 50) setTokenLimitThreshold(50);
+        }
+    };
+
+    const handleSamplePayloadClick = (payload, ensure) => {
+        EXAMPLE_SETUP[ensure]?.();
         setPlaygroundInput(payload);
         // Focus the input field after setting the value
         setTimeout(() => {
@@ -1586,14 +1690,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 <Button onClick={handleNext} disabled={steps.findIndex(s => s.number === currentStep) >= steps.length - 1}>
                                     Next
                                 </Button>
-                                <Button
-                                    primary
-                                    onClick={handleSave}
-                                    loading={loading}
-                                    disabled={!allStepsValid}
-                                >
-                                    {isEditMode ? "Update policy" : "Create policy"}
-                                </Button>
+                                <AllowedAction allowed={canCall('api/createGuardrailPolicy')}>
+                                    <Button
+                                        primary
+                                        onClick={handleSave}
+                                        loading={loading}
+                                        disabled={!allStepsValid}
+                                    >
+                                        {isEditMode ? "Update policy" : "Create policy"}
+                                    </Button>
+                                </AllowedAction>
                             </HorizontalStack>
                         </HorizontalStack>
                     </div>

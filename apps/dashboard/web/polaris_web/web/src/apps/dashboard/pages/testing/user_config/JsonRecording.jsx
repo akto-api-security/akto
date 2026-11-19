@@ -4,6 +4,8 @@ import TestingStore from "../testingStore"
 import api from "../api"
 import Store from "../../../store"
 import AuthParams from "./AuthParams"
+import { usePermissions, whenAllowed } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 async function fetchRecordedLoginScreenshotsList(trimmedRole) {
     const resp = await api.fetchRecordedLoginScreenshots(trimmedRole)
@@ -27,6 +29,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
 
     const authMechanism = TestingStore(state => state.authMechanism)
     const setToastConfig = Store(state => state.setToastConfig)
+    const { canCall } = usePermissions()
     const [tokenFetchCommand, setTokenFetchCommand] = useState('"Bearer " + JSON.parse(Object.values(window.localStorage).find(x => x.indexOf("access_token")> -1)).body.access_token')
     const [content, setContent] = useState("")
     const [extractedToken, setExtractedToken] = useState("")
@@ -263,6 +266,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
                     id:"upload-json-button",
                     content: 'Upload JSON Recording',
                     onAction: handleClick,
+                    ...whenAllowed(canCall('api/uploadRecordedFlow'))
                 }}
             >
                 <Text variant="headingMd">Steps To Add Recording</Text>
@@ -346,7 +350,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
             <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
             <br />
-            { showOnlyApi ? null : <Button id={"save-token"} onClick={handleSave} primary>Save changes</Button> }
+            { showOnlyApi ? null : <AllowedAction allowed={canCall('api/addAuthMechanism')}><Button id={"save-token"} onClick={handleSave} primary>Save changes</Button></AllowedAction> }
         </div>
     )
 }

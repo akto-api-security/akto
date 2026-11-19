@@ -1,4 +1,5 @@
 import request from "@/util/request";
+import LocalStore from "@/apps/main/LocalStorageStore";
 import observeApi from "../api";
 import { buildMcpComponentsFromStis, buildAgentBuiltinToolsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
 import { deviceServiceKey } from "./constants";
@@ -12,6 +13,15 @@ function extractRuleViolated(metadata) {
         return obj.rule_violated || obj.ruleViolated || "-";
     } catch {
         return "-";
+    }
+}
+
+function extractBehaviour(metadata) {
+    if (!metadata) return "";
+    try {
+        return JSON.parse(metadata).behaviour || "";
+    } catch {
+        return "";
     }
 }
 
@@ -31,6 +41,8 @@ function normalizeEvent(e) {
         sessionId:    e.sessionId || "",
         ruleViolated: extractRuleViolated(e.metadata),
         method:       e.method || "",
+        subCategory:  e.subCategory || "",
+        behaviour:    extractBehaviour(e.metadata),
     };
 }
 
@@ -130,6 +142,37 @@ export async function fetchViolationCountsByCollection(hostCounts) {
         console.error("fetchViolationCountsByCollection failed:", e);
         return {};
     }
+}
+
+// Last-7-days violation counts keyed by collection id, for the AI inventory asset panel's violations
+// line (independent of the page's date range). Account-wide, so one fetch is shared by every panel
+// opened within the TTL.
+const RECENT_VIOLATIONS_DAYS = 7;
+const RECENT_VIOLATIONS_TTL_MS = 60 * 1000;
+let recentViolationsCache = null; // { fetchedAt, promise }
+
+function fetchRecentViolationCountsByCollection() {
+    if (recentViolationsCache && Date.now() - recentViolationsCache.fetchedAt < RECENT_VIOLATIONS_TTL_MS) {
+        return recentViolationsCache.promise;
+    }
+    const endTimestamp = Math.floor(Date.now() / 1000);
+    const startTimestamp = endTimestamp - RECENT_VIOLATIONS_DAYS * 24 * 60 * 60;
+    const promise = fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp }).then(fetchViolationCountsByCollection);
+    recentViolationsCache = { fetchedAt: Date.now(), promise };
+    return promise;
+}
+
+// An asset's last-7-days violations by severity, summed across its collections. Skills aren't
+// host-attributable, so they get none — same as the inventory's Violations column.
+export async function fetchRecentViolations(asset) {
+    const totals = { critical: 0, high: 0, medium: 0, low: 0 };
+    if (asset?.rowType === "skill" || !asset?.collectionIds?.length) return totals;
+    const byCollection = await fetchRecentViolationCountsByCollection();
+    asset.collectionIds.forEach((id) => {
+        const v = byCollection[String(id)] || {};
+        Object.keys(totals).forEach((severity) => { totals[severity] += v[severity] || 0; });
+    });
+    return totals;
 }
 
 // LatestAPICollectionID in events is set to time.Now().Unix() (a fake timestamp),
@@ -244,6 +287,37 @@ export function aggregateViolationCountsByCollectionId(hostCounts = {}, collecti
     return byCollection;
 }
 
+// Guardrail activity page (GuardrailDetection.jsx) for a time range: a values.ranges alias such as
+// "last7days", or explicit epoch seconds. startTimestamp 0 means all time.
+export function guardrailActivityPath({ range, startTimestamp, endTimestamp } = {}) {
+    const params = new URLSearchParams();
+    if (range) params.set("range", range);
+    else if (!startTimestamp) params.set("range", "allTime");
+    else {
+        params.set("startTimestamp", String(startTimestamp));
+        params.set("endTimestamp", String(endTimestamp));
+    }
+    return `/dashboard/guardrails/activity?${params.toString()}`;
+}
+
+// Same-tab deep-link into the new Guardrails Violations page (New Layout's AgenticAssetFlyout
+// only — ViolationsTab.jsx/AgentComponentsView.jsx). Legacy DeviceFlyout.jsx still uses
+// openViolationInThreatActivity below. ViolationsPage redirects back to the legacy activity page
+// unless guardrailViolationsNewLayout is set — mirrors ThreatDetectionPage's own toggle-on
+// handler so this deep link doesn't get bounced straight back. refId is passed through so
+// ViolationsPage can auto-open that exact row's flyout once its data loads (see its own
+// refId-handling effect), not just land on the filtered list.
+export function openViolationInGuardrailViolations(row = {}) {
+    LocalStore.getState().setGuardrailViolationsNewLayout(true);
+    const { filterId, actor, refId } = row;
+    const params = new URLSearchParams();
+    if (filterId) params.set("policy", filterId);
+    if (actor) params.set("user", actor);
+    if (refId) params.set("refId", refId);
+    const query = params.toString();
+    window.location.href = query ? `/dashboard/guardrails/violations?${query}` : "/dashboard/guardrails/violations";
+}
+
 // Deep-links to the one activity page that reads these params (ThreatDetectionPage). All 3 callers
 // live under pages/observe/agentic (Atlas-only) — hardcoded rather than dashboardCategory-gated
 // since these pages have no category check of their own and can load before it's set to ENDPOINT.
@@ -264,9 +338,9 @@ export function openViolationInThreatActivity(row = {}) {
         if (url) params.set("url", url);
         if (method) params.set("method", method);
         if (ruleViolated && ruleViolated !== "-") params.set("ruleViolated", ruleViolated);
-        window.open(`${base}?${params.toString()}#${hash}`, "_blank");
+        window.location.href = `${base}?${params.toString()}#${hash}`;
     } else {
-        window.open(`${base}#${hash}`, "_blank");
+        window.location.href = `${base}#${hash}`;
     }
 }
 
@@ -312,6 +386,64 @@ export function summarizeViolations(rows = []) {
     return t;
 }
 
+// Rows that carry an approvalStatus can be approved/blocked; LLM rows need an audit record to update.
+export function canUpdateApproval(row) {
+    if (!row?.approvalStatus) return false;
+    return row.rowType !== "llm" || (row.auditHexIds || []).length > 0;
+}
+
+// AI inventory approval actions; `status` is the approvalStatus a row ends up with.
+export const APPROVAL_ACTIONS = {
+    APPROVE: { label: "Approve", remarks: "Approved", status: "Approved", primary: true },
+    BLOCK: { label: "Block", remarks: "Rejected", status: "Blocked", destructive: true },
+    UNDER_REVIEW: { label: "Mark under review", remarks: "Under review", status: "Under review" },
+};
+
+// Only offer an action that changes the row; marking under review never unblocks (backend enforces it too).
+export function approvalActionApplies(action, row) {
+    if (!canUpdateApproval(row) || row.approvalStatus === action.status) return false;
+    return !(action === APPROVAL_ACTIONS.UNDER_REVIEW && row.approvalStatus === "Blocked");
+}
+
+export function approvalActionRequires(rows) {
+    return rows.some((r) => r.rowType === "service") ? "api/updateAuditData" : "api/updateLlmAuditData";
+}
+
+// Applies an APPROVAL_ACTIONS entry through the Audit Data page's own APIs: MCP servers for all
+// agents (same as its "Block for all agents"), LLM sites by record id, AI agents by name.
+// Resolves to the number of rows it changed.
+export async function updateAssetApproval(rows, action) {
+    const target = rows.filter((r) => approvalActionApplies(action, r));
+    const servers = target.filter((r) => r.rowType === "service").map((r) => r.groupKey);
+    const llmHexIds = target.filter((r) => r.rowType === "llm").flatMap((r) => r.auditHexIds);
+    const agentNames = target.filter((r) => r.rowType === "agent").map((r) => r.groupKey);
+    const calls = servers.map((name) => observeApi.updateAuditData(null, action.remarks, null, null, null, name));
+    if (llmHexIds.length) calls.push(observeApi.updateLlmAuditData(llmHexIds, action.remarks, "browser-llm"));
+    if (agentNames.length) calls.push(observeApi.updateLlmAuditData(agentNames, action.remarks, "ai-agent"));
+    await Promise.all(calls);
+    return target.length;
+}
+
+// MCP servers, AI agents and LLM sites can be guardrail policy targets; skills/plugins/SaaS agents can't.
+export function canTargetGuardrail(row) {
+    return row?.rowType === "service" || row?.rowType === "llm" || (row?.rowType === "agent" && row.type === "AI Agent");
+}
+
+// Prefill for GuardrailPolicies' create flow (location.state.topicGuardrailPrefill), scoped to these
+// rows. groupKeys are what the policy form resolves server entries to: service name for MCP servers
+// and LLM sites, canonical client key for agents.
+export function buildGuardrailPrefillForAssets(rows) {
+    const targets = rows.filter(canTargetGuardrail);
+    const entries = (rowType) => targets.filter((r) => r.rowType === rowType).map((r) => ({ id: r.groupKey, name: r.groupKey }));
+    return {
+        name: targets.length === 1 ? `Guardrail for ${targets[0].name}` : `Guardrail for ${targets.length} AI tools`,
+        applyToAllServers: false,
+        selectedMcpServersV2: entries("service"),
+        selectedAgentServersV2: entries("agent"),
+        selectedLlmServersV2: entries("llm"),
+    };
+}
+
 export function buildAgenticObserveChatMetadata(scope, data = {}) {
     return {
         type: "agentic_observe",
@@ -323,11 +455,11 @@ export function buildAgenticObserveChatMetadata(scope, data = {}) {
 }
 
 const agenticObserveApi = {
-    async listUserAnalysis() {
+    async listUserAnalysis(startTime, endTime) {
         const resp = await request({
             url: "/api/listUserAnalysis",
             method: "post",
-            data: {},
+            data: { startTime: startTime || 0, endTime: endTime || 0 },
         });
         if (Array.isArray(resp)) return resp;
         if (Array.isArray(resp?.userAnalysisList)) return resp.userAnalysisList;

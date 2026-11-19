@@ -10,6 +10,9 @@ import java.util.List;
 
 public class AgentGuardSystemPromptClassifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "agent-guard-labeling"; }
+
     public static final String SYSTEM_PROMPT = "systemPrompt";
     public static final String SOURCE_KEY = "system_prompt";
     private static final int MAX_PROMPT_CHARS = 8000;

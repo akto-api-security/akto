@@ -41,6 +41,13 @@ export const ENTERPRISE_LICENSE_COMPLIANCE_CATEGORIES = [
         helpText:
             "Block assistance building covert tracking tools, stalkerware, or unauthorized monitoring systems targeting individuals without consent.",
     },
+    {
+        key: "MODEL_ABUSE",
+        label: "Abusive Behavior Toward AI Models",
+        helpText:
+            "Block abusive or cruel behavior toward AI models that serves no discernible purpose. Does not apply to user frustration, pushback, dark creative themes, or model testing and research.",
+        beta: true,
+    },
 ];
 
 export const ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN = "ENTERPRISE_LICENSE_COMPLIANCE";

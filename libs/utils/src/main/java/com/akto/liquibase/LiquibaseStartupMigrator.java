@@ -3,6 +3,7 @@ package com.akto.liquibase;
 import com.akto.log.LoggerMaker;
 import com.akto.util.AccountTask;
 import com.akto.util.DashboardMode;
+import com.akto.util.DbNames;
 import liquibase.Contexts;
 import liquibase.Liquibase;
 import liquibase.database.Database;
@@ -39,8 +40,8 @@ public final class LiquibaseStartupMigrator {
 
         logger.info(ENV_FLAG + "=true, running DB migrations");
 
-        runScope(mongoUrl, "common", "common");
-        runScope(mongoUrl, "billing", "billing");
+        runScope(mongoUrl, "common", DbNames.COMMON);
+        runScope(mongoUrl, "billing", DbNames.BILLING);
 
         // On-prem: single fixed account; SaaS/multi-tenant: iterate active accounts via AccountTask.
         if (DashboardMode.isOnPremDeployment()) {

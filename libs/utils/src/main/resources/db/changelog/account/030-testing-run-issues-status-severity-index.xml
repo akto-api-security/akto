@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors TestingRunIssuesDao.createIndicesIfAbsent's {testRunIssueStatus, severity} index.
+        Severity appears in no other testing_run_issues index, so a {status, severity} count (the
+        Ask Akto overlay's open-criticals tile, computed on every overlay open) scans every OPEN
+        document past the {status} index.
+
+        Name and keys match MCollection.generateIndexName (ascending; each field name is cut to
+        14 characters, so testRunIssueStatus becomes testRunIssueSt) so that if DaoInit's
+        createIndexIfAbsent already built it, this createIndex is a no-op.
+    -->
+
+    <changeSet id="030-account-testing-run-issues-status-severity-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="testing_run_issues"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="testing_run_issues">
+            <mongodb:keys>{ "testRunIssueStatus": 1, "severity": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "testRunIssueSt-severity_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="testing_run_issues">
+                <mongodb:keys>{ "testRunIssueStatus": 1, "severity": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

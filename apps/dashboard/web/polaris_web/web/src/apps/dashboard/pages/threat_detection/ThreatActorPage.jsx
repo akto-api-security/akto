@@ -18,6 +18,8 @@ import React from "react";
 import { getDashboardCategory, mapLabel, getReportCategoryShortName, shortNameToCategory } from "../../../main/labelHelper";
 import PersistStore from "../../../main/PersistStore";
 import useThreatReportDownload from "../../hooks/useThreatReportDownload";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../components/shared/AllowedAction";
 
 // Opened in a fresh tab (e.g. "View All"), so apply ?category= before first render, same as ThreatReport.jsx.
 const categoryOverride = shortNameToCategory[getReportCategoryShortName()]
@@ -51,8 +53,11 @@ const ChartComponent = ({ onSubCategoryClick, currDateRange }) => {
 const MemoizedChartComponent = React.memo(ChartComponent);
 
 function ThreatActorPage() {
+  const { canCall } = usePermissions();
   const [actorDetails, setActorDetails] = useState(null);
   const [showActorDetails, setShowActorDetails] = useState(false);
+  const [actorsRefreshCount, setActorsRefreshCount] = useState(0);
+  const onActorStatusChange = () => setActorsRefreshCount(count => count + 1);
 
   const [searchParams] = useSearchParams();
   const getInitialDateRange = () => {
@@ -74,7 +79,7 @@ function ThreatActorPage() {
       }
     }
     const specialAccounts = [1776384040, 1776625569, 1776626846];
-    return specialAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? values.ranges[4] : values.ranges[2];
+    return specialAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? values.ranges[4] : func.getDefaultDateRange(values.ranges[2]);
   };
   const initialDateRange = getInitialDateRange();
   const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -113,8 +118,10 @@ function ThreatActorPage() {
       key={"threat-actor-data-table"}
       currDateRange={currDateRange}
       handleRowClick={onRowClick}
+      refreshCount={actorsRefreshCount}
+      onStatusChange={onActorStatusChange}
     />,
-    ...(showActorDetails ? [<ActorDetails actorDetails={actorDetails} setShowActorDetails={setShowActorDetails} />] : [])
+    ...(showActorDetails ? [<ActorDetails key={actorDetails?.id} actorDetails={actorDetails} setShowActorDetails={setShowActorDetails} onStatusChange={onActorStatusChange} />] : [])
   ];
 
   return (
@@ -135,9 +142,11 @@ function ThreatActorPage() {
         />
       }
       secondaryActions={
-        <Button primary onClick={downloadThreatReport}>
-          Export Threat Report
-        </Button>
+        <AllowedAction allowed={canCall('api/generateThreatReport')}>
+          <Button primary onClick={downloadThreatReport}>
+            Export Threat Report
+          </Button>
+        </AllowedAction>
       }
       components={components}
     />

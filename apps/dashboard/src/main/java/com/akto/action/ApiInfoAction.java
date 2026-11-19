@@ -57,14 +57,6 @@ public class ApiInfoAction extends UserAction {
     private String url ;
     private String method;
     private ApiInfo apiInfo;
-    @Setter
-    private boolean showApiInfo;
-
-    @Getter
-    private int unauthenticatedApis;
-    @Getter
-    private List<ApiInfo> unauthenticatedApiList;
-
     @Getter
     @Setter
     private List<String> missingUrls;
@@ -86,38 +78,6 @@ public class ApiInfoAction extends UserAction {
         }
         return SUCCESS.toUpperCase();
     }
-    public String fetchAllUnauthenticatedApis(){
-        Bson filter = Document.parse(
-            "{ \"allAuthTypesFound\": { \"$elemMatch\": { \"$elemMatch\": { \"$eq\": \"UNAUTHENTICATED\" } } } }"
-        );
-        if(!showApiInfo){
-            this.unauthenticatedApis = (int) ApiInfoDao.instance.count(filter);
-        }else{
-            int count = 0;
-            int skip = 0;
-            int limit = 1000;
-            Bson sort = Sorts.ascending(Constants.ID);
-            while(true){
-                List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter, skip, limit, sort);
-                if(apiInfos.isEmpty()) {
-                    break;
-                }
-                for(ApiInfo apiInfo: apiInfos) {
-                    apiInfo.calculateActualAuth();
-                }
-                if(unauthenticatedApiList == null) {
-                    unauthenticatedApiList = apiInfos;
-                } else {
-                    unauthenticatedApiList.addAll(apiInfos);
-                }
-                count += apiInfos.size();
-                skip += limit;
-            }
-            this.unauthenticatedApis = count;
-        }
-        return SUCCESS.toUpperCase();
-    }
-
     /**
      * Queries api_info collection for matching URLs and returns a map of URL -> Collection IDs
      */

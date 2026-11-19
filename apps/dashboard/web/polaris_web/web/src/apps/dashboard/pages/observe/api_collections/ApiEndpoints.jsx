@@ -45,6 +45,8 @@ import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadg
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent"
 import GraphqlTreeView from "../../../components/shared/treeView/GraphqlTreeView"
 import RestTreeView from "../../../components/shared/treeView/RestTreeView"
+import { usePermissions, withPermissions, whenAllowed } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 const headings = [
     {
@@ -58,7 +60,7 @@ const headings = [
         text: "Risk score",
         title: <HeadingWithTooltip
             title={"Risk score"}
-            content={"Risk score is calculated based on the amount of sensitive information the API shares and its current status regarding security issues."}
+            content={"Risk score is calculated based on the amount of sensitive information the " + mapLabel('API', getDashboardCategory()) + " shares and its current status regarding security issues."}
         />,
         value: "riskScoreComp",
         textValue: "riskScore",
@@ -95,7 +97,7 @@ const headings = [
         title:"Access Type",
         showFilter: true,
         type: CellType.TEXT,
-        tooltipContent: "Access type of the API. It can be public, private, partner"
+        tooltipContent: "Access type of the " + mapLabel('API', getDashboardCategory()) + ". It can be public, private, partner"
     },
     {
         text: 'Auth Type',
@@ -103,7 +105,7 @@ const headings = [
         value: 'auth_type',
         showFilter: true,
         textValue: 'authTypeTag',
-        tooltipContent: "Authentication type of the API."
+        tooltipContent: "Authentication type of the " + mapLabel('API', getDashboardCategory()) + "."
     }] : []),
     {
         text: 'Sensitive params in response',
@@ -117,7 +119,7 @@ const headings = [
         text: 'Last Seen',
         title: <HeadingWithTooltip 
                 title={"Last Seen"}
-                content={"Time when API was last detected in traffic."}
+                content={"Time when " + mapLabel('API', getDashboardCategory()) + " was last detected in traffic."}
             />,
         value: 'last_seen',
         isText: true,
@@ -129,7 +131,7 @@ const headings = [
         text: 'Discovered At',
         title: <HeadingWithTooltip
                 title={"Discovered At"}
-                content={"Time when API was first discovered in traffic."}
+                content={"Time when " + mapLabel('API', getDashboardCategory()) + " was first discovered in traffic."}
             />,
         value: 'added',
         isText: true,
@@ -141,7 +143,7 @@ const headings = [
         text: 'Last ' + mapLabel('Tested', getDashboardCategory()),
         title: <HeadingWithTooltip
                 title={"Last " + mapLabel('Tested', getDashboardCategory())}
-                content={"Time when API was last tested successfully."}
+                content={"Time when " + mapLabel('API', getDashboardCategory()) + " was last tested successfully."}
             />,
         value: 'lastTestedComp',
         sortActive: true,
@@ -176,7 +178,7 @@ const headings = [
         textValue: "description",
         title: "Description",
         filterKey: "description",
-        tooltipContent: "Description of the API",
+        tooltipContent: "Description of the " + mapLabel('API', getDashboardCategory()),
     },
     { title: '', type: CellType.ACTION }
 ]
@@ -244,7 +246,10 @@ function getRiskAnalysisForEndpoint(endpointUrl, resourceNameToRiskMap) {
     return componentName != null ? (resourceNameToRiskMap.get(componentName) ?? null) : null;
 }
 
-function makeUploadItem(fileFormat, tooltipText, label, onFileChanged) {
+function makeUploadItem(fileFormat, tooltipText, label, onFileChanged, allowed = true) {
+    if (!allowed) {
+        return { content: label, prefix: <Icon source={FileMinor} />, ...whenAllowed(false) }
+    }
     return {
         content: '',
         prefix: (
@@ -270,6 +275,7 @@ function ApiEndpoints(props) {
     const location = useLocation()
     const apiCollectionId = params.apiCollectionId
     const navigate = useNavigate()
+    const { canCall } = usePermissions()
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
@@ -903,7 +909,7 @@ function ApiEndpoints(props) {
 
     function computeApiGroup() {
         api.computeCustomCollections(pageTitle);
-        func.setToast(true, false, "API group is being computed.")
+        func.setToast(true, false, mapLabel('API group', getDashboardCategory()) + " is being computed.")
     }
 
     function redactCheckBoxClicked(){
@@ -937,9 +943,9 @@ function ApiEndpoints(props) {
     
     
         api.deleteApis(apiObjects).then(resp => {
-            func.setToast(true, false, "APIs deleted successfully. Refresh to see the changes.")
+            func.setToast(true, false, mapLabel('APIs', getDashboardCategory()) + " deleted successfully. Refresh to see the changes.")
         }).catch (err => {
-            func.setToast(true, true, "There was some error deleting the APIs. Please contact support@akto.io for assistance")
+            func.setToast(true, true, "There was some error deleting the " + mapLabel('APIs', getDashboardCategory()) + ". Please contact support@akto.io for assistance")
         })
     }
 
@@ -1226,7 +1232,7 @@ function ApiEndpoints(props) {
         const envType = collectionsObj?.envType
         const envTypeList = envType?.map(func.formatCollectionType) || []
 
-        return getTagsCompactComponent(envTypeList)
+        return transform.getCollectionTypeList(envTypeList, 5, true)
     }
 
     function getEmptyScreenText(collectionsObj) {
@@ -1248,8 +1254,8 @@ function ApiEndpoints(props) {
             };
         }
         return {
-            headingText: "Discover APIs to get started",
-            description: "Your API collection is currently empty. Import APIs from other collections now."
+            headingText: "Discover " + mapLabel('APIs', getDashboardCategory()) + " to get started",
+            description: "Your " + mapLabel('API', getDashboardCategory()) + " collection is currently empty. Import " + mapLabel('APIs', getDashboardCategory()) + " from other collections now."
         };
     }
 
@@ -1270,7 +1276,7 @@ function ApiEndpoints(props) {
     const viewConfigs = [
         {
             key: 'sequences',
-            label: 'Display graph view',
+            label: 'Display session explorer',
             state: showSequencesFlow,
             setState: setShowSequencesFlow,
             condition: !isEndpointSecurityCategory()
@@ -1339,7 +1345,7 @@ function ApiEndpoints(props) {
             >
                 <div className="inventory-list">
                 <ActionList
-                    sections={[
+                    sections={withPermissions([
                         ...(() => {
                             const switchViewItems = viewConfigs
                                 .map(config => createViewToggleItem(config))
@@ -1355,17 +1361,19 @@ function ApiEndpoints(props) {
                                         onAction: () => { handleRefresh(); setExportOpen(false) },
                                     },
                                     isApiGroup ? {
-                                        content: 'Re-compute API Group',
+                                        content: 'Re-compute ' + mapLabel('API Group', getDashboardCategory()),
                                         onAction: () => { computeApiGroup(); setExportOpen(false) },
+                                        requires: 'api/computeCustomCollections'
                                     }: {}
                                 ]
                             },
                             {
                                 title: 'Upload',
                                 items: [
-                                    !isApiGroup && !isGraphQLCollection && makeUploadItem('.json,.yaml,.yml', 'Upload OpenAPI file', 'Upload OpenAPI file', file => { uploadOpenApiFile(file); setExportOpen(false) }),
-                                    !isApiGroup && isGraphQLCollection && makeUploadItem('.graphql,.gql', 'Upload GraphQL schema', 'Upload GraphQL schema', file => { uploadGraphQLSchemaFile(file); setExportOpen(false) }),
-                                    !isApiGroup && !(isHostnameCollection)  && {
+                                    !isApiGroup && !isGraphQLCollection && makeUploadItem('.json,.yaml,.yml', 'Upload OpenAPI file', 'Upload OpenAPI file', file => { uploadOpenApiFile(file); setExportOpen(false) }, canCall('api/importDataFromOpenApiSpec')),
+                                    !isApiGroup && isGraphQLCollection && makeUploadItem('.graphql,.gql', 'Upload GraphQL schema', 'Upload GraphQL schema', file => { uploadGraphQLSchemaFile(file); setExportOpen(false) }, canCall('api/uploadGraphQLSchema')),
+                                    !isApiGroup && !(isHostnameCollection) && !canCall('api/uploadHar') && makeUploadItem('.har', 'Upload traffic(.har)', 'Upload har file', null, false),
+                                    !isApiGroup && !(isHostnameCollection) && canCall('api/uploadHar') && {
                                         content: '',
                                         prefix:  (<Box width="160px" >
                                             <UploadFile
@@ -1384,7 +1392,8 @@ function ApiEndpoints(props) {
                                             />
                                         </Box>)
                                     },
-                                    !isApiGroup && (!isHostnameCollection && hasAccessToDiscoveryAgent) && {
+                                    !isApiGroup && (!isHostnameCollection && hasAccessToDiscoveryAgent) && !canCall('api/importDataFromOpenApiSpec') && { content: 'Upload using AI', prefix: <Icon source={MagicMinor} />, ...whenAllowed(false) },
+                                    !isApiGroup && (!isHostnameCollection && hasAccessToDiscoveryAgent) && canCall('api/importDataFromOpenApiSpec') && {
                                         content: '',
                                         prefix: (<Box width="160px" >
                                             <UploadFile
@@ -1411,10 +1420,12 @@ function ApiEndpoints(props) {
                                     {
                                         content: 'OpenAPI spec',
                                         onAction: () => { (selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi() : exportOpenApi()},
+                                        requires: 'api/generateOpenApiFile'
                                     },
                                     {
                                         content: 'Postman',
                                         onAction: () => { exportPostman(); setExportOpen(false) },
+                                        requires: 'api/createPostmanApi'
                                     },
                                     {
                                         content: 'CSV',
@@ -1428,7 +1439,8 @@ function ApiEndpoints(props) {
                                     isAgenticSecurityCategory() && {
                                         content: 'Add system prompt',
                                         onAction: () => { addSystemPrompt() },
-                                        prefix: <Box><Icon source={EditMinor} /></Box>
+                                        prefix: <Box><Icon source={EditMinor} /></Box>,
+                                        requires: 'api/saveCollectionDescription'
                                     },
                                     {
                                         content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
@@ -1440,8 +1452,10 @@ function ApiEndpoints(props) {
                                                     label='Redact'
                                                     checked={redacted}
                                                     onChange={() => redactCheckBoxClicked()}
+                                                    disabled={!canCall('api/redactCollection')}
                                                 /></Box>,
                                         onAction: () => { redactCheckBoxClicked() },
+                                        requires: 'api/redactCollection'
                                     },
                                     window?.USER_NAME?.includes("@akto.io") && {
                                         content: 'Show only unique endpoints',
@@ -1450,12 +1464,12 @@ function ApiEndpoints(props) {
                                 ]
                             }
                         ])
-                    ]}
+                    ])}
                 />
                 </div>
             </Popover>
 
-            {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
+            {isApiGroup &&collectionsObj?.automated !== true ? <AllowedAction allowed={canCall('api/updateCustomCollection')}><Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button></AllowedAction> : null}
 
             {/* {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null} */}
 
@@ -1467,7 +1481,7 @@ function ApiEndpoints(props) {
                     filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
                     runTestFromOutside={runTests}
                     closeRunTest={() => setRunTests(false)}
-                    disabled={showEmptyScreen || window.USER_ROLE === "GUEST" || (collectionsObj?.isOutOfTestingScope || false)}
+                    disabled={showEmptyScreen || !canCall('api/startTest') || (collectionsObj?.isOutOfTestingScope || false)}
                     selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
                     preActivator={false}
                     warningMessage={isCopilotUnpublished ? "Bot is not published. Please publish the bot in Copilot Studio before running a scan." : null}
@@ -1542,7 +1556,7 @@ function ApiEndpoints(props) {
         })
 
         if (mergedApis.length === 0) {
-            func.setToast(true, true, "No merged APIs selected. Only merged APIs can be de-merged.")
+            func.setToast(true, true, "No merged " + mapLabel('APIs', getDashboardCategory()) + " selected. Only merged " + mapLabel('APIs', getDashboardCategory()) + " can be de-merged.")
             return
         }
 
@@ -1565,14 +1579,14 @@ function ApiEndpoints(props) {
 
         api.bulkDeMergeApis(apiObjects).then(resp => {
             setDeMergingInProgress(false)
-            func.setToast(true, false, `Successfully de-merged ${apiObjects.length} API(s). Refresh to see the changes.`)
+            func.setToast(true, false, `Successfully de-merged ${apiObjects.length} ${mapLabel('API', getDashboardCategory())}(s). Refresh to see the changes.`)
             // Optionally refresh the data
             setTimeout(() => {
                 fetchData()
             }, 1000)
         }).catch(err => {
             setDeMergingInProgress(false)
-            func.setToast(true, true, "There was an error de-merging the APIs. Please try again or contact support@akto.io")
+            func.setToast(true, true, "There was an error de-merging the " + mapLabel('APIs', getDashboardCategory()) + ". Please try again or contact support@akto.io")
         })
     }
 
@@ -1605,38 +1619,44 @@ function ApiEndpoints(props) {
                 onAction: () => exportCsv(selectedResources)
             },
             {
-                content: setEndpointTagsContent
+                content: setEndpointTagsContent,
+                requires: 'api/updateApiInfoTags'
             }
         ]
         if (isApiGroup) {
             ret.push(
                 {
                     content: 'Remove from ' + mapLabel('API', getDashboardCategory()) + ' group',
-                    onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE)
+                    onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE),
+                    requires: 'api/removeApisFromCustomCollection'
                 }
             )
         } else {
             ret.push({
                 content: <div data-testid="add_to_api_group_button">{'Add to ' + mapLabel('API', getDashboardCategory()) + ' group'}</div>,
-                onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
+                onAction: () => handleApiGroupAction(selectedResources, Operation.ADD),
+                requires: 'api/addApisToCustomCollection'
             })
         }
 
         // Add bulk de-merge option
         ret.push({
             content: 'De-merge ' + mapLabel('APIs', getDashboardCategory()),
-            onAction: () => handleBulkDeMerge(selectedResources)
+            onAction: () => handleBulkDeMerge(selectedResources),
+            requires: 'api/bulkDeMergeApis'
         })
 
         // Add bulk guardrail actions (only for agent proxy collections in Argus dashboard)
         if (isAgenticSecurityCategory() && isAgentProxyCollection) {
             ret.push({
                 content: 'Enable guardrails',
-                onAction: () => handleBulkGuardrail(selectedResources, true)
+                onAction: () => handleBulkGuardrail(selectedResources, true),
+                requires: 'api/apiInfo/bulkAgentProxyGuardrail'
             })
             ret.push({
                 content: 'Disable guardrails',
-                onAction: () => handleBulkGuardrail(selectedResources, false)
+                onAction: () => handleBulkGuardrail(selectedResources, false),
+                requires: 'api/apiInfo/bulkAgentProxyGuardrail'
             })
         }
 
@@ -1657,13 +1677,15 @@ function ApiEndpoints(props) {
                 if (hasUnblocked) {
                     ret.push({
                         content: 'Block Skills',
-                        onAction: () => handleBulkSkillBlock(selectedResources, true)
+                        onAction: () => handleBulkSkillBlock(selectedResources, true),
+                        requires: 'api/updateSkillBlockStatus'
                     })
                 }
                 if (hasBlocked) {
                     ret.push({
                         content: 'Unblock Skills',
-                        onAction: () => handleBulkSkillBlock(selectedResources, false)
+                        onAction: () => handleBulkSkillBlock(selectedResources, false),
+                        requires: 'api/updateSkillBlockStatus'
                     })
                 }
             }
@@ -1672,7 +1694,8 @@ function ApiEndpoints(props) {
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
                 content: 'Delete ' + mapLabel('APIs', getDashboardCategory()),
-                onAction: () => deleteApis(selectedResources)
+                onAction: () => deleteApis(selectedResources),
+                requires: 'api/deleteApis'
             })
         }
 
@@ -1801,7 +1824,7 @@ function ApiEndpoints(props) {
             key="redact-modal-1"
         >
             <Modal.Section>
-                <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>
+                <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your {mapLabel('API', getDashboardCategory())} Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>
             </Modal.Section>
         </Modal>
     )
@@ -1818,7 +1841,7 @@ function ApiEndpoints(props) {
             key="delete-api-modal"
         >
             <Modal.Section>
-                <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
+                <Text>Are you sure you want to delete {(apis || []).length} {mapLabel('API', getDashboardCategory())}(s)?</Text>
             </Modal.Section>
         </Modal>
     )
@@ -1843,7 +1866,7 @@ function ApiEndpoints(props) {
         >
             <Modal.Section>
                 <VerticalStack gap="4">
-                    <Text>Are you sure you want to de-merge {(apis || []).length} merged API(s)?</Text>
+                    <Text>Are you sure you want to de-merge {(apis || []).length} merged {mapLabel('API', getDashboardCategory())}(s)?</Text>
                     <Text variant="bodyMd" color="subdued">
                         This will split the merged endpoints back into their original forms. For example,
                         <Text as="span" fontWeight="semibold"> /api/products/INTEGER/reviews </Text>
@@ -1936,14 +1959,16 @@ function ApiEndpoints(props) {
                     content: 'Disable guardrails for this endpoint',
                     onAction: async () => {
                         handleToggleGuardrail(apiInfoId, false, null)
-                    }
+                    },
+                    requires: 'api/apiInfo/bulkAgentProxyGuardrail'
                 })
             } else {
                 actions.push({
                     content: 'Enable guardrails for this endpoint',
                     onAction: async () => {
                         handleToggleGuardrail(apiInfoId, true, null)
-                    }
+                    },
+                    requires: 'api/apiInfo/bulkAgentProxyGuardrail'
                 })
             }
             actions.push({
@@ -1951,7 +1976,8 @@ function ApiEndpoints(props) {
                 onAction: () => {
                     setSelectedEndpointForSchema(item)
                     setShowGuardrailSchemaModal(true)
-                }
+                },
+                requires: 'api/apiInfo/bulkAgentProxyGuardrail'
             })
         }
         
@@ -2157,7 +2183,7 @@ function ApiEndpoints(props) {
 
     const handleSaveDescription = () => {
         // Check for special characters
-        const allowedChars = /^[a-zA-Z0-9\s.,!?;:'"()\-_/&]+$/;
+        const allowedChars = /^[a-zA-Z0-9\s.,!?;:'"()\-_/&@#$%*+=\[\]{}\\|^~`<>–—]+$/;
 
         if (editableDescription.length > 0 && !allowedChars.test(editableDescription)) {
             func.setToast(true, true, "Description contains invalid characters.");
@@ -2195,10 +2221,10 @@ function ApiEndpoints(props) {
                                             {isEditing ? (
                                                 <InlineEditableText textValue={editableTitle} setTextValue={handleTitleChange} handleSaveClick={handleSaveClick} setIsEditing={setIsEditing} maxLength={24} />
                                             ) :
-                                                <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ? () => { setIsEditing(true); } : undefined}>
+                                                <div style={{ cursor: isApiGroup && canCall('api/editCollectionName') ? 'pointer' : 'default' }} onClick={isApiGroup && canCall('api/editCollectionName') ? () => { setIsEditing(true); } : undefined}>
                                                     <TitleWithInfo
                                                         titleComp={<TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />}
-                                                        tooltipContent={isApiGroup ? "This API group is computed periodically" : null}
+                                                        tooltipContent={isApiGroup ? "This " + mapLabel('API group', getDashboardCategory()) + " is computed periodically" : null}
                                                     />
                                                 </div>
                                             }
@@ -2221,14 +2247,16 @@ function ApiEndpoints(props) {
                                             </VerticalStack>
                                         ) : (
                                             !description ? (
+                                                <AllowedAction allowed={canCall('api/saveCollectionDescription')}>
                                                 <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
                                                     Add description
                                                 </Button>
+                                                </AllowedAction>
                                             ) : (
                                                 /*
                                                  Setting maxWidth to 100% to override the tooltipSpan class max-width of 63 vw and instead use the max-width of the parent HorizontalStack.
                                                 */
-                                                <Box maxWidth="100%" onClick={() => setIsEditingDescription(true)}>
+                                                <Box maxWidth="100%" onClick={canCall('api/saveCollectionDescription') ? () => setIsEditingDescription(true) : undefined}>
                                                     <TooltipText tooltip={description} text={description} textProps={{ variant: 'bodyMd', fontWeight: "medium"}} />
                                                 </Box>
                                             )

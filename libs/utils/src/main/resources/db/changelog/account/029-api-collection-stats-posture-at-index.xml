@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors ApiCollectionStatsDao.createIndicesIfAbsent, for the home dashboard's per collection
+        api counts (the "posture" sub document of api_collection_stats).
+
+        {posture.at} orders the refresh that recounts the least recently counted collections first,
+        and finds the ones never counted. api_collection_stats itself is created by the DAO, so where
+        it does not exist yet the changeset is marked as run and the DAO builds the index with it.
+
+        Name matches ApiCollectionStatsDao, so this is a no-op where DaoInit already built it.
+    -->
+
+    <changeSet id="029-account-api-collection-stats-posture-at-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="api_collection_stats"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="api_collection_stats">
+            <mongodb:keys>{ "posture.at": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "posture_at_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_collection_stats">
+                <mongodb:keys>{ "posture.at": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

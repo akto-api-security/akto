@@ -25,7 +25,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false, severity = [], skillEvaluationMode = undefined, configEvaluationMode = undefined) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false, severity = [], skillEvaluationMode = undefined, configEvaluationMode = undefined, riskScoreFilterType = undefined, riskScoreFilterValue = undefined, humanResponseFilter = undefined, ungroupActivities = false, extraFilters = {}) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -51,7 +51,17 @@ const threatDetectionRequests = {
                 ...(typeof sortBySeverity === 'boolean' ? { sortBySeverity } : {}),
                 ...(severity && severity.length > 0 ? { severity } : {}),
                 ...(skillEvaluationMode ? { skillEvaluationMode } : {}),
-                ...(configEvaluationMode ? { configEvaluationMode } : {})
+                ...(configEvaluationMode ? { configEvaluationMode } : {}),
+                ...(riskScoreFilterType ? { riskScoreFilterType } : {}),
+                ...(riskScoreFilterValue != null && riskScoreFilterValue !== "" ? { riskScoreFilterValue } : {}),
+                ...(humanResponseFilter ? { humanResponse: humanResponseFilter } : {}),
+                ...(ungroupActivities ? { ungroupActivities: true } : {}),
+                ...(extraFilters.atlasToolKey ? { atlasToolKey: extraFilters.atlasToolKey } : {}),
+                ...(extraFilters.agenticTypes?.length ? { agenticTypes: extraFilters.agenticTypes } : {}),
+                ...(extraFilters.behaviours?.length ? { behaviours: extraFilters.behaviours } : {}),
+                // Guardrail case management: owner logins (UNASSIGNED_OWNER = no owner) and whether the event has notes.
+                ...(extraFilters.caseOwners?.length ? { caseOwners: extraFilters.caseOwners } : {}),
+                ...(typeof extraFilters.hasCaseNotes === 'boolean' ? { hasCaseNotes: extraFilters.hasCaseNotes } : {}),
             },
             suppress403Toast: true
         })
@@ -139,16 +149,26 @@ const threatDetectionRequests = {
             data,
         })
     },
-    fetchMaliciousRequest(refId, eventType, actor, filterId) {
+    // eventIds: a grouped activity row's events, returned as the attempts to page through.
+    fetchMaliciousRequest(refId, eventType, actor, filterId, eventIds = []) {
         return request({
             url: '/api/fetchAggregateMaliciousRequests',
             method: 'post',
-            data: {refId, eventType, actor, filterId}
+            data: {refId, eventType, actor, filterId, ...(eventIds.length > 0 ? { eventIds } : {})}
         })
     },
-    fetchCountBySeverity(startTs, endTs, severityStatusFilter) {
+    auditContentView(refId, eventId) {
+        return request({
+            url: '/api/fetchGuardrailActivityDetail',
+            method: 'post',
+            data: {refId, eventId}
+        })
+    },
+    fetchCountBySeverity(startTs, endTs, severityStatusFilter, skillEvaluationMode, configEvaluationMode) {
         const data = { startTs, endTs };
         if (severityStatusFilter) data.severityStatusFilter = severityStatusFilter;
+        if (skillEvaluationMode) data.skillEvaluationMode = skillEvaluationMode;
+        if (configEvaluationMode) data.configEvaluationMode = configEvaluationMode;
         return request({
             url: '/api/fetchCountBySeverity',
             method: 'post',
@@ -167,6 +187,43 @@ const threatDetectionRequests = {
             url: '/api/getDailyThreatActorsCount',
             method: 'post',
             data: {startTs, endTs, latestAttack: latestAttack || []}
+        })
+    },
+    // Guardrail overview: events per day split by action. `filters` takes the violations list's filter keys.
+    fetchGuardrailActionCounts(startTimestamp, endTimestamp, filters) {
+        return request({
+            url: '/api/fetchGuardrailActionCounts',
+            method: 'post',
+            data: {startTimestamp, endTimestamp, filters: filters || {}}
+        })
+    },
+    // The overview's list panels page on the backend: `skip` rows in, `limit` rows out, plus the total.
+    fetchGuardrailTopPolicies(startTimestamp, endTimestamp, filters, skip, limit) {
+        return request({
+            url: '/api/fetchGuardrailTopPolicies',
+            method: 'post',
+            data: {startTimestamp, endTimestamp, filters: filters || {}, skip, limit}
+        })
+    },
+    fetchGuardrailHeatmap(startTimestamp, endTimestamp, filters, skip, limit) {
+        return request({
+            url: '/api/fetchGuardrailHeatmap',
+            method: 'post',
+            data: {startTimestamp, endTimestamp, filters: filters || {}, skip, limit}
+        })
+    },
+    fetchGuardrailNeedsAttention(startTimestamp, endTimestamp, filters, skip, limit) {
+        return request({
+            url: '/api/fetchGuardrailNeedsAttention',
+            method: 'post',
+            data: {startTimestamp, endTimestamp, filters: filters || {}, skip, limit}
+        })
+    },
+    fetchGuardrailTriageTime(startTimestamp, endTimestamp, filters) {
+        return request({
+            url: '/api/fetchGuardrailTriageTime',
+            method: 'post',
+            data: {startTimestamp, endTimestamp, filters: filters || {}}
         })
     },
     fetchSensitiveParamsForEndpoints (urls) {
@@ -236,11 +293,16 @@ const threatDetectionRequests = {
             data: {startTs, endTs}
         })
     },
-    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5) {
+    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5, severityStatusFilter, skillEvaluationMode, configEvaluationMode) {
         return request({
             url: '/api/fetchThreatTopNData',
             method: 'post',
-            data: {startTs, endTs, latestAttack: latestAttack || [], limit}
+            data: {
+                startTs, endTs, latestAttack: latestAttack || [], limit,
+                ...(severityStatusFilter ? { severityStatusFilter } : {}),
+                ...(skillEvaluationMode ? { skillEvaluationMode } : {}),
+                ...(configEvaluationMode ? { configEvaluationMode } : {}),
+            }
         })
     },
     exportThreatActivityToAdx(startTimestamp, endTimestamp) {
@@ -259,6 +321,13 @@ const threatDetectionRequests = {
             url: '/api/getAdxExportStatus',
             method: 'post',
             data: {}
+        })
+    },
+    startComplianceClauseScan(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/startComplianceClauseScan',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
         })
     },
     fetchThreatActivityWebhookIntegration() {
@@ -346,6 +415,13 @@ const threatDetectionRequests = {
             url: '/api/fetchSessionContext',
             method: 'post',
             data: { sessionId }
+        })
+    },
+    fetchContextMessages(host, timestamp) {
+        return request({
+            url: '/api/fetchContextMessages',
+            method: 'post',
+            data: { host, timestamp }
         })
     },
     fetchGuardrailLatency(startTs, endTs) {

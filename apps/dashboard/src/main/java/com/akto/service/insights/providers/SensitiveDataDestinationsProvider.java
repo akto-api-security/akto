@@ -65,6 +65,10 @@ public class SensitiveDataDestinationsProvider extends AbstractInsightProvider {
         r.setStatus(InsightResult.Status.READY.name());
         r.setMetricsComplete(scope == Scope.DETAIL);
         r.setHeadline(InsightUtil.count(piiTotal, "PII detections") + " across " + piiSubCategories.size() + " types");
+        r.setSeverity("HIGH");
+        r.setConcern("Your PII guardrail policies fired " + InsightUtil.count(piiTotal, "times") + " — real personal data is being sent to an AI system.");
+        r.setImpact("Every unblocked detection is PII that reached its destination unredacted; where it's going below is what determines whether that's an approved, contained flow or a real exposure.");
+        r.setRemediation("Check the destinations below against your allowlist. For anything unapproved, tighten the policy to block or redact instead of just alerting.");
 
         if (scope == Scope.DETAIL) {
             List<DashboardMaliciousEvent> events = bundle.fetchPiiEvents(scope, piiSubCategories, 2000);

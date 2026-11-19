@@ -23,6 +23,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
+import com.akto.util.trpc.TrpcUtils;
 import com.akto.graphql.PersistedGraphQLUtils;
 import com.akto.imperva.ImpervaUtils;
 import com.akto.jsonrpc.JsonRpcUtils;
@@ -75,6 +76,8 @@ public class HttpCallParser {
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
+
+    private static final String AGENTIC_COLLECTION_PREFIX = "-agentic";
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .writeTimeout(1, TimeUnit.SECONDS)
             .readTimeout(1, TimeUnit.SECONDS)
@@ -115,7 +118,12 @@ public class HttpCallParser {
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionMap = new HashMap<>();
         DbLayer.fetchAllApiCollections()
-            .forEach(apiCollection -> apiCollectionMap.put(apiCollection.getId(), apiCollection));
+            .forEach(apiCollection -> {
+                apiCollectionMap.put(apiCollection.getId(), apiCollection);
+                if (apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+                    hostNameToIdMap.put(apiCollection.getHostName().toLowerCase().trim(), apiCollection.getId());
+                }
+            });
 
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
     }
@@ -203,6 +211,27 @@ public class HttpCallParser {
         }
     }
 
+    /*
+     * Traffic imported from a file (postman, har, openAPI, ...) is explicitly uploaded by the user,
+     * so advanced traffic filters only enrich it (eg. modify_url) and never discard it.
+     * Collected traffic keeps the allow-list behaviour: no matching filter means the api is dropped.
+     */
+    public static boolean isImportedTraffic(HttpResponseParams.Source source) {
+        if (source == null) {
+            return false;
+        }
+        switch (source) {
+            case POSTMAN:
+            case HAR:
+            case OPEN_API:
+            case BURP:
+            case IMPERVA:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     public static FILTER_TYPE isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap, Map<String, List<ExecutorNode>> executorNodesMap){
         FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED;
         String message = responseParam.getOrig();
@@ -238,7 +267,11 @@ public class HttpCallParser {
                     }else{
                         filterType = FILTER_TYPE.ALLOWED;
                     }
-                    
+
+                    if (apiFilter.getStrategy() != null && Boolean.TRUE.equals(apiFilter.getStrategy().getDemerge())) {
+                        APICatalogSync.markUrlAsMerged(apiCollectionId, responseParam.getRequestParams().getURL(),
+                                responseParam.getRequestParams().getMethod());
+                    }
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
@@ -502,25 +535,38 @@ public class HttpCallParser {
 
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
 
-        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(httpResponseParam).getFirst();
-
         List<CollectionTags> tagsToApply = new ArrayList<>();
-        
+
         String tagsJson = httpResponseParam.getTags();
+        BasicDBObject parsedTags = null;
         if (tagsJson != null && !tagsJson.isEmpty()) {
             try {
-                BasicDBObject parsedTags = BasicDBObject.parse(tagsJson);
+                parsedTags = BasicDBObject.parse(tagsJson);
                 for (String key : parsedTags.keySet()) {
                     tagsToApply.add(new CollectionTags(Context.now(), key, String.valueOf(parsedTags.get(key)), TagSource.AKTO));
                 }
             } catch (Exception ignored) {}
         }
 
+        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(httpResponseParam).getFirst()
+                && isAgenticTaggingAllowed(parsedTags);
+
         if (isMcpRequest) tagsToApply.add(getMcpServerTag());
 
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
+
+            boolean isEndpointSource = Constants.AKTO_ENDPOINT_SOURCE_VALUE.equals(
+                    parsedTags != null ? parsedTags.getString(Constants.AKTO_ENDPOINT_SOURCE_TAG) : null);
+
+            Integer realHostCollectionId = hostNameToIdMap.get(hostName);
+            ApiCollection realHostCollection = realHostCollectionId != null ? apiCollectionMap.get(realHostCollectionId) : null;
+
+            if (realHostCollection != null && !hasAtlasOrArgusTag(realHostCollection)
+                    && isMcpRequest && !isEndpointSource) {
+                hostName = hostName + AGENTIC_COLLECTION_PREFIX;
+            }
 
             String key = hostName;
 
@@ -534,6 +580,15 @@ public class HttpCallParser {
                 try {
 
                     apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagsToApply);
+
+                    // Add to the in-memory cache immediately instead of waiting for the next periodic
+                    // catalog sync - otherwise a same-session follow-up request for this same host can't
+                    // see this collection via apiCollectionMap, even though hostNameToIdMap already does.
+                    ApiCollection newCollection = new ApiCollection(
+                        apiCollectionId, hostName, Context.now(), new HashSet<>(), hostName, 0, false, true
+                    );
+                    newCollection.setTagsList(tagsToApply);
+                    apiCollectionMap.put(apiCollectionId, newCollection);
 
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
@@ -622,7 +677,10 @@ public class HttpCallParser {
                 incTrafficMetrics(totalRequestsKey,1);
             }
 
-            boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
+            // WebSocket traffic (handshake and frames, all 101) bypasses HTTP-specific filters (status codes, content-types)
+            boolean isWebSocket = "WEBSOCKET".equals(httpResponseParam.getType());
+
+            boolean cond = isWebSocket || HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN) && httpResponseParam.getStatusCode() <= 0) {
                 cond = true;
             }
@@ -638,7 +696,7 @@ public class HttpCallParser {
             }
 
             // check for garbage points here
-            if(redundantUrlsList != null && !redundantUrlsList.isEmpty()){
+            if(!isWebSocket && redundantUrlsList != null && !redundantUrlsList.isEmpty()){
                 if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), pattern)){
                     continue;
                 }
@@ -679,7 +737,8 @@ public class HttpCallParser {
             if (!skipAdvancedFilters) {
                 Pair<HttpResponseParams, FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
                 HttpResponseParams param = temp.getFirst();
-                if (param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)) {
+                boolean unmatched = temp.getSecond().equals(FILTER_TYPE.UNCHANGED);
+                if (param == null || (unmatched && !isImportedTraffic(httpResponseParam.getSource()))) {
                     continue;
                 } else {
                     httpResponseParam = param;
@@ -691,7 +750,12 @@ public class HttpCallParser {
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
-            List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
+            // a tRPC call is split into one REST call per procedure; everything else carries on to the other parsers
+            List<HttpResponseParams> responseParamsList = TrpcUtils.parseTrpcResponseParam(httpResponseParam);
+            boolean isTrpc = !responseParamsList.isEmpty();
+            if (!isTrpc) {
+                responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
+            }
             if (responseParamsList.isEmpty()) {
                 // Check for persisted GraphQL payload structure
                 List<HttpResponseParams> persistedGraphQLResponseParams =
@@ -739,7 +803,7 @@ public class HttpCallParser {
                 }
             } else {
                 filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + " new graphql endpoints in inventory", LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + " new " + (isTrpc ? "trpc" : "graphql") + " endpoints in inventory", LogDb.RUNTIME);
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -828,6 +892,31 @@ public class HttpCallParser {
 
     private CollectionTags getMcpServerTag() {
         return new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES);
+    }
+
+    private boolean hasAtlasOrArgusTag(ApiCollection collection) {
+        List<CollectionTags> existingTags = collection.getTagsList();
+        if (existingTags == null) {
+            return false;
+        }
+        for (CollectionTags tag : existingTags) {
+            if (Constants.AKTO_MCP_SERVER_TAG.equals(tag.getKeyName())) {
+                return true;
+            }
+            if (Constants.AKTO_ENDPOINT_SOURCE_TAG.equals(tag.getKeyName())
+                    && Constants.AKTO_ENDPOINT_SOURCE_VALUE.equals(tag.getValue())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isAgenticTaggingAllowed(BasicDBObject parsedTags) {
+        String source = parsedTags != null ? parsedTags.getString(Constants.AKTO_ENDPOINT_SOURCE_TAG) : null;
+        if (Constants.AKTO_ENDPOINT_SOURCE_VALUE.equals(source)) {
+            return true;
+        }
+        return UsageMetricUtils.isSecurityTypeAgenticGranted(Context.accountId.get());
     }
 
     private Bson getUpdatesForTags(List<CollectionTags> tagsToApply, Bson updates) {

@@ -1,15 +1,27 @@
 package com.akto.action;
 
+import com.akto.utils.ArgusCollectionScope;
+import com.akto.utils.RiskScoreExplainer;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.RuleCollections;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.action.monitoring.EndpointShieldAgentAction;
+import com.akto.dao.AgentUsersDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.service.atlas.AtlasAssetStatusService;
+import com.akto.service.atlas.AtlasPeopleService;
+import com.akto.service.atlas.AtlasToolRow;
+import com.akto.service.insights.HostCollectionResolver;
+import com.akto.service.insights.InsightUtil;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ComponentRiskAnalysis;
 import com.akto.dto.DeviceTag;
@@ -55,7 +67,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+import java.util.stream.Collectors;
 
 /**
  * Violations for agentic observe flyouts and assets table.
@@ -91,6 +106,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter
     private int endTimestamp;
 
+    // Optional first-seen window of the inventory rows: [firstSeenStart, firstSeenEnd), 0 = no bound. The Atlas Overview's new-tools chart links here.
+    @Setter
+    private int firstSeenStart;
+
+    @Setter
+    private int firstSeenEnd;
+
     // ---- Server-side pagination for fetchAgenticAssetsSummary ----
     @Setter private int skip;
     @Setter private int limit;
@@ -100,12 +122,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private Map<String, Integer> trafficMap;
     @Setter private Map<String, Double> riskScoreMap;
     @Setter private Map<String, List<String>> filters; // AG Grid column filters, keyed by field name (e.g. "tags", "groupName")
+    // fetchAgenticAssetsSummary from the AI inventory (new layout): adds tool search and per-row tools,
+    // approval status, employees and category. The legacy Endpoints page leaves it off.
+    @Setter private boolean aiInventory;
 
     // ---- Server-side pagination for fetchUsersAndDevicesSummary ----
     @Setter private String groupBy; // "user" | "device"
     @Setter private Map<String, List<String>> sensitiveMap; // collection id (string) -> sensitive types
     @Setter private Map<String, String> usernameMap; // Endpoint Shield username resolution map
-    @Setter private Map<String, Map<String, String>> userMetadataMap; // username -> {userEmail}
     // username -> that user's generic device tags (AgenticUsers.deviceTags, each {key, value, source}).
     // Device rows inherit their resolved owner's tags (see classifyHostGroupedRows).
     @Setter private Map<String, List<Map<String, String>>> tagsByUsername;
@@ -140,37 +164,48 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // fetchAgenticSkillData lives on this same class, fetchAgenticAssetsSummary can just read this
     // cache directly instead of requiring the client to round-trip the whole set back to us. Same
     // TTL/eviction shape as getOrBuildClassification (see its own doc for the rationale).
-    private static final Map<Integer, SkillDataCacheEntry> skillDataCache = new ConcurrentHashMap<>();
+    private static final Map<String, SkillDataCacheEntry> skillDataCache = new ConcurrentHashMap<>();
 
     private static final class SkillDataCacheEntry {
-        final Map<String, Float> skillScoreMap;
+        // skillName -> max riskScore (number) for the ApiInfo that last wrote the score
+        final BasicDBObject skillScoreMap;
+        // skillName -> riskScoreFactors list for that same ApiInfo (kept separate so skillScoreMap stays numeric)
+        final BasicDBObject skillRiskScoreFactors;
         final Set<String> maliciousSkills;
         final Set<String> maliciousSkillKeys;
         final Set<String> misconfiguredSkills;
         final Set<Integer> misconfiguredCollectionIds;
+        // Same "<collectionId>|<skillNameLowercase>" keys as maliciousSkillKeys -> that copy's skill-tags
+        final Map<String, Set<String>> skillTagsByKey;
         final long builtAt;
-        SkillDataCacheEntry(Map<String, Float> skillScoreMap, Set<String> maliciousSkills, Set<String> maliciousSkillKeys,
-                Set<String> misconfiguredSkills, Set<Integer> misconfiguredCollectionIds, long builtAt) {
+        SkillDataCacheEntry(BasicDBObject skillScoreMap, BasicDBObject skillRiskScoreFactors,
+                Set<String> maliciousSkills, Set<String> maliciousSkillKeys,
+                Set<String> misconfiguredSkills, Set<Integer> misconfiguredCollectionIds,
+                Map<String, Set<String>> skillTagsByKey, long builtAt) {
             this.skillScoreMap = skillScoreMap;
+            this.skillRiskScoreFactors = skillRiskScoreFactors;
             this.maliciousSkills = maliciousSkills;
             this.maliciousSkillKeys = maliciousSkillKeys;
             this.misconfiguredSkills = misconfiguredSkills;
             this.misconfiguredCollectionIds = misconfiguredCollectionIds;
+            this.skillTagsByKey = skillTagsByKey;
             this.builtAt = builtAt;
         }
     }
 
     private SkillDataCacheEntry getOrBuildSkillData() {
-        int accountId = Context.accountId.get();
+        // Users limited to specific collections get their own entry, so their view never mixes with another user's
+        String cacheKey = ArgusCollectionScope.isLimited(getSUser())
+            ? scopedCacheKey() : accountCacheKey();
         long now = System.currentTimeMillis();
-        SkillDataCacheEntry existing = skillDataCache.get(accountId);
+        SkillDataCacheEntry existing = skillDataCache.get(cacheKey);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
             return existing;
         }
         if (skillDataCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
             skillDataCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
-        return skillDataCache.compute(accountId, (id, cached) -> {
+        return skillDataCache.compute(cacheKey, (id, cached) -> {
             if (cached != null && (System.currentTimeMillis() - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
                 return cached;
             }
@@ -185,7 +220,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                             Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivated)
                     ));
 
-            Map<String, Float> skillScoreMap = new HashMap<>();
+            BasicDBObject skillScoreMap = new BasicDBObject();
+            BasicDBObject skillRiskScoreFactors = new BasicDBObject();
             Set<String> maliciousSkills = new HashSet<>();
             // Collection-scoped "<collectionId>|<skillNameLowercase>" keys — matches constants.js's
             // skillCollectionKey exactly — so a same-named skill on a different user/collection
@@ -193,6 +229,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Set<String> maliciousSkillKeys = new HashSet<>();
             Set<String> misconfiguredSkills = new HashSet<>();
             Set<Integer> misconfiguredCollectionIds = new HashSet<>();
+            Map<String, Set<String>> skillTagsByKey = new HashMap<>();
 
             for (ApiInfo info : apiInfos) {
                 if (info == null || info.getId() == null) continue;
@@ -205,12 +242,23 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 if (idx >= 0) {
                     String skillName = url.substring(idx + "skills/".length());
                     if (!skillName.isEmpty()) {
+                        // Last ApiInfo for this skill name wins — score and factors stay in sync.
                         skillScoreMap.put(skillName, info.getRiskScore());
+                        List<BasicDBObject> factors = RiskScoreExplainer.factorsIfMatches(info, info.getRiskScore());
+                        if (!factors.isEmpty()) {
+                            skillRiskScoreFactors.put(skillName, factors);
+                        } else {
+                            skillRiskScoreFactors.remove(skillName);
+                        }
                         if (malicious) {
                             maliciousSkills.add(skillName);
                             maliciousSkillKeys.add(info.getId().getApiCollectionId() + "|" + skillName.toLowerCase(Locale.ROOT));
                         }
                         if (misconfigured) misconfiguredSkills.add(skillName);
+                        Set<String> skillTags = skillTagValues(info.getTagsList());
+                        if (!skillTags.isEmpty()) {
+                            skillTagsByKey.put(info.getId().getApiCollectionId() + "|" + skillName.toLowerCase(Locale.ROOT), skillTags);
+                        }
                     }
                 }
                 if (url.contains("/config/") && misconfigured) {
@@ -219,8 +267,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             loggerMaker.warnAndAddToDb("[agenticSkillDataCache] rebuilt: " + (System.currentTimeMillis() - tStart)
                     + "ms, apiInfos=" + apiInfos.size() + ", maliciousSkillKeys=" + maliciousSkillKeys.size());
-            return new SkillDataCacheEntry(skillScoreMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills,
-                    misconfiguredCollectionIds, System.currentTimeMillis());
+            return new SkillDataCacheEntry(skillScoreMap, skillRiskScoreFactors, maliciousSkills,
+                    maliciousSkillKeys, misconfiguredSkills, misconfiguredCollectionIds, skillTagsByKey,
+                    System.currentTimeMillis());
         });
     }
 
@@ -228,6 +277,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         response = new BasicDBObject();
         SkillDataCacheEntry cached = getOrBuildSkillData();
         response.put("skillScoreMap", cached.skillScoreMap);
+        response.put("skillRiskScoreFactors", cached.skillRiskScoreFactors);
         response.put("maliciousSkills", new ArrayList<>(cached.maliciousSkills));
         response.put("maliciousSkillKeys", new ArrayList<>(cached.maliciousSkillKeys));
         response.put("misconfiguredSkills", new ArrayList<>(cached.misconfiguredSkills));
@@ -241,6 +291,19 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (t != null && keyName.equals(t.getKeyName()) && "true".equals(t.getValue())) return true;
         }
         return false;
+    }
+
+    // A skill's risk tags as the agent page shows them: skill-tags values, minus the "version=" marker
+    private static Set<String> skillTagValues(List<CollectionTags> tags) {
+        Set<String> out = new TreeSet<>();
+        if (tags == null) return out;
+        for (CollectionTags t : tags) {
+            if (t == null || !"skill-tags".equals(t.getKeyName())) continue;
+            String v = t.getValue();
+            if (StringUtils.isBlank(v) || v.toLowerCase(Locale.ROOT).startsWith("version=")) continue;
+            out.add(v);
+        }
+        return out;
     }
 
     public String fetchAgenticViolations() {
@@ -429,9 +492,36 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return sb.toString();
     }
 
+    // Same "self collection" preference as GroupSummary's own description field (see its comment
+    // there) — duplicated rather than shared because this resolves one specific group's (e.g. one
+    // MCP server's) description from an ad-hoc collection map, not GroupSummary's incremental
+    // per-collection accumulation across the whole account.
+    private static String resolveGroupDescription(List<Integer> collectionIds, Map<Integer, ApiCollection> byId, String groupKey) {
+        if (collectionIds == null || collectionIds.isEmpty()) return null;
+        String fallback = null;
+        for (Integer id : collectionIds) {
+            ApiCollection c = byId.get(id);
+            if (c == null || StringUtils.isBlank(c.getDescription())) continue;
+            String serviceName = extractServiceNameForGrouping(c.getHostName());
+            if (serviceName != null && serviceName.equalsIgnoreCase(groupKey)) {
+                return c.getDescription();
+            }
+            if (fallback == null) fallback = c.getDescription();
+        }
+        return fallback;
+    }
+
     // Java port of transform.js's splitCollectionNameForEndpointSecurity's "sourceId" segment
     // (parts[1]) — used by fetchAgenticAssetEndpointsPage's child rows for MCP Server/LLM assets,
     // whose "source" column shows which agent/client called into them, not their own service name.
+    // <endpointId>.<agent>.<name> -> "<agent>.<name>", lowercased: one agentic entity regardless of
+    // which device it was seen on (AgenticCountBadges' counts; AgentEndpointTreeTable keys the same way).
+    private static String entityKeyWithoutDevice(String hostName) {
+        if (StringUtils.isBlank(hostName)) return "";
+        int dot = hostName.indexOf('.');
+        return (dot >= 0 ? hostName.substring(dot + 1) : hostName).toLowerCase(Locale.ROOT);
+    }
+
     private static String extractSourceIdForGrouping(String hostName) {
         if (StringUtils.isBlank(hostName)) return "";
         String[] parts = DOT_SPLIT.split(hostName);
@@ -453,9 +543,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // Java port of mcpClientHelper.js's hasPersonalAccountTag/hasLocalMcpServerTag/
     // hasMisconfiguredConfigTag — extracted (unlike GroupSummary.accumulateCheap's own inline copy
     // of this same logic) because fetchAgenticAssetEndpointsPage needs it per-child, not just once
-    // per group. {personal, localMcp, misconfigured}.
+    // per group. {personal, localMcp, misconfigured, owner}.
     private static boolean[] computeAgenticTagFlags(List<CollectionTags> envType) {
-        boolean personal = false, localMcp = false, misconfigured = false;
+        boolean personal = false, localMcp = false, misconfigured = false, owner = false;
         if (envType != null) {
             for (CollectionTags tag : envType) {
                 if (tag == null) continue;
@@ -466,9 +556,46 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 }
                 if ("local-mcp-server".equals(key)) localMcp = true;
                 if ("misconfigured-config".equals(key) && "true".equals(value)) misconfigured = true;
+                if (Constants.AKTO_AI_AGENT_OWNER_TAG.equals(key) && "true".equals(value)) owner = true;
             }
         }
-        return new boolean[]{personal, localMcp, misconfigured};
+        return new boolean[]{personal, localMcp, misconfigured, owner};
+    }
+
+    // The agent's signed-in email, written onto the collection by Endpoint Shield's login detector
+    // alongside login-user-email-type (see CreateCollectionForAgentSkills). Read from the same
+    // already-projected tagsList computeAgenticTagFlags above walks, so this costs no extra query.
+    private static final String AI_AGENT_EMAIL_TAG = "ai-agent-email";
+
+    // McpClientRegistry canonical group keys the ai-agent-email filter is offered for. "claude1" is
+    // Claude Desktop (raw tag value "claude-desktop" folds into it via resolveClientKey); "claude2"
+    // is Claude CLI. Scoped to Claude Desktop for now — add keys here to widen it. Kept in sync with
+    // AI_AGENT_EMAIL_GROUP_KEYS in AgenticAssetDevicesPage.jsx, which decides whether to show the chip.
+    private static final Set<String> AI_AGENT_EMAIL_GROUP_KEYS = new HashSet<>(Arrays.asList("claude1"));
+
+    // Upper bound on a user-supplied regex. The pattern runs against every row's emails, so this
+    // caps how much catastrophic backtracking one request can buy.
+    private static final int MAX_AI_AGENT_EMAIL_REGEX_LEN = 200;
+
+    private static String extractAiAgentEmail(List<CollectionTags> envType) {
+        if (envType == null) return null;
+        for (CollectionTags tag : envType) {
+            if (tag != null && AI_AGENT_EMAIL_TAG.equals(tag.getKeyName())
+                    && StringUtils.isNotBlank(tag.getValue())) {
+                return tag.getValue().trim();
+            }
+        }
+        return null;
+    }
+
+    private static String extractEnvironmentName(List<CollectionTags> envType) {
+        if (envType == null) return null;
+        for (CollectionTags tag : envType) {
+            if (tag != null && Constants.AKTO_COPILOT_BOT_ENVIRONMENT_NAME_TAG.equals(tag.getKeyName())) {
+                return tag.getValue();
+            }
+        }
+        return null;
     }
 
     // Cheap per-group accumulator, built for EVERY group (agent/service/llm/skill — ~800 at real
@@ -490,6 +617,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final Set<String> rawTagValues = new HashSet<>();
         final Set<String> hostNames = new HashSet<>();
         final Set<String> endpointIds = new HashSet<>();
+        // Atlas: device -> its latest traffic on this group.
+        final Map<String, Integer> endpointLastSeen = new HashMap<>();
         final Set<String> misconfiguredEndpointIds = new HashSet<>();
         final Set<String> skillNames = new HashSet<>();
         // Only the count is serialized per row, same as skillNames — full list comes from the detail call.
@@ -521,23 +650,54 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         // account-wide agenticFlatData this rebuild deliberately doesn't send.
         final Map<String, Set<Integer>> serviceCollectionIds = new HashMap<>();
         final List<Integer> collectionIds = new ArrayList<>();
+        // Atlas flyout: the collections that hold this tool's own observed tools.
+        final Set<Integer> capabilityCollectionIds = new LinkedHashSet<>();
+        final Set<String> personalEndpointIds = new HashSet<>();
         double maxRiskScore = 0;
+        // Collection whose collRisk last raised maxRiskScore — used to load the winning endpoint's
+        // factor breakdown for the risk-score tooltip (see fetchAgenticAssetsSummary page loop).
+        // 0 means none; hashed collection ids may be negative.
+        int winningCollectionId;
         Double baseRiskScore;
         String baseRiskScoreReason;
         int maxTrafficTimestamp = 0;
+        int minStartTs = 0; // 0 == "no discovered time seen yet", same convention as EndpointGroup.startTs
         boolean hasPersonalAccount = false;
         boolean hasLocalMcpServer = false;
         boolean hasMisconfiguredConfig = false;
+        // A group is a rollup of many collections — e.g. the "cursor" agent group contains both
+        // <device>.ai_agent.cursor (the agent client itself) and <device>.ai_agent.github (a
+        // service it happened to call). Prefer the description on the collection whose hostname
+        // service segment matches the group's own key (the canonical "self" collection) over any
+        // unrelated member's; fall back to the first non-blank description seen otherwise.
+        String selfDescription;
+        String fallbackDescription;
+
+        String description() {
+            return selfDescription != null ? selfDescription : fallbackDescription;
+        }
 
         GroupSummary(String groupKey, String rowType) {
             this.groupKey = groupKey;
             this.rowType = rowType;
         }
 
+        // An MCP server's collections are all the server; an agent's own collection is the one named after it.
+        private boolean holdsOwnTools(String hostName) {
+            if ("service".equals(rowType)) return true;
+            if (!"agent".equals(rowType)) return false;
+            String serviceName = extractServiceNameForGrouping(hostName);
+            return serviceName != null && McpClientRegistry.resolveClientKey(serviceName).equalsIgnoreCase(groupKey);
+        }
+
         void accumulateCheap(ApiCollection c, String hostName, List<CollectionTags> envType, double collRisk, int collTraffic, String deviceId, List<String> sensitive) {
             collectionIds.add(c.getId());
+            if (holdsOwnTools(hostName)) capabilityCollectionIds.add(c.getId());
             hostNames.add(hostName);
-            if (deviceId != null) endpointIds.add(deviceId);
+            if (deviceId != null) {
+                endpointIds.add(deviceId);
+                endpointLastSeen.merge(deviceId, collTraffic, Math::max);
+            }
             if (sensitive != null) {
                 for (String s : sensitive) {
                     if (StringUtils.isNotBlank(s)) sensitiveTypes.add(s);
@@ -550,9 +710,21 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             String cPluginName = AgenticObserveUtil.getPluginName(c);
             if (cPluginName != null) pluginNames.add(cPluginName);
+            if (StringUtils.isNotBlank(c.getDescription())) {
+                if (fallbackDescription == null) fallbackDescription = c.getDescription();
+                String cServiceName = extractServiceNameForGrouping(hostName);
+                if (selfDescription == null && cServiceName != null && cServiceName.equalsIgnoreCase(groupKey)) {
+                    selfDescription = c.getDescription();
+                }
+            }
             if ("agent".equals(rowType) && !isConnectorIngested(envType)) {
                 String serviceName = extractServiceNameForGrouping(hostName);
-                if (serviceName != null && !serviceName.equalsIgnoreCase(groupKey)) {
+                // groupKey is the canonical registry key (e.g. "claude2"), but serviceName is the raw
+                // hostname segment (e.g. "claudecli"/"claude-cli-project") — comparing them directly
+                // never matches for any agent whose raw tag value differs from its canonical key, so
+                // the agent's own identity collection was being added as if it were one of its own
+                // linked MCP servers. Canonicalize serviceName the same way groupKey was derived.
+                if (serviceName != null && !McpClientRegistry.resolveClientKey(serviceName).equalsIgnoreCase(groupKey)) {
                     serviceNames.add(serviceName);
                     serviceCollectionIds.computeIfAbsent(serviceName, k -> new HashSet<>()).add(c.getId());
                 }
@@ -564,6 +736,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     String value = tag.getValue();
                     if (("browser-llm-account-type".equals(key) || "login-user-email-type".equals(key)) && "personal".equals(value)) {
                         hasPersonalAccount = true;
+                        if (deviceId != null) personalEndpointIds.add(deviceId);
                     }
                     if ("local-mcp-server".equals(key)) hasLocalMcpServer = true;
                     if ("misconfigured-config".equals(key) && "true".equals(value)) {
@@ -574,10 +747,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             if (collRisk > maxRiskScore) {
                 maxRiskScore = collRisk;
+                winningCollectionId = c.getId();
                 baseRiskScore = c.getBaseRiskScore();
                 baseRiskScoreReason = c.getBaseRiskScoreReason();
             }
             if (collTraffic > maxTrafficTimestamp) maxTrafficTimestamp = collTraffic;
+            int cStartTs = c.getStartTs();
+            if (cStartTs > 0 && (minStartTs == 0 || cStartTs < minStartTs)) minStartTs = cStartTs;
         }
 
         // Deliberately excludes hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds
@@ -601,7 +777,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.put("skillCount", skillNames.size());
             g.put("pluginCount", pluginNames.size());
             if (pluginVersion != null) g.put("pluginVersion", pluginVersion);
-            if (pluginScope != null) g.put("pluginScope", pluginScope);
             if (pluginStatus != null) g.put("pluginStatus", pluginStatus);
             if (pluginMarketplace != null) g.put("pluginMarketplace", pluginMarketplace);
             if (pluginParentAgent != null) g.put("pluginParentAgent", pluginParentAgent);
@@ -612,11 +787,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 g.put("baseRiskScoreReason", baseRiskScoreReason);
             }
             g.put("lastSeenEpoch", maxTrafficTimestamp);
+            g.put("discoveredAt", minStartTs);
             g.put("hasPersonalAccount", hasPersonalAccount);
             g.put("hasLocalMcpServer", hasLocalMcpServer);
             g.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
             g.put("misconfiguredDeviceCount", misconfiguredEndpointIds.size());
             if (!sensitiveTypes.isEmpty()) g.put("sensitiveInRespTypes", new ArrayList<>(sensitiveTypes));
+            if (StringUtils.isNotBlank(description())) g.put("description", description());
             return g;
         }
     }
@@ -631,7 +808,12 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         int aiInteractions;
         final Set<String> services = new HashSet<>();
         final Set<String> seenAnalysisKeys = new HashSet<>();
+        // Plugin-asset devices tab only — this device's own AKTO_PLUGIN_STATUS_TAG, null for every
+        // other asset type (no plugin collection to read it from).
+        String pluginStatus;
+        String pluginScope;
 
+        String hookUsername;
         DeviceAcc(String deviceId) { this.deviceId = deviceId; }
 
         BasicDBObject toResponse() {
@@ -642,6 +824,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             d.put("lastSeenEpoch", lastSeenEpoch);
             d.put("services", new ArrayList<>(services));
             d.put("aiInteractions", aiInteractions);
+            if (pluginStatus != null) d.put("pluginStatus", pluginStatus);
+            if (pluginScope != null) d.put("pluginScope", pluginScope);
             return d;
         }
     }
@@ -684,10 +868,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Double r = risk.get(idStr);
             double collRisk = r != null ? r : 0.0;
             DeviceAcc d = devices.computeIfAbsent(deviceId, DeviceAcc::new);
+            if (d.hookUsername == null) d.hookUsername = inferenceHookUsername(c);
             if (collRisk > d.riskScore) d.riskScore = collRisk;
             if (collTraffic > d.lastSeenEpoch) d.lastSeenEpoch = collTraffic;
             if (serviceName != null) d.services.add(serviceName);
             accumulateAiInteractions(d, hostName, userAnalysisMap);
+            // Plugin collections only (getPluginTagValue returns null for anything else) — one
+            // device only ever has one collection for a given plugin, so no conflict to resolve.
+            String devicePluginStatus = AgenticObserveUtil.getPluginTagValue(c, Constants.AKTO_PLUGIN_STATUS_TAG);
+            if (devicePluginStatus != null) d.pluginStatus = devicePluginStatus;
+            String devicePluginScope = AgenticObserveUtil.getPluginTagValue(c, Constants.AKTO_PLUGIN_SCOPE_TAG);
+            if (devicePluginScope != null) d.pluginScope = devicePluginScope;
         }
         return devices;
     }
@@ -698,6 +889,20 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         List<BasicDBObject> out = new ArrayList<>();
         for (DeviceAcc d : devices.values()) out.add(d.toResponse());
         return out;
+    }
+
+    // Inference-hook collections have no Endpoint Shield module, so their username comes from the username collection tag.
+    private static String inferenceHookUsername(ApiCollection c) {
+        List<CollectionTags> tags = c.getEnvType();
+        if (tags == null) return null;
+        boolean isHook = false;
+        for (CollectionTags t : tags) {
+            if (t != null && "inference-hooks".equals(t.getKeyName())) {
+                isHook = true;
+                break;
+            }
+        }
+        return isHook ? findUsernameFromEnvTypeTags(tags) : null;
     }
 
     private static String resolveUsernameByDeviceId(String deviceId, Map<String, String> usernameMap) {
@@ -739,21 +944,28 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.in(Constants.ID, ids),
-                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
+                    // TAGS_STRING needed so accumulateDevices can read a plugin collection's own
+                    // AKTO_PLUGIN_STATUS_TAG (getEnvType()/getPluginTagValue) for Plugin-asset devices.
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING)
             );
             Map<Integer, ApiCollection> byId = new HashMap<>();
             for (ApiCollection c : collections) byId.put(c.getId(), c);
 
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
-            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            // The AI inventory no longer sends trafficMap/riskScoreMap — fall back to the same cached
+            // server-side maps fetchAgenticAssetsSummary uses, so device last-seen/risk aren't 0.
+            Map<String, Integer> traffic = getOrComputeTrafficMap();
+            Map<String, Double> risk = getOrComputeRiskScoreMap();
+            Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
 
             Map<String, DeviceAcc> devices = accumulateDevices(ids, byId, traffic, risk, userAnalysis);
 
+            Map<String, String> usernames = getOrComputeUsernameMap();
             List<BasicDBObject> rows = new ArrayList<>();
             for (DeviceAcc d : devices.values()) {
                 BasicDBObject row = d.toResponse();
-                row.put("username", resolveUsernameByDeviceId(d.deviceId, usernameMap));
+                String resolvedUsername = resolveUsernameByDeviceId(d.deviceId, usernames);
+                if ("-".equals(resolvedUsername) && d.hookUsername != null) resolvedUsername = d.hookUsername;
+                row.put("username", resolvedUsername);
                 rows.add(row);
             }
 
@@ -795,6 +1007,12 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final String deviceId;
         String username = "-";
         double riskScore = 0;
+        // Collection whose collRisk last raised riskScore — for the risk-score tooltip factors.
+        // 0 means none; hashed collection ids may be negative. Factors are stamped after pagination
+        // in fetchAgenticAssetEndpointsPage.
+        int winningCollectionId;
+        Double baseRiskScore = null;
+        String baseRiskScoreReason = null;
         int lastSeenEpoch = 0;
         int startTs = 0; // 0 == "no discovered time seen yet"; matches JS's Infinity->0 fallback
         final Set<String> sensitiveTypes = new LinkedHashSet<>();
@@ -802,6 +1020,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         boolean hasLocalMcpServer = false;
         boolean hasMisconfiguredConfig = false;
         boolean hasMaliciousSkill = false;
+        boolean hasOwnerTag = false;
+        // Plugin rows only — a device only ever has one collection for a given plugin, so no
+        // conflict to resolve (unlike riskScore/lastSeenEpoch above, which merge across children).
+        String pluginStatus = null;
+        String pluginScope = null;
+        String environmentName = null;
+        // A Set, not a single value: one device row merges several collections, and nothing
+        // guarantees they were all signed in as the same account.
+        final Set<String> aiAgentEmails = new LinkedHashSet<>();
         final List<BasicDBObject> children = new ArrayList<>();
 
         EndpointGroup(String deviceId) { this.deviceId = deviceId; }
@@ -829,6 +1056,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             double collRisk = r != null ? r : 0.0;
             List<String> collSensitive = sensitive != null ? sensitive.get(idStr) : null;
             boolean[] flags = computeAgenticTagFlags(c.getEnvType());
+            String environmentName = extractEnvironmentName(c.getEnvType());
+            String aiAgentEmail = extractAiAgentEmail(c.getEnvType());
             int childStartTs = c.getStartTs();
 
             int skillCount = 0;
@@ -857,15 +1086,34 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             child.put("hasPersonalAccount", flags[0]);
             child.put("hasLocalMcpServer", flags[1]);
             child.put("hasMisconfiguredConfig", flags[2]);
+            child.put("hasOwnerTag", flags[3]);
+            if (StringUtils.isNotBlank(environmentName)) child.put("environmentName", environmentName);
+            if (aiAgentEmail != null) child.put("aiAgentEmail", aiAgentEmail);
             child.put("hasMaliciousSkill", childMalicious);
             child.put("skillCount", skillCount);
             child.put("baseRiskScore", c.getBaseRiskScore());
             child.put("baseRiskScoreReason", c.getBaseRiskScoreReason());
+            // Lets the devices page's bulk actions offer only the toggles that apply to the selection.
+            child.put("deactivated", c.isDeactivated());
+            child.put("isOutOfTestingScope", c.getIsOutOfTestingScope());
+            List<BasicDBObject> childTags = new ArrayList<>();
+            if (c.getEnvType() != null) {
+                for (CollectionTags tag : c.getEnvType()) {
+                    childTags.add(new BasicDBObject("keyName", tag.getKeyName()).append("value", tag.getValue()));
+                }
+            }
+            child.put("envType", childTags);
 
             // Plugin collections carry the agent's mcp-client/ai-agent tags (naming where the plugin is
             // installed), so label the child by its own type rather than letting those tags speak.
+            String childPluginStatus = null;
+            String childPluginScope = null;
             if ("plugin".equals(rowType)) {
                 child.put("type", AgenticObserveUtil.CLIENT_TYPE_PLUGIN);
+                childPluginStatus = AgenticObserveUtil.getPluginTagValue(c, Constants.AKTO_PLUGIN_STATUS_TAG);
+                if (childPluginStatus != null) child.put("pluginStatus", childPluginStatus);
+                childPluginScope = AgenticObserveUtil.getPluginTagValue(c, Constants.AKTO_PLUGIN_SCOPE_TAG);
+                if (childPluginScope != null) child.put("pluginScope", childPluginScope);
             } else {
                 // MCP Server/LLM asset's own device tree only — each child IS that server's own
                 // collection, so its plugin-name tag (if any) is unambiguous here (see
@@ -879,18 +1127,39 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             EndpointGroup g = groups.computeIfAbsent(deviceId, id -> {
                 EndpointGroup ng = new EndpointGroup(id);
                 ng.username = resolveUsernameByDeviceId(id, usernameMap);
+                if ("-".equals(ng.username)) {
+                    String hookUsername = inferenceHookUsername(c);
+                    if (hookUsername != null) ng.username = hookUsername;
+                }
                 return ng;
             });
             g.children.add(child);
+            if ("plugin".equals(rowType) && childPluginStatus != null) g.pluginStatus = childPluginStatus;
+            if ("plugin".equals(rowType) && childPluginScope != null) g.pluginScope = childPluginScope;
             if (collTraffic > g.lastSeenEpoch) g.lastSeenEpoch = collTraffic;
             if (childStartTs > 0 && (g.startTs == 0 || childStartTs < g.startTs)) g.startTs = childStartTs;
-            if (collRisk > g.riskScore) g.riskScore = collRisk;
+            // Carry the base score/remarks from whichever child owns the current max risk score,
+            // so the device row's tooltip can explain the score it displays (mirrors
+            // AgentEndpointTreeTable.jsx's groupByEndpointId).
+            if (collRisk >= g.riskScore) {
+                g.baseRiskScore = c.getBaseRiskScore();
+                g.baseRiskScoreReason = c.getBaseRiskScoreReason();
+                g.riskScore = collRisk;
+                g.winningCollectionId = c.getId();
+            }
             if (collSensitive != null) g.sensitiveTypes.addAll(collSensitive);
             if (flags[0]) g.hasPersonalAccount = true;
             if (flags[1]) g.hasLocalMcpServer = true;
             if (flags[2]) g.hasMisconfiguredConfig = true;
+            if (flags[3]) g.hasOwnerTag = true;
+            // First non-blank wins — every child of one owner-tagged group is the same bot, same environment.
+            if (g.environmentName == null && StringUtils.isNotBlank(environmentName)) g.environmentName = environmentName;
+            // Unlike environmentName above, every distinct email is kept: the device row matches the
+            // ai-agent-email filter if ANY of its collections was signed in as a matching account.
+            if (aiAgentEmail != null) g.aiAgentEmails.add(aiAgentEmail);
             if (childMalicious) g.hasMaliciousSkill = true;
         }
+        // Factors are stamped after pagination in fetchAgenticAssetEndpointsPage (page-scoped only).
         return groups;
     }
 
@@ -931,8 +1200,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Filters.in(Constants.ID, ids),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING,
                             ApiCollection.SKILLS, ApiCollection.START_TS, ApiCollection.BASE_RISK_SCORE,
-                            ApiCollection.BASE_RISK_SCORE_REASON)
+                            ApiCollection.BASE_RISK_SCORE_REASON, "deactivated", ApiCollection.IS_OUT_OF_TESTING_SCOPE)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
 
             // Computed here, scoped to just this asset's own `ids` — unlike every other agentic
             // endpoint on this page, which reads trafficMap/riskScoreMap/sensitiveMap off the
@@ -953,7 +1223,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             String effectiveRowType = StringUtils.isNotBlank(rowType) ? rowType : "agent";
 
             Map<String, EndpointGroup> groups = groupCollectionsByEndpointId(
-                    collections, traffic, risk, sensitive, maliciousSkillKeys, usernameMap, effectiveRowType);
+                    collections, traffic, risk, sensitive, maliciousSkillKeys, getOrComputeUsernameMap(), effectiveRowType);
 
             List<BasicDBObject> rows = new ArrayList<>();
             for (EndpointGroup g : groups.values()) {
@@ -961,13 +1231,23 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("endpointId", g.deviceId);
                 row.put("username", g.username);
                 row.put("riskScore", g.riskScore > 0 ? AgenticObserveUtil.roundRiskScore(g.riskScore) : 0);
+                if (RiskScoreExplainer.isSetCollectionId(g.winningCollectionId)) {
+                    row.put("winningCollectionId", g.winningCollectionId);
+                }
+                row.put("baseRiskScore", g.baseRiskScore);
+                row.put("baseRiskScoreReason", g.baseRiskScoreReason);
                 row.put("sensitiveInRespTypes", new ArrayList<>(g.sensitiveTypes));
                 row.put("lastSeenEpoch", g.lastSeenEpoch);
                 row.put("startTs", g.startTs);
+                if (g.pluginStatus != null) row.put("pluginStatus", g.pluginStatus);
+                if (g.pluginScope != null) row.put("pluginScope", g.pluginScope);
                 row.put("hasPersonalAccount", g.hasPersonalAccount);
                 row.put("hasLocalMcpServer", g.hasLocalMcpServer);
                 row.put("hasMisconfiguredConfig", g.hasMisconfiguredConfig);
                 row.put("hasMaliciousSkill", g.hasMaliciousSkill);
+                row.put("hasOwnerTag", g.hasOwnerTag);
+                row.put("environmentName", g.environmentName);
+                row.put("aiAgentEmails", new ArrayList<>(g.aiAgentEmails));
                 row.put("childCount", g.children.size());
                 row.put("children", g.children);
                 rows.add(row);
@@ -1003,6 +1283,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if (wanted.contains("Local MCP Server") && Boolean.TRUE.equals(r.getBoolean("hasLocalMcpServer", false))) return false;
                     if (wanted.contains("Misconfigured") && Boolean.TRUE.equals(r.getBoolean("hasMisconfiguredConfig", false))) return false;
                     if (wanted.contains("Malicious Skills") && Boolean.TRUE.equals(r.getBoolean("hasMaliciousSkill", false))) return false;
+                    if (wanted.contains("Owner") && Boolean.TRUE.equals(r.getBoolean("hasOwnerTag", false))) return false;
                     return true;
                 });
             }
@@ -1019,6 +1300,42 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 rows.removeIf(r -> !wanted.contains(String.valueOf(r.get("username"))));
             }
 
+            // ai-agent-email regex filter. Sits with the other filters — after grouping, before the
+            // sort/subList below — so it applies across every device of this asset, not just the
+            // page being returned. Offered only for the asset groups in AI_AGENT_EMAIL_GROUP_KEYS;
+            // the check is repeated here (the UI already hides the chip elsewhere) so a stale URL
+            // carrying this filter onto another asset is ignored rather than silently applied.
+            List<String> aiAgentEmailFilters = filters != null ? filters.get("aiAgentEmail") : null;
+            boolean aiAgentEmailFilterAllowed = "agent".equals(effectiveRowType)
+                    && AI_AGENT_EMAIL_GROUP_KEYS.contains(groupKey);
+            if (aiAgentEmailFilterAllowed && aiAgentEmailFilters != null && !aiAgentEmailFilters.isEmpty()
+                    && StringUtils.isNotBlank(aiAgentEmailFilters.get(0))) {
+                String rawPattern = aiAgentEmailFilters.get(0).trim();
+                Pattern compiled = null;
+                if (rawPattern.length() <= MAX_AI_AGENT_EMAIL_REGEX_LEN) {
+                    try {
+                        compiled = Pattern.compile(rawPattern, Pattern.CASE_INSENSITIVE);
+                    } catch (PatternSyntaxException e) {
+                        // Half-typed regex ("...gmail.com[") is a normal intermediate state on a
+                        // debounced text field — treat it as no filter instead of erroring the page.
+                        compiled = null;
+                    }
+                }
+                if (compiled != null) {
+                    final Pattern emailPattern = compiled; // compiled once, not per row
+                    rows.removeIf(r -> {
+                        Object raw = r.get("aiAgentEmails");
+                        if (!(raw instanceof List)) return true;
+                        for (Object e : (List<?>) raw) {
+                            // find(), not matches(): "gmail" works as a substring search while
+                            // "^.*@akto\.io$" still anchors.
+                            if (e != null && emailPattern.matcher(String.valueOf(e)).find()) return false;
+                        }
+                        return true;
+                    });
+                }
+            }
+
             Comparator<BasicDBObject> cmp = buildEndpointGroupComparator(sortKey);
             if (sortOrder < 0) cmp = cmp.reversed();
             rows.sort(cmp);
@@ -1027,7 +1344,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             int effectiveLimit = limit > 0 ? Math.min(limit, 500) : 20;
             int from = Math.max(0, skip);
             int to = Math.min(rows.size(), from + effectiveLimit);
-            List<BasicDBObject> page = from < to ? rows.subList(from, to) : Collections.emptyList();
+            List<BasicDBObject> page = from < to ? new ArrayList<>(rows.subList(from, to)) : new ArrayList<>();
+            stampEndpointPageRiskScoreFactors(page);
 
             response.put("endpoints", page);
             response.put("total", total);
@@ -1038,6 +1356,54 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             loggerMaker.errorAndAddToDb("Error fetching agentic asset endpoints page: " + e.getMessage());
             addActionError("Error fetching agentic asset endpoints page: " + e.getMessage());
             return ERROR.toUpperCase();
+        }
+    }
+
+    /** Page-scoped factors load: only the winning + child collections on this page of devices. */
+    private static void stampEndpointPageRiskScoreFactors(List<BasicDBObject> page) {
+        if (page == null || page.isEmpty()) return;
+        Set<Integer> collectionIds = new HashSet<>();
+        for (BasicDBObject row : page) {
+            Object winningId = row.get("winningCollectionId");
+            if (winningId instanceof Number && RiskScoreExplainer.isSetCollectionId((Number) winningId)) {
+                collectionIds.add(((Number) winningId).intValue());
+            }
+            Object children = row.get("children");
+            if (!(children instanceof List)) continue;
+            for (Object childObj : (List<?>) children) {
+                if (!(childObj instanceof BasicDBObject)) continue;
+                Object childId = ((BasicDBObject) childObj).get("id");
+                Object childRisk = ((BasicDBObject) childObj).get("riskScore");
+                if (childId instanceof Number && childRisk instanceof Number
+                        && ((Number) childRisk).doubleValue() > 0) {
+                    collectionIds.add(((Number) childId).intValue());
+                }
+            }
+        }
+        RiskScoreExplainer.LoadResult loaded =
+                RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(collectionIds);
+        if (loaded.unavailable) return;
+        for (BasicDBObject row : page) {
+            Object winningId = row.remove("winningCollectionId");
+            Object rowRisk = row.get("riskScore");
+            if (winningId instanceof Number && rowRisk instanceof Number
+                    && RiskScoreExplainer.isSetCollectionId((Number) winningId)
+                    && ((Number) rowRisk).doubleValue() > 0) {
+                ApiInfo winning = loaded.byCollection.get(((Number) winningId).intValue());
+                RiskScoreExplainer.putExplanationIfMatches(row, winning, ((Number) rowRisk).doubleValue());
+            }
+            Object children = row.get("children");
+            if (!(children instanceof List)) continue;
+            for (Object childObj : (List<?>) children) {
+                if (!(childObj instanceof BasicDBObject)) continue;
+                BasicDBObject child = (BasicDBObject) childObj;
+                Object childId = child.get("id");
+                Object childRisk = child.get("riskScore");
+                if (!(childId instanceof Number) || !(childRisk instanceof Number)) continue;
+                if (((Number) childRisk).doubleValue() <= 0) continue;
+                ApiInfo childWinning = loaded.byCollection.get(((Number) childId).intValue());
+                RiskScoreExplainer.putExplanationIfMatches(child, childWinning, ((Number) childRisk).doubleValue());
+            }
         }
     }
 
@@ -1184,6 +1550,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Filters.in(Constants.ID, ids),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.SKILLS, ApiCollection.TAGS_STRING)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
 
             Set<String> skillNamesFromCollections = new LinkedHashSet<>();
             Set<String> mcpHostNames = new HashSet<>();
@@ -1366,6 +1733,23 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             // ---- Connected MCP servers — already known/cheap, no re-derivation ----
             if (mcpServerNames != null) {
+                // These are a DIFFERENT set of collections than this agent's own `ids`/`collectionById`
+                // above (the MCP server's own collections), so its description needs its own small,
+                // separately-scoped query rather than reusing collectionById.
+                Set<Integer> mcpCollectionIdSet = new HashSet<>();
+                if (mcpServerCollectionIds != null) {
+                    for (List<Integer> v : mcpServerCollectionIds.values()) {
+                        if (v != null) mcpCollectionIdSet.addAll(v);
+                    }
+                }
+                Map<Integer, ApiCollection> mcpCollectionById = new HashMap<>();
+                if (!mcpCollectionIdSet.isEmpty()) {
+                    List<ApiCollection> mcpCollections = ApiCollectionsDao.instance.findAll(
+                            Filters.in(Constants.ID, new ArrayList<>(mcpCollectionIdSet)),
+                            Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.DESCRIPTION));
+                    for (ApiCollection c : mcpCollections) mcpCollectionById.put(c.getId(), c);
+                }
+
                 Set<String> seen = new HashSet<>();
                 for (String mcpName : mcpServerNames) {
                     if (StringUtils.isBlank(mcpName) || !seen.add(mcpName.toLowerCase(Locale.ROOT))) continue;
@@ -1376,6 +1760,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     row.put("toolCount", 0);
                     List<Integer> mcpCollectionIds = mcpServerCollectionIds != null ? mcpServerCollectionIds.get(mcpName) : null;
                     row.put("collectionIds", mcpCollectionIds != null ? mcpCollectionIds : Collections.emptyList());
+                    String description = resolveGroupDescription(mcpCollectionIds, mcpCollectionById, mcpName);
+                    if (StringUtils.isNotBlank(description)) row.put("description", description);
                     rows.add(row);
                 }
             }
@@ -1485,10 +1871,20 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     }
     private static final Map<String, ScopedMapCacheEntry<Integer>> trafficMapFallbackCache = new ConcurrentHashMap<>();
     private static final Map<String, ScopedMapCacheEntry<Double>> riskScoreMapFallbackCache = new ConcurrentHashMap<>();
+    // Both account-scoped, not RBAC-scoped: module_info/agent_users have no per-user view to leak.
+    private static final Map<String, ScopedMapCacheEntry<String>> usernameMapFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<List<Map<String, String>>>> tagsByUsernameFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<Map<String, String>>> deviceMetadataMapFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<Integer>> userAnalysisFlatMapFallbackCache = new ConcurrentHashMap<>();
 
     // Both underlying DAO calls RBAC-scope by (userId, accountId) — keyed on accountId alone, one user's restricted view would leak into another's.
     private static String scopedCacheKey() {
         return Context.accountId.get() + "_" + Context.userId.get();
+    }
+
+    // Account-scoped cache key, unlike scopedCacheKey()'s RBAC-scoped traffic/risk maps.
+    private static String accountCacheKey() {
+        return String.valueOf(Context.accountId.get());
     }
 
     private Map<String, Integer> getOrComputeTrafficMap() {
@@ -1552,7 +1948,90 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         }).map;
     }
 
-    private ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
+    // Shared TTL-cache read used by the two resolvers below; mirrors getOrComputeTrafficMap's shape.
+    private static <V> Map<String, V> getOrComputeCachedMap(Map<String, ScopedMapCacheEntry<V>> cache, String key,
+            Supplier<Map<String, V>> compute, String what) {
+        long now = System.currentTimeMillis();
+        ScopedMapCacheEntry<V> existing = cache.get(key);
+        if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing.map;
+        }
+        if (cache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            cache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
+        }
+        // compute() serializes concurrent misses for the same key instead of each racing to Mongo.
+        return cache.compute(key, (k, cached) -> {
+            long recheckNow = System.currentTimeMillis();
+            if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            try {
+                return new ScopedMapCacheEntry<>(compute.get(), recheckNow);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed computing " + what + " server-side for agentic assets", LogDb.DASHBOARD);
+                return cached != null ? cached : new ScopedMapCacheEntry<>(Collections.emptyMap(), recheckNow);
+            }
+        }).map;
+    }
+
+    // Endpoint Shield hostname -> username, server-side so the client stops POSTing every device id.
+    private Map<String, String> getOrComputeUsernameMap() {
+        if (usernameMap != null && !usernameMap.isEmpty()) return usernameMap;
+        return getOrComputeCachedMap(usernameMapFallbackCache, accountCacheKey(),
+                () -> ModuleInfoDao.instance.fetchUsernameLookupMapForEndpointShield(), "username map");
+    }
+
+    // Username -> device tags, server-side so the client stops POSTing the account's identity list.
+    private Map<String, List<Map<String, String>>> getOrComputeTagsByUsername() {
+        if (tagsByUsername != null && !tagsByUsername.isEmpty()) return tagsByUsername;
+        return getOrComputeCachedMap(tagsByUsernameFallbackCache, accountCacheKey(),
+                () -> AgentUsersDao.instance.fetchDeviceTagsByUsername(), "tags-by-username map");
+    }
+
+    // deviceId -> {username, os, browserName}, server-side so the client stops POSTing device identities.
+    private Map<String, Map<String, String>> getOrComputeDeviceMetadataMap() {
+        if (deviceMetadataMap != null && !deviceMetadataMap.isEmpty()) return deviceMetadataMap;
+        return getOrComputeCachedMap(deviceMetadataMapFallbackCache, accountCacheKey(),
+                () -> ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield(), "device metadata map");
+    }
+
+    // "serviceId|deviceId" -> total tokens; keyed by time range too since this varies with the picker.
+    private Map<String, Integer> getOrComputeUserAnalysisFlatMap() {
+        if (userAnalysisFlatMap != null && !userAnalysisFlatMap.isEmpty()) return userAnalysisFlatMap;
+        String key = accountCacheKey() + "_" + startTimestamp + "_" + endTimestamp;
+        return getOrComputeCachedMap(userAnalysisFlatMapFallbackCache, key, this::buildUserAnalysisFlatMap, "user analysis map");
+    }
+
+    // Mirrors constants.js's buildUserAnalysisFlatMap; reuses EndpointShieldAgentAction for the ES-vs-counter branching.
+    private Map<String, Integer> buildUserAnalysisFlatMap() {
+        EndpointShieldAgentAction action = new EndpointShieldAgentAction();
+        action.setStartTime(startTimestamp);
+        action.setEndTime(endTimestamp);
+        action.fetchUserAnalysisList();
+
+        Map<String, Integer> result = new HashMap<>();
+        List<UserAnalysisData> rows = action.getUserAnalysisList();
+        if (rows == null) return result;
+        for (UserAnalysisData row : rows) {
+            if (row == null || row.getId() == null) continue;
+            String serviceId = row.getId().getServiceId();
+            String deviceId = row.getId().getDeviceId();
+            if (StringUtils.isBlank(serviceId) || StringUtils.isBlank(deviceId)) continue;
+            long total = row.getTotalInputTokens() + row.getTotalOutputTokens();
+            if (total <= 0) continue;
+            int capped = (int) Math.min(total, Integer.MAX_VALUE);
+            result.put(serviceId + "|" + deviceId, capped);
+            result.put(serviceId.toLowerCase(Locale.ROOT) + "|" + deviceId.toLowerCase(Locale.ROOT), capped);
+        }
+        return result;
+    }
+
+    // Called by ModuleInfoAction after a device-tag write so the edit shows on the next fetch, not after the TTL.
+    public static void invalidateTagsByUsernameCache() {
+        tagsByUsernameFallbackCache.remove(accountCacheKey());
+    }
+
+    private  ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
             Map<String, Double> risk, Map<String, List<String>> sensitive) {
         int accountId = Context.accountId.get();
         long now = System.currentTimeMillis();
@@ -1572,8 +2051,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS,
-                            ApiCollection.BASE_RISK_SCORE, ApiCollection.BASE_RISK_SCORE_REASON)
+                            ApiCollection.BASE_RISK_SCORE, ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection._DEACTIVATED,ApiCollection.DESCRIPTION)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
             long tFindAll = System.currentTimeMillis();
             Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk, sensitive);
             long tClassify = System.currentTimeMillis();
@@ -1627,9 +2107,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // "not-attached" hostname (an orphan skill bucket, not a real agent/service/llm) —
             // matches constants.js's groupCollectionsBySkill, which never checks
             // isNotAttachedHostName, unlike its Agent/Service/LLM siblings below.
+            boolean fannedOutSkillFromArray = false;
             if (c.getSkills() != null) {
                 for (String skill : c.getSkills()) {
                     if (StringUtils.isBlank(skill)) continue;
+                    fannedOutSkillFromArray = true;
                     GroupSummary g = groups.computeIfAbsent("skill|" + skill, k -> {
                         GroupSummary gs = new GroupSummary(skill, "skill");
                         gs.name = skill;
@@ -1646,6 +2128,35 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     // its "skill" tag names it, so this collection (c) is never the one contributing it.
                     if (g.owningPluginName == null) g.owningPluginName = AgenticObserveUtil.getOwningPluginName(c);
                     if (g.owningPluginName == null) g.owningPluginName = skillNameToOwningPlugin.get(skill);
+                }
+            }
+            // Standalone skill collections (no owning agent's .skills array lists them — the
+            // collection IS the skill, named by its own "skill" tag(s) rather than a member of some
+            // other collection's .skills array) never fan out above since .skills is empty/null on
+            // them. Without this fallback they fall through to the agent/service classification
+            // below, find no mcp-client/ai-agent/mcp-server/gen-ai/browser-llm tag, and get dropped
+            // by the `if (typeTag == null) continue;` a few lines down — silently excluded from every
+            // group despite being tagged AKTO_SKILL_TAG in the DB. Only applies when the array fan-out
+            // above found nothing, so a collection already counted via .skills isn't double-counted.
+            // A single collection can carry MULTIPLE "skill" tags (one per skill the owning
+            // user/agent has created) — unlike getOwningPluginName's single-value lookup, this must
+            // walk every tag, not just the first, or every skill past the first on that collection
+            // silently disappears from the count.
+            if (!fannedOutSkillFromArray && envType != null) {
+                for (CollectionTags tag : envType) {
+                    if (tag == null || !Constants.AKTO_SKILL_TAG.equals(tag.getKeyName()) || StringUtils.isBlank(tag.getValue())) {
+                        continue;
+                    }
+                    String ownSkillTag = tag.getValue();
+                    GroupSummary g = groups.computeIfAbsent("skill|" + ownSkillTag, k -> {
+                        GroupSummary gs = new GroupSummary(ownSkillTag, "skill");
+                        gs.name = ownSkillTag;
+                        gs.clientType = AgenticObserveUtil.CLIENT_TYPE_SKILL;
+                        return gs;
+                    });
+                    g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId, sensitive);
+                    if (g.owningPluginName == null) g.owningPluginName = AgenticObserveUtil.getOwningPluginName(c);
+                    if (g.owningPluginName == null) g.owningPluginName = skillNameToOwningPlugin.get(ownSkillTag);
                 }
             }
 
@@ -1715,8 +2226,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             boolean hasBrowserLlm = hasTagKey(envType, Constants.AKTO_BROWSER_LLM_TAG);
             if (hasBrowserLlm) {
-                String serviceName = extractServiceNameForGrouping(hostName);
-                if (StringUtils.isNotBlank(serviceName)) {
+                String serviceName = llmGroupKey(c);
+                if (serviceName != null) {
                     GroupSummary g = groups.computeIfAbsent("llm|" + serviceName, k -> {
                         GroupSummary gs = new GroupSummary(serviceName, "llm");
                         gs.name = serviceName;
@@ -1731,9 +2242,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             CollectionTags assetTag = AgenticObserveUtil.findAssetTag(c);
             boolean addedToAgentGroup = false;
-            if (assetTag != null && StringUtils.isNotBlank(assetTag.getValue())
-                    && !Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName())) {
-                String key = McpClientRegistry.resolveClientKey(assetTag.getValue());
+            String key = agentGroupKey(c);
+            if (key != null) {
                 boolean isSaasAgent = hasTagKey(envType, Constants.AKTO_SAAS_AGENT_TAG);
                 GroupSummary g = groups.computeIfAbsent("agent|" + key, k -> {
                     GroupSummary gs = new GroupSummary(key, "agent");
@@ -1747,21 +2257,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 addedToAgentGroup = true;
             }
 
-            CollectionTags typeTag = AgenticObserveUtil.findTypeTag(c);
-            if (typeTag == null) continue;
-
-            // constants.js's groupCollectionsByService only excludes an agent-owned collection from
-            // ALSO getting its own service row when the type tag is gen-ai — an agent-owned
-            // mcp-server collection (e.g. mcp-client=cursor + mcp-server) still gets a service row
-            // too, deliberately double-counted across the agent and service groups. Mirror that
-            // exact scoping rather than unconditionally skipping the service branch whenever a bound
-            // or orphaned (unbound) owner tag was found.
-            if (Constants.AKTO_GEN_AI_TAG.equals(typeTag.getKeyName())) {
-                if (addedToAgentGroup || hasAgentOwnerTag(envType)) continue;
-            }
-
-            String serviceName = extractServiceNameForGrouping(hostName);
-            if (StringUtils.isBlank(serviceName)) continue;
+            String serviceName = serviceGroupKey(c, addedToAgentGroup);
+            if (serviceName == null) continue;
             final ApiCollection fc = c;
             GroupSummary g = groups.computeIfAbsent("service|" + serviceName, k -> {
                 GroupSummary gs = new GroupSummary(serviceName, "service");
@@ -1808,23 +2305,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Getter
     private Map<String, Map<String, Integer>> collectionViolationCounts;
 
-    // Mirrors agenticObserveApi.js's deviceServiceKey exactly — device+service loose-match key for
-    // 2-segment vs 3-segment host attribution (see resolveHostToCollectionIds's javadoc below).
-    private static String deviceServiceKey(String hostName) {
-        if (StringUtils.isBlank(hostName)) return null;
-        String[] parts = hostName.split("\\.");
-        if (parts.length < 2) return null;
-        return parts[0] + " " + parts[parts.length - 1];
-    }
-
-    // Mirrors agenticObserveApi.js's isClaudeConfigHost exactly.
-    private static boolean isClaudeConfigHost(String hostName) {
-        if (StringUtils.isBlank(hostName)) return false;
-        String[] parts = hostName.split("\\.");
-        if (parts.length != 2) return false;
-        String service = parts[1].toLowerCase(Locale.ROOT);
-        return "claude-settings".equals(service) || "claude".equals(service);
-    }
+    // deviceServiceKey/isClaudeConfigHost moved to HostCollectionResolver, which now also owns
+    // the exact/loose/claude-config join below — so any other caller needing "host -> collection
+    // ids" (e.g. the Argus/AGENTIC insight providers) shares this implementation instead of a
+    // second hand-copied matcher.
 
     /**
      * Attributes server-aggregated per-host violation severity counts (from
@@ -1849,47 +2333,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Projections.include(Constants.ID, ApiCollection.HOST_NAME)
             );
 
-            Map<String, List<Integer>> hostToIds = new HashMap<>();
-            Map<String, List<Integer>> looseToIds = new HashMap<>();
-            Map<String, List<Integer>> claudeDeviceToIds = new HashMap<>();
-            List<Integer> allClaudeIds = new ArrayList<>();
-
-            for (ApiCollection c : collections) {
-                String hostName = c.getHostName();
-                if (StringUtils.isBlank(hostName)) continue;
-
-                hostToIds.computeIfAbsent(hostName, k -> new ArrayList<>()).add(c.getId());
-
-                String lk = deviceServiceKey(hostName);
-                if (lk != null) {
-                    looseToIds.computeIfAbsent(lk, k -> new ArrayList<>()).add(c.getId());
-                }
-
-                String[] parts = hostName.split("\\.");
-                String deviceId = parts.length > 0 ? parts[0] : null;
-                String service = parts.length > 0 ? parts[parts.length - 1].toLowerCase(Locale.ROOT) : null;
-                if (StringUtils.isNotBlank(deviceId) && "claude".equals(service)) {
-                    claudeDeviceToIds.computeIfAbsent(deviceId, k -> new ArrayList<>()).add(c.getId());
-                    allClaudeIds.add(c.getId());
-                }
-            }
+            HostCollectionResolver resolver = new HostCollectionResolver(collections);
 
             for (Map.Entry<String, Map<String, Integer>> entry : hostCounts.entrySet()) {
                 String host = entry.getKey();
                 Map<String, Integer> counts = entry.getValue();
                 if (host == null || counts == null) continue;
 
-                List<Integer> ids = hostToIds.get(host);
-                if (ids == null || ids.isEmpty()) {
-                    ids = looseToIds.get(deviceServiceKey(host));
-                }
-                if ((ids == null || ids.isEmpty()) && isClaudeConfigHost(host)) {
-                    String deviceId = host.split("\\.")[0];
-                    List<Integer> pool = claudeDeviceToIds.get(deviceId);
-                    if (pool == null || pool.isEmpty()) pool = allClaudeIds;
-                    ids = pool.isEmpty() ? null : Collections.singletonList(pool.get(0));
-                }
-                if (ids == null || ids.isEmpty()) continue;
+                List<Integer> ids = resolver.resolve(host);
+                if (ids.isEmpty()) continue;
 
                 for (Integer id : ids) {
                     Map<String, Integer> agg = collectionViolationCounts.computeIfAbsent(String.valueOf(id), k -> {
@@ -1938,28 +2390,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         out.put("low", low);
         return out;
     }
-
-    // Skill-name equivalent of sumViolationsForCollections above — skill rows use this instead,
-    // since a skill's declaring collection is shared with the agent/device that invoked it, so
-    // collection-based attribution can't give a skill its own count (see skillViolationsByName's
-    // own field comment). Same "null when zero" contract.
-    private static BasicDBObject violationsForSkillName(String skillName, Map<String, Map<String, Integer>> skillViolationsByName) {
-        if (StringUtils.isBlank(skillName) || skillViolationsByName == null) return null;
-        Map<String, Integer> v = skillViolationsByName.get(skillName);
-        if (v == null) return null;
-        int critical = v.getOrDefault("critical", 0);
-        int high = v.getOrDefault("high", 0);
-        int medium = v.getOrDefault("medium", 0);
-        int low = v.getOrDefault("low", 0);
-        if (critical + high + medium + low == 0) return null;
-        BasicDBObject out = new BasicDBObject();
-        out.put("critical", critical);
-        out.put("high", high);
-        out.put("medium", medium);
-        out.put("low", low);
-        return out;
-    }
-
     // Total violation count for one group, used to make "violations" a real server-side sort key
     // (see fetchAgenticAssetsSummary's sortKey handling) instead of only a per-page display value.
     // Skill rows always sort as 0 here, matching the per-row "violations" field above which no
@@ -1971,6 +2401,180 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return v.getInt("critical", 0) + v.getInt("high", 0) + v.getInt("medium", 0) + v.getInt("low", 0);
     }
 
+    // Discovered tools per collection, account-wide, for the AI inventory's Tool capabilities column
+    // and tool search. Read from api_info (one small record per endpoint, ids only) rather than
+    // aggregating single_type_info, which holds a record per parameter. Cached like the skill data:
+    // one read per TTL, not per page.
+    private static final Map<String, ToolNamesCacheEntry> toolNamesCache = new ConcurrentHashMap<>();
+
+    private static final class ToolNamesCacheEntry {
+        final long builtAt = System.currentTimeMillis();
+        // Agent hosts' built-in tools (/tool/*) and MCP servers' tool endpoints, kept apart because an
+        // agent row's collections also carry its MCP servers' traffic.
+        final Map<Integer, Set<String>> builtinTools = new HashMap<>();
+        final Map<Integer, Set<String>> mcpTools = new HashMap<>();
+    }
+
+    private ToolNamesCacheEntry getOrBuildToolNames(Collection<GroupSummary> groups) {
+        String cacheKey = ArgusCollectionScope.isLimited(getSUser()) ? scopedCacheKey() : accountCacheKey();
+        ToolNamesCacheEntry existing = toolNamesCache.get(cacheKey);
+        if (existing != null && (System.currentTimeMillis() - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing;
+        }
+        return toolNamesCache.compute(cacheKey, (k, cached) -> {
+            if (cached != null && (System.currentTimeMillis() - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            ToolNamesCacheEntry entry = new ToolNamesCacheEntry();
+            Set<Integer> collectionIds = new HashSet<>();
+            for (GroupSummary g : groups) {
+                if ("agent".equals(g.rowType) || "service".equals(g.rowType)) collectionIds.addAll(g.collectionIds);
+            }
+            if (collectionIds.isEmpty()) return entry;
+            for (ApiInfo info : ApiInfoDao.instance.findAll(
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds), Projections.include(Constants.ID))) {
+                if (info.getId() == null) continue;
+                String url = info.getId().getUrl();
+                int collectionId = info.getId().getApiCollectionId();
+                if (url == null) continue;
+                if (isAgentBuiltinToolUrl(url)) {
+                    entry.builtinTools.computeIfAbsent(collectionId, c -> new TreeSet<>()).add(mcpDisplayName(url));
+                } else if ("Tool".equals(bucketFromUrl(url)) && !isAgentLlmMessagesUrl(url)) {
+                    entry.mcpTools.computeIfAbsent(collectionId, c -> new TreeSet<>()).add(mcpDisplayName(url));
+                }
+            }
+            return entry;
+        });
+    }
+
+    // Agent rows: their own built-in tools; MCP server rows: their tools; others have none.
+    private static Set<String> toolNamesOf(GroupSummary g, ToolNamesCacheEntry tools) {
+        Map<Integer, Set<String>> source = "agent".equals(g.rowType) ? tools.builtinTools
+                : "service".equals(g.rowType) ? tools.mcpTools : null;
+        Set<String> names = new TreeSet<>();
+        if (source == null) return names;
+        for (Integer id : g.collectionIds) {
+            Set<String> s = source.get(id);
+            if (s != null) names.addAll(s);
+        }
+        return names;
+    }
+
+    static final String APPROVAL_APPROVED = "Approved";
+    static final String APPROVAL_UNAPPROVED = "Unapproved";
+    static final String APPROVAL_BLOCKED = "Blocked";
+    static final String APPROVAL_UNDER_REVIEW = "Under review";
+
+    // Filter values the AI inventory's Tags and Risk columns accept besides the ones the grid lists itself.
+    private static final String TAG_MALICIOUS_MCP_SERVER = "Malicious MCP Server";
+    private static final String RISK_BAND_HIGH = "High risk";
+
+    private static Set<Integer> maliciousServerCollectionIds(List<ApiCollection> collections) {
+        Set<Integer> ids = new HashSet<>();
+        for (ApiCollection c : collections) {
+            if (InsightUtil.isMaliciousMcpServer(c)) ids.add(c.getId());
+        }
+        return ids;
+    }
+
+    // AI inventory tab of a row (keys; AgenticInventoryTable.jsx owns the labels).
+    private static String inventoryCategory(GroupSummary g) {
+        String t = g.clientType;
+        if (AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(t)) return McpClientRegistry.isIdeAssistant(g.groupKey) ? "ide" : "agent";
+        if (AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT.equals(t)) return "saas";
+        if (AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER.equals(t)) return "mcp";
+        if (AgenticObserveUtil.CLIENT_TYPE_LLM.equals(t)) return "browser_ai";
+        if (AgenticObserveUtil.CLIENT_TYPE_SKILL.equals(t)) return "skills";
+        if (AgenticObserveUtil.CLIENT_TYPE_PLUGIN.equals(t)) return "plugins";
+        return null;
+    }
+
+    // Audit type whose Allow/Block decisions apply to this row, or null when the row can't be approved.
+    private static String approvalAuditType(GroupSummary g) {
+        if ("service".equals(g.rowType)) return Constants.AKTO_MCP_SERVER_TAG;
+        if ("llm".equals(g.rowType)) return Constants.AKTO_BROWSER_LLM_TAG;
+        if ("agent".equals(g.rowType) && AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(g.clientType)) return Constants.AKTO_AI_AGENT_TAG;
+        return null;
+    }
+
+    private static final class ApprovalState {
+        int priority = Integer.MAX_VALUE;
+        // browser-llm rows are updated by record id (updateLlmAuditData)
+        final List<String> hexIds = new ArrayList<>();
+
+        String status() {
+            // Same collapse as AuditDataAction.collapseRemarksArr: an expired conditional shows as Rejected.
+            if (priority == 0 || priority == 3) return APPROVAL_BLOCKED;
+            if (priority == 1 || priority == 2) return APPROVAL_APPROVED;
+            return priority == 4 ? APPROVAL_UNDER_REVIEW : APPROVAL_UNAPPROVED;
+        }
+    }
+
+    /**
+     * Approval state per approvable group (keyed by approvalAuditType + "|" + groupKey), from the same
+     * mcp_audit_info records the Audit Data page shows. Groups with no record are absent (Unapproved).
+     * mcp-server records are named bare, agent- or device+agent-prefixed ("mcp.notion.com",
+     * "cursor.akto-docs", "<device>.cursor.akto-docs"), so they go to the longest groupKey they end
+     * with, the same suffix rule updateAuditData's mcpServerForAllAgents uses.
+     */
+    private static Map<String, ApprovalState> fetchApprovalStates(List<GroupSummary> groups) {
+        Map<String, Set<String>> keysByType = new HashMap<>();
+        for (GroupSummary g : groups) {
+            String type = approvalAuditType(g);
+            if (type != null) keysByType.computeIfAbsent(type, k -> new HashSet<>()).add(g.groupKey);
+        }
+        Map<String, ApprovalState> states = new HashMap<>();
+        if (keysByType.isEmpty()) return states;
+
+        List<Bson> byType = new ArrayList<>();
+        Set<String> serverKeys = keysByType.getOrDefault(Constants.AKTO_MCP_SERVER_TAG, Collections.emptySet());
+        if (!serverKeys.isEmpty()) {
+            Bson serverFilter = Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG);
+            if (Context.contextSource.get() != null) {
+                serverFilter = Filters.and(serverFilter, Filters.or(
+                        Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name()),
+                        Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false)));
+            }
+            byType.add(serverFilter);
+        }
+        for (String type : Arrays.asList(Constants.AKTO_BROWSER_LLM_TAG, Constants.AKTO_AI_AGENT_TAG)) {
+            Set<String> keys = keysByType.get(type);
+            if (keys != null) byType.add(Filters.and(Filters.eq(McpAuditInfo.TYPE, type), Filters.in(McpAuditInfo.RESOURCE_NAME, keys)));
+        }
+        if (byType.isEmpty()) return states;
+
+        long now = System.currentTimeMillis() / 1000L;
+        List<McpAuditInfo> records = McpAuditInfoDao.instance.findAll(Filters.or(byType),
+                Projections.include(McpAuditInfo.TYPE, McpAuditInfo.RESOURCE_NAME, McpAuditInfo.REMARKS, McpAuditInfo.APPROVAL_CONDITIONS));
+        for (McpAuditInfo rec : records) {
+            String name = rec.getResourceName();
+            if (StringUtils.isBlank(name)) continue;
+            String groupKey = Constants.AKTO_MCP_SERVER_TAG.equals(rec.getType()) ? longestSuffixKey(name, serverKeys) : name;
+            if (groupKey == null) continue;
+            ApprovalState state = states.computeIfAbsent(rec.getType() + "|" + groupKey, k -> new ApprovalState());
+            state.priority = Math.min(state.priority, AuditDataAction.remarksPriority(rec.getRemarks(), rec.getApprovalConditions(), now));
+            if (Constants.AKTO_BROWSER_LLM_TAG.equals(rec.getType()) && rec.getId() != null) state.hexIds.add(rec.getId().toHexString());
+        }
+        return states;
+    }
+
+    // "a.b.c" tries "a.b.c", then "b.c", then "c".
+    private static String longestSuffixKey(String name, Set<String> keys) {
+        for (String candidate = name; candidate != null; ) {
+            if (keys.contains(candidate)) return candidate;
+            int dot = candidate.indexOf('.');
+            candidate = dot < 0 ? null : candidate.substring(dot + 1);
+        }
+        return null;
+    }
+
+    private static String approvalStatusOf(GroupSummary g, Map<String, ApprovalState> states) {
+        String type = approvalAuditType(g);
+        if (type == null) return null;
+        ApprovalState state = states.get(type + "|" + g.groupKey);
+        return state == null ? APPROVAL_UNAPPROVED : state.status();
+    }
+
     /**
      * Paginated, sorted, searchable grouped-asset rows for the Agentic Assets "New Layout" table.
      * Builds lightweight summaries for every group (classifyAllGroups — one pass, no per-device
@@ -1980,6 +2584,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
      * endpoint doesn't touch), scoped to just this page's devices — see AgenticAssetsPage.jsx.
      */
     public String fetchAgenticAssetsSummary() {
+        // Argus and Atlas asset page: newly found agents may match custom roles' rules
+        RuleCollections.refreshInBackground(Context.accountId.get());
         response = new BasicDBObject();
         try {
             long tStart = System.currentTimeMillis();
@@ -1997,11 +2603,25 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 int end = endTimestamp > 0 ? endTimestamp : (int) (System.currentTimeMillis() / 1000);
                 all.removeIf(g -> g.maxTrafficTimestamp < startTimestamp || g.maxTrafficTimestamp > end);
             }
+            // Same "first seen" the Atlas Overview counts; a group with no known start is left out once a bound is set.
+            if (firstSeenStart > 0) {
+                all.removeIf(g -> g.minStartTs < firstSeenStart || (firstSeenEnd > 0 && g.minStartTs >= firstSeenEnd));
+            }
 
             if (StringUtils.isNotBlank(queryValue)) {
                 String q = queryValue.toLowerCase(Locale.ROOT);
-                all.removeIf(g -> g.name == null || !g.name.toLowerCase(Locale.ROOT).contains(q));
+                ToolNamesCacheEntry searchTools = aiInventory ? getOrBuildToolNames(cached.groups.values()) : null;
+                all.removeIf(g -> {
+                    if (g.name != null && g.name.toLowerCase(Locale.ROOT).contains(q)) return false;
+                    if (searchTools != null) {
+                        for (String t : toolNamesOf(g, searchTools)) if (t.toLowerCase(Locale.ROOT).contains(q)) return false;
+                    }
+                    return true;
+                });
             }
+
+            // Read fresh on every call (not part of the classification cache) so an Approve/Block shows immediately.
+            Map<String, ApprovalState> approvalStates = aiInventory ? fetchApprovalStates(all) : Collections.emptyMap();
 
             // AG Grid column filters. "type" is a small fixed enum (AgenticObserveUtil.CLIENT_TYPE_*),
             // matched directly. "tags" mirrors AgenticAssetsPage.jsx's shapeRow tag derivation exactly
@@ -2026,6 +2646,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 if (filters.containsKey("tags")) {
                     Set<String> allowedTags = new HashSet<>(filters.get("tags"));
                     Set<String> maliciousKeys = getOrBuildSkillData().maliciousSkillKeys;
+                    Set<Integer> maliciousServers = allowedTags.contains(TAG_MALICIOUS_MCP_SERVER) ? maliciousServerCollectionIds(cached.collections) : Collections.<Integer>emptySet();
                     all.removeIf(g -> {
                         boolean isSkill = "skill".equals(g.rowType);
                         // Fan-out rows borrow their parent agent collection's flags, so suppress both.
@@ -2040,6 +2661,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                                     .anyMatch(cid -> maliciousKeys.contains(cid + "|" + lname));
                             if (malicious) groupTags.add("Malicious Skill");
                         }
+                        if ("service".equals(g.rowType) && g.collectionIds.stream().anyMatch(maliciousServers::contains)) groupTags.add(TAG_MALICIOUS_MCP_SERVER);
                         return groupTags.stream().noneMatch(allowedTags::contains);
                     });
                 }
@@ -2048,7 +2670,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 // resolveUsernameByDeviceId's use elsewhere in this class (e.g. fetchAgenticAssetDetail).
                 if (filters.containsKey("username")) {
                     Set<String> allowedUsernames = new HashSet<>(filters.get("username"));
-                    Map<String, String> resolveMap = usernameMap != null ? usernameMap : Collections.emptyMap();
+                    Map<String, String> resolveMap = getOrComputeUsernameMap();
                     all.removeIf(g -> g.endpointIds.stream()
                             .noneMatch(id -> allowedUsernames.contains(resolveUsernameByDeviceId(id, resolveMap))));
                 }
@@ -2063,6 +2685,20 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                         if (v == null) return true;
                         return allowedSeverities.stream().noneMatch(s -> v.getInt(s, 0) > 0);
                     });
+                }
+                // "riskBand" — "High risk" keeps the rows at the Atlas Overview's high-risk score or above.
+                if (filters.containsKey("riskBand") && filters.get("riskBand").contains(RISK_BAND_HIGH)) {
+                    all.removeIf(g -> AgenticObserveUtil.roundRiskScore(g.maxRiskScore) < AtlasPeopleService.HIGH_RISK_SCORE);
+                }
+                // "category" — the AI inventory tabs (inventoryCategory keys).
+                if (filters.containsKey("category")) {
+                    Set<String> allowedCategories = new HashSet<>(filters.get("category"));
+                    all.removeIf(g -> !allowedCategories.contains(inventoryCategory(g)));
+                }
+                // "approvalStatus" — Approved / Unapproved / Under review / Blocked; rows that can't be approved never match.
+                if (filters.containsKey("approvalStatus")) {
+                    Set<String> allowedStatuses = new HashSet<>(filters.get("approvalStatus"));
+                    all.removeIf(g -> !allowedStatuses.contains(approvalStatusOf(g, approvalStates)));
                 }
             }
 
@@ -2087,24 +2723,49 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<Integer, ApiCollection> byId = new HashMap<>();
             for (ApiCollection c : collections) byId.put(c.getId(), c);
 
-            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
+            Map<String, String> usernameMap = getOrComputeUsernameMap();
+            ToolNamesCacheEntry rowTools = aiInventory ? getOrBuildToolNames(cached.groups.values()) : null;
             SkillDataCacheEntry skillData = getOrBuildSkillData();
             Set<String> maliciousKeys = skillData.maliciousSkillKeys;
+            // Risk-score tooltip factors: one aggregation for this page's winning collections only
+            // (not all ~800 groups). Explains the endpoint that produced each row's max riskScore.
+            Set<Integer> winningCollectionIds = new HashSet<>();
+            for (GroupSummary g : page) {
+                if (RiskScoreExplainer.isSetCollectionId(g.winningCollectionId)
+                        && g.maxRiskScore > 0 && !"plugin".equals(g.rowType)) {
+                    winningCollectionIds.add(g.winningCollectionId);
+                }
+            }
+            RiskScoreExplainer.LoadResult winningApiInfos =
+                    RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(winningCollectionIds);
+            Set<Integer> maliciousServerIds = maliciousServerCollectionIds(cached.collections);
             List<BasicDBObject> rowsOut = new ArrayList<>();
             for (GroupSummary g : page) {
                 BasicDBObject row = g.toSummaryResponse();
+                if (!winningApiInfos.unavailable
+                        && !"plugin".equals(g.rowType)
+                        && RiskScoreExplainer.isSetCollectionId(g.winningCollectionId)
+                        && g.maxRiskScore > 0) {
+                    ApiInfo winning = winningApiInfos.byCollection.get(g.winningCollectionId);
+                    RiskScoreExplainer.putExplanationIfMatches(row, winning, g.maxRiskScore);
+                }
                 // devices itself is NOT sent (dropped in favor of the two small values actually
                 // derived from it below) — a group with hundreds of member devices turned this into
                 // the single biggest contributor to a 16MB response once hostNames/collectionIds were
                 // fixed (see fetchAgenticAssetDetail, the lazy per-asset endpoint the Overview tab's
                 // full device list — topology graph, etc. — now comes from instead).
                 List<BasicDBObject> devices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
-                int aiInteractionsTotal = 0;
-                for (BasicDBObject d : devices) {
-                    Object v = d.get("aiInteractions");
-                    if (v instanceof Number) aiInteractionsTotal += ((Number) v).intValue();
+                // Only "agent" rows have their own token identity — service/llm/skill/plugin rows
+                // would just redundantly echo whichever agent's tokens their hostname happens to embed.
+                if ("agent".equals(g.rowType)) {
+                    int aiInteractionsTotal = 0;
+                    for (BasicDBObject d : devices) {
+                        Object v = d.get("aiInteractions");
+                        if (v instanceof Number) aiInteractionsTotal += ((Number) v).intValue();
+                    }
+                    if (aiInteractionsTotal > 0) row.put("aiInteractions", aiInteractionsTotal);
                 }
-                if (aiInteractionsTotal > 0) row.put("aiInteractions", aiInteractionsTotal);
                 // Precomputed here (server already has g.collectionIds in memory) instead of sending
                 // the raw collectionIds list to the browser just so it can do this same sum — see
                 // toSummaryResponse()'s comment for why collectionIds/hostNames/etc. no longer appear
@@ -2118,13 +2779,21 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                         ? null
                         : sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
                 if (violations != null) row.put("violations", violations);
+                if ("service".equals(g.rowType) && g.collectionIds.stream().anyMatch(maliciousServerIds::contains)) row.put("isMalicious", true);
                 // Misconfigured is an Agent/MCP-server-only concept (a bad tool/config setup on that
-                // asset) — Skill rows never show it, regardless of any tag collision. isMalicious is
-                // the only skill-specific risk flag.
+                // asset) — Skill rows never show it, regardless of any tag collision. isMalicious flags
+                // skills (below) and, set above, MCP servers.
                 if ("skill".equals(g.rowType) && StringUtils.isNotBlank(g.name)) {
                     String lname = g.name.toLowerCase(Locale.ROOT);
                     boolean malicious = g.collectionIds.stream().anyMatch(cid -> maliciousKeys.contains(cid + "|" + lname));
                     if (malicious) row.put("isMalicious", true);
+                    // Every user's copy of the skill, each tag once
+                    Set<String> skillTags = new TreeSet<>();
+                    for (Integer cid : g.collectionIds) {
+                        Set<String> tags = skillData.skillTagsByKey.get(cid + "|" + lname);
+                        if (tags != null) skillTags.addAll(tags);
+                    }
+                    if (!skillTags.isEmpty()) row.put("skillTags", new ArrayList<>(skillTags));
                 }
                 // Plugin discovery carries no risk of its own, and g.maxRiskScore is the AGENT's —
                 // showing it would mark every plugin on a risky agent as risky.
@@ -2133,7 +2802,23 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     row.remove("baseRiskScore");
                     row.remove("baseRiskScoreReason");
                 }
-                if ("plugin".equals(g.rowType)) row.put("aiInteractions", null);
+                if (aiInventory) {
+                    row.put("inventoryCategory", inventoryCategory(g));
+                    // Discovered tool names, for the Tool capabilities column and the asset panel's tools list.
+                    row.put("tools", new ArrayList<>(toolNamesOf(g, rowTools)));
+                    Set<String> employees = new HashSet<>();
+                    for (String id : g.endpointIds) {
+                        String u = resolveUsernameByDeviceId(id, usernameMap);
+                        if (StringUtils.isNotBlank(u) && !"-".equals(u)) employees.add(u.toLowerCase(Locale.ROOT));
+                    }
+                    row.put("employeesCount", employees.size());
+                    String approvalStatus = approvalStatusOf(g, approvalStates);
+                    if (approvalStatus != null) {
+                        row.put("approvalStatus", approvalStatus);
+                        ApprovalState state = approvalStates.get(approvalAuditType(g) + "|" + g.groupKey);
+                        if ("llm".equals(g.rowType)) row.put("auditHexIds", state == null ? Collections.emptyList() : state.hexIds);
+                    }
+                }
                 rowsOut.add(row);
             }
             loggerMaker.warnAndAddToDb("[fetchAgenticAssetsSummary-timing] TOTAL=" + (System.currentTimeMillis() - tStart)
@@ -2142,11 +2827,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // Current-page-only, same as fetchAgenticAssetEndpointsPage's distinctUsernames — the
             // client accumulates these across page turns to progressively populate the Username filter's
             // choices (see Endpoints.jsx's updateFilterChoicesIfChanged).
-            Map<String, String> resolveMapForChoices = usernameMap != null ? usernameMap : Collections.emptyMap();
             Set<String> distinctUsernames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
             for (GroupSummary g : page) {
                 for (String id : g.endpointIds) {
-                    String u = resolveUsernameByDeviceId(id, resolveMapForChoices);
+                    String u = resolveUsernameByDeviceId(id, usernameMap);
                     if (StringUtils.isNotBlank(u) && !"-".equals(u)) distinctUsernames.add(u);
                 }
             }
@@ -2164,9 +2848,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     @Setter private String groupKey;
     @Setter private String rowType;
+    @Setter private List<String> groupKeys;
 
     @Getter private List<String> assetHostNames;
     @Getter private List<Integer> assetCollectionIds;
+    // Same "self collection" description GroupSummary.toSummaryResponse() ships on the new-UI
+    // summary rows — not included there for old-UI's dedicated AgenticAssetDevicesPage.jsx, which
+    // never fetches the summary list and only ever calls this endpoint for its page title.
+    @Getter private String assetDescription;
     // Count only, not the full name list — the only consumer is the Overview tab's topology graph,
     // which just needs a "N Skills" summary node (see AssetTopologyGraph.jsx). The actual skill
     // *names* are never read off this response: the Components tab's fetchAgenticComponentsPage
@@ -2214,6 +2903,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Getter private boolean assetHasInlineLlm;
     @Getter private List<String> assetInlineToolNames;
     @Getter private int assetMcpComponentCount;
+    // Asset-level risk badge next to "AI Agent - Cursor" on the legacy devices page.
+    @Getter private Double assetRiskScore;
+    @Getter private List<BasicDBObject> assetRiskScoreFactors;
 
     /**
      * Lazy per-asset detail — hostNames/collectionIds/skillCount/mcpServers/mcpServerCollectionIds/
@@ -2242,13 +2934,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 return ERROR.toUpperCase();
             }
 
-            // Uses the request's own trafficMap/riskScoreMap (not empty maps) even though this
-            // endpoint itself never reads GroupSummary's traffic/risk-derived fields — it shares the
-            // classification cache with fetchAgenticAssetsSummary/fetchAgenticAssetsStats (which DO
-            // read them), so building with empty maps here could win the rebuild race and leave every
-            // other caller reading zeroed-out traffic/risk for the whole TTL window.
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            // Same server-side traffic/risk fallback as fetchAgenticAssetDevicesPage — a cold call
+            // without client maps must not rebuild the shared classification cache with zeros.
+            Map<String, Integer> traffic = getOrComputeTrafficMap();
+            Map<String, Double> risk = getOrComputeRiskScoreMap();
             ClassificationCacheEntry cached = getOrBuildClassification(traffic, risk, Collections.emptyMap());
             List<ApiCollection> collections = cached.collections;
             GroupSummary g = cached.groups.get(rowType + "|" + groupKey);
@@ -2256,6 +2945,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (g == null) {
                 assetHostNames = Collections.emptyList();
                 assetCollectionIds = Collections.emptyList();
+                assetDescription = null;
                 assetSkillCount = 0;
                 assetPluginNames = Collections.emptyList();
                 assetPluginVersion = null;
@@ -2278,12 +2968,46 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 assetHasInlineLlm = false;
                 assetInlineToolNames = Collections.emptyList();
                 assetMcpComponentCount = 0;
+                assetRiskScore = null;
+                assetRiskScoreFactors = Collections.emptyList();
                 return SUCCESS.toUpperCase();
             }
 
             assetHostNames = new ArrayList<>(g.hostNames);
             assetCollectionIds = g.collectionIds;
+            assetDescription = g.description();
             assetSkillCount = g.skillNames.size();
+            if ("skill".equals(g.rowType)) {
+                // List shows skillScoreMap[name]; header must match that score/factors, not g.maxRiskScore.
+                SkillDataCacheEntry skillData = getOrBuildSkillData();
+                Object skillScore = skillData.skillScoreMap.get(g.groupKey);
+                if (skillScore instanceof Number && ((Number) skillScore).doubleValue() > 0) {
+                    assetRiskScore = AgenticObserveUtil.roundRiskScore(((Number) skillScore).doubleValue());
+                    Object factors = skillData.skillRiskScoreFactors.get(g.groupKey);
+                    if (factors instanceof List) {
+                        @SuppressWarnings("unchecked")
+                        List<BasicDBObject> typed = (List<BasicDBObject>) factors;
+                        assetRiskScoreFactors = typed;
+                    } else {
+                        assetRiskScoreFactors = Collections.emptyList();
+                    }
+                } else {
+                    assetRiskScore = null;
+                    assetRiskScoreFactors = Collections.emptyList();
+                }
+            } else if (g.maxRiskScore > 0
+                    && RiskScoreExplainer.isSetCollectionId(g.winningCollectionId)
+                    && !"plugin".equals(g.rowType)) {
+                assetRiskScore = AgenticObserveUtil.roundRiskScore(g.maxRiskScore);
+                RiskScoreExplainer.LoadResult winning =
+                        RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(
+                                Collections.singleton(g.winningCollectionId));
+                ApiInfo top = winning.unavailable ? null : winning.byCollection.get(g.winningCollectionId);
+                assetRiskScoreFactors = RiskScoreExplainer.factorsIfMatches(top, g.maxRiskScore);
+            } else {
+                assetRiskScore = null;
+                assetRiskScoreFactors = Collections.emptyList();
+            }
             assetPluginNames = new ArrayList<>(g.pluginNames);
             assetPluginVersion = g.pluginVersion;
             assetPluginScope = g.pluginScope;
@@ -2366,7 +3090,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 }
             }
 
-            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
             // Count comes from the same accumulateDevices() map buildDevicesForGroup uses internally —
             // that per-collection accumulation pass can't be skipped for the count either way, but we
             // avoid the more costly per-device toResponse()/serialization step for anything past the
@@ -2374,7 +3098,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, DeviceAcc> deviceAccs = accumulateDevices(g.collectionIds, byId, traffic, risk, userAnalysis);
             assetDeviceCount = deviceAccs.size();
             List<BasicDBObject> deviceSample = new ArrayList<>();
-            int deviceSampleCap = 6;
+            int deviceSampleCap = 25;
             for (DeviceAcc d : deviceAccs.values()) {
                 if (deviceSample.size() >= deviceSampleCap) break;
                 deviceSample.add(d.toResponse());
@@ -2437,6 +3161,76 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     }
 
     /**
+     * Batch form of fetchAgenticAssetDetail, scoped to just the fields the device flyout's
+     * context graph needs per agent (mcpServers/mcpServerCollectionIds/skillCount/pluginNames) —
+     * a device can show 10+ AI Agents, and firing fetchAgenticAssetDetail once per agent means
+     * that many concurrent requests just to draw one graph. getOrBuildClassification is called
+     * once for the whole batch (not once per groupKey); every other rowType-specific branch in
+     * fetchAgenticAssetDetail (plugin reverse-lookup, device sampling, inline topology) is left
+     * out here since the device flyout graph doesn't use them.
+     */
+    public String fetchAgenticAssetDetailsBatch() {
+        response = new BasicDBObject();
+        Map<String, BasicDBObject> byGroupKey = new HashMap<>();
+        try {
+            if (groupKeys == null || groupKeys.isEmpty() || StringUtils.isBlank(rowType)) {
+                response.put("detailsByGroupKey", byGroupKey);
+                return SUCCESS.toUpperCase();
+            }
+
+            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
+            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            ClassificationCacheEntry cached = getOrBuildClassification(traffic, risk, Collections.emptyMap());
+            Map<Integer, ApiCollection> byId = new HashMap<>();
+            for (ApiCollection c : cached.collections) byId.put(c.getId(), c);
+
+            for (String key : groupKeys) {
+                GroupSummary g = cached.groups.get(rowType + "|" + key);
+                BasicDBObject item = new BasicDBObject();
+                if (g == null) {
+                    item.put("mcpServers", Collections.emptyList());
+                    item.put("mcpServerCollectionIds", Collections.emptyMap());
+                    item.put("llmServers", Collections.emptyList());
+                    item.put("skillCount", 0);
+                    item.put("pluginNames", Collections.emptyList());
+                } else {
+                    item.put("mcpServers", new ArrayList<>(g.serviceNames));
+                    Map<String, List<Integer>> serviceCollectionIdsOut = new HashMap<>();
+                    // serviceNames is one flat set of everything linked to this agent, so callers
+                    // can't tell an LLM from an MCP server on their own — split out the LLMs using
+                    // the same classifier every other surface uses (buildDeviceChildren's row
+                    // types, the flyout's own stat counts). Deliberately NOT a raw tag check: a
+                    // gen-ai tag means AI Agent, not LLM, and an mcp-server tag outranks both.
+                    List<String> llmServers = new ArrayList<>();
+                    for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
+                        serviceCollectionIdsOut.put(e.getKey(), new ArrayList<>(e.getValue()));
+                        for (Integer id : e.getValue()) {
+                            ApiCollection c = byId.get(id);
+                            if (c == null) continue;
+                            if (AgenticObserveUtil.CLIENT_TYPE_LLM.equals(AgenticObserveUtil.getTypeFromCollection(c))) {
+                                llmServers.add(e.getKey());
+                                break;
+                            }
+                        }
+                    }
+                    item.put("mcpServerCollectionIds", serviceCollectionIdsOut);
+                    item.put("llmServers", llmServers);
+                    item.put("skillCount", g.skillNames.size());
+                    item.put("pluginNames", new ArrayList<>(g.pluginNames));
+                }
+                byGroupKey.put(key, item);
+            }
+
+            response.put("detailsByGroupKey", byGroupKey);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching agentic asset details batch: " + e.getMessage());
+            addActionError("Error fetching agentic asset details batch: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
      * Header-tile stats (asset counts by type) for the Agentic Assets page — same classification
      * pass as fetchAgenticAssetsSummary, aggregated rather than paginated. Violation totals stay
      * client-side (already cheap — see aggregateViolationCountsByCollectionId in constants.js,
@@ -2468,13 +3262,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
 
             Map<String, Integer> countsByType = new LinkedHashMap<>();
+            Map<String, Integer> countsByCategory = new LinkedHashMap<>();
             List<Integer> assetTs = new ArrayList<>();
             for (GroupSummary g : counted) {
                 countsByType.merge(g.clientType, 1, Integer::sum);
+                String category = inventoryCategory(g);
+                if (category != null) countsByCategory.merge(category, 1, Integer::sum);
                 assetTs.add(g.maxTrafficTimestamp);
             }
             response.put("totalAssets", counted.size());
             response.put("countsByType", countsByType);
+            response.put("countsByCategory", countsByCategory);
 
             // Legacy Endpoints.jsx's "Total endpoints" summary card — unique device count across the
             // whole account (not deduped per-group, since one device can belong to several groups).
@@ -2569,9 +3367,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // collection's own hostname (<deviceId>.<serviceId>.<host>) — mirrors
             // analysisKeysForCollection's hostname-segment candidates, not module_info's own id/name
             // (which never actually matches UserAnalysisData's key scheme).
-            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
             List<BasicDBObject> topApps = new ArrayList<>();
             for (GroupSummary g : groups.values()) {
+                // Only "agent" rows get ranked here — same reasoning as the grid column above.
+                if (!"agent".equals(g.rowType)) continue;
                 int groupTotal = 0;
                 Set<String> seenKeys = new HashSet<>();
                 for (String hostName : g.hostNames) {
@@ -2592,6 +3392,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     row.put("id", g.rowType + "-" + g.groupKey);
                     row.put("name", g.name);
                     row.put("type", g.clientType);
+                    // Frontend maps this to assetTagValue to resolve a per-app icon (see shapeRow).
+                    row.put("groupKey", g.groupKey);
                     row.put("aiInteractions", groupTotal);
                     topApps.add(row);
                 }
@@ -2674,6 +3476,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final Set<String> clientTypes = new HashSet<>();
         final Set<String> sensitiveTypes = new HashSet<>();
         double maxRiskScore = 0;
+        // Collection whose collRisk last raised maxRiskScore — for the risk-score tooltip factors.
+        // 0 means none; hashed collection ids may be negative.
+        int winningCollectionId;
         int maxTrafficTimestamp = 0;
         boolean hasPersonalAccount = false;
         boolean hasLocalMcpServer = false;
@@ -2681,6 +3486,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         // Generic device tags (AgenticUsers.deviceTags), resolved via this group's owner username.
         List<Map<String, String>> tags = Collections.emptyList();
         int nonSkillCollectionsCount = 0;
+        // For the per-entity count badges. An entity is the hostname without its device prefix
+        // (<agent>.<name>): the same MCP server under two agents is two, the same agent+server on two
+        // devices is one. Keyed by type (getTypeFromCollection). Skills are counted by name alone
+        // (uniqueSkillNames): agents that share a skills folder all report the same skills.
+        final Map<String, Set<String>> entityKeysByType = new HashMap<>();
         final Set<String> uniqueSkillNames = new HashSet<>();
         final Set<String> uniquePluginNames = new HashSet<>();
         // Device-row extras (DeviceEndpoints only — null/zero when not populated, e.g. Users-and-Devices).
@@ -2698,19 +3508,28 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             hostNames.add(hostName);
             String category = AgenticObserveUtil.getTypeFromCollection(c);
             clientTypes.add(category);
+            String entityKey = entityKeyWithoutDevice(hostName);
+            entityKeysByType.computeIfAbsent(category, k -> new HashSet<>()).add(entityKey);
             if (!AgenticObserveUtil.CLIENT_TYPE_SKILL.equals(category)) nonSkillCollectionsCount++;
             if (c.getSkills() != null && !c.getSkills().isEmpty()) {
                 clientTypes.add(AgenticObserveUtil.CLIENT_TYPE_SKILL);
                 for (String s : c.getSkills()) {
                     if (StringUtils.isNotBlank(s)) uniqueSkillNames.add(s.toLowerCase(Locale.ROOT));
                 }
+            } else if (AgenticObserveUtil.CLIENT_TYPE_SKILL.equals(category)) {
+                // A standalone skill collection is the skill itself
+                String skillName = extractServiceNameForGrouping(hostName);
+                if (StringUtils.isNotBlank(skillName)) uniqueSkillNames.add(skillName.toLowerCase(Locale.ROOT));
             }
             // Plugins have their own collection, so nonSkillCollectionsCount above already counted it —
             // this set is for the "N plugins" badge only, never added to the asset total.
             String pluginName = AgenticObserveUtil.getPluginName(c);
             if (pluginName != null) uniquePluginNames.add(pluginName.toLowerCase(Locale.ROOT));
             if (sensitive != null) sensitiveTypes.addAll(sensitive);
-            if (collRisk > maxRiskScore) maxRiskScore = collRisk;
+            if (collRisk > maxRiskScore) {
+                maxRiskScore = collRisk;
+                winningCollectionId = c.getId();
+            }
             if (collTraffic > maxTrafficTimestamp) maxTrafficTimestamp = collTraffic;
             if (collViolations != null) {
                 for (int i = 0; i < 4; i++) violations[i] += collViolations[i];
@@ -2764,6 +3583,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             row.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
             row.put("uniqueSkillNames", new ArrayList<>(uniqueSkillNames));
             row.put("uniquePluginNames", new ArrayList<>(uniquePluginNames));
+            BasicDBObject countsByType = new BasicDBObject();
+            entityKeysByType.forEach((type, keys) -> countsByType.put(type, keys.size()));
+            row.put("countsByType", countsByType);
             row.put("os", os);
             row.put("username", username);
             BasicDBObject violationsObj = new BasicDBObject();
@@ -2802,16 +3624,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     private Map<String, HostGroupSummary> classifyHostGroupedRows(List<ApiCollection> collections, String groupBy,
             Map<String, Integer> traffic, Map<String, Double> risk, Map<String, List<String>> sensitive,
-            Map<String, String> usernames, Map<String, Map<String, String>> userMeta,
+            Map<String, String> usernames,
             Map<String, Map<String, String>> deviceMeta, Map<String, Map<String, Integer>> violationsByCollectionId,
             boolean excludeConnectorIngested) {
-        return classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, userMeta,
+        return classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames,
                 deviceMeta, violationsByCollectionId, excludeConnectorIngested, Collections.emptyMap());
     }
 
     private Map<String, HostGroupSummary> classifyHostGroupedRows(List<ApiCollection> collections, String groupBy,
             Map<String, Integer> traffic, Map<String, Double> risk, Map<String, List<String>> sensitive,
-            Map<String, String> usernames, Map<String, Map<String, String>> userMeta,
+            Map<String, String> usernames,
             Map<String, Map<String, String>> deviceMeta, Map<String, Map<String, Integer>> violationsByCollectionId,
             boolean excludeConnectorIngested, Map<String, List<Map<String, String>>> tagsByUser) {
         boolean isUserGroup = "user".equals(groupBy);
@@ -2896,16 +3718,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             Map<String, List<String>> sensitive = sensitiveMap != null ? sensitiveMap : Collections.emptyMap();
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
-            Map<String, Map<String, String>> userMeta = userMetadataMap != null ? userMetadataMap : Collections.emptyMap();
-            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
+            Map<String, List<Map<String, String>>> tagsByUser = getOrComputeTagsByUsername();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
 
-            Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, userMeta, null, null, false, tagsByUser);
+            Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, null, null, false, tagsByUser);
             List<HostGroupSummary> all = new ArrayList<>(groups.values());
 
             if (StringUtils.isNotBlank(queryValue)) {
@@ -2949,8 +3771,25 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<HostGroupSummary> page = from < to ? all.subList(from, to) : Collections.emptyList();
 
             boolean isUserGroup = "user".equals(groupBy);
+            Set<Integer> winningCollectionIds = new HashSet<>();
+            for (HostGroupSummary g : page) {
+                if (RiskScoreExplainer.isSetCollectionId(g.winningCollectionId) && g.maxRiskScore > 0) {
+                    winningCollectionIds.add(g.winningCollectionId);
+                }
+            }
+            RiskScoreExplainer.LoadResult winningApiInfos =
+                    RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(winningCollectionIds);
             List<BasicDBObject> rowsOut = new ArrayList<>();
-            for (HostGroupSummary g : page) rowsOut.add(g.toRow(isUserGroup));
+            for (HostGroupSummary g : page) {
+                BasicDBObject row = g.toRow(isUserGroup);
+                if (!winningApiInfos.unavailable
+                        && RiskScoreExplainer.isSetCollectionId(g.winningCollectionId)
+                        && g.maxRiskScore > 0) {
+                    ApiInfo winning = winningApiInfos.byCollection.get(g.winningCollectionId);
+                    RiskScoreExplainer.putExplanationIfMatches(row, winning, g.maxRiskScore);
+                }
+                rowsOut.add(row);
+            }
 
             response.put("rows", rowsOut);
             response.put("total", total);
@@ -2974,18 +3813,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         try {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
-            Map<String, Map<String, String>> userMeta = userMetadataMap != null ? userMetadataMap : Collections.emptyMap();
-            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
+            Map<String, List<Map<String, String>>> tagsByUser = getOrComputeTagsByUsername();
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
 
             Map<String, HostGroupSummary> userGroups = classifyHostGroupedRows(collections, "user", traffic, risk,
-                    Collections.emptyMap(), usernames, userMeta, null, null, false, tagsByUser);
+                    Collections.emptyMap(), usernames, null, null, false, tagsByUser);
             Map<String, HostGroupSummary> deviceGroups = classifyHostGroupedRows(collections, "device", traffic, risk,
-                    Collections.emptyMap(), usernames, Collections.emptyMap(), null, null, false, tagsByUser);
+                    Collections.emptyMap(), usernames, null, null, false, tagsByUser);
 
             long usersAgenticAssetsTotal = 0;
             for (HostGroupSummary g : userGroups.values()) {
@@ -3074,6 +3913,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         Map<String, double[]> childRisk = new HashMap<>(); // pathKey -> {riskScore, lastTraffic}
         Map<String, int[]> childViolations = new HashMap<>();
         Map<String, Integer> childSkillCount = new HashMap<>();
+        // Only ever read for a direct (non-agent) MCP Server row's own tools — an agent's linked
+        // MCP servers get their collection ids from fetchAgenticAssetDetailsBatch instead.
+        Map<String, Set<Integer>> childCollectionIds = new HashMap<>();
         // Plugins live in their own child row (own collection), not embedded in the agent's — so
         // "how many plugins does this agent have" is answered by matching sibling plugin children
         // under the same device to this agent's own owner tag (mcp-client/ai-agent value).
@@ -3101,7 +3943,39 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             int skillCount = c.getSkills() != null ? c.getSkills().size() : 0;
 
             final String fServiceName = serviceName;
-            String childType = AgenticObserveUtil.getTypeFromCollection(c);
+            // getTypeFromCollection alone isn't enough here: it classifies purely off which type tags
+            // are present, and a known client like claude-cli/cursor commonly carries ONLY an
+            // mcp-client tag (no ai-agent/mcp-server/gen-ai tag of its own) — which getTypeFromCollection
+            // falls through to its raw MCP Server default. Mirror classifyAllGroups' precedent of
+            // checking the asset-owner tag through McpClientRegistry so a known client still resolves
+            // to AI Agent (or SaaS Agent) instead.
+            // But when the collection DOES carry its own definitive type tag (mcp-server/gen-ai/
+            // browser-llm) — e.g. an Atlassian-hosted MCP server tagged mcp-client=kiroide to record
+            // who it belongs to, or a client's own locally-hosted MCP sub-server (mcp-client=
+            // claude-desktop + mcp-server=MCP Server) — that own tag wins instead, same as
+            // findTypeTag's "mcp-server wins regardless of tag insertion order" rule. Otherwise this
+            // row would show up mislabeled with the SERVER's name but the OWNER's agent type.
+            boolean isPlugin = AgenticObserveUtil.isPluginCollection(c);
+            CollectionTags assetTag = isPlugin ? null : AgenticObserveUtil.findAssetTag(c);
+            boolean ownedByAgent = assetTag != null && StringUtils.isNotBlank(assetTag.getValue())
+                    && !Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName())
+                    && AgenticObserveUtil.findTypeTag(c) == null;
+            String childType;
+            if (isPlugin) {
+                childType = AgenticObserveUtil.CLIENT_TYPE_PLUGIN;
+            } else if (ownedByAgent) {
+                String key = McpClientRegistry.resolveClientKey(assetTag.getValue());
+                childType = AgenticObserveUtil.hasSaasAgentTag(c)
+                        ? AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT
+                        : McpClientRegistry.getAgentTypeFromValue(key);
+            } else {
+                childType = AgenticObserveUtil.getTypeFromCollection(c);
+            }
+            // Same key classifyAllGroups uses for "agent" GroupSummary rows (McpClientRegistry.
+            // resolveClientKey off the asset tag, not this row's own rawServiceName/hostname
+            // parsing) — lets the frontend look this agent up via fetchAgenticAssetDetailsBatch.
+            final CollectionTags fAssetTag = AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(childType)
+                    ? assetTag : null;
             BasicDBObject child = children.computeIfAbsent(pathKey, k -> {
                 BasicDBObject row = new BasicDBObject();
                 row.put("path", Arrays.asList(deviceId, k));
@@ -3109,12 +3983,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("endpoint", McpClientRegistry.formatDisplayName(fServiceName));
                 row.put("rawServiceName", fServiceName);
                 row.put("type", childType);
+                if (fAssetTag != null && StringUtils.isNotBlank(fAssetTag.getValue())) {
+                    row.put("groupKey", McpClientRegistry.resolveClientKey(fAssetTag.getValue()));
+                    row.put("rowType", "agent");
+                }
                 return row;
             });
             double[] rt = childRisk.computeIfAbsent(pathKey, k -> new double[2]);
             if (collRisk > rt[0]) rt[0] = collRisk;
             if (collTraffic > rt[1]) rt[1] = collTraffic;
             childSkillCount.merge(pathKey, skillCount, Math::max);
+            childCollectionIds.computeIfAbsent(pathKey, k -> new HashSet<>()).add(c.getId());
             if (AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(childType)) {
                 CollectionTags ownerTag = AgenticObserveUtil.findAssetTag(c);
                 if (ownerTag != null) ownerTagByPathKey.put(pathKey, ownerTag.getValue());
@@ -3141,6 +4020,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             row.put("lastTrafficEpoch", (int) rt[1]);
             int skillCount = childSkillCount.getOrDefault(pathKey, 0);
             if (skillCount > 0) row.put("skillCount", skillCount);
+            if ("MCP Server".equals(row.getString("type"))) {
+                Set<Integer> ids = childCollectionIds.get(pathKey);
+                if (ids != null && !ids.isEmpty()) row.put("collectionIds", new ArrayList<>(ids));
+            }
             String ownerTagValue = ownerTagByPathKey.get(pathKey);
             int pluginCount = ownerTagValue != null ? pluginCountByOwnerTag.getOrDefault(ownerTagValue, 0) : 0;
             if (pluginCount > 0) row.put("pluginCount", pluginCount);
@@ -3170,17 +4053,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     public String fetchDeviceEndpointsSummary() {
         response = new BasicDBObject();
         try {
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
-            Map<String, Map<String, String>> deviceMeta = deviceMetadataMap != null ? deviceMetadataMap : Collections.emptyMap();
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
+            Map<String, Integer> traffic = getOrComputeTrafficMap();
+            Map<String, Double> risk = getOrComputeRiskScoreMap();
+            Map<String, Map<String, String>> deviceMeta = getOrComputeDeviceMetadataMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
             Map<String, Map<String, Integer>> violations = violationsByCollectionId != null ? violationsByCollectionId : Collections.emptyMap();
-            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
+            Map<String, List<Map<String, String>>> tagsByUser = getOrComputeTagsByUsername();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
 
             if (StringUtils.isNotBlank(parentDeviceId)) {
                 BasicDBObject childrenResp = buildDeviceChildren(parentDeviceId, collections, traffic, risk, violations);
@@ -3211,7 +4095,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
 
             Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, "device", traffic, risk,
-                    Collections.emptyMap(), usernames, Collections.emptyMap(), deviceMeta, violations, true, tagsByUser);
+                    Collections.emptyMap(), usernames, deviceMeta, violations, true, tagsByUser);
             List<HostGroupSummary> all = new ArrayList<>(groups.values());
 
             if (StringUtils.isNotBlank(queryValue)) {
@@ -3283,9 +4167,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     private static final String[] MONTH_ABBR = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
 
-    private static final class MonthSlot {
-        final int boundary;
-        final String label;
+    public static final class MonthSlot {
+        public final int boundary;
+        public final String label;
         MonthSlot(int boundary, String label) { this.boundary = boundary; this.label = label; }
     }
 
@@ -3295,7 +4179,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     // Mirrors buildWindowSlots exactly: windowStart>0 spans [windowStart, windowEnd] months;
     // windowStart<=0 (all-time) anchors at the earliest data point (or 365 days back if none).
-    private static List<MonthSlot> buildWindowSlots(int windowStart, int windowEnd, int dataMinTs) {
+    public static List<MonthSlot> buildWindowSlots(int windowStart, int windowEnd, int dataMinTs) {
         int nowSec = (int) (System.currentTimeMillis() / 1000);
         int end = windowEnd > 0 ? windowEnd : nowSec;
         int startSec = windowStart > 0 ? windowStart : (dataMinTs > 0 ? dataMinTs : end - 365 * 86400);
@@ -3318,7 +4202,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     // Mirrors cumulativeCounts: a true cumulative running total — items before the first slot seed
     // the baseline so the line ends at the true grand total, not just in-window additions.
-    private static int[] cumulativeCounts(List<Integer> timestamps, List<MonthSlot> slots, int end) {
+    public static int[] cumulativeCounts(List<Integer> timestamps, List<MonthSlot> slots, int end) {
         int n = slots.size();
         int firstBoundary = slots.get(0).boundary;
         int baseline = 0;
@@ -3338,7 +4222,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return counts;
     }
 
-    private static int earliestTs(List<Integer> timestamps) {
+    public static int earliestTs(List<Integer> timestamps) {
         int min = Integer.MAX_VALUE;
         for (Integer ts : timestamps) if (ts != null && ts > 0 && ts < min) min = ts;
         return min == Integer.MAX_VALUE ? 0 : min;
@@ -3365,8 +4249,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     public String fetchDeviceEndpointsStats() {
         response = new BasicDBObject();
         try {
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
-            Map<String, Map<String, String>> deviceMeta = deviceMetadataMap != null ? deviceMetadataMap : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
+            Map<String, Map<String, String>> deviceMeta = getOrComputeDeviceMetadataMap();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
@@ -3507,5 +4391,200 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             addActionError("Error fetching device endpoints stats: " + e.getMessage());
             return ERROR.toUpperCase();
         }
+    }
+
+    // Agentic assets' AI Agents as audit rows (resourceName = group key), the source of Audit Data -> AI Agents.
+    public List<McpAuditInfo> fetchAiAgentAuditRows() {
+        ClassificationCacheEntry cached = getOrBuildClassification(getOrComputeTrafficMap(), getOrComputeRiskScoreMap(), Collections.emptyMap());
+        List<McpAuditInfo> rows = new ArrayList<>();
+        for (GroupSummary g : cached.groups.values()) {
+            if (!AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(g.clientType)) continue;
+            McpAuditInfo row = new McpAuditInfo();
+            row.setType(Constants.AKTO_AI_AGENT_TAG);
+            row.setResourceName(g.groupKey);
+            row.setLastDetected(g.maxTrafficTimestamp);
+            row.setRawValues(new ArrayList<>(aiAgentRawValues(g)));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    // Names guardrails matches the agent on: tag values plus host segments that aren't another known agent.
+    private static Set<String> aiAgentRawValues(GroupSummary g) {
+        Set<String> raws = new TreeSet<>();
+        if (!"agent".equals(g.rowType)) {
+            raws.add(g.groupKey.toLowerCase(Locale.ROOT));
+            return raws;
+        }
+        for (String v : g.rawTagValues) raws.add(v.toLowerCase(Locale.ROOT));
+        for (String host : g.hostNames) {
+            String seg = hostAgentSegment(host);
+            if (seg != null && !namesOtherAgent(seg, g.groupKey)) raws.add(seg);
+        }
+        return raws;
+    }
+
+    // "claude" on a cursor row is another agent; "ollama-devstral-latest" isn't, despite the substring "vs".
+    private static boolean namesOtherAgent(String seg, String key) {
+        String segKey = McpClientRegistry.resolveClientKey(seg);
+        McpClientRegistry.ClientInfo info = McpClientRegistry.findClientInfo(segKey);
+        return !key.equals(segKey) && info != null && segKey.equals(info.keyword);
+    }
+
+    // Agent segment of "{device}.{agent}.{server}", or everything after "ai-agent" in "{device}.ai-agent.{agent}".
+    private static String hostAgentSegment(String host) {
+        String[] parts = DOT_SPLIT.split(host.toLowerCase(Locale.ROOT));
+        if (parts.length < 3) return null;
+        if (Constants.AKTO_AI_AGENT_TAG.equals(parts[1])) return StringUtils.trimToNull(String.join(".", Arrays.copyOfRange(parts, 2, parts.length)));
+        return parts[1];
+    }
+
+    private static final int ATLAS_VENDOR_HOST_SCAN_LIMIT = 50;
+    // Hosts of tools with no known vendor carry this placeholder in the vendor segment.
+    private static final String ATLAS_UNKNOWN_VENDOR = "unknown";
+
+    // Same server runs on many devices with the same tools, so a few collections describe it.
+    private static final int ATLAS_CAPABILITY_COLLECTIONS = 5;
+
+    // Atlas discovery's per-tool rows: one per classified group, with its devices and agent -> MCP server edges.
+    public List<AtlasToolRow> fetchAtlasToolRows() {
+        ClassificationCacheEntry cached = getOrBuildClassification(getOrComputeTrafficMap(), getOrComputeRiskScoreMap(), Collections.emptyMap());
+        Map<Integer, String> deviceByCollection = new HashMap<>();
+        Set<Integer> maliciousCollectionIds = new HashSet<>();
+        for (ApiCollection c : cached.collections) {
+            String deviceId = AgenticObserveUtil.extractEndpointId(c.getHostName());
+            if (deviceId != null) deviceByCollection.put(c.getId(), deviceId);
+            if (InsightUtil.isMaliciousMcpServer(c)) maliciousCollectionIds.add(c.getId());
+        }
+        SkillDataCacheEntry skillData = atlasSkillData();
+        Set<String> maliciousSkillKeys = skillData == null ? Collections.<String>emptySet() : skillData.maliciousSkillKeys;
+        BasicDBObject skillScores = skillData == null ? new BasicDBObject() : skillData.skillScoreMap;
+        List<AtlasToolRow> rows = new ArrayList<>();
+        for (GroupSummary g : cached.groups.values()) {
+            AtlasToolRow row = new AtlasToolRow();
+            row.setGroupKey(g.groupKey);
+            row.setRowType(g.rowType);
+            row.setName(StringUtils.defaultIfBlank(g.name, g.groupKey));
+            row.setClientType(g.clientType);
+            row.setVendorName(atlasVendorName(g));
+            row.setRiskReason(g.baseRiskScoreReason);
+            row.setBaseRiskScore(g.baseRiskScore);
+            // A skill carries its own score, kept per skill name apart from its collections' scores.
+            double skillRisk = 0;
+            if (AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType) && g.name != null) {
+                Object skillEntryObj = skillScores.get(g.name);
+                if (skillEntryObj instanceof Number) {
+                    skillRisk = ((Number) skillEntryObj).doubleValue();
+                }
+            }
+            double risk = AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType)
+                    ? Math.max(g.maxRiskScore, skillRisk) : g.maxRiskScore;
+            row.setRiskScore(risk > 0 ? AgenticObserveUtil.roundRiskScore(risk) : 0);
+            row.setFirstSeen(g.minStartTs);
+            row.setLastSeen(g.maxTrafficTimestamp);
+            // Skill and plugin rows borrow their parent agent's flags, so they must not count them again.
+            boolean fanOut = AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType) || AtlasAssetStatusService.ROW_TYPE_PLUGIN.equals(g.rowType);
+            row.setPersonal(g.hasPersonalAccount && !fanOut);
+            row.setLocalMcp(g.hasLocalMcpServer && !fanOut);
+            row.setMisconfigured(g.hasMisconfiguredConfig && !fanOut);
+            row.setMisconfiguredDevices(fanOut ? 0 : g.misconfiguredEndpointIds.size());
+            row.setPersonalDevices(fanOut ? 0 : g.personalEndpointIds.size());
+            if (!fanOut) {
+                row.setMisconfiguredDeviceIds(new HashSet<>(g.misconfiguredEndpointIds));
+                row.setPersonalDeviceIds(new HashSet<>(g.personalEndpointIds));
+            }
+            row.setMalicious(atlasIsMalicious(g, maliciousCollectionIds, maliciousSkillKeys));
+            if (row.isMalicious() && AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType)) row.setCollectionIds(new ArrayList<>(g.collectionIds));
+            row.setDeviceIds(new HashSet<>(g.endpointIds));
+            row.setDeviceLastSeen(new HashMap<>(g.endpointLastSeen));
+            row.setCapabilityCollectionIds(g.capabilityCollectionIds.stream().limit(ATLAS_CAPABILITY_COLLECTIONS).collect(Collectors.toList()));
+            if (AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(g.clientType)) row.setRawValues(new ArrayList<>(aiAgentRawValues(g)));
+            // Servers that differ only by case are one server; one with no resolved device is left out.
+            Map<String, String> serverNames = new HashMap<>();
+            for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
+                Set<String> devices = new HashSet<>();
+                for (Integer collectionId : e.getValue()) {
+                    String deviceId = deviceByCollection.get(collectionId);
+                    if (deviceId != null) devices.add(deviceId);
+                }
+                if (devices.isEmpty()) continue;
+                String name = serverNames.computeIfAbsent(e.getKey().toLowerCase(Locale.ROOT), k -> e.getKey());
+                row.getMcpDevices().computeIfAbsent(name, k -> new HashSet<>()).addAll(devices);
+            }
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    // Host names of one Atlas tool's group, so its violations can be summed from per-host counts.
+    public Set<String> fetchAtlasToolHosts(String rowType, String groupKey) {
+        ClassificationCacheEntry cached = getOrBuildClassification(getOrComputeTrafficMap(), getOrComputeRiskScoreMap(), Collections.emptyMap());
+        GroupSummary group = cached.groups.get(rowType + "|" + groupKey);
+        return group == null ? Collections.emptySet() : new HashSet<>(group.hostNames);
+    }
+
+    // A malicious-tagged MCP server collection, or a skill the skill scan flagged ("<collectionId>|<skill>" keys).
+    private static boolean atlasIsMalicious(GroupSummary g, Set<Integer> maliciousCollectionIds, Set<String> maliciousSkillKeys) {
+        // An agent row also holds its MCP servers' collections, so only servers and skills are flagged (as in the inventory).
+        if (!AtlasAssetStatusService.ROW_TYPE_SERVICE.equals(g.rowType) && !AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType)) return false;
+        boolean skill = AtlasAssetStatusService.ROW_TYPE_SKILL.equals(g.rowType) && StringUtils.isNotBlank(g.name);
+        String skillKeySuffix = skill ? "|" + g.name.toLowerCase(Locale.ROOT) : null;
+        for (Integer collectionId : g.collectionIds) {
+            if (maliciousCollectionIds.contains(collectionId)) return true;
+            if (skill && maliciousSkillKeys.contains(collectionId + skillKeySuffix)) return true;
+        }
+        return false;
+    }
+
+    // The skill scan is cached for a minute and optional here: a failure must not blank the overview.
+    private SkillDataCacheEntry atlasSkillData() {
+        try {
+            return getOrBuildSkillData();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Atlas discovery: skill scan unavailable: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // First vendor an endpoint host of this group resolves to; bounded so a 25k-host group stays cheap.
+    private static String atlasVendorName(GroupSummary g) {
+        int scanned = 0;
+        for (String host : g.hostNames) {
+            if (scanned++ >= ATLAS_VENDOR_HOST_SCAN_LIMIT) break;
+            String vendor = InsightUtil.endpointVendorNameOfHost(host);
+            if (vendor != null && !ATLAS_UNKNOWN_VENDOR.equalsIgnoreCase(vendor)) return vendor;
+        }
+        return null;
+    }
+
+    // The llm group a collection belongs to, as classifyAllGroups keys it; null when it has no browser-llm tag.
+    public static String llmGroupKey(ApiCollection c) {
+        if (!hasTagKey(c.getEnvType(), Constants.AKTO_BROWSER_LLM_TAG)) return null;
+        String serviceName = extractServiceNameForGrouping(c.getHostName());
+        return StringUtils.isNotBlank(serviceName) ? serviceName : null;
+    }
+
+    // The agent group a collection belongs to, as classifyAllGroups keys it; null when it has no agent tag.
+    public static String agentGroupKey(ApiCollection c) {
+        CollectionTags assetTag = AgenticObserveUtil.findAssetTag(c);
+        if (assetTag == null || StringUtils.isBlank(assetTag.getValue())
+                || Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName())) return null;
+        return McpClientRegistry.resolveClientKey(assetTag.getValue());
+    }
+
+    // The service group a collection belongs to, as classifyAllGroups keys it; null when it gets no service row.
+    // constants.js's groupCollectionsByService only excludes an agent-owned collection from
+    // ALSO getting its own service row when the type tag is gen-ai — an agent-owned
+    // mcp-server collection (e.g. mcp-client=cursor + mcp-server) still gets a service row
+    // too, deliberately double-counted across the agent and service groups. Mirror that
+    // exact scoping rather than unconditionally skipping the service branch whenever a bound
+    // or orphaned (unbound) owner tag was found.
+    public static String serviceGroupKey(ApiCollection c, boolean inAgentGroup) {
+        CollectionTags typeTag = AgenticObserveUtil.findTypeTag(c);
+        if (typeTag == null) return null;
+        if (Constants.AKTO_GEN_AI_TAG.equals(typeTag.getKeyName())
+                && (inAgentGroup || hasAgentOwnerTag(c.getEnvType()))) return null;
+        String serviceName = extractServiceNameForGrouping(c.getHostName());
+        return StringUtils.isNotBlank(serviceName) ? serviceName : null;
     }
 }

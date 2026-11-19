@@ -5,7 +5,7 @@ import { TypeBadge, RiskPill, SeverityBadge } from "./AgenticCellRenderers";
 import { ToolDetailPanel, SkillDetailPanel } from "./McpComponentsView";
 import PluginComponentsView from "./PluginComponentsView";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
-import agenticObserveApi, { openViolationInThreatActivity } from "./agenticObserveApi";
+import agenticObserveApi, { openViolationInGuardrailViolations } from "./agenticObserveApi";
 import { buildMcpComponentsFromStis } from "./agenticPageBuilders";
 import api from "../api";
 import func from "@/util/func";
@@ -147,6 +147,14 @@ export function AgentMcpToolsView({ asset, selectedMcp, goToList, onNavChange, s
 
     return (
         <Box className="agentic-flex-fill">
+            {selectedMcp?.description && (
+                <>
+                    <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="3">
+                        <Text variant="bodySm">{selectedMcp.description}</Text>
+                    </Box>
+                    <Divider />
+                </>
+            )}
             {mcpTools.length === 0 ? (
                 <Box padding="4"><Text variant="bodySm" color="subdued">No tools found.</Text></Box>
             ) : (
@@ -279,7 +287,7 @@ function ConfigViolationsView({ configRows = [] }) {
                 rowData={rows}
                 columnDefs={CONFIG_VIOL_COL_DEFS}
                 defaultColDef={GRID_DEFAULT_COL}
-                onRowClicked={(e) => { if (e.data) openViolationInThreatActivity(e.data); }}
+                onRowClicked={(e) => { if (e.data) openViolationInGuardrailViolations(e.data); }}
                 getRowStyle={() => ({ cursor: "pointer" })}
                 fillHeight
                 noOuterBorder

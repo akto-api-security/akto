@@ -26,7 +26,21 @@ public class InsightResult {
     private String group;               // InsightId.Group — ATLAS_DISCOVERY | GUARDRAIL_VIOLATIONS
     private String status;              // Status
     private String severity;
+    // Copied straight from InsightId.disabled (see AbstractInsightProvider.skeleton) — a static,
+    // hand-set "this insight's provider isn't wired up yet" toggle, same for every account. NOT a
+    // signal for "this account has no data right now" — a confirmed-zero or NO_DATA result is
+    // still a real, checked outcome and should render normally with no severity badge.
+    private boolean disabled;
     private String headline;            // Java-built one-liner. NEVER from the LLM.
+    // concern/impact/remediation: the provider sets a Java-computed, deterministic draft (or
+    // leaves it null when there's nothing to flag) — that's the guaranteed fallback shown
+    // immediately. On DETAIL fetch, InsightService/InsightNarrativeHandler may replace each one
+    // with a version grounded in real evidence rows (naming actual hosts/users/topics, not just
+    // aggregate numbers); the draft is never cleared, only overwritten when the model returns
+    // something. See InsightService.buildNarrativeInput/applyNarrativeSummaryFields.
+    private String concern;
+    private String impact;
+    private String remediation;
     private boolean metricsComplete = true;
     private List<Metric> metrics = new ArrayList<>();
     private List<Evidence> evidence = new ArrayList<>();

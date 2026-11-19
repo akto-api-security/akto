@@ -1,5 +1,12 @@
 FROM eclipse-temurin:17-jre-noble
 
+# CVE-2026-91403: drop all eMudhra roots per openjdk.org/emudhra's 2026/10/24 update (now
+# includes G1/G2, not just the compromised G3); fail build if any remain. Remove once Temurin's
+# base image ships this itself.
+RUN for a in cn_emsign_root_ca__g1,o_emudhra_technologies_limited,ou_emsign_pki,c_in cn_emsign_root_ca__g2,o_emudhra_technologies_limited,ou_emsign_pki,c_in cn_emsign_ecc_root_ca__g3,o_emudhra_technologies_limited,ou_emsign_pki,c_in cn_emsign_ecc_root_ca__c3,o_emudhra_inc,ou_emsign_pki,c_us cn_emsign_root_ca__c1,o_emudhra_inc,ou_emsign_pki,c_us; do \
+      keytool -delete -cacerts -storepass changeit -alias "$a [jdk]" || true; done; \
+    ! keytool -list -v -cacerts -storepass changeit | grep -E "Owner: CN=emSign (ECC Root CA - (G3|C3)|Root CA - (G1|G2|C1))|Owner: CN=AAA Certificate Services,"
+
 # NOTE: Not yet tested on Red Hat (RHEL/Podman/OpenShift). Verified only under Docker on a
 # cgroup-v2 host (a faithful proxy for RHEL 9's runtime constraints), not on an actual Red Hat
 # host. The image ships its own Ubuntu userspace so host distro shouldn't matter, but a real
@@ -44,7 +51,8 @@ COPY gzip.ini ${JETTY_BASE}/start.d/gzip.ini
 
 RUN useradd jetty && chown -R jetty:jetty ${JETTY_HOME} ${JETTY_BASE}
 
-ENV JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError"
+
+ENV JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError -XX:-UseBASE64Intrinsics"
 WORKDIR ${JETTY_BASE}
 EXPOSE 8080
 

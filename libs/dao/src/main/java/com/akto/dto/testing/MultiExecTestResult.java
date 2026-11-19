@@ -53,7 +53,6 @@ public class MultiExecTestResult extends GenericTestResult {
             NodeResult nodeRes = nodeResultMap.get(k);
             String confidence = "HIGH";
             List<String> errors = nodeRes.getErrors();
-            List<String> messageList = Arrays.asList(nodeRes.getMessage().split("\"request\": "));
             boolean vulnerable = nodeRes.isVulnerable();
             String validationReason = nodeRes.getValidationReason() != null ? nodeRes.getValidationReason() : "";
             double percentageMatch = 0;
@@ -61,7 +60,8 @@ public class MultiExecTestResult extends GenericTestResult {
             Map<String, WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails = testingRunResult.getWorkflowTest().getMapNodeIdToWorkflowNodeDetails();
             YamlNodeDetails workflowNodeDetails = (YamlNodeDetails) mapNodeIdToWorkflowNodeDetails.get(k);
             String originalMessage = workflowNodeDetails.getOriginalMessage();
-            if (messageList.size() <= 1) {
+            List<String> messages = stepMessages(nodeRes);
+            if (messages.isEmpty()) {
                 List<String> error_messages = new ArrayList<>();
                 if (errors.size() > 0) {
                     error_messages = errors;
@@ -78,14 +78,7 @@ public class MultiExecTestResult extends GenericTestResult {
                 runResults.add(errorResult);
             }
 
-            for (int j = 1; j<messageList.size(); j++) {
-                String message = "{\"request\": " + messageList.get(j);
-                if (j != messageList.size() - 1) {
-                    message = message.substring(0, message.length() - 3);
-                } else {
-                    message = message.substring(0, message.length() - 2);
-                    message = message + "}";
-                }
+            for (String message : messages) {
                 res = new TestResult(message, originalMessage, errors, percentageMatch, vulnerable, Confidence.HIGH, null);
                 res.setValidationReason(validationReason);
                 runResults.add(res);
@@ -102,21 +95,27 @@ public class MultiExecTestResult extends GenericTestResult {
         Map<String, NodeResult> nodeResultMap = this.getNodeResultMap();
         for (int i=0; i < this.executionOrder.size(); i++) {
             String k = this.executionOrder.get(i);
-            NodeResult nodeRes = nodeResultMap.get(k);
-            List<String> messageList = Arrays.asList(nodeRes.getMessage().split("\"request\": "));
-
-            for (int j = 1; j<messageList.size(); j++) {
-                String message = "{\"request\": " + messageList.get(j);
-                if (j != messageList.size() - 1) {
-                    message = message.substring(0, message.length() - 3);
-                } else {
-                    message = message.substring(0, message.length() - 2);
-                    message = message + "}";
-                }
-                ret.add(message);
-            }       
+            ret.addAll(stepMessages(nodeResultMap.get(k)));
         }
 
         return ret;
+    }
+
+    /** The request/response messages one step stored, one per request it sent, in order. */
+    public static List<String> stepMessages(NodeResult nodeRes) {
+        List<String> messages = new ArrayList<>();
+        if (nodeRes == null || nodeRes.getMessage() == null) return messages;
+        List<String> messageList = Arrays.asList(nodeRes.getMessage().split("\"request\": "));
+        for (int j = 1; j<messageList.size(); j++) {
+            String message = "{\"request\": " + messageList.get(j);
+            if (j != messageList.size() - 1) {
+                message = message.substring(0, message.length() - 3);
+            } else {
+                message = message.substring(0, message.length() - 2);
+                message = message + "}";
+            }
+            messages.add(message);
+        }
+        return messages;
     }
 }

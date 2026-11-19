@@ -4,6 +4,7 @@ import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleC
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import func from '@/util/func'
 import { CellType } from '../../../components/tables/rows/GithubRow'
+import { withPermissions } from '@/util/permissions'
 
 const DEFAULT_HEADERS = [
     { text: 'Value', title: 'Value', value: 'patternValue', type: CellType.TEXT },
@@ -44,10 +45,15 @@ function PatternSettingsPage({
     headers,
     buildRow,
     additionalCards = [],
+    leadingCards = [],
+    refreshKey,
     onRowClick,
     getRowActions,
     secondaryActions,
-    initialValue
+    initialValue,
+    // server actions behind add and delete; when the role can't call them those controls are disabled
+    addRequires,
+    deleteRequires
 }) {
     const tableHeaders = headers || DEFAULT_HEADERS
     const [value, setValue] = useState('')
@@ -69,7 +75,7 @@ function PatternSettingsPage({
         }
     }
 
-    useEffect(() => { fetchData() }, [])
+    useEffect(() => { fetchData() }, [refreshKey])
     useEffect(() => {
         if (initialValue?.value) {
             setValue(initialValue.value)
@@ -111,6 +117,7 @@ function PatternSettingsPage({
         return [{
             content: `Delete ${resourceName.singular}${selectedResources.length > 1 ? 's' : ''}`,
             destructive: true,
+            requires: deleteRequires,
             onAction: () => {
                 func.showConfirmationModal(
                     `Delete ${selectedResources.length} ${resourceName.singular}${selectedResources.length > 1 ? 's' : ''}?`,
@@ -138,7 +145,7 @@ function PatternSettingsPage({
             open={addModalOpen}
             onClose={handleClose}
             title={cardTitle}
-            primaryAction={{ content: 'Add', onAction: handleAdd, loading, disabled: inputDisabled || !value.trim() }}
+            primaryAction={withPermissions({ content: 'Add', onAction: handleAdd, loading, disabled: inputDisabled || !value.trim(), requires: addRequires })}
             secondaryActions={[{ content: 'Cancel', onAction: handleClose }]}
         >
             <Modal.Section>
@@ -187,9 +194,9 @@ function PatternSettingsPage({
             <PageWithMultipleCards
                 title={title}
                 isFirstPage={true}
-                primaryAction={{ content: `Add ${resourceName.singular}`, onAction: () => setAddModalOpen(true) }}
+                primaryAction={{ content: `Add ${resourceName.singular}`, onAction: () => setAddModalOpen(true), requires: addRequires }}
                 secondaryActions={secondaryActions}
-                components={[addModal, tableCard, ...(additionalCards || [])]}
+                components={[addModal, ...(leadingCards || []), tableCard, ...(additionalCards || [])]}
             />
         </>
     )

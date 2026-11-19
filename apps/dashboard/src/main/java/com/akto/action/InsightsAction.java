@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -31,6 +32,11 @@ public class InsightsAction extends UserAction {
     @Getter private InsightResult insight;
 
     public String fetchInsightsList() {
+        // Users limited to specific collections (Argus): posture and insights are built from account-wide data, so none is shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            insights = new java.util.ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
         try {
             // Atlas Discovery and the guardrail/violations set (InsightId.Group) never mix in the
             // same list — callers that don't send `group` yet (today's three Atlas entry points)
@@ -55,6 +61,11 @@ public class InsightsAction extends UserAction {
     }
 
     private String computeDetail(boolean forceRefresh) {
+        // Users limited to specific collections (Argus): posture and insights are built from account-wide data, so none is shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            insight = null;
+            return SUCCESS.toUpperCase();
+        }
         try {
             InsightId id = InsightId.valueOf(insightId);
             insight = insightService.getInsightDetail(buildContext(), id, forceRefresh);

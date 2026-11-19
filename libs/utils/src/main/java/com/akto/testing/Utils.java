@@ -58,6 +58,9 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.testing.login_flow.LoginFlowCookieJar;
+import com.akto.testing.login_flow.PlaceholderException;
+import com.akto.testing.login_flow.PlaceholderResolver;
 import com.akto.testing_utils.TestingUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
@@ -72,6 +75,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 
 import okhttp3.MediaType;
@@ -79,6 +83,33 @@ import okhttp3.MediaType;
 public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
+
+    // Applies a step's regex to the raw response body, for values that can't be reached through JSON paths
+    // (e.g. a CSRF token inside an HTML page). The first capture group (or the whole match, if the regex has
+    // no groups) is stored as <nodeId>.response.regex and every capture group N as <nodeId>.response.regex.N
+    public static void populateRegexValues(Map<String, Object> valuesMap, String payloadStr, String nodeId, String regex) {
+        if (StringUtils.isBlank(regex) || payloadStr == null) return;
+
+        Matcher matcher;
+        try {
+            matcher = Pattern.compile(regex).matcher(payloadStr);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("invalid regex for node " + nodeId + ": " + e.getMessage());
+            return;
+        }
+        if (!matcher.find()) return;
+
+        String key = nodeId + ".response.regex";
+        String value = matcher.groupCount() > 0 ? matcher.group(1) : matcher.group();
+        if (value != null) {
+            valuesMap.put(key, value);
+        }
+        for (int i = 1; i <= matcher.groupCount(); i++) {
+            if (matcher.group(i) != null) {
+                valuesMap.put(key + "." + i, matcher.group(i));
+            }
+        }
+    }
 
     public static void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
             List<String>> headers, boolean isRequest, String queryParams) {
@@ -141,64 +172,57 @@ public class Utils {
             }
         }
 
+        List<String> rawSetCookies = new ArrayList<>();
         for (String headerName: headers.keySet()) {
             List<String> headerValues = headers.get(headerName);
-            String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;
+            if (headerValues == null || headerValues.isEmpty()) continue;
 
-            switch (headerValues.size()) {
-                case 0: 
-                    continue;
-                case 1: 
-                    valuesMap.put(key, headerValues.get(0));
-                    continue;
-                default: 
-                    String val =  String.join(";", headers.get(headerName));
-                    valuesMap.put(key, val);
+            // HTTP/2 servers send lower-case names; also expose every header under its lower-case name
+            List<String> names = new ArrayList<>();
+            names.add(headerName);
+            String lower = headerName.toLowerCase();
+            if (!lower.equals(headerName) && !headers.containsKey(lower)) names.add(lower);
+
+            String headerValue = headerValues.size() == 1 ? headerValues.get(0) : String.join(";", headerValues);
+            for (String name : names) {
+                valuesMap.put(nodeId + "." + reqOrResp + ".header." + name, headerValue);
             }
 
-            // Extract individual cookie keys from Cookie and Set-Cookie headers
-            if (headerName.equalsIgnoreCase("cookie") || headerName.equalsIgnoreCase("set-cookie")) {
-                for (String headerValue : headerValues) {
-                    if (headerValue == null || headerValue.isEmpty()) {
-                        continue;
-                    }
+            boolean isSetCookie = lower.equals("set-cookie");
+            if (!isSetCookie && !lower.equals("cookie")) continue;
+            if (isSetCookie && !isRequest) rawSetCookies.addAll(headerValues);
 
-                    // Parse cookies from the header value
-                    // Cookie format: "key1=value1; key2=value2"
-                    // Set-Cookie format: "key=value; Path=/; HttpOnly" (may have attributes)
-                    String[] cookiePairs = headerValue.split(";");
-                    for (String cookiePair : cookiePairs) {
-                        cookiePair = cookiePair.trim();
-                        int equalsIndex = cookiePair.indexOf('=');
-                        if (equalsIndex > 0) {
-                            String cookieKey = cookiePair.substring(0, equalsIndex).trim();
-                            String cookieValue = cookiePair.substring(equalsIndex + 1).trim();
-
-                            // Skip Set-Cookie attributes (Path, Domain, Secure, HttpOnly, SameSite, Max-Age, Expires)
-                            if (headerName.equalsIgnoreCase("set-cookie")) {
-                                if (cookieKey.equalsIgnoreCase("Path") ||
-                                    cookieKey.equalsIgnoreCase("Domain") ||
-                                    cookieKey.equalsIgnoreCase("Secure") ||
-                                    cookieKey.equalsIgnoreCase("HttpOnly") ||
-                                    cookieKey.equalsIgnoreCase("SameSite") ||
-                                    cookieKey.equalsIgnoreCase("Max-Age") ||
-                                    cookieKey.equalsIgnoreCase("Expires")) {
-                                    continue;
-                                }
-                            }
-
-                            // Store individual cookie key-value pair
-                            String cookieMapKey = nodeId + "." + reqOrResp + "." + "header" + "." + headerName + "." + cookieKey;
-                            valuesMap.put(cookieMapKey, cookieValue);
-                        }
+            // individual cookie values: <node>.<req|resp>.header.<header name>.<cookie name>
+            for (String value : headerValues) {
+                if (value == null || value.isEmpty()) continue;
+                List<String[]> cookies = new ArrayList<>();
+                if (isSetCookie) {
+                    LoginFlowCookieJar.ParsedSetCookie parsed = LoginFlowCookieJar.parseSetCookie(value);
+                    if (parsed != null) cookies.add(new String[]{parsed.getName(), parsed.getValue()});
+                } else {
+                    cookies.addAll(LoginFlowCookieJar.parseCookieHeader(value));
+                }
+                for (String[] cookie : cookies) {
+                    for (String name : names) {
+                        valuesMap.put(nodeId + "." + reqOrResp + ".header." + name + "." + cookie[0], cookie[1]);
                     }
                 }
             }
-
+        }
+        if (!rawSetCookies.isEmpty()) {
+            valuesMap.put(nodeId + LoginFlowCookieJar.RAW_SET_COOKIE_SUFFIX, LoginFlowCookieJar.joinRaw(rawSetCookies));
         }
     }
 
     public static OriginalHttpRequest buildHttpRequest(WorkflowUpdatedSampleData updatedSampleData, Map<String, Object> valuesMap) throws Exception {
+        return buildHttpRequest(updatedSampleData, valuesMap, null);
+    }
+
+    /**
+     * @param loginFlowNodeId node id of a login-flow step (enables stepK aliases and ${cookies...}, scoped to
+     *                        nodes before this one); null for API workflow tests (original placeholder behaviour)
+     */
+    public static OriginalHttpRequest buildHttpRequest(WorkflowUpdatedSampleData updatedSampleData, Map<String, Object> valuesMap, String loginFlowNodeId) throws Exception {
 
         String sampleData = updatedSampleData.getOrig();
         OriginalHttpRequest request = new OriginalHttpRequest();
@@ -210,21 +234,30 @@ public class Utils {
         String requestUrl = updatedSampleData.getRequestUrl();
 
         String queryFromReplacedUrl = null;
+        boolean loginFlow = loginFlowNodeId != null;
 
         boolean userSuppliedQueryParamsNullOrEmpty = queryParams == null || queryParams.trim().length() == 0;
         if (requestUrl != null) {
             loggerMaker.infoAndAddToDb("requestUrl: " + requestUrl, LogDb.TESTING);
-            String rawUrl = executeCode(requestUrl, valuesMap);
-            loggerMaker.infoAndAddToDb("rawUrl: " + requestUrl, LogDb.TESTING);
+            // the URL itself has no request URL to scope ${cookies} to.
+            // akto has no #[ ]# evaluation (removed in 163210e): in login flows say so instead of sending it literally
+            String rawUrl = loginFlow
+                    ? resolvePlaceholders(requestUrl, valuesMap,
+                            PlaceholderResolver.Options.loginFlow(loginFlowNodeId, null).withJsExpressionsRejected())
+                    : executeCode(requestUrl, valuesMap);
             // this url might contain urlQueryParams. We need to move it queryParams
             String[] rawUrlArr = rawUrl.split("\\?");
             request.setUrl(rawUrlArr[0]);
             if (rawUrlArr.length > 1) {
                 queryFromReplacedUrl = rawUrlArr[1];
             }
-            loggerMaker.infoAndAddToDb("final url: " + request.getUrl(), LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("queryFromReplacedUrl: " + queryFromReplacedUrl, LogDb.TESTING);
+            // resolved URLs and queries may carry tokens: log only that resolution happened
+            loggerMaker.debugAndAddToDb("url resolved, has query: " + (queryFromReplacedUrl != null), LogDb.TESTING);
         }
+
+        PlaceholderResolver.Options options = loginFlow
+                ? PlaceholderResolver.Options.loginFlow(loginFlowNodeId, request.getUrl()).withJsExpressionsRejected()
+                : PlaceholderResolver.Options.standard(true, true);
 
         if (userSuppliedQueryParamsNullOrEmpty) {
             loggerMaker.infoAndAddToDb("setting null", LogDb.TESTING);
@@ -232,12 +265,12 @@ public class Utils {
         }
 
         if (requestPayload != null) {
-            String finalPayload =  executeCode(requestPayload, valuesMap);
+            String finalPayload = resolvePlaceholders(requestPayload, valuesMap, options);
             request.setBody(finalPayload);
         }
 
         if (requestHeaders != null) {
-            String finalPayload = executeCode(requestHeaders, valuesMap);
+            String finalPayload = resolvePlaceholders(requestHeaders, valuesMap, options);
             Map<String, List<String>> res = OriginalHttpRequest.buildHeadersMap(finalPayload);
             request.setHeaders(res);
         }
@@ -246,14 +279,12 @@ public class Utils {
 
         if (!userSuppliedQueryParamsNullOrEmpty) {
             loggerMaker.infoAndAddToDb("user has supplied query params", LogDb.TESTING);
-            String finalQueryParams = executeCode(queryParams, valuesMap);
-            loggerMaker.infoAndAddToDb("finalQueryParams: " + finalQueryParams, LogDb.TESTING);
+            String finalQueryParams = resolvePlaceholders(queryParams, valuesMap, options);
             if (queryFromReplacedUrlNullOrEmpty) {
                 request.setQueryParams(finalQueryParams);
             } else {
                 // combine original query params and user defined query params and latter overriding former
                 String combinedQueryParams = OriginalHttpRequest.combineQueryParams(queryFromReplacedUrl, finalQueryParams);
-                loggerMaker.infoAndAddToDb("combinedQueryParams: " + combinedQueryParams, LogDb.TESTING);
                 request.setQueryParams(combinedQueryParams);
             }
         } else if (!queryFromReplacedUrlNullOrEmpty) {
@@ -268,42 +299,17 @@ public class Utils {
     }
 
     public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString, boolean shouldThrowException) throws Exception {
-        String regex = "\\$\\{((x|step)\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
-        Pattern p = Pattern.compile(regex);
+        return resolvePlaceholders(payload, valuesMap, PlaceholderResolver.Options.standard(escapeString, shouldThrowException));
+    }
 
-        // replace with values
-        Matcher matcher = p.matcher(payload);
-        StringBuffer sb = new StringBuffer();
-        while (matcher.find()) {
-            String key = matcher.group(1);
-            if (key == null) continue;
-            Object obj = valuesMap.get(key);
-            if (obj == null) {
-                loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
-                if(shouldThrowException){
-                    throw new Exception("Couldn't find " + key);
-                }else{
-                    continue;
-                }
-            }
-            String val = obj.toString();
-            if (escapeString) {
-                val = val.replace("\\", "\\\\")
-                        .replace("\t", "\\t")
-                        .replace("\b", "\\b")
-                        .replace("\n", "\\n")
-                        .replace("\r", "\\r")
-                        .replace("\f", "\\f")
-                        .replace("\'", "\\'")
-                        .replace("\"", "\\\"");
-            }
-            matcher.appendReplacement(sb, "");
-            sb.append(val);
+    public static String resolvePlaceholders(String payload, Map<String, Object> valuesMap, PlaceholderResolver.Options options) throws PlaceholderException {
+        try {
+            return PlaceholderResolver.resolve(payload, valuesMap, options);
+        } catch (PlaceholderException e) {
+            // resolver messages name keys and patterns only, never values
+            loggerMaker.errorAndAddToDb("placeholder resolution failed: " + e.getMessage(), LogDb.TESTING);
+            throw e;
         }
-
-        matcher.appendTail(sb);
-
-        return sb.toString();
     }
 
     public static boolean validateTest(String testValidatorCode, Map<String, Object> valuesMap) {
@@ -775,18 +781,31 @@ public class Utils {
     }
 
     public static OriginalHttpResponse runRequestOnHybridTesting(OriginalHttpRequest originalHttpRequest){
+        return runRequestOnHybridTesting(originalHttpRequest, null);
+    }
+
+    // miniTestingName targets a specific mini-testing instance; when empty, any instance may pick the request up
+    public static OriginalHttpResponse runRequestOnHybridTesting(OriginalHttpRequest originalHttpRequest, String miniTestingName){
+        return runRequestOnHybridTesting(originalHttpRequest, miniTestingName, 5 * 60);
+    }
+
+    // timeoutSeconds: how long to wait for mini-testing to answer, e.g. shorter when a user waits on the result
+    public static OriginalHttpResponse runRequestOnHybridTesting(OriginalHttpRequest originalHttpRequest, String miniTestingName, int timeoutSeconds){
         OriginalHttpResponse res = null;
         TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
         testingRunPlayground.setState(TestingRun.State.SCHEDULED);
         testingRunPlayground.setCreatedAt(Context.now());
         testingRunPlayground.setTestingRunPlaygroundType(TestingRunPlayground.TestingRunPlaygroundType.POSTMAN_IMPORTS);
         testingRunPlayground.setOriginalHttpRequest(originalHttpRequest);
+        if (!StringUtils.isEmpty(miniTestingName)) {
+            testingRunPlayground.setMiniTestingName(miniTestingName);
+        }
         InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
         if (insertOne.wasAcknowledged()) {
             String testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
             int startTime = Context.now();
-            int timeout = 5 * 60; // 5 minutes
-            
+            int timeout = timeoutSeconds;
+
             TestingRunPlayground currentState = null;
             while (Context.now() - startTime <= timeout) {
                 currentState = TestingRunPlaygroundDao.instance.findOne(
@@ -807,6 +826,18 @@ public class Utils {
                 }
             }
             
+            // mini-testing only ever looks at the first SCHEDULED request it finds, so an unanswered one
+            // blocks every later request until it ages out; fail it so they can go through
+            if (currentState != null && currentState.getState() == TestingRun.State.SCHEDULED) {
+                TestingRunPlaygroundDao.instance.updateOne(
+                    Filters.and(
+                        Filters.eq("_id", new ObjectId(testingRunPlaygroundHexId)),
+                        Filters.eq(TestingRunPlayground.STATE, TestingRun.State.SCHEDULED)
+                    ),
+                    Updates.set(TestingRunPlayground.STATE, TestingRun.State.FAILED)
+                );
+            }
+
             res = (currentState != null && (currentState.getState() != TestingRun.State.FAILED
                     || currentState.getState() != TestingRun.State.SCHEDULED)) ?
                 currentState.getOriginalHttpResponse() : new OriginalHttpResponse();

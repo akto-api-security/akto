@@ -20,6 +20,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
+import com.akto.util.McpClientPolicy;
+import com.akto.util.McpOAuthUtils;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.jobs.JobUtils;
@@ -958,4 +960,47 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
+    @Setter
+    private boolean mcpKnownClientsOnly;
+    @Setter
+    private String mcpRedirectUri;
+
+    // Admin switch: unknown https MCP clients can no longer be approved, and clients that are no longer allowed lose their refresh tokens
+    public String updateMcpKnownClientsOnly() {
+        saveMcpSetting(Updates.set(AccountSettings.MCP_KNOWN_CLIENTS_ONLY, mcpKnownClientsOnly));
+        McpClientPolicy.load().revokeDisallowedGrants();
+        return reloadAccountSettings();
+    }
+
+    public String addMcpAllowedRedirectUri() {
+        String uri = mcpRedirectUri == null ? "" : mcpRedirectUri.trim();
+        if (!McpOAuthUtils.isValidAllowedRedirectEntry(uri)) {
+            addActionError("Enter an https URL with a path, such as https://app.example.com/oauth/callback; end it with * to allow everything under that path.");
+            return ERROR.toUpperCase();
+        }
+        AccountSettings current = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        List<String> allowed = current == null ? null : current.getMcpAllowedRedirectUris();
+        if (allowed != null && !allowed.contains(uri) && allowed.size() >= McpClientPolicy.MAX_ALLOWED_URIS) {
+            addActionError("At most " + McpClientPolicy.MAX_ALLOWED_URIS + " URLs can be allowed. Remove one first.");
+            return ERROR.toUpperCase();
+        }
+        saveMcpSetting(Updates.addToSet(AccountSettings.MCP_ALLOWED_REDIRECT_URIS, uri));
+        return reloadAccountSettings();
+    }
+
+    public String deleteMcpAllowedRedirectUri() {
+        saveMcpSetting(Updates.pull(AccountSettings.MCP_ALLOWED_REDIRECT_URIS, mcpRedirectUri == null ? "" : mcpRedirectUri.trim()));
+        McpClientPolicy.load().revokeDisallowedGrants();
+        return reloadAccountSettings();
+    }
+
+    // Upsert: an account without a settings document yet must not lose the change silently
+    private void saveMcpSetting(Bson update) {
+        AccountSettingsDao.instance.getMCollection().updateOne(AccountSettingsDao.generateFilter(), update, new UpdateOptions().upsert(true));
+    }
+
+    private String reloadAccountSettings() {
+        accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        return SUCCESS.toUpperCase();
+    }
 }

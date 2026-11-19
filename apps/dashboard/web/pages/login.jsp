@@ -61,6 +61,8 @@
                     window.AZURE_BOARDS_INTEGRATED ='${requestScope.azureBoardsIntegrated}'
                     window.SERVICENOW_INTEGRATED ='${requestScope.servicenowIntegrated}'
                     window.DEVREV_INTEGRATED ='${requestScope.devrevIntegrated}'
+                    window.LINEAR_INTEGRATED ='${requestScope.linearIntegrated}'
+                    window.PORT_IO_INTEGRATED ='${requestScope.portIOIntegrated}'
                     window.WIZ_INTEGRATED ='${requestScope.wizIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'
@@ -75,6 +77,8 @@
                     window.IS_AWS_WAF_INTEGRATED = '${requestScope.isAwsWafIntegrated}'
                     window.IS_CLOUDFLARE_WAF_INTEGRATED = '${requestScope.isCloudflareWafIntegrated}'
                     window.SCOPE_ROLE_MAPPING = JSON.parse('${requestScope.scopeRoleMapping}' || '{}');
+                    window.SCOPE_BASE_ROLE_MAPPING = JSON.parse('${requestScope.scopeBaseRoleMapping}' || '{}');
+                    window.SCOPE_THREAT_ACCESS = JSON.parse('${requestScope.scopeThreatAccess}' || '{}');
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');
                     window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse('${requestScope.stiggFeatureWiseAllowed}' || '{}');

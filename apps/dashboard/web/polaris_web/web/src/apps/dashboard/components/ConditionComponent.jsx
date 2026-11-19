@@ -6,6 +6,7 @@ import func from "@/util/func"
 import api from '../pages/testing/api';
 import PersistStore from '../../main/PersistStore';
 import { labelMap } from '../../main/labelHelperMap';
+import { mapLabel } from '@/apps/main/labelHelper'
 
 function ConditionComponent(props) {
 
@@ -113,7 +114,7 @@ function ConditionComponent(props) {
                 <div style={{flexGrow:"1"}}>
                 <DropdownSearch
                     id={`${id}-api-collection-${index}`}
-                    placeholder="Select API collection"
+                    placeholder={mapLabel('Select API collection', dashboardCategory)}
                     optionsList={allCollectionsOptions}
                     setSelected={(collectionId) => handleCollectionSelected(collectionId)}
                     preSelected={[Number(getCollectionId(field))]}

@@ -6,6 +6,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResult.TestLog;
@@ -18,6 +19,7 @@ import com.akto.mcp.McpSchema;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
+import com.akto.util.trpc.TrpcUtils;
 
 import kotlin.Pair;
 import okhttp3.*;
@@ -41,7 +43,7 @@ public class ApiExecutor {
     private static final int MAX_RESPONSE_SIZE = 1024*1024*5;
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol, TLSAuthParam authParam) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -82,6 +84,10 @@ public class ApiExecutor {
 
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
+        }
+
+        if (authParam != null) {
+            client = CustomHTTPClientHandler.instance.getClient(authParam, isHttps, followRedirects, requestProtocol);
         }
 
         Call call = client.newCall(request);
@@ -309,6 +315,9 @@ public class ApiExecutor {
             TestingRunConfig runConfig = new TestingRunConfig();
             runConfig.setOverriddenTestAppUrl("");
             runConfig.setConfigsAdvancedSettings(testingRunConfig.getConfigsAdvancedSettings());
+            // without these the run's chosen scripts would silently fall back to the default ones
+            runConfig.setPreRequestScriptId(testingRunConfig.getPreRequestScriptId());
+            runConfig.setPostRequestScriptId(testingRunConfig.getPostRequestScriptId());
             return sendRequest(request, followRedirects, runConfig, debug, testLogs, skipSSRFCheck);
         }
     }
@@ -344,8 +353,7 @@ public class ApiExecutor {
 
 
     public static Request buildRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
-        boolean executeScript = testingRunConfig != null;
-        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+        ApiExecutorUtil.calculateHashAndAddAuth(request, testingRunConfig);
         String url = prepareUrl(request, testingRunConfig);
         request.setUrl(url);
         Request.Builder builder = new Request.Builder();
@@ -390,6 +398,9 @@ public class ApiExecutor {
         boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
+        // a tRPC GET carries its input in the `input` query param; tests work on it as the body, put it back before sending
+        TrpcUtils.moveBodyToInputQuery(request);
+
         if (!jsonRpcCheck && shouldInitiateSSEStream(request)) {
             return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
         }
@@ -398,8 +409,7 @@ public class ApiExecutor {
             calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
         }
 
-        boolean executeScript = testingRunConfig != null;
-        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+        ApiExecutorUtil.calculateHashAndAddAuth(request, testingRunConfig);
 
         String url = prepareUrl(request, testingRunConfig);
 
@@ -442,7 +452,7 @@ public class ApiExecutor {
         }
 
         if (response != null) {
-            ApiExecutorUtil.applyPostRequestScript(request, response, executeScript);
+            ApiExecutorUtil.applyPostRequestScript(request, response, testingRunConfig);
         }
         return response;
     }
@@ -453,7 +463,7 @@ public class ApiExecutor {
 
     private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String type)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, type);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, type, request.getTlsAuthParam());
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -683,7 +693,7 @@ public class ApiExecutor {
             builder.post(requestBody);
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
-            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol, request.getTlsAuthParam());
         }
 
         String payload = request.getBody();
@@ -821,7 +831,7 @@ public class ApiExecutor {
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol, request.getTlsAuthParam());
     }
 
     private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
@@ -1005,7 +1015,7 @@ public class ApiExecutor {
         JsonNode sseJson = objectMapper.readTree(sseMsg);
         String jsonBody = objectMapper.writeValueAsString(sseJson);
         OriginalHttpResponse sseResponse = new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
-        ApiExecutorUtil.applyPostRequestScript(request, sseResponse, testingRunConfig != null);
+        ApiExecutorUtil.applyPostRequestScript(request, sseResponse, testingRunConfig);
         return sseResponse;
     }
 

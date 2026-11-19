@@ -23,13 +23,23 @@ class FakeProvider:
 
 
 class FakeScanner:
-    """Stands in for LLMScanner; returns scripted[provider] and records calls."""
+    """Stands in for LLMScanner; returns scripted[provider] and records calls.
+
+    Mirrors the real LLMScanner(provider, response_format) signature so the
+    cascade's per-model format plumbing is exercised rather than stubbed away;
+    formats records what each provider was constructed with.
+    """
 
     script = {}
     calls = []
+    formats = {}
+    built = []
 
-    def __init__(self, provider):
+    def __init__(self, provider, response_format=""):
         self.provider = provider
+        self.response_format = response_format
+        FakeScanner.built.append(self)
+        FakeScanner.formats[provider.name] = response_format
 
     async def scan(self, scanner_name, scanner_type, text, config):
         FakeScanner.calls.append(self.provider.name)
@@ -44,7 +54,9 @@ class FakeScanner:
 @pytest.fixture(autouse=True)
 def patch_providers(monkeypatch):
     FakeScanner.calls = []
+    FakeScanner.formats = {}
     FakeScanner.script = {}
+    FakeScanner.built = []
     monkeypatch.setattr(model_map, "build_provider_from_config", lambda entry: FakeProvider(entry["provider"]))
     # run() does `from llm_scanner import LLMScanner`; patch it there.
     import llm_scanner
@@ -151,6 +163,15 @@ async def test_foundry_providers_share_stems_with_vertex():
     assert r["details"]["cascade_decision"] == "gemma_authority"
     assert r["details"]["qwen"]["completed"] is True
     assert r["details"]["gemma"]["completed"] is True
+
+
+async def test_bedrock_arbiter_gets_its_own_stem():
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"), _entry("bedrock", "FINAL_ARBITER")]
+    r = await _run(cfg, {"qwen3guard": UNSAFE, "bedrock": UNSAFE})
+    assert r["is_valid"] is False
+    assert r["details"]["llm_provider"] == "bedrock"
+    assert r["details"]["cascade_decision"] == "bedrock_authority"
+    assert r["details"]["bedrock"]["completed"] is True
 
 
 async def test_winner_values_forwarded_for_password_redaction():
@@ -274,3 +295,231 @@ async def test_arbiter_reason_priority_follows_modelconfigs_order():
     r = await _run(cfg, {"anthropic": anthropic_unsafe, "gemma_vertexai": gemma_unsafe})
     assert r["details"]["llm_provider"] == "anthropic"
     assert r["details"]["reason"] == "anthropic reason"
+
+
+async def test_response_format_is_per_model_not_global():
+    """A fast tier may answer in letters while the arbiter stays on JSON.
+
+    The arbiter's verdict is the one reported, and the letter contract carries
+    no reason string — so responseFormat must reach each scanner individually.
+    """
+    cfg = [
+        _entry("gemma_foundry", "FAST_THREAT_FILTER", responseFormat="abcd"),
+        _entry("gemma_vertexai", "FINAL_ARBITER"),
+    ]
+    await _run(cfg, {"gemma_foundry": UNSAFE, "gemma_vertexai": UNSAFE})
+    assert FakeScanner.formats == {"gemma_foundry": "abcd", "gemma_vertexai": ""}
+
+
+# ── FINAL_ARBITER_BACKUP: a modelConfigs entry, never a scanner of its own ──
+
+
+def _arbiter_scanner():
+    return next(sc for sc in FakeScanner.built if sc.provider.name == "gemma_vertexai")
+
+
+async def test_arbiter_is_wrapped_when_a_backup_entry_exists():
+    from providers import FallbackProvider
+
+    cfg = [_entry("gemma_vertexai", "FINAL_ARBITER"), _entry("anthropic", "FINAL_ARBITER_BACKUP")]
+    await _run(cfg, {"gemma_vertexai": SAFE})
+    assert isinstance(_arbiter_scanner().provider, FallbackProvider)
+
+
+async def test_arbiter_is_not_wrapped_without_a_backup_entry():
+    from providers import FallbackProvider
+
+    await _run([_entry("gemma_vertexai", "FINAL_ARBITER")], {"gemma_vertexai": SAFE})
+    assert not isinstance(_arbiter_scanner().provider, FallbackProvider)
+
+
+async def test_backup_entry_never_runs_and_is_not_reported_in_details():
+    cfg = [_entry("gemma_vertexai", "FINAL_ARBITER"), _entry("anthropic", "FINAL_ARBITER_BACKUP")]
+    r = await _run(cfg, {"gemma_vertexai": UNSAFE})
+    assert FakeScanner.calls == ["gemma_vertexai"]
+    assert r["is_valid"] is False
+    assert "anthropic" not in r["details"]
+
+
+def _fallback(monkeypatch, primary):
+    import providers
+
+    class Backup:
+        name = "backup"
+
+        async def complete(self, prompt):
+            return "from backup"
+
+    monkeypatch.setattr(providers, "build_provider_from_config", lambda entry: Backup())
+    monkeypatch.setattr(providers, "_ensure_health_monitor", lambda url: None)
+    monkeypatch.setattr(providers, "_PRIMARY_AVAILABLE", {})
+    return providers.FallbackProvider(primary, {"provider": "anthropic"})
+
+
+class _Primary:
+    name = "primary"
+    base_url = "http://vllm:80/v1"
+    health_path = "/health"
+
+    async def complete(self, prompt):
+        return "from primary"
+
+
+async def test_fallback_skips_primary_when_flagged_down(monkeypatch):
+    import providers
+
+    fb = _fallback(monkeypatch, _Primary())
+    assert fb.health_url == "http://vllm:80/health"
+    providers._PRIMARY_AVAILABLE[fb.health_url] = False
+    assert await fb.complete("hi") == "from backup"
+
+
+async def test_fallback_uses_primary_when_available_or_unknown(monkeypatch):
+    import providers
+
+    fb = _fallback(monkeypatch, _Primary())
+    assert await fb.complete("hi") == "from primary"  # unknown counts as available
+    providers._PRIMARY_AVAILABLE[fb.health_url] = True
+    assert await fb.complete("hi") == "from primary"
+
+
+async def test_connect_error_is_raised_without_backup_or_flagging_down(monkeypatch):
+    import httpx
+
+    import providers
+
+    class Refused(_Primary):
+        async def complete(self, prompt):
+            raise httpx.ConnectError("refused")
+
+    fb = _fallback(monkeypatch, Refused())
+    with pytest.raises(httpx.ConnectError):
+        await fb.complete("hi")
+    assert providers._PRIMARY_AVAILABLE.get(fb.health_url, True) is True
+
+
+async def test_health_probe_sets_the_flag_back_to_available(monkeypatch):
+    import asyncio
+
+    import providers
+
+    monkeypatch.setattr(providers, "_PRIMARY_AVAILABLE", {"u": False})
+
+    class Client:
+        async def get(self, url):
+            return type("R", (), {"status_code": 200})()
+
+    async def stop(_):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(providers, "_health_client", lambda: Client())
+    monkeypatch.setattr(providers.asyncio, "sleep", stop)
+    try:
+        await providers._health_loop("u")
+    except asyncio.CancelledError:
+        pass
+    assert providers._PRIMARY_AVAILABLE["u"] is True
+
+
+async def test_health_probe_marks_down_only_after_consecutive_failures(monkeypatch):
+    import asyncio
+
+    import providers
+
+    monkeypatch.setattr(providers, "_PRIMARY_AVAILABLE", {})
+    monkeypatch.setattr(providers, "_HEALTH_FAILURES", {})
+    monkeypatch.setattr(providers, "_HEALTH_FAILURES_TO_DOWN", 3)
+    # A good probe in between resets the count; a probe that raises counts as a failure.
+    statuses = iter([503, 503, 200, 503, 503, None])
+    seen: list[bool | None] = []
+
+    class Client:
+        async def get(self, url):
+            status = next(statuses)
+            if status is None:
+                raise ConnectionError("refused")
+            return type("R", (), {"status_code": status})()
+
+    async def record(_):
+        seen.append(providers._PRIMARY_AVAILABLE.get("u"))
+        if len(seen) == 6:
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(providers, "_health_client", lambda: Client())
+    monkeypatch.setattr(providers.asyncio, "sleep", record)
+    try:
+        await providers._health_loop("u")
+    except asyncio.CancelledError:
+        pass
+    assert seen == [None, None, True, True, True, False]
+
+
+async def test_health_probe_does_not_queue_behind_scan_traffic(monkeypatch):
+    # A probe sharing the scan pool waited for a free connection under load, hit PoolTimeout, and a
+    # healthy primary was marked DOWN.
+    import providers
+
+    monkeypatch.setattr(providers, "_HEALTH_CLIENT", None)
+    assert providers._health_client() is not providers.http_client.get_client()
+
+
+async def test_other_errors_are_raised_without_backup_or_flagging_down(monkeypatch):
+    import providers
+
+    class Boom(_Primary):
+        async def complete(self, prompt):
+            raise ValueError("bad reply")
+
+    fb = _fallback(monkeypatch, Boom())
+    with pytest.raises(ValueError):
+        await fb.complete("hi")
+    assert providers._PRIMARY_AVAILABLE.get(fb.health_url, True) is True
+
+
+async def test_hung_primary_times_out_without_backup_or_flagging_down(monkeypatch):
+    import asyncio
+
+    import providers
+
+    class Hung(_Primary):
+        async def complete(self, prompt):
+            await asyncio.sleep(60)
+
+    fb = _fallback(monkeypatch, Hung())
+    fb.primary_timeout_s = 0.05
+    with pytest.raises(TimeoutError):
+        await fb.complete("hi")
+    assert providers._PRIMARY_AVAILABLE.get(fb.health_url, True) is True
+
+
+async def test_arbiter_primary_gets_its_timeout_and_backup_gets_extra_time():
+    from providers import FallbackProvider
+
+    # Current default config: backup entry has no timeoutMs, so it gets the 5s default.
+    cfg = [
+        _entry("gemma_fast_arbiter", "FINAL_ARBITER", model="gemma-4-26b-a4b-it", timeoutMs=5000),
+        {"provider": "gemma_foundry", "model": "google--gemma-4-e2b-it-2", "modelRole": "FINAL_ARBITER_BACKUP"},
+    ]
+    await _run(cfg, {"gemma_fast_arbiter": SAFE})
+    fb = next(sc.provider for sc in FakeScanner.built if isinstance(sc.provider, FallbackProvider))
+    assert (fb.primary_timeout_s, fb.backup_timeout_s) == (5.0, 5.0)
+    assert FakeScanner.calls == ["gemma_fast_arbiter"]
+
+
+async def test_primary_without_health_path_is_never_monitored(monkeypatch):
+    class Plain(_Primary):
+        health_path = ""
+
+    assert _fallback(monkeypatch, Plain()).health_url == ""
+
+
+async def test_primary_without_health_path_falls_back_on_a_failed_request(monkeypatch):
+    """No probe can ever mark it down, so a failed request is the only signal to use the backup."""
+
+    class Plain(_Primary):
+        health_path = ""
+
+        async def complete(self, prompt):
+            raise ValueError("bad reply")
+
+    assert await _fallback(monkeypatch, Plain()).complete("hi") == "from backup"

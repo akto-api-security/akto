@@ -79,6 +79,9 @@ public class APICatalogSync {
     public static final Pattern VERSION_PATTERN = Pattern.compile("\\bv([1-9][0-9]?|100)\\b");
 
     public static Set<MergedUrls> mergedUrls;
+    // Same merged_urls collection as mergedUrls, filtered to only the demerge:true rows
+    // (see MergedUrls#isDemerge for why this needs to stay a distinct in-memory view).
+    public static Set<MergedUrls> demergedUrls;
 
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
 
@@ -100,6 +103,7 @@ public class APICatalogSync {
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         this.aktoPolicyNew = new AktoPolicyNew();
         mergedUrls = new HashSet<>();
+        demergedUrls = new HashSet<>();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
@@ -776,6 +780,10 @@ public class APICatalogSync {
             return null; // Don't merge GraphQL endpoints
         }
 
+        if (isUrlMerged(newUrl.getUrl(), newUrl.getMethod().name())) {
+            return null; // URL was flagged demerge:true by an advanced traffic filter
+        }
+
         for(int i = start; i < tokens.length; i ++) {
             String tempToken = tokens[i];
             if(DictionaryFilter.isEnglishWord(tempToken)) continue;
@@ -836,6 +844,10 @@ public class APICatalogSync {
 
         if(HttpResponseParams.isGraphQLEndpoint(dbUrl.getUrl()) || HttpResponseParams.isGraphQLEndpoint(newUrl.getUrl())) {
             return null; // Don't merge GraphQL endpoints
+        }
+
+        if (isUrlMerged(dbUrl.getUrl(), dbUrl.getMethod().name()) || isUrlMerged(newUrl.getUrl(), newUrl.getMethod().name())) {
+            return null; // One of the URLs was flagged demerge:true by an advanced traffic filter
         }
 
         for(int i = 0; i < newTokens.length; i ++) {
@@ -902,6 +914,39 @@ public class APICatalogSync {
         }
 
         return urlTemplate;
+    }
+
+    public static boolean isUrlMerged(String url, String method) {
+        for (MergedUrls entry : demergedUrls) {
+            if (entry.getUrl().equals(url) && entry.getMethod().equals(method)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static void markUrlAsMerged(int apiCollectionId, String url, String method) {
+        if (isUrlMerged(url, method)) {
+            return;
+        }
+        try {
+            // Same merged_urls collection as genuine template merges, but flagged demerge:true
+            // so MergedUrlsDao#getMergedUrls (used by convertToMap to exclude already-merged
+            // urls from SingleTypeInfo writes) skips these rows instead of wrongly excluding them.
+            MergedUrlsDao.instance.updateOne(Filters.and(
+                    Filters.eq(MergedUrls.URL, url),
+                    Filters.eq(MergedUrls.METHOD, method),
+                    Filters.eq(MergedUrls.API_COLLECTION_ID, apiCollectionId)
+            ), Updates.combine(
+                    Updates.set(MergedUrls.URL, url),
+                    Updates.set(MergedUrls.METHOD, method),
+                    Updates.set(MergedUrls.API_COLLECTION_ID, apiCollectionId),
+                    Updates.set(MergedUrls.DEMERGE, true)
+            ));
+            demergedUrls.add(new MergedUrls(url, method, apiCollectionId));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while saving demerged url in DB: " + e.getMessage(), LogDb.RUNTIME);
+        }
     }
 
     public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb,boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions, boolean skipMergingOnKnownStaticURLsForVersionedApis) {
@@ -1697,6 +1742,7 @@ public class APICatalogSync {
         }
 
         mergedUrls = MergedUrlsDao.instance.getMergedUrls();
+        demergedUrls = MergedUrlsDao.instance.getDemergedUrls();
 
         loggerMaker.infoAndAddToDb("Building from db completed", LogDb.RUNTIME);
         aktoPolicyNew.buildFromDb(fetchAllSTI);

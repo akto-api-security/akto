@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from ._abcd import to_abcd
+
 DEFAULT = """You are a security system that detects whether a message discusses or relates to specific banned topics.
 
 Banned topics: %s
@@ -16,7 +18,7 @@ Analyze this text and respond ONLY with valid JSON:
   "isBanned": <true if the message actively discusses or relates to a banned topic, false otherwise>,
   "confidence": <float 0.0 to 1.0 — your estimated p(boolean-above-is-true). Use ~0.9+ when sure it is true, ~0.1 or lower when sure it is false. NEVER invert.>,
   "matchedTopic": "<which banned topic was matched, or empty string if none>",
-  "reason": "<one sentence explanation>"
+  "reason": "<one sentence explanation; refer to any PII, secret or personal data by category only, never quote the values>"
 }
 
 Text to analyze:
@@ -62,11 +64,22 @@ Analyze this text and respond ONLY with valid JSON:
   "isBanned": <true if the message actively discusses or relates to a banned topic, false otherwise>,
   "confidence": <float 0.0 to 1.0 — your estimated p(boolean-above-is-true). Use ~0.9+ when sure it is true, ~0.1 or lower when sure it is false. NEVER invert.>,
   "matchedTopic": "<which banned topic was matched, or empty string if none>",
-  "reason": "<one sentence explanation>"
+  "reason": "<one sentence explanation; refer to any PII, secret or personal data by category only, never quote the values>"
 }
 
 Text to analyze:
 %s"""
+
+
+# Single-letter variants, derived from the JSON templates above.
+_ABCD_KWARGS = {
+    "flag_key": "isBanned",
+    "safe": "NO BANNED TOPIC",
+    "flag": "BANNED TOPIC",
+    "near_miss": "a banned topic in an educational, defensive, fictional, or incidental context",
+}
+DEFAULT_ABCD = to_abcd(DEFAULT, label="ban_topics/default", **_ABCD_KWARGS)
+GEMMA_ABCD = to_abcd(GEMMA, label="ban_topics/gemma", **_ABCD_KWARGS)
 
 
 def _format_topic_entry(topic: str, descriptions: dict[str, str], sample_phrases: dict[str, list]) -> str:
@@ -95,12 +108,14 @@ def _format_topics(
     return ", ".join(str(t) for t in topics if t)
 
 
-def build(config: dict[str, Any], provider_name: str, text: str) -> str:
+def build(config: dict[str, Any], provider_name: str, text: str, response_format: str = "") -> str:
     topics_str = _format_topics(
         config.get("topics", []),
         config.get("topicDescriptions", {}),
         config.get("topicSamplePhrases", {}),
     )
     # Any Gemma backend (gemma_vertexai, gemma_foundry) gets the Gemma-tuned prompt.
-    template = GEMMA if provider_name.startswith("gemma") else DEFAULT
-    return template % (topics_str, text)
+    gemma = provider_name.startswith("gemma")
+    if response_format == "abcd":
+        return (GEMMA_ABCD if gemma else DEFAULT_ABCD) % (topics_str, text)
+    return (GEMMA if gemma else DEFAULT) % (topics_str, text)

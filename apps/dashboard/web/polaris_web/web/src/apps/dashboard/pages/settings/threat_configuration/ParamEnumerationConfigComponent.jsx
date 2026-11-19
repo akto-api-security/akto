@@ -3,8 +3,10 @@ import func from "@/util/func"
 import { LegacyCard, VerticalStack, Divider, Text, Box, TextField, HorizontalGrid } from "@shopify/polaris";
 import api from "../../../pages/threat_detection/api.js";
 import Dropdown from "../../../components/layouts/Dropdown.jsx";
+import { usePermissions, whenAllowed } from "@/util/permissions";
 
 const ParamEnumerationConfigComponent = ({ title, description }) => {
+    const { canCall } = usePermissions();
     const [uniqueParamThreshold, setUniqueParamThreshold] = useState(50);
     const [windowSizeMinutes, setWindowSizeMinutes] = useState(5);
     const [isSaveDisabled, setIsSaveDisabled] = useState(true);
@@ -95,7 +97,8 @@ const ParamEnumerationConfigComponent = ({ title, description }) => {
                 content: 'Save',
                 onAction: onSave,
                 loading: false,
-                disabled: isSaveDisabled
+                disabled: isSaveDisabled,
+                ...whenAllowed(canCall('api/modifyThreatConfiguration'))
             }}
         >
             <Divider />

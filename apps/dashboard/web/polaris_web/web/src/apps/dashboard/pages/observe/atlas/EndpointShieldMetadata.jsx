@@ -1,6 +1,6 @@
 import { Text, HorizontalStack, Icon, Tooltip } from "@shopify/polaris"
-import { StatusActiveMajor, DiamondAlertMinor, RefreshMinor } from "@shopify/polaris-icons"
-import { useEffect, useReducer, useState, useCallback } from "react"
+import { StatusActiveMajor, DiamondAlertMinor, RefreshMinor, ClockMinor } from "@shopify/polaris-icons"
+import { useEffect, useReducer, useState, useCallback, useRef } from "react"
 import values from "@/util/values";
 import { produce } from "immer"
 import func from "@/util/func"
@@ -12,7 +12,7 @@ import settingRequests from "../../settings/api";
 import PersistStore from "../../../../main/PersistStore";
 import { mapLabel } from "../../../../main/labelHelper";
 import AgentDetails from "./AgentDetails";
-import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE, isExtensionAgent } from "../api_collections/endpointShieldHelper";
 
 const createHeading = (text, value = null, sortKey = null) => ({
     text,
@@ -63,14 +63,26 @@ const createFilter = (key, label) => ({
     choices: []
 });
 
+const STATUS_LABELS = {
+    active: 'Running',
+    inactive: 'Inactive',
+    error: 'Stale',
+    failed: 'Never connected',
+    installing: 'Installing',
+    install_failed: 'Install failed'
+};
+
 const resourceName = {
     singular: 'agent',
     plural: 'agents',
 };
 
+const OS_LABELS = { mac: 'macOS', darwin: 'macOS', windows: 'Windows', linux: 'Linux' };
 const OS_ICON_MAP = { darwin: '/public/os-mac.svg', mac: '/public/os-mac.svg', windows: '/public/os-windows.svg', linux: '/public/linux.svg' };
 const BROWSER_ICON_MAP = { chrome: '/public/chrome.svg', firefox: '/public/firefox.svg', safari: '/public/safari.svg', brave: '/public/brave.svg', edge: '/public/edge.svg' };
 const GENERIC_BROWSER_ICON = '/public/Globe_icon.svg';
+const CLAUDE_ICON = '/public/claude.svg';
+const CLAUDE_COMPLIANCE_LABEL = 'Claude Compliance';
 
 const getIconFromMap = (value, map) => {
     if (!value || value === DEFAULT_VALUE) return null;
@@ -81,13 +93,20 @@ const getIconFromMap = (value, map) => {
     return null;
 };
 
-// Installer device IDs are raw hex (no hyphens); extension IDs are hyphenated UUIDs or missing ("-").
-// Newer extension builds also suffix their version with "-extension" 
-const isExtensionAgent = (deviceId, agentVersion) =>
-    !deviceId || deviceId.includes('-') || !!agentVersion?.toLowerCase().includes('extension');
-
 const getOsOrBrowserComp = (agentData) => {
-    if (isExtensionAgent(agentData?.deviceId, agentData?.agentVersion)) {
+    if (agentData?.provider === 'claude' && agentData?.orgName) {
+        return (
+            <HorizontalStack gap="1" wrap={false} blockAlign="center">
+                <img src={CLAUDE_ICON} alt={CLAUDE_COMPLIANCE_LABEL} style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+                <Text variant="bodySm">{CLAUDE_COMPLIANCE_LABEL}</Text>
+            </HorizontalStack>
+        );
+    }
+
+    const reportedBrowser = agentData?.browserName;
+    const hasReportedBrowser = reportedBrowser && reportedBrowser !== DEFAULT_VALUE && reportedBrowser.toLowerCase() !== 'unknown';
+    const hasReportedOs = agentData?.os && agentData.os !== DEFAULT_VALUE;
+    if (hasReportedBrowser || (!hasReportedOs && isExtensionAgent(agentData?.deviceId, agentData?.agentVersion))) {
         const browserName = agentData?.browserName;
         const browserVersion = agentData?.browserVersion;
         const hasBrowserName = browserName && browserName !== DEFAULT_VALUE && browserName.toLowerCase() !== 'unknown';
@@ -105,7 +124,7 @@ const getOsOrBrowserComp = (agentData) => {
 
     const os = agentData?.os;
     const osDisplayName = agentData?.osDisplayName;
-    const displayOs = (osDisplayName && osDisplayName !== DEFAULT_VALUE) ? osDisplayName : (os && os !== DEFAULT_VALUE ? os : null);
+    const displayOs = (osDisplayName && osDisplayName !== DEFAULT_VALUE) ? osDisplayName : (os && os !== DEFAULT_VALUE ? (OS_LABELS[os.toLowerCase()] || os) : null);
     if (!displayOs) return DEFAULT_VALUE;
     const osIcon = getIconFromMap(os, OS_ICON_MAP);
     return (
@@ -116,29 +135,34 @@ const getOsOrBrowserComp = (agentData) => {
     );
 };
 
-const getStatusComp = (installStatus, lastHeartbeat) => {
-    if (installStatus === 'installing') {
-        return (
-            <Tooltip content="Installation in progress" dismissOnMouseOut>
-                <Icon source={RefreshMinor} color="warning" />
-            </Tooltip>
-        );
-    }
-    if (installStatus === 'failed') {
-        return (
-            <Tooltip content="Installation failed" dismissOnMouseOut>
-                <Icon source={DiamondAlertMinor} color="critical" />
-            </Tooltip>
-        );
-    }
-    if (lastHeartbeat > 0) {
-        return (
-            <Tooltip content="Running" dismissOnMouseOut>
-                <Icon source={StatusActiveMajor} color="success" />
-            </Tooltip>
-        );
-    }
-    return null;
+// currentStatus is computed server-side (ModuleInfoAction.endpointShieldCurrentStatusExpr):
+// installing / install_failed from installStatus, otherwise from lastHeartbeatReceived —
+// active (<2h), inactive (<24h), error (stale >24h), failed (never heartbeat). Rendering
+// straight off it, rather than re-deriving installing/failed from installStatus here, is
+// what keeps the icon, the Status filter and STATUS_LABELS describing the same device.
+// install_failed covers installOutcome === 'failed' as well, which is what the panel's
+// banner reads, so a device whose agent came up after a failed deploy carries the failure
+// in both places until an attempt that succeeds (or rolls back cleanly) writes a new
+// outcome.
+const CURRENT_STATUS_COMP_MAP = {
+    installing: { icon: RefreshMinor, color: "warning", tooltip: "Installation in progress" },
+    // Short, like the other status tooltips: the full reason is long enough to span the
+    // row and sit under the icon itself. It is shown in the device panel's banner instead.
+    install_failed: { icon: DiamondAlertMinor, color: "critical", tooltip: "Last deployment failed" },
+    active: { icon: StatusActiveMajor, color: "success", tooltip: "Running" },
+    inactive: { icon: ClockMinor, color: "warning", tooltip: "No heartbeat in over 2 hours" },
+    error: { icon: DiamondAlertMinor, color: "critical", tooltip: "No heartbeat in over 24 hours" },
+    failed: { icon: DiamondAlertMinor, color: "critical", tooltip: "Never connected" },
+};
+
+const getStatusComp = (currentStatus) => {
+    const statusComp = CURRENT_STATUS_COMP_MAP[currentStatus];
+    if (!statusComp) return null;
+    return (
+        <Tooltip content={statusComp.tooltip} preferredPosition="above" dismissOnMouseOut>
+            <Icon source={statusComp.icon} color={statusComp.color} />
+        </Tooltip>
+    );
 };
 
 const convertDataIntoTableFormat = (agentData) => ({
@@ -147,21 +171,29 @@ const convertDataIntoTableFormat = (agentData) => ({
     lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
     lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
     osComp: getOsOrBrowserComp(agentData),
-    statusComp: getStatusComp(agentData?.installStatus, agentData?.lastHeartbeat),
+    statusComp: getStatusComp(agentData?.currentStatus),
 });
+
+const knownOrDefault = (value) => (value && String(value).toLowerCase() !== 'unknown') ? value : DEFAULT_VALUE;
+const hideUnknownLabel = (text, fallback) => String(text).toLowerCase() === 'unknown' ? fallback : text;
 
 const mapModuleToAgent = (module) => ({
     agentId: module.id,
     hostname: module.name,
-    deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
+    deviceId: module.additionalData?.deviceId || module?.id || DEFAULT_VALUE,
     agentVersion: module.currentVersion || DEFAULT_VALUE,
-    username: module.additionalData?.username || DEFAULT_VALUE,
+    username: module.additionalData?.username || module?.additionalData?.email || DEFAULT_VALUE,
     lastHeartbeat: module.lastHeartbeatReceived || 0,
-    lastDeployed: module.startedTs || 0,
-    os: module.additionalData?.os || DEFAULT_VALUE,
-    osDisplayName: module.additionalData?.osDisplayName || DEFAULT_VALUE,
-    browserName: module.additionalData?.browserName || DEFAULT_VALUE,
-    browserVersion: module.additionalData?.browserVersion || DEFAULT_VALUE,
+    // Latest deployment attempt (computed server-side: installStartedTs, else startedTs).
+    lastDeployed: module.additionalData?.lastDeployedTs || module.additionalData?.installStartedTs || module.startedTs || 0,
+    firstSeen: module.startedTs || 0,
+    currentStatus: module.additionalData?.currentStatus || null,
+    provider: module.additionalData?.provider || null,
+    orgName: module.additionalData?.orgName || null,
+    os: knownOrDefault(module.additionalData?.os),
+    osDisplayName: knownOrDefault(module.additionalData?.osDisplayName),
+    browserName: knownOrDefault(module.additionalData?.browserName),
+    browserVersion: knownOrDefault(module.additionalData?.browserVersion),
     osVersion: module.additionalData?.osVersion || DEFAULT_VALUE,
     arch: module.additionalData?.arch || DEFAULT_VALUE,
     kernelVersion: module.additionalData?.kernelVersion || DEFAULT_VALUE,
@@ -182,6 +214,17 @@ const mapModuleToAgent = (module) => ({
     bootTime: module.additionalData?.bootTime || null,
     installedApps: module.additionalData?.installedApps || [],
     installStatus: module.additionalData?.installStatus || null,
+    // Failure summary sent by the installer with a failed status (cleared on success).
+    installFailureReason: module.additionalData?.installFailureReason || null,
+    installDiagnosis: module.additionalData?.installDiagnosis || null,
+    installFindings: Array.isArray(module.additionalData?.installFindings) ? module.additionalData.installFindings : [],
+    installExitCode: module.additionalData?.installExitCode ?? null,
+    installId: module.additionalData?.installId || null,
+    // Latest deployment attempt (installers only; see getDeploymentAttempt).
+    installStartedTs: module.additionalData?.installStartedTs || 0,
+    installFinishedTs: module.additionalData?.installFinishedTs || 0,
+    installOutcome: module.additionalData?.installOutcome || null,
+    installVersion: module.additionalData?.installVersion || null,
     _moduleData: module
 });
 
@@ -195,11 +238,14 @@ function EndpointShieldMetadata() {
     const [showFlyout, setShowFlyout] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
     const [allowedEnvFields, setAllowedEnvFields] = useState([]);
+    const agentsCacheRef = useRef({});
     const [filters, setFilters] = useState([
         createFilter('username', 'Username'),
         createFilter('hostname', 'Hostname'),
         createFilter('deviceId', 'Device ID'),
-        createFilter('os', 'OS')
+        createFilter('osBrowser', 'OS/Browser'),
+        createFilter('agentVersion', 'Agent Version'),
+        createFilter('status', 'Status')
     ]);
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -207,7 +253,9 @@ function EndpointShieldMetadata() {
     const endTimestamp = getTimeEpoch("until");
 
     function disambiguateLabel(key, value) {
-        return func.convertToDisambiguateLabelObj(value, null, 2);
+        const choices = filters.find(f => f.key === key)?.choices || [];
+        const labels = Array.isArray(value) ? value.map(v => choices.find(c => c.value === v)?.label || v) : value;
+        return func.convertToDisambiguateLabelObj(labels, null, 2);
     }
 
     // Filter dropdown options (distinct values across ALL agents) — fetched ONCE, server-side.
@@ -220,7 +268,13 @@ function EndpointShieldMetadata() {
                     { ...createFilter('username', 'Username'), choices: (opts.usernames || []).map(u => ({ label: u, value: u })) },
                     { ...createFilter('hostname', 'Hostname'), choices: (opts.hostnames || []).map(h => ({ label: h, value: h })) },
                     { ...createFilter('deviceId', 'Device ID'), choices: (opts.deviceIds || []).map(d => ({ label: d, value: d })) },
-                    { ...createFilter('os', 'OS'), choices: (opts.oses || []).map(o => ({ label: o, value: o })) }
+                    { ...createFilter('osBrowser', 'OS/Browser'), choices: [
+                        ...(opts.oses || []).map(o => ({ label: hideUnknownLabel(OS_LABELS[o.toLowerCase()] || o, 'OS'), value: `os:${o}` })),
+                        ...(opts.browserNames || []).map(b => ({ label: hideUnknownLabel(b, 'Browser'), value: `browser:${b}` })),
+                        ...((opts.providers || []).includes('claude') ? [{ label: CLAUDE_COMPLIANCE_LABEL, value: 'provider:claude' }] : [])
+                    ] },
+                    { ...createFilter('agentVersion', 'Agent Version'), choices: (opts.agentVersions || []).map(v => ({ label: hideUnknownLabel(v, 'Version'), value: v })) },
+                    { ...createFilter('status', 'Status'), choices: (opts.statuses || []).map(st => ({ label: STATUS_LABELS[st] || st, value: st })) },
                 ]);
             } catch (e) { /* ignore */ }
         })();
@@ -243,6 +297,7 @@ function EndpointShieldMetadata() {
         setLoading(true);
         let ret = [];
         let total = 0;
+        const pickOsBrowser = (type) => (filters?.osBrowser || []).filter(v => v.startsWith(`${type}:`)).map(v => v.slice(type.length + 1));
         try {
             const resp = await settingRequests.fetchEndpointShieldAgents({
                 skip, limit,
@@ -251,7 +306,11 @@ function EndpointShieldMetadata() {
                 usernames: filters?.username || [],
                 hostnames: filters?.hostname || [],
                 deviceIds: filters?.deviceId || [],
-                oses: filters?.os || [],
+                oses: pickOsBrowser('os'),
+                browserNames: pickOsBrowser('browser'),
+                agentVersions: filters?.agentVersion || [],
+                statuses: filters?.status || [],
+                providers: pickOsBrowser('provider'),
                 queryValue: queryValue || "",
                 startTimestamp, endTimestamp,
             });
@@ -259,6 +318,7 @@ function EndpointShieldMetadata() {
             const agents = (resp?.moduleInfos || []).map(mapModuleToAgent);
             total = resp?.total || 0;
             ret = agents.map(convertDataIntoTableFormat);
+            ret.forEach((agent) => { agentsCacheRef.current[agent.agentId] = agent; });
         } catch (error) {
             console.error("Error fetching MCP Endpoint Shield metadata:", error);
         } finally {
@@ -267,19 +327,102 @@ function EndpointShieldMetadata() {
         return { value: ret, total };
     }, [startTimestamp, endTimestamp]);
 
+    // Delete stays restricted to internal akto.io users (destructive — removes agent info entries
+    // outright). Enable/Disable System Proxy is reversible (just flips an env flag and reboots the
+    // agent, same as the single-device Configure tab's toggle) and available to anyone who can
+    // reach this page — the backend still enforces ADMIN_ACTIONS regardless.
     const allowBulkActions = window.USER_NAME && window.USER_NAME.endsWith("@akto.io");
 
     const promotedBulkActions = (selectedAgents) => {
         const actions = [];
+        const agentCount = selectedAgents.length;
+        const agentWord = `agent${agentCount > 1 ? "s" : ""}`;
+
+        const selectedAgentsMeta = selectedAgents.map((id) => agentsCacheRef.current[id]).filter(Boolean);
+        const allInstallers = selectedAgentsMeta.length === agentCount &&
+            selectedAgentsMeta.every((a) => !isExtensionAgent(a.deviceId, a.agentVersion));
+
+        const bulkToggleSystemProxy = (enable) => () => {
+            const verb = enable ? "enable" : "disable";
+            const msg = `Are you sure you want to ${verb} system proxy for ${agentCount} ${agentWord}? They will pick up the change on their next reboot.`;
+            func.showConfirmationModal(msg, enable ? "Enable" : "Disable", async () => {
+                try {
+                    await settingRequests.bulkUpdateModuleEnvAndReboot(selectedAgents, { ENABLE_SYSTEM_PROXY: enable ? "true" : "false" });
+                    func.setToast(true, false, `System proxy ${enable ? "enabled" : "disabled"} for ${agentCount} ${agentWord}. Agents will pick up changes shortly.`);
+                    setRefreshKey(k => k + 1);
+                } catch (error) {
+                    console.error("Error updating system proxy:", error);
+                    func.setToast(true, true, "Failed to update system proxy");
+                }
+            });
+        };
+
+        actions.push({
+            content: `Enable system proxy for ${agentCount} ${agentWord}`,
+            onAction: bulkToggleSystemProxy(true),
+            requires: 'api/bulkUpdateModuleEnvAndReboot',
+        });
+        actions.push({
+            content: `Disable system proxy for ${agentCount} ${agentWord}`,
+            onAction: bulkToggleSystemProxy(false),
+            requires: 'api/bulkUpdateModuleEnvAndReboot',
+        });
+
+        if (allInstallers) {
+            const bulkToggleAutoUpdate = (enable) => () => {
+                const verb = enable ? "enable" : "disable";
+                const msg = `Are you sure you want to ${verb} auto update for ${agentCount} ${agentWord}? They will pick up the change on their next reboot.`;
+                func.showConfirmationModal(msg, enable ? "Enable" : "Disable", async () => {
+                    try {
+                        await settingRequests.bulkUpdateModuleEnvAndReboot(selectedAgents, { ENABLE_AUTO_UPDATE: enable ? "true" : "false" });
+                        func.setToast(true, false, `Auto update ${enable ? "enabled" : "disabled"} for ${agentCount} ${agentWord}. Agents will pick up changes shortly.`);
+                        setRefreshKey(k => k + 1);
+                    } catch (error) {
+                        console.error("Error updating auto update flag:", error);
+                        func.setToast(true, true, "Failed to update auto update setting");
+                    }
+                });
+            };
+
+            actions.push({
+                content: `Enable auto update for ${agentCount} ${agentWord}`,
+                onAction: bulkToggleAutoUpdate(true),
+                requires: 'api/bulkUpdateModuleEnvAndReboot',
+            });
+            actions.push({
+                content: `Disable auto update for ${agentCount} ${agentWord}`,
+                onAction: bulkToggleAutoUpdate(false),
+                requires: 'api/bulkUpdateModuleEnvAndReboot',
+            });
+
+            actions.push({
+                content: `Update ${agentCount} ${agentWord} to latest version`,
+                onAction: () => {
+                    const msg = `Are you sure you want to update ${agentCount} ${agentWord} to the latest version? They will pick up the change on their next reboot.`;
+                    func.showConfirmationModal(msg, "Update", async () => {
+                        try {
+                            await settingRequests.bulkUpdateModuleEnvAndReboot(selectedAgents, { UPDATE_TO_LATEST_VERSION: "true" });
+                            func.setToast(true, false, `${agentCount} ${agentWord} queued to update to the latest version.`);
+                            setRefreshKey(k => k + 1);
+                        } catch (error) {
+                            console.error("Error triggering update to latest version:", error);
+                            func.setToast(true, true, "Failed to trigger update to latest version");
+                        }
+                    });
+                },
+                requires: 'api/bulkUpdateModuleEnvAndReboot',
+            });
+        }
+
         if (allowBulkActions) {
             actions.push({
-                content: `Delete ${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"}`,
+                content: `Delete ${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"}`,
                 onAction: async () => {
-                    const msg = `Are you sure you want to delete ${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"}?`;
+                    const msg = `Are you sure you want to delete ${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"}?`;
                     func.showConfirmationModal(msg, "Delete", async () => {
                         try {
                             await settingRequests.deleteModuleInfo(selectedAgents);
-                            func.setToast(true, false, `${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"} deleted successfully`);
+                            func.setToast(true, false, `${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"} deleted successfully`);
                             window.location.reload();
                         } catch (error) {
                             console.error("Error deleting agent info:", error);
@@ -287,6 +430,24 @@ function EndpointShieldMetadata() {
                         }
                     });
                 },
+                requires: 'api/deleteModuleInfo',
+            });
+
+            // Server side, no agent involved: the skills already stored are validated again and their tags replaced.
+            actions.push({
+                content: `Revalidate stored skills of ${agentCount} ${agentWord}`,
+                onAction: () => {
+                    const msg = `Validate every stored skill of ${agentCount} ${agentWord} again? Their evidence and tags are replaced with the new result. Only SKILL.md is stored, so the scripts the skills run are not checked.`;
+                    func.showConfirmationModal(msg, "Revalidate", async () => {
+                        try {
+                            await settingRequests.triggerSkillRevalidation(selectedAgents);
+                            func.setToast(true, false, `Skill revalidation started for ${agentCount} ${agentWord}.`);
+                        } catch (error) {
+                            console.error("Error starting skill revalidation:", error);
+                        }
+                    });
+                },
+                requires: 'api/triggerSkillRevalidation',
             });
         }
         return actions;
@@ -341,7 +502,7 @@ function EndpointShieldMetadata() {
                         headings={headings}
                         onRowClick={handleRowClick}
                         rowClickable={true}
-                        selectable={allowBulkActions}
+                        selectable={true}
                         promotedBulkActions={promotedBulkActions}
                     />
                 ]}

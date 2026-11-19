@@ -144,6 +144,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Enterprise License Compliance ─────────────────────────────────────────
     {
         prefixes: ["EnterpriseLicenseCompliance", "enterprise_license_compliance"],
+        capability: "enterpriseLicenseCompliance",
         heading: "Enterprise License Compliance Violation",
         overview: [
             {
@@ -344,6 +345,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Intent Analysis / Base Prompt ─────────────────────────────────────────
     {
         prefixes: ["IntentAnalysis", "BasePrompt", "base_prompt", "intent"],
+        capability: "basePromptRule",
         heading: "Intent Mismatch - Agent Purpose Violated",
         overview: [
             {
@@ -445,6 +447,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Code Detection ────────────────────────────────────────────────────────
     {
         prefixes: ["BanCode", "Code", "ban_code", "code_detection"],
+        capability: "banCodeDetection",
         heading: "Code Detected in Payload",
         overview: [
             {
@@ -500,6 +503,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Token Limit ───────────────────────────────────────────────────────────
     {
         prefixes: ["tokenLimit", "TokenLimit", "token_limit"],
+        capability: "tokenLimitDetection",
         heading: "Token Limit Exceeded",
         overview: [
             {
@@ -527,7 +531,8 @@ This event means the guardrail **successfully protected** the data - the sensiti
 
     // ─── Anomaly Detection ─────────────────────────────────────────────────────
     {
-        prefixes: ["Anomaly", "anomaly"],
+        prefixes: ["Anomaly", "anomaly", "ToolCallRateExceeded", "ErrorRateExceeded"],
+        capability: "anomalyDetection",
         heading: "Anomalous Behaviour Detected",
         overview: [
             {
@@ -582,9 +587,96 @@ This event means the guardrail **successfully protected** the data - the sensiti
 `
     },
 
+    // ─── Overpowered Agent ──────────────────────────────────────────────────────
+    {
+        prefixes: ["OverpoweredAgent", "overpowered_agent", "Overpowered Agent", "ExcessiveAgency", "excessive_agency"],
+        heading: "Overpowered Agent Detected",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "The agent has standing access to a high-risk tool (destructive, financial, or otherwise irreversible) that has never actually been invoked in observed traffic. The capability is provisioned but unused - pure exposure with no offsetting business value."
+            },
+            {
+                heading: "Why is it dangerous?",
+                body: "An unused, high-risk tool is a standing liability rather than a working feature: it still counts as attack surface for prompt injection, compromised credentials, or a model that decides on its own to call it, but there's no legitimate traffic pattern to distinguish an authorised call from an abusive one. The broader the agent's permissions relative to its actual task, the larger the blast radius of a single manipulated turn."
+            }
+        ],
+        remediation: `## What to do
+
+### Immediate
+- Confirm the tool is genuinely unused by checking traffic/audit logs over a representative window (not just the sample that triggered this alert).
+- Identify who registered this tool for the agent and why - most "unused high-risk tool" cases trace back to a broad default toolset rather than a deliberate decision.
+
+### Structural fixes
+1. **Apply least privilege** - grant only the tools the agent's task actually requires. Remove this tool from the agent's toolset if it serves no purpose the agent needs.
+2. **Require human-in-the-loop for high-risk tools** - if the tool must stay available for occasional legitimate use, add an approval step before execution instead of leaving it directly callable.
+3. **Re-review the toolset periodically** - as agents and their prompts evolve, tools that were once needed can become dead weight. Treat an unused high-risk tool the same as an unused IAM permission: revoke it.
+4. **Log all tool invocations** - so the next review can tell "unused" from "used but not yet sampled" with confidence.
+`
+    },
+
+    // ─── Tool Poisoning ─────────────────────────────────────────────────────────
+    {
+        prefixes: ["ToolPoisoning", "tool_poisoning", "RugPull", "rug_pull"],
+        templateIdPrefixes: ["ToolPoisoningPolicy", "tool-poisoning-policy"],
+        heading: "Tool Poisoning Detected",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "A tool the agent already trusts - one that was reviewed and approved - has had its definition altered after the fact (a \"rug pull\"), or was malicious from the start with instructions hidden in its description or schema rather than in its visible output. Because a tool's description is read by the model on every tool-list call but is rarely re-reviewed by a human, an attacker can smuggle in an instruction that no user or reviewer ever sees."
+            },
+            {
+                heading: "Why is it dangerous?",
+                body: "The tool keeps working normally on the surface - correct results, no errors - while quietly directing the agent to take an extra, unauthorised action: exfiltrating data to an external endpoint, invoking a second, more sensitive tool, or overriding its own instructions. Because nothing in the visible conversation or output looks wrong, this bypasses both human review and output-only monitoring."
+            }
+        ],
+        remediation: `## What to do
+
+### Immediate
+- Diff the tool's current description and schema against its last-approved version to confirm what changed and when.
+- Check what the tool has actually been invoked to do since the change - especially any outbound network calls or chained tool invocations.
+
+### Structural fixes
+1. **Pin and hash tool definitions** - fingerprint each approved tool's name, description and schema; alert on any change instead of silently trusting whatever the server currently returns.
+2. **Re-review on every change, not just on first approval** - a tool that passed review once should not be trusted indefinitely; treat a definition change as a new, unreviewed tool.
+3. **Scan tool descriptions for hidden instructions** - apply the same content-filtering guardrails used on user input to tool metadata, not just user-facing text.
+4. **Require human-in-the-loop for tools that change** - until re-approved, route calls to a changed tool through manual approval rather than silently blocking or allowing it.
+`
+    },
+
+    // ─── Agent Memory Poisoning ─────────────────────────────────────────────────
+    {
+        prefixes: ["AgentMemoryPoisoning", "agent_memory_poisoning", "MemoryPoisoning", "memory_poisoning", "ContextPoisoning", "context_poisoning"],
+        templateIdPrefixes: ["AgentMemoryPoisoningPolicy", "agent-memory-poisoning-policy", "MemoryPoisoningPolicy"],
+        heading: "Agent Memory Poisoning Detected",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "An adversary injected false or malicious content into data the agent later treats as trusted long-term memory - a document, a RAG result, or a prior session summary - rather than attacking the current conversation directly. The injected instruction sits dormant until a future session retrieves that memory as context, at which point the agent acts on it as if it were a verified fact."
+            },
+            {
+                heading: "Why is it dangerous?",
+                body: "Prompt-injection filters only scan the live conversation turn, so a payload smuggled in through stored memory is invisible to them - it can silently persist for days, survive across sessions and even across users, and by the time it fires there is no live attacker message to point to, only a memory entry that looks like ordinary context."
+            }
+        ],
+        remediation: `## What to do
+
+### Immediate
+- Identify and purge the poisoned memory entry - trace it back to the document or session that introduced it and remove every downstream memory record derived from it.
+- Audit any decisions the agent made while this memory entry was active, especially approvals or privilege changes.
+
+### Structural fixes
+1. **Never write memory directly from untrusted input** - documents, RAG chunks, tool output and user messages should pass through the same content-filtering guardrails before being summarised into long-term memory, not just before being shown to the user.
+2. **Tag memory with provenance and trust level** - record where each memory entry came from and require a higher bar before treating externally-sourced content as an instruction rather than as data.
+3. **Re-verify high-risk actions against source data, not memory** - before an approval, refund, or privilege change, confirm the underlying claim against its original source rather than trusting a summarised memory of it.
+4. **Expire and re-validate stale memory** - memory older than a defined window should be re-checked against current guardrail policies before continuing to influence agent behaviour.
+`
+    },
+
     // ─── MCP Server Not in Allowed List ────────────────────────────────────────
     {
         prefixes: ["McpServerNotInAllowedList", "McpServer", "mcp_server"],
+        capability: "mcpServerAllowList",
         heading: "MCP Server Not Allowed",
         overview: [
             {
@@ -641,9 +733,70 @@ This is **working as intended**. The host was blocked on purpose by your organis
 `
     },
 
+    // ─── Blocked LLM (Audit Data → LLMs) ───────────────────────────────────────
+    {
+        prefixes: ["LLMAccessRejected"],
+        capability: "blockedLlms",
+        heading: "Blocked LLM",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "A prompt was sent to an LLM website that an administrator has blocked in Audit Data → LLMs. Users can still open the website, but prompts sent to it are blocked."
+            },
+            {
+                heading: "Why is it blocked?",
+                body: "Blocking an LLM website prevents company data from being shared with AI services that have not been approved for use within the organisation."
+            }
+        ],
+        remediation: `## Recommended actions
+
+### Review the request
+1. Identify the user and the LLM website from the event details.
+2. Check the **Values** tab for any sensitive or confidential data in the prompt.
+
+### Update access
+- **To allow the website:** go to Audit Data → LLMs, select the website and click **Allow**. The change applies within a minute.
+- **To keep it blocked:** no action is required. Direct the user to an approved AI tool.
+
+### Ongoing review
+Review the LLMs tab in Audit Data regularly and allow or block newly discovered websites.
+`
+    },
+
+    // ─── Blocked AI Agent (Audit Data → AI Agents) ─────────────────────────────
+    {
+        prefixes: ["AIAgentAccessRejected"],
+        capability: "blockedAgents",
+        heading: "Blocked AI Agent",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "A request was made by an AI agent that an administrator has blocked in Audit Data → AI Agents. All prompts and MCP calls from this agent are blocked for the users and devices the block covers."
+            },
+            {
+                heading: "Why is it blocked?",
+                body: "Blocking an AI agent prevents company data and systems from being accessed by agents that have not been approved for use within the organisation."
+            }
+        ],
+        remediation: `## Recommended actions
+
+### Review the request
+1. Identify the user, device and AI agent from the event details.
+2. Check the **Values** tab for any sensitive or confidential data in the request.
+
+### Update access
+- **To allow the agent:** go to Audit Data → AI Agents, select the agent and click **Allow**. The change applies within a minute.
+- **To keep it blocked:** no action is required. Direct the user to an approved AI agent.
+
+### Ongoing review
+Review the AI Agents tab in Audit Data regularly and allow or block newly discovered agents.
+`
+    },
+
     // ─── Audit Controls (ComponentAccess, Approval, IP, Endpoint) ──────────────
     {
         prefixes: ["ComponentAccessRejected", "ApprovalConditionsNotDefined", "ApprovalExpired", "IPNotInAllowedList", "EndpointNotWhitelisted"],
+        capability: "componentAccess",
         heading: "Access Control Violation",
         overview: [
             {
@@ -677,6 +830,7 @@ Identify the specific rule from the \`ruleViolated\` field:
     // ─── Personal Account ──────────────────────────────────────────────────────
     {
         prefixes: ["BlockPersonalAccounts", "block_personal_account", "personal_account", "personalaccount"],
+        capability: "blockPersonalAccounts",
         templateIdPrefixes: ["block-personal-account"],
         heading: "Personal Account Usage Blocked",
         overview: [
@@ -697,6 +851,70 @@ Identify the specific rule from the \`ruleViolated\` field:
 ### For an administrator
 - If this account *should* be allowed (it was blocked by mistake, or it is actually a valid work account), update the personal-accounts policy to permit it.
 - If the same user keeps hitting this block, it usually means they need a reminder to switch to their company account rather than any technical change.
+`
+    },
+
+    // ─── Public Share ───────────────────────────────────────────────────────────
+    {
+        prefixes: ["BlockPublicShare", "block_public_share", "public_share"],
+        capability: "blockPublicShare",
+        heading: "Public Sharing Blocked",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "A chat or artifact share request was set to public, making it visible to anyone with the link rather than only the organisation or invited users. This is an intentional policy block, not a detected attack."
+            },
+            {
+                heading: "Why is it blocked?",
+                body: "A public link removes the organisation's control over who can view the shared content, with no record of who it may be forwarded to. Restricting sharing to the organisation or named invitees keeps the content within governance and compliance boundaries."
+            }
+        ],
+        remediation: `### Recommended actions
+- **If public sharing should be permitted for this case**, an administrator can disable the \`Block public sharing\` option under the guardrail policy's Access restrictions.
+- **If users repeatedly encounter this block**, advise them to share with the organisation or specific individuals instead of setting the link to public.
+`
+    },
+
+    // ─── Context Poisoning ──────────────────────────────────────────────────────
+    {
+        prefixes: ["ContextPoisoning", "context_poisoning"],
+        capability: "contextPoisoning",
+        heading: "Context Poisoning Detected",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "Content that entered the agent's context - a fetched web page, a file, or a tool result - carried hidden instructions or misleading information meant to steer the agent away from the user's actual request."
+            },
+            {
+                heading: "Why is it dangerous?",
+                body: "An agent treats what is in its context as trusted input. Poisoned context can make it leak data, call tools it should not, or act on false information, without the user ever typing anything malicious."
+            }
+        ],
+        remediation: `### Recommended actions
+- **Identify the source** of the poisoned content (the URL, file or tool named in the violation) and stop the agent from reading it.
+- **Review what the agent did next** in this session for any tool calls or data sent as a result.
+- **Restrict untrusted sources** the agent is allowed to read, for example with a blocked-hosts policy.
+`
+    },
+
+    // ─── Custom Redaction Rule ──────────────────────────────────────────────────
+    {
+        prefixes: ["UserDefinedLLMRedactionRule"],
+        heading: "Custom Redaction Rule Applied",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "A user-defined redaction rule, evaluated by an LLM validator, found content matching what your organisation asked to be redacted, and removed it before the request continued."
+            },
+            {
+                heading: "Why does it matter?",
+                body: "Redaction rules cover organisation-specific sensitive content that standard filters do not recognise. A hit means that content was about to leave through an AI tool."
+            }
+        ],
+        remediation: `### Recommended actions
+- **No action is needed for this request** - the matching content was redacted.
+- **If the same rule fires often for one user or tool**, check why that content keeps being shared and whether the workflow should change.
+- **If the redaction was wrong**, an administrator can refine the rule in the guardrail policy.
 `
     }
 ];
@@ -736,8 +954,14 @@ export function getGuardrailRuleInfo(ruleViolated, templateId) {
 
 // Capabilities without a detail-dialog entry above. capability === guardrails/<capability>.conf filename.
 const EXTRA_CAPABILITY_PREFIXES = [
-    { prefixes: ["ContextPoisoning", "context_poisoning"], capability: "contextPoisoning" },
-    { prefixes: ["BlockedHosts", "blocked_host", "EndpointNotWhitelisted"], capability: "blockedHosts" },
+    { prefixes: ["BlockedHosts", "blocked_host"], capability: "blockedHosts" },
+    // Credential types detected by the PII filter (and the Password scanner) are secrets, not personal data.
+    {
+        prefixes: ["Password", "PII-password", "PII-secret", "PII-token", "PII-otp", "PII-aws_access_key_id", "PII-ssh_private_key",
+            "PII-gcp_credential", "PII-azure_credential", "PII-database", "PII-aws_rds_url", "PII-aws_docdb_url",
+            "PII-aws_dynamodb_url", "PII-aws_arn_connect_instance", "PII-webhook_url"],
+        capability: "secretsDetection",
+    },
 ];
 
 // Maps an event's rule_violated to its compliance capability (e.g. "PII_EMAIL" -> "piiTypes").
@@ -746,7 +970,7 @@ export function getGuardrailCapabilityForRule(ruleViolated) {
     const v = ruleViolated.trim().toLowerCase();
     const matches = (prefixes) => prefixes.some(p => v.startsWith(p.toLowerCase()) || v.includes(p.toLowerCase()));
 
-    for (const def of [...GUARDRAIL_RULE_DEFINITIONS, ...EXTRA_CAPABILITY_PREFIXES]) {
+    for (const def of [...EXTRA_CAPABILITY_PREFIXES, ...GUARDRAIL_RULE_DEFINITIONS]) {
         if (def.capability && matches(def.prefixes)) return def.capability;
     }
     return null;

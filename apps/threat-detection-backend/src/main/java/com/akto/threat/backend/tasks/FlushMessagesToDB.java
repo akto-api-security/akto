@@ -13,6 +13,7 @@ import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.utils.SplunkEvent;
+import com.akto.util.ThreatDetectionConstants;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -206,6 +207,19 @@ public class FlushMessagesToDB {
         return;
       }
 
+      // skip misconfigurations events from going to actor_info table
+      if ("settings-scanner".equals(actor)) {
+        return;
+      }
+
+      String filterId = event.getFilterId();
+      String skillEndpoint = event.getLatestApiEndpoint();
+      boolean isSkillFilterId = "skill_evaluation".equals(filterId) || "malicious_skill_detected".equals(filterId);
+      boolean isSkillEndpoint = skillEndpoint != null && skillEndpoint.startsWith("/skills/");
+      if (isSkillFilterId || isSkillEndpoint) {
+        return;
+      }
+
       // Get contextSource, default to "API" if null or empty
       String contextSource = event.getContextSource();
       if (contextSource == null || contextSource.isEmpty()) {
@@ -241,7 +255,7 @@ public class FlushMessagesToDB {
       updatesList.add(Updates.set("updatedAt", Context.now()));
       updatesList.add(Updates.setOnInsert("actorId", actor));
       updatesList.add(Updates.setOnInsert("contextSource", contextSource));  // Set on insert
-      updatesList.add(Updates.setOnInsert("status", "ACTIVE"));
+      updatesList.add(Updates.setOnInsert("status", ThreatDetectionConstants.ACTIVE));
       updatesList.add(Updates.inc("totalAttacks", 1));
 
       // Only set isCritical to true if this event is HIGH/CRITICAL

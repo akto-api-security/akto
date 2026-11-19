@@ -26,7 +26,8 @@ public class WebhookSender {
         loggerMaker.setDb(db);
     }
 
-    public static void sendCustomWebhook(CustomWebhook webhook, String payload, List<String> errors, int now, LogDb db){
+    /** Returns the receiver's response, or null if the request could not be sent. */
+    public static OriginalHttpResponse sendCustomWebhook(CustomWebhook webhook, String payload, List<String> errors, int now, LogDb db){
 
         initLoggerMaker(db);
 
@@ -53,6 +54,7 @@ public class WebhookSender {
 
         CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(), webhook.getUserEmail(), now, message, errors);
         CustomWebhooksResultDao.instance.insertOne(webhookResult);
+        return response;
     }
 
 }

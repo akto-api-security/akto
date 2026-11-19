@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActionList,
     Badge,
@@ -7,7 +7,9 @@ import {
     ChoiceList,
     Divider,
     HorizontalStack,
+    Key,
     Modal,
+    Pagination,
     Popover,
     Tabs,
     Text,
@@ -18,24 +20,37 @@ import { MobileCancelMajor } from "@shopify/polaris-icons";
 
 import AgenticFlyoutShell from "@/apps/dashboard/pages/observe/agentic/AgenticFlyoutShell";
 import AiChatSection from "@/apps/dashboard/pages/observe/agentic/AiChatSection";
+import { buildAgenticObserveChatMetadata } from "@/apps/dashboard/pages/observe/agentic/agenticObserveApi";
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
+import { isBackfillRefId } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
 import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/ActivityTracker";
 import JiraTicketCreationModal from "@/apps/dashboard/components/shared/JiraTicketCreationModal";
 import SampleDataList from "@/apps/dashboard/components/shared/SampleDataList";
 import func from "@/util/func";
 import guardrailsApi from "../api";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
+import { redactSampleDataByKeywords } from "@/apps/dashboard/pages/threat_detection/utils/redactSampleData";
 import issuesApi from "@/apps/dashboard/pages/issues/api";
 import settingFunctions from "@/apps/dashboard/pages/settings/module";
 import issuesFunctions from "@/apps/dashboard/pages/issues/module";
+import { usePermissions, withPermissions } from "@/util/permissions";
+import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
+import ReviewCaseModal from "@/apps/dashboard/pages/guardrails/components/ReviewCaseModal";
+import CasePanel from "@/apps/dashboard/pages/guardrails/components/CasePanel";
+import useCaseOwners from "@/apps/dashboard/pages/threat_detection/utils/useCaseOwners";
+import { buildCaseTimeline } from "@/apps/dashboard/pages/threat_detection/utils/caseManagement";
 
 import {
     ChatSessionSection,
     FileSection,
+    HumanApprovalActions,
+    HumanResponseBadge,
     OverviewSection,
+    PromptResponseSection,
     RemediationSection,
+    isHumanApprovalPending,
 } from "./ViolationFlyoutSections";
-import { buildFallbackDetail } from "./violationsData";
+import { buildFallbackDetail, buildViolationChatContext } from "./violationsData";
 import "../../../components/layouts/style.css";
 
 // ─── Event Actions dropdown ───────────────────────────────────────────────────
@@ -59,9 +74,12 @@ function buildViolationDescription(row) {
     ].join("\n");
 }
 
+// onStatusUpdate({ status?, caseOwner?, caseNotes? }) tells the page what was saved, so the open flyout and the
+// table can show it. Marking for review opens a case: the dialog sets its owner and notes.
 function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row }) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [reviewOpen, setReviewOpen] = useState(false);
 
     // Jira state
     const [jiraModalActive, setJiraModalActive]   = useState(false);
@@ -83,14 +101,14 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
         }
     }, []);
 
-    const handleStatusChange = async (newStatus) => {
+    const handleStatusChange = async (newStatus, caseFields = {}) => {
         if (!violationId) return;
         setOpen(false);
         setLoading(true);
         try {
-            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: violationId, status: newStatus });
+            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: violationId, status: newStatus, ...caseFields });
             if (response?.updateSuccess) {
-                onStatusUpdate?.(newStatus);
+                onStatusUpdate?.({ status: newStatus, ...caseFields });
                 const label = newStatus === "UNDER_REVIEW" ? "marked for review"
                     : newStatus === "IGNORED" ? "ignored" : "reactivated";
                 func.setToast(true, false, `Event ${label} successfully`);
@@ -193,17 +211,17 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
 
     const items = [
         (eventStatus === "UNDER_REVIEW" || eventStatus === "TRIAGE")
-            ? { content: "Reactivate", onAction: () => handleStatusChange("ACTIVE") }
-            : { content: "Mark for Review", onAction: () => handleStatusChange("UNDER_REVIEW") },
+            ? { content: "Reactivate", onAction: () => handleStatusChange("ACTIVE"), requires: "api/updateMaliciousEventStatus" }
+            : { content: "Mark for Review", onAction: () => { setOpen(false); setReviewOpen(true); }, requires: "api/updateMaliciousEventStatus" },
         eventStatus === "IGNORED"
-            ? { content: "Reactivate", onAction: () => handleStatusChange("ACTIVE") }
-            : { content: "Ignore", onAction: () => handleStatusChange("IGNORED") },
+            ? { content: "Reactivate", onAction: () => handleStatusChange("ACTIVE"), requires: "api/updateMaliciousEventStatus" }
+            : { content: "Ignore", onAction: () => handleStatusChange("IGNORED"), requires: "api/updateMaliciousEventStatus" },
         jiraTicketUrl
             ? { content: "View Jira Ticket", onAction: () => window.open(jiraTicketUrl, "_blank") }
-            : { content: "Create Jira Ticket", onAction: handleJiraClick, disabled: window.JIRA_INTEGRATED !== "true" },
+            : { content: "Create Jira Ticket", onAction: handleJiraClick, disabled: window.JIRA_INTEGRATED !== "true", requires: ["api/fetchIntegration", "api/createGeneralJiraTicket"] },
         azureBoardsUrl
             ? { content: "View Work Item", onAction: () => window.open(azureBoardsUrl, "_blank") }
-            : { content: "Create Work Item", onAction: handleAzureClick, disabled: window.AZURE_BOARDS_INTEGRATED !== "true" },
+            : { content: "Create Work Item", onAction: handleAzureClick, disabled: window.AZURE_BOARDS_INTEGRATED !== "true", requires: ["api/fetchAzureBoardsIntegration", "api/createGeneralAzureBoardsWorkItem"] },
     ];
 
     return (
@@ -220,9 +238,17 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
                 preferredAlignment="right"
             >
                 <Box minWidth="180px">
-                    <ActionList actionRole="menuitem" items={items} />
+                    <ActionList actionRole="menuitem" items={withPermissions(items)} />
                 </Box>
             </Popover>
+
+            <ReviewCaseModal
+                open={reviewOpen}
+                onClose={() => setReviewOpen(false)}
+                onConfirm={(caseFields) => { setReviewOpen(false); handleStatusChange("UNDER_REVIEW", caseFields); }}
+                initialOwner={row?.caseOwner || ""}
+                initialNotes={row?.caseNotes || ""}
+            />
 
             <JiraTicketCreationModal
                 activator={null}
@@ -256,6 +282,7 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
 // ─── Approve server button (for "approval" behaviour policies) ─────────────────
 
 function ApproveServerButton({ row }) {
+    const { canCall } = usePermissions();
     const [modalActive, setModalActive] = useState(false);
     const [mode, setMode]               = useState("ALWAYS"); // ALWAYS | DURATION
     const [days, setDays]               = useState("7");
@@ -297,7 +324,9 @@ function ApproveServerButton({ row }) {
 
     return (
         <>
-            <Button size="slim" onClick={openModal}>Approve server</Button>
+            <AllowedAction allowed={canCall("api/approveServerForPolicy")}>
+                <Button size="slim" onClick={openModal}>Approve server</Button>
+            </AllowedAction>
             <Modal
                 open={modalActive}
                 onClose={() => setModalActive(false)}
@@ -339,7 +368,12 @@ function ApproveServerButton({ row }) {
 
 // ─── Header ─────────────────────────────────────────────────────────────────────
 
-function FlyoutHeader({ row, onClose, onStatusUpdate }) {
+function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
+    const { canCall } = usePermissions();
+    const isHumanApprovalEvent = String(row?._status || "").toUpperCase() === "HUMAN_APPROVAL";
+    const humanResponse = String(row?.humanResponse || "PENDING").toUpperCase();
+    const pending = isHumanApprovalEvent && isHumanApprovalPending(humanResponse);
+
     return (
         <>
             <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">
@@ -347,20 +381,37 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
                     <HorizontalStack gap="2" blockAlign="center">
                         <Text variant="headingMd" fontWeight="semibold">{row.violation}</Text>
                         <SeverityBadge severity={row.severity} />
-                        {row.action && (
+                        {isBackfillRefId(row.refId) ? (
+                            <Badge size="small" status="info">Backfill</Badge>
+                        ) : row.action && (
                             <Badge size="small" status={row.action === "Blocked" ? "critical" : "warning"}>
                                 {row.action}
                             </Badge>
                         )}
                     </HorizontalStack>
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                        <EventActionsDropdown
-                            violationId={row.id}
-                            eventStatus={row._status}
-                            onStatusUpdate={onStatusUpdate}
-                            row={row}
-                        />
-                        {row.behaviour === "approval" && <ApproveServerButton row={row} />}
+                        {!isHumanApprovalEvent && (
+                            <>
+                                <EventActionsDropdown
+                                    violationId={row.id}
+                                    eventStatus={row._status}
+                                    onStatusUpdate={onStatusUpdate}
+                                    row={row}
+                                />
+                                {row.behaviour === "approval" && func.canManageGuardrailPolicies() && <ApproveServerButton row={row} />}
+                            </>
+                        )}
+                        {isHumanApprovalEvent && pending && (
+                            <HumanApprovalActions
+                                pending
+                                allowed={canCall("api/updateMaliciousEventStatus")}
+                                onApprove={() => onHumanApproval?.("APPROVED")}
+                                onBlock={() => onHumanApproval?.("BLOCKED")}
+                            />
+                        )}
+                        {isHumanApprovalEvent && !pending && (
+                            <HumanResponseBadge response={humanResponse} />
+                        )}
                         <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
                     </HorizontalStack>
                 </HorizontalStack>
@@ -372,41 +423,97 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
 
 // ─── Flyout ─────────────────────────────────────────────────────────────────────
 
-export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate }) {
+export default function ViolationFlyout({ violation: rowViolation, toAttemptRow, show, onClose, onStatusUpdate, onHumanApproval }) {
     const [selectedTab, setSelectedTab] = useState(0);
+    // Captured events to show: the row's own, or every event of a grouped activity, newest first.
+    const [attemptPayloads, setAttemptPayloads] = useState([]);
+    const [attemptIndex, setAttemptIndex] = useState(0);
+    const enrichedPayload = attemptPayloads[attemptIndex]?.orig || null;
+    // Paging a grouped activity shows the selected event's own details, not just its payload.
+    const attempt = attemptPayloads.length > 1 ? attemptPayloads[attemptIndex] : null;
+    const violation = useMemo(
+        // On close the row goes away a render before the previous row's attempts are cleared.
+        () => (rowViolation && attempt && toAttemptRow ? toAttemptRow(rowViolation, attempt) : rowViolation),
+        [attempt, toAttemptRow, rowViolation]
+    );
 
-    useEffect(() => { setSelectedTab(0); }, [violation?.id]);
+    useEffect(() => { setSelectedTab(0); }, [rowViolation?.id]);
+
+    // The list endpoint's row doesn't always carry the full captured request/response
+    // (row.payload can be empty even though the event has one) - the same gap the old
+    // Threat Activity flyout covers by fetching it on open via refId/eventType/filterId.
+    // Do the same here, only when the row itself has nothing to show.
+    // A grouped activity row also fetches its other events, so each prompt can be paged through.
+    useEffect(() => {
+        setAttemptPayloads([]);
+        setAttemptIndex(0);
+        const groupEventIds = rowViolation?.groupCount > 1 ? (rowViolation.groupEventIds || []) : [];
+        if ((rowViolation?.payload && groupEventIds.length === 0) || !rowViolation?.refId || !rowViolation?.eventType || !rowViolation?.filterId) return;
+        let cancelled = false;
+        threatDetectionApi.fetchMaliciousRequest(rowViolation.refId, rowViolation.eventType, rowViolation.actor || "", rowViolation.filterId, groupEventIds)
+            .then(res => {
+                if (cancelled) return;
+                const attempts = (res?.maliciousPayloadsResponses || []).filter(p => p?.orig);
+                setAttemptPayloads(attempts.map(p => ({ ...p, orig: redactSampleDataByKeywords(p.orig) })));
+            })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [rowViolation?.id, rowViolation?.refId, rowViolation?.eventType, rowViolation?.filterId, rowViolation?.actor, rowViolation?.payload, rowViolation?.groupCount, rowViolation?.groupEventIds]);
 
     const detail = useMemo(() => {
         if (!violation) return null;
-        return buildFallbackDetail(violation);
-    }, [violation]);
+        return buildFallbackDetail(enrichedPayload ? { ...violation, payload: enrichedPayload } : violation);
+    }, [violation, enrichedPayload]);
 
-    // Timeline for the selected violation — shows just this event.
-    // Previously iterated allRows (the entire dataset) client-side; now the flyout
-    // only has the current page's data so we show a single-entry timeline.
+    const chatMetadata = useMemo(() => {
+        if (!violation || !detail) return null;
+        return buildAgenticObserveChatMetadata("violation", buildViolationChatContext(violation, detail));
+    }, [violation, detail]);
+
+    // Timeline of the selected event: when it was detected, then every status, owner and notes change.
+    const { owners: caseOwners } = useCaseOwners();
     const timelineActivity = useMemo(() => {
         if (!violation) return [];
-        return [{
-            description: (violation.violation || "Violation detected") + " (this event)",
-            timestamp: violation.detected,
-        }];
-    }, [violation]);
+        return buildCaseTimeline(violation.caseTimeline, violation.detected, caseOwners, `${violation.violation || "Violation"} detected`);
+    }, [violation, caseOwners]);
 
-    // Tabs: Overview · (type-specific middle tab) · Remediation · Timeline.
+    const isHumanApprovalEvent = String(violation?._status || "").toUpperCase() === "HUMAN_APPROVAL";
+    // An event marked for review is a case (owner, notes); one that has been one keeps its case data.
+    const hasCase = violation?._status === "UNDER_REVIEW" || !!violation?.caseOwner || !!violation?.caseNotes;
+
+    // Tabs: Overview · Values · Remediation · and last either Review case or Timeline. A case is one tab: its
+    // owner and notes, with the timeline below them. An event that isn't a case keeps the plain Timeline tab.
+    // Human Approval only needs Overview and Values.
     const tabModel = useMemo(() => {
-        const tabs = [{ id: "overview", content: "Overview" }];
+        const tabs = [
+            { id: "overview", content: "Overview" },
+            { id: "promptResponse", content: "Values" },
+        ];
         let middle = null;
-        if (detail?.chatSession?.length) middle = "chat";
-        else if (detail?.fileContent && violation?.type !== "Skill") middle = "file";
-        if (middle === "chat") tabs.push({ id: "chat", content: "Chat Session" });
-        if (middle === "file") tabs.push({ id: "file", content: detail.fileTabLabel || "File" });
-        if (detail?.remediation) tabs.push({ id: "remediation", content: "Remediation" });
-        tabs.push({ id: "timeline", content: "Timeline" });
+        if (!isHumanApprovalEvent) {
+            if (detail?.remediation) tabs.push({ id: "remediation", content: "Remediation" });
+            tabs.push(hasCase ? { id: "case", content: "Review case" } : { id: "timeline", content: "Timeline" });
+        }
         return { tabs, middle };
-    }, [detail, violation]);
+    }, [detail, violation, isHumanApprovalEvent, hasCase]);
 
-    const handleTabSelect = useCallback((idx) => setSelectedTab(idx), []);
+    // Tabs are picked by position, but the last tab changes between Case and Timeline with the event's status:
+    // keep the tab the user is on when the list changes under them (marking for review turns Timeline into Case).
+    const activeTabIdRef = useRef("overview");
+    useEffect(() => { activeTabIdRef.current = "overview"; }, [rowViolation?.id]);
+    useEffect(() => {
+        const ids = tabModel.tabs.map((t) => t.id);
+        const wanted = activeTabIdRef.current;
+        const idx = ids.indexOf(ids.includes(wanted) ? wanted : (wanted === "case" ? "timeline" : wanted === "timeline" ? "case" : wanted));
+        if (idx >= 0) {
+            activeTabIdRef.current = ids[idx];
+            setSelectedTab(idx);
+        }
+    }, [tabModel]);
+    const handleTabSelect = useCallback((idx) => {
+        activeTabIdRef.current = tabModel.tabs[idx]?.id;
+        setSelectedTab(idx);
+    }, [tabModel]);
 
     if (!violation) return null;
 
@@ -414,7 +521,27 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
 
     function renderTabContent(id) {
         switch (id) {
-            case "overview":    return <OverviewSection row={violation} detail={detail} />;
+            case "overview":        return <OverviewSection row={violation} detail={detail} />;
+            case "promptResponse":  return (
+                <>
+                    {attemptPayloads.length > 1 && (
+                        <Box paddingBlockStart="3" paddingInlineEnd="4" paddingInlineStart="4">
+                            <HorizontalStack align="end">
+                                <Pagination
+                                    label={`${attemptIndex + 1} of ${attemptPayloads.length}`}
+                                    hasPrevious={attemptIndex > 0}
+                                    previousKeys={[Key.LeftArrow]}
+                                    onPrevious={() => setAttemptIndex(i => i - 1)}
+                                    hasNext={attemptIndex < attemptPayloads.length - 1}
+                                    nextKeys={[Key.RightArrow]}
+                                    onNext={() => setAttemptIndex(i => i + 1)}
+                                />
+                            </HorizontalStack>
+                        </Box>
+                    )}
+                    <PromptResponseSection detail={detail} host={violation.host} anchorTimestamp={violation.detected} />
+                </>
+            );
             case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
             case "file":
                 if (violation.type === "Tool") {
@@ -430,6 +557,15 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
                     );
                 }
                 return <FileSection detail={detail} />;
+            case "case":        return (
+                <CasePanel
+                    eventIds={violation.groupCount > 1 && violation.groupEventIds?.length ? violation.groupEventIds : [violation.id]}
+                    caseOwner={violation.caseOwner || ""}
+                    caseNotes={violation.caseNotes || ""}
+                    activity={timelineActivity}
+                    onSaved={(fields) => onStatusUpdate?.(fields)}
+                />
+            );
             case "remediation": return <RemediationSection markdown={detail?.remediation} />;
             case "timeline":    return <ActivityTracker latestActivity={timelineActivity} />;
             default:            return null;
@@ -442,7 +578,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
             width={840}
             header={
                 <>
-                    <FlyoutHeader row={violation} onClose={onClose} onStatusUpdate={onStatusUpdate} />
+                    <FlyoutHeader row={violation} onClose={onClose} onStatusUpdate={onStatusUpdate} onHumanApproval={onHumanApproval} />
                     <Box paddingInlineStart="1" paddingInlineEnd="1">
                         <Tabs tabs={tabModel.tabs} selected={selectedTab} onSelect={handleTabSelect} />
                     </Box>
@@ -454,6 +590,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
                     placeholder="Ask anything related to your endpoints..."
                     resetKey={violation.id}
                     conversationType="AGENTIC_OBSERVE"
+                    chatMetadata={chatMetadata}
                 />
             }
         >

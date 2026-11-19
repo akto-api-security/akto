@@ -10,7 +10,6 @@ import (
 
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"go.uber.org/zap"
-	"golang.org/x/sync/singleflight"
 )
 
 // aktoParamPattern matches Akto-style path parameters: INTEGER, STRING, FLOAT, BOOLEAN
@@ -194,11 +193,9 @@ func ExtractContentFirst(payload string, fields []MessageFieldEntry) string {
 type SchemaFetcher struct {
 	dbClient        *dbabstractor.Client
 	refreshInterval time.Duration
-	lastFetchTime   time.Time
 	mu              sync.RWMutex
 	logger          *zap.Logger
 	endpoints       map[string]map[string]bool // method -> path -> true
-	refreshGroup    singleflight.Group
 }
 
 // NewSchemaFetcher creates a new SchemaFetcher and performs an initial fetch.
@@ -216,28 +213,20 @@ func NewSchemaFetcher(dbClient *dbabstractor.Client, refreshInterval time.Durati
 	return sf
 }
 
-// RefreshIfNeeded fetches and updates if the refresh interval has elapsed.
-func (sf *SchemaFetcher) RefreshIfNeeded() {
-	sf.mu.RLock()
-	elapsed := time.Since(sf.lastFetchTime)
-	sf.mu.RUnlock()
-
-	if elapsed < sf.refreshInterval {
-		return
+func (sf *SchemaFetcher) StartRefresher() {
+	interval := sf.refreshInterval
+	if interval <= 0 {
+		interval = time.Minute
 	}
-
-	_, err, _ := sf.refreshGroup.Do("guardrail-schema", func() (interface{}, error) {
-		sf.mu.RLock()
-		if time.Since(sf.lastFetchTime) < sf.refreshInterval {
-			sf.mu.RUnlock()
-			return nil, nil
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := sf.FetchAndUpdate(); err != nil {
+				sf.logger.Warn("SchemaFetcher: refresh failed, using stale state", zap.Error(err))
+			}
 		}
-		sf.mu.RUnlock()
-		return nil, sf.FetchAndUpdate()
-	})
-	if err != nil {
-		sf.logger.Warn("SchemaFetcher: refresh failed, using stale state", zap.Error(err))
-	}
+	}()
 }
 
 // IsEndpointSelected checks if an endpoint has guardrails enabled in the dashboard.
@@ -357,7 +346,6 @@ func (sf *SchemaFetcher) FetchAndUpdate() error {
 
 	sf.mu.Lock()
 	sf.endpoints = newEndpoints
-	sf.lastFetchTime = time.Now()
 	sf.mu.Unlock()
 
 	totalCount := 0

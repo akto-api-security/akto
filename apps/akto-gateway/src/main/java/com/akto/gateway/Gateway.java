@@ -19,6 +19,11 @@ public class Gateway {
     // way _traces already does. Keeping it out of requestHeaders matters: a recorded header becomes
     // part of the API's schema and its stored sample, and would be replayed during tests.
     private static final String GUARDRAIL_FIELD = "_guardrail";
+    // Optional request payload to validate instead of requestPayload, e.g. only the newest user
+    // turn of a long conversation. requestPayload is still what gets ingested.
+    public static final String GUARDRAILS_REQUEST_PAYLOAD = "guardrailsRequestPayload";
+    // Optional comma-separated policy names the guardrails service narrows its policies to.
+    public static final String GUARDRAILS_POLICY_NAME = "policyName";
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -36,23 +41,25 @@ public class Gateway {
 
     public Map<String, Object> processHttpProxy(Map<String, Object> requestData) {
         loggerMaker.infoAndAddToDb(
-            "Processing HTTP proxy request - path: {}, method: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}",
+            "Processing HTTP proxy request - path: {}, method: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}, activityId: {}",
             requestData.get("path"),
             requestData.get("method"),
             requestData.get("guardrails"),
             requestData.get("response_guardrails"),
-            requestData.get("ingest_data"));
+            requestData.get("ingest_data"),
+            requestData.get("activityId"));
+
+        String activityId = getStringField(requestData, "activityId");
+        if (activityId != null && !activityId.isEmpty()) {
+            return checkHumanApprovalStatus(activityId);
+        }
 
         long start = System.currentTimeMillis();
         try {
             String requestPayload = getStringField(requestData, "requestPayload");
             if (requestPayload == null || requestPayload.isEmpty()) {
-                loggerMaker.warnAndAddToDb("Missing required field: requestPayload");
-                Map<String, Object> error = new HashMap<>();
-                error.put("success", false);
-                error.put("message", "Missing required field: requestPayload");
-                error.put("error", "requestPayload is required");
-                return error;
+                requestPayload = "{}";
+                requestData.put("requestPayload", requestPayload);
             }
 
             Map<String, Object> result = new HashMap<>();
@@ -111,8 +118,21 @@ public class Gateway {
         }
     }
 
+    /** Checks a pending Human Approval activity's status via the same /api/http-proxy path. */
+    private Map<String, Object> checkHumanApprovalStatus(String activityId) {
+        Map<String, Object> validateRequest = new HashMap<>();
+        validateRequest.put("activityId", activityId);
+        Map<String, Object> guardrailsResponse = guardrailsClient.callValidateRequest(validateRequest);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", "Approval status checked");
+        result.put("guardrailsResult", guardrailsResponse);
+        return result;
+    }
+
     private static boolean shouldForceGuardrailsForAccount(Integer accountId) {
-        return accountId != null && (accountId == 1710118493 || accountId == 1000000);
+        return accountId != null && accountId == 1710118493;
     }
 
     private Map<String, Object> mergeGuardrailsResults(Map<String, Object> existing, Map<String, Object> incoming) {
@@ -156,13 +176,13 @@ public class Gateway {
             out.put("guardrailViolated", !isAllowed(guardrailsResult));
             putIfNotBlank(out, "guardrailAction", firstNonBlank(verdict, "behaviour", "Behaviour"));
             putIfNotBlank(out, "guardrailReason", firstNonBlank(verdict, "reason", "Reason"));
+            putIfNotBlank(out, "guardrailSeverity", firstNonBlank(verdict, "severity", "Severity"));
 
             Object metaObj = verdict.get("Metadata") != null ? verdict.get("Metadata") : verdict.get("metadata");
             if (metaObj instanceof Map) {
                 Map<?, ?> meta = (Map<?, ?>) metaObj;
-                putIfNotBlank(out, "guardrailPolicy", asString(meta.get("policy_name")));
-                putIfNotBlank(out, "guardrailRule", asString(meta.get("rule_violated")));
-                putIfNotBlank(out, "guardrailSeverity", asString(meta.get("severity")));
+                putIfNotBlank(out, "guardrailPolicy", asString(meta.get("policyName")));
+                putIfNotBlank(out, "guardrailRule", asString(meta.get("ruleViolated")));
             }
 
             requestData.put(GUARDRAIL_FIELD, objectMapper.writeValueAsString(out));
@@ -204,7 +224,8 @@ public class Gateway {
 
     private Map<String, Object> callGuardrails(Map<String, Object> requestData, boolean isResponse) {
         Map<String, Object> validateRequest = new HashMap<>();
-        validateRequest.put("requestPayload", requestData.get("requestPayload"));
+        Object verdictPayload = requestData.get(GUARDRAILS_REQUEST_PAYLOAD);
+        validateRequest.put("requestPayload", verdictPayload != null ? verdictPayload : requestData.get("requestPayload"));
         validateRequest.put("contextSource", requestData.get("contextSource"));
 
         putIfNotNull(validateRequest, requestData, "path");
@@ -225,6 +246,8 @@ public class Gateway {
         putIfNotNull(validateRequest, requestData, "direction");
         putIfNotNull(validateRequest, requestData, "tag");
         putIfNotNull(validateRequest, requestData, "metadata");
+        putIfNotNull(validateRequest, requestData, "fullRequest");
+        putIfNotNull(validateRequest, requestData, GUARDRAILS_POLICY_NAME);
 
         String contextSource = getStringField(requestData, "contextSource");
         String endpoint = isResponse ? "/validate/response" : "/validate/request";
@@ -265,6 +288,8 @@ public class Gateway {
         batch.setEnabled_graph(getStringField(requestData, "enabled_graph"));
         batch.setTag(getStringField(requestData, "tag"));
         batch.set_guardrail(getStringField(requestData, GUARDRAIL_FIELD));
+        batch.setRequest_guardrails(String.valueOf("true".equalsIgnoreCase(getStringField(requestData, "guardrails"))));
+        batch.setResponse_guardrails(String.valueOf("true".equalsIgnoreCase(getStringField(requestData, "response_guardrails"))));
 
         if (dataPublisher != null) {
             try {

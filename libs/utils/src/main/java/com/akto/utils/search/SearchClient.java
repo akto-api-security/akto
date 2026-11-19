@@ -1,5 +1,6 @@
 package com.akto.utils.search;
 
+import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -34,6 +35,8 @@ public abstract class SearchClient {
     protected static final String KEY_TERM            = "term";
     protected static final String KEY_TRACE_ID        = "traceId";
     protected static final String KEY_TIMESTAMP       = "timestamp";
+    protected static final String KEY_HAS_ACTIVE_GUARDRAIL = "hasActiveGuardrail";
+    protected static final String KEY_GUARDRAIL_POLICIES   = "guardrailPolicies";
 
     public abstract boolean isConfigured();
 
@@ -45,7 +48,7 @@ public abstract class SearchClient {
     public abstract SessionsResult fetchSessions(
         int accountId, long startMs, long endMs, String searchString,
         Map<String, List<String>> filters, Boolean atlasTrafficFilter,
-        int sessionsLimit, String sessionsAfterKey);
+        int sessionsLimit, String sessionsAfterKey, boolean includeTracesContent);
 
     public abstract List<Map<String, Object>> fetchMessages(
         int accountId, long startMs, long endMs,
@@ -55,8 +58,51 @@ public abstract class SearchClient {
         int accountId, long startMs, long endMs,
         Map<String, List<String>> filters, Boolean atlasTrafficFilter);
 
+    public ArgusStats fetchArgusStats(
+        int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent) {
+        return fetchArgusStats(accountId, startMs, endMs, null, atlasTrafficFilter, includeTracesContent);
+    }
+
+    /** Same as above, narrowed by field filters (e.g. serviceId) - null for no filters. */
     public abstract ArgusStats fetchArgusStats(
-        int accountId, long startMs, long endMs, Boolean atlasTrafficFilter);
+        int accountId, long startMs, long endMs, Map<String, List<String>> filters,
+        Boolean atlasTrafficFilter, boolean includeTracesContent);
+
+    /**
+     * Time-ranged replacement for UserAnalysisDataDao's lifetime-total read — sums input/output
+     * tokens per (serviceId, deviceId) within [startMs, endMs). Only id/totalInputTokens/
+     * totalOutputTokens are populated; topic/summary fields are cron-computed elsewhere.
+     */
+    public abstract List<UserAnalysisData> fetchUserAnalysisTokenTotals(
+        int accountId, long startMs, long endMs);
+
+    /**
+     * Argus (AGENTIC) posture read: a per-serviceId (not per-device) rollup for the dashboard's
+     * own window — token totals plus a real topic/subTopic breakdown straight off the indexed
+     * AgentQueryRecord fields (the ones UserAnalysisCron writes back via bulkUpdateTopics).
+     * Deliberately NOT the Mongo-materialized "harmful topic" classification
+     * (UserAnalysisData#getHarmfulTopics) — that's an LLM-computed, cron-only rollup with no live
+     * ES/ADX equivalent; see service/posture/CLAUDE.md's Argus section for why AGENTIC
+     * observability uses topic concentration instead of a harmful-topic signal.
+     * atlasTrafficFilter=false at the call site — Argus/agentic traffic is exactly the "not
+     * Atlas" half of AgentQueryRecord's isAtlasTraffic split. Only id.serviceId (deviceId left
+     * blank — this is a per-service rollup)/totalInputTokens/totalOutputTokens/topicHierarchy are
+     * populated; harmfulTopics/aiSummary are always empty.
+     */
+    public abstract List<UserAnalysisData> fetchAgenticServiceObservability(
+        int accountId, long startMs, long endMs, int topicsPerServiceCap);
+
+    /**
+     * Argus (AGENTIC) posture read: the account-wide (not per-service) topic/subTopic hierarchy
+     * for the dashboard's own window — the top `topicsCap` topics overall, each with its top
+     * `subTopicsCap` subtopics, straight off the indexed AgentQueryRecord fields. Same
+     * atlasTrafficFilter=false rationale as fetchAgenticServiceObservability above (Argus/agentic
+     * traffic is the "not Atlas" half of isAtlasTraffic). Returned map shape matches
+     * UserAnalysisData#topicHierarchy exactly (domain -> subDomain -> doc_count), insertion order
+     * = descending count, so no separate DTO is needed for this global rollup.
+     */
+    public abstract Map<String, Map<String, Integer>> fetchAgenticGlobalTopicHierarchy(
+        int accountId, long startMs, long endMs, int topicsCap, int subTopicsCap);
 
     public abstract List<Map<String, Object>> fetchTraceDetail(
         int accountId, String traceId, Boolean atlasTrafficFilter);
@@ -67,7 +113,8 @@ public abstract class SearchClient {
     public abstract SearchResult searchPrompts(
         int accountId, long startMs, long endMs, int skip, int limit,
         String sortKey, boolean sortAsc, String searchAfterJson,
-        Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString);
+        Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
+        boolean includeTracesContent);
 
     /** Used by UserAnalysisCron to fetch not-yet-topic-classified records. */
     public abstract void scrollQueryData(int accountId, long startTsMs, long endTsMs,

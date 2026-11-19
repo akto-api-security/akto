@@ -92,6 +92,7 @@ const JobInfo = () => {
                 icon: DeleteMajor,
                 destructive: true,
                 onAction: () => handleDelete(row),
+                requires: "api/deleteAccountJob",
             }]
         }
     ]

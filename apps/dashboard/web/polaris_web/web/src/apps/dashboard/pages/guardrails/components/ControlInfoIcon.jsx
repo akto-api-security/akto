@@ -5,15 +5,17 @@ import { Popover, Avatar, Box, VerticalStack, HorizontalStack, Text, Button, Div
 // the same active/onClose pattern). Shows a description plus zero or more concrete examples, each
 // with its own "Try now" button that hands the example text off via onTryPrompt (wired by the parent
 // to CreateGuardrailPage's handleSamplePayloadClick, which fills and focuses the Playground input).
-const ControlInfoIcon = ({ description, examples = [], onTryPrompt, preferredPosition = "above" }) => {
+// onEnable (optional): flips the control's checkbox on before firing onTryPrompt.
+const ControlInfoIcon = ({ description, examples = [], onTryPrompt, onEnable, preferredPosition = "above" }) => {
     const [active, setActive] = useState(false);
 
-    const handleTry = (event, text) => {
+    const handleTry = (event, example) => {
         // preventDefault (not stopPropagation) cancels the native label->checkbox activation this
         // button would otherwise trigger, without blocking Popover's own document-level "click
         // outside closes other popovers" listener.
         event.preventDefault();
-        onTryPrompt?.(text);
+        onEnable?.();
+        onTryPrompt?.(example.text, example.ensure);
         setActive(false);
     };
 
@@ -58,7 +60,7 @@ const ControlInfoIcon = ({ description, examples = [], onTryPrompt, preferredPos
                                         )}
                                         <Text as="span" variant="bodySm" tone="subdued">"{example.text}"</Text>
                                         <HorizontalStack align="end">
-                                            <Button size="slim" onClick={(event) => handleTry(event, example.text)}>Try now</Button>
+                                            <Button size="slim" onClick={(event) => handleTry(event, example)}>Try now</Button>
                                         </HorizontalStack>
                                     </VerticalStack>
                                 ))}

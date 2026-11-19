@@ -6,6 +6,9 @@ import javax.validation.ValidationException;
 
 public class McpToolMaliciousnessAnalyzer extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "mcp-tool-maliciousness"; }
+
     public static final String TOOL_NAME = "toolName";
     public static final String TOOL_DESCRIPTION = "toolDescription";
 

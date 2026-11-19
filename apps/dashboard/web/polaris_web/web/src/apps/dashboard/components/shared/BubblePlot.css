@@ -1,0 +1,77 @@
+/* Scatter of circles on a positioned grid; per-bubble values come as CSS custom properties. */
+.bubble-plot {
+    /* --zone-color and --glow-color come from BubblePlot.jsx. */
+    --zone-text: var(--p-color-text-critical);
+    position: relative;
+    height: var(--plot-height);
+    border-left: 1px solid var(--p-color-border);
+    border-bottom: 1px solid var(--p-color-border);
+    background: var(--plot-grid);
+}
+
+.bubble-plot__zone {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: var(--zone-width);
+    height: var(--zone-height);
+    background: color-mix(in srgb, var(--zone-color) 4%, transparent);
+    border-left: 1px dashed color-mix(in srgb, var(--zone-color) 30%, transparent);
+    border-bottom: 1px dashed color-mix(in srgb, var(--zone-color) 30%, transparent);
+    border-bottom-left-radius: 8px;
+}
+
+.bubble-plot__zone-label {
+    position: absolute;
+    right: 10px;
+    top: 8px;
+    font-size: 12px;
+    color: var(--zone-text);
+}
+
+.bubble-plot__circle {
+    position: absolute;
+    left: clamp(calc(var(--d) / 2), var(--x), calc(100% - var(--d) / 2));
+    bottom: clamp(0px, var(--y), 100%);
+    width: var(--d);
+    height: var(--d);
+    margin-left: calc(var(--d) / -2);
+    margin-bottom: calc(var(--d) / -2);
+    box-sizing: border-box;
+    border-radius: 50%;
+    background: var(--fill);
+    border: 1px solid var(--stroke);
+    cursor: pointer;
+}
+
+.bubble-plot__circle:hover {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow-color) 25%, transparent);
+}
+
+.bubble-plot__label {
+    position: absolute;
+    bottom: calc(var(--y) - 9px);
+    left: calc(var(--x) + var(--offset));
+    padding: 0 3px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--p-color-bg-surface) 85%, transparent);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+/* Near the right edge the name goes to the left of its circle. */
+.bubble-plot__label--flip {
+    left: auto;
+    right: calc(100% - var(--x) + var(--offset));
+}
+
+/* Level names down the left, one per band, centred on it. */
+.bubble-plot__bands {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    flex: none;
+    width: 56px;
+    height: var(--plot-height);
+    text-align: right;
+}

@@ -4,28 +4,60 @@ Differences from the container version:
   - httpx.AsyncClient + async complete()
   - every request sets Accept-Encoding: identity (Pyodide double-gunzip fix)
   - Vertex auth uses gcp_auth.get_token() instead of google-auth credentials
+  - Bedrock IAM auth uses aws_auth.sign_headers() instead of botocore
 """
 
 import asyncio
+import functools
+import json
 import logging
 import math
+import os
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any, Optional
+from urllib.parse import quote, urlparse
 
 import httpx
 
+import alerts
+import aws_auth
 import gcp_auth
 import http_client
+import reachback
 from settings import settings
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+_DEFAULT_MAX_TOKENS = 256
+_ASYNC_MAX_TOKENS = 4096
+_relaxed_limits: ContextVar[bool] = ContextVar("relaxed_limits", default=False)
+
+
+@contextmanager
+def relaxed_limits(enabled: bool = True):
+    token = _relaxed_limits.set(enabled)
+    try:
+        yield
+    finally:
+        _relaxed_limits.reset(token)
+
+
+def _max_tokens() -> int:
+    return _ASYNC_MAX_TOKENS if _relaxed_limits.get() else _DEFAULT_MAX_TOKENS
+
+
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 _IDENTITY = {"Accept-Encoding": "identity"}
+
+# Greedy decoding for every verdict call: the same input should get the same
+# verdict, so a block never flips to allow between identical requests.
+_TEMPERATURE = 0.0
 
 # Process-wide cache of built providers, keyed by (provider, model, base_url, deployment).
 _PROVIDER_CACHE: dict[tuple[str, str, str, str], "LLMProvider"] = {}
@@ -63,7 +95,14 @@ def _cached_provider(
 
 
 async def _post_json_logged(
-    client: httpx.AsyncClient, url: str, headers: dict, json_body: dict, log_tag: str, extra: str = ""
+    client: httpx.AsyncClient,
+    url: str,
+    headers: dict,
+    json_body: dict | None,
+    log_tag: str,
+    extra: str = "",
+    *,
+    content: bytes | None = None,
 ) -> dict:
     """POST + parse JSON, logging enough on failure to diagnose without a debugger.
 
@@ -73,10 +112,14 @@ async def _post_json_logged(
     deployment, quota exceeded), and non-JSON/malformed bodies. Callers still
     see the same exceptions as before (nothing swallowed), just with a log
     line alongside so a client-only failure doesn't require a repro to debug.
+
+    Pass pre-serialized `content` instead of `json_body` when the request is
+    signed over its body bytes (SigV4) — those exact bytes must be what's sent.
     """
     ctx = f" ({extra})" if extra else ""
+    body_kwargs: dict[str, Any] = {"content": content} if content is not None else {"json": json_body}
     try:
-        resp = await client.post(url, headers=headers, json=json_body)
+        resp = await client.post(url, headers=headers, **body_kwargs)
     except httpx.RequestError as exc:
         logger.error(f"{log_tag} request to {url} failed{ctx}: {exc!r}")
         raise
@@ -97,11 +140,62 @@ async def _post_json_logged(
         raise ValueError(f"{log_tag} non-JSON response from {url}: {body[:200]!r}") from exc
 
 
+def _log_vllm_metrics(provider: str, model: str, base_url: str, body: Any, client_ms: float) -> None:
+    metrics = body.get("metrics") if isinstance(body, dict) else None
+    if isinstance(metrics, dict):
+        fields = " ".join(f"{key}={value}" for key, value in metrics.items())
+        ttft = metrics.get("time_to_first_token_ms")
+        generation = metrics.get("generation_time_ms")
+        if isinstance(ttft, (int, float)) and isinstance(generation, (int, float)):
+            llm_ms = ttft + generation
+            fields += f" llm_ms={llm_ms:.1f} network_ms={client_ms - llm_ms:.1f}"
+    elif metrics is None:
+        fields = "metrics=missing"
+    else:
+        fields = "metrics=invalid"
+    req_id = body.get("id") if isinstance(body, dict) else None
+    logger.info(
+        f"[vllm-metrics] provider={provider} model={model} host={urlparse(base_url).netloc} "
+        f"req_id={req_id} client_ms={client_ms:.1f} {fields}"
+    )
+
+
 class LLMProvider(ABC):
     name: str = ""
 
+    @property
+    def prompt_name(self) -> str:
+        """Name the prompt builders key their model-specific templates on
+        (e.g. the Gemma-tuned BanTopics prompt for any "gemma*" name)."""
+        return self.name
+
     @abstractmethod
     async def complete(self, prompt: str) -> str: ...
+
+    async def complete_with_image(self, prompt: str, image_b64: str, mime: str, max_tokens: int) -> str:
+        """The prompt with one image attached (POST /ocr). Only providers whose API carries images override this;
+        reads_images() says which."""
+        raise NotImplementedError(f"{self.name} can't take image input")
+
+
+def reads_images(provider: LLMProvider) -> bool:
+    """Whether a provider overrides complete_with_image; for a FallbackProvider, whether its primary does."""
+    if isinstance(provider, FallbackProvider):
+        return reads_images(provider.primary)
+    return type(provider).complete_with_image is not LLMProvider.complete_with_image
+
+
+def _image_messages(prompt: str, image_b64: str, mime: str) -> list[dict[str, Any]]:
+    """An OpenAI chat-completions user turn: the prompt, then the image as a data URL."""
+    return [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{image_b64}"}},
+            ],
+        }
+    ]
 
 
 class OpenAIProvider(LLMProvider):
@@ -114,23 +208,35 @@ class OpenAIProvider(LLMProvider):
         self.name = "openai" if "openai.com" in self.base_url else "openai_compatible"
         logger.info(f"[OpenAI] model={self.model} base_url={self.base_url} api_key={_redact_secret(self.api_key)}")
 
+    include_metrics = False
+
     async def complete(self, prompt: str) -> str:
+        return await self._chat([{"role": "user", "content": prompt}], _max_tokens())
+
+    async def complete_with_image(self, prompt: str, image_b64: str, mime: str, max_tokens: int) -> str:
+        return await self._chat(_image_messages(prompt, image_b64, mime), max_tokens)
+
+    async def _chat(self, messages: list[dict[str, Any]], max_tokens: int) -> str:
         headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        payload = {
+            "model": self.model,
+            "temperature": _TEMPERATURE,
+            "max_tokens": max_tokens,
+            "messages": messages,
+        }
+        if self.include_metrics:
+            payload["include_metrics"] = True
         client = http_client.get_client()
-        resp = await client.post(
-            f"{self.base_url}/chat/completions",
-            headers=headers,
-            json={
-                "model": self.model,
-                "temperature": 0.1,
-                "max_tokens": 256,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-        )
+        started = time.perf_counter()
+        resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
+        client_ms = (time.perf_counter() - started) * 1000
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        body = resp.json()
+        if self.include_metrics:
+            _log_vllm_metrics(self.name, self.model, self.base_url, body, client_ms)
+        return body["choices"][0]["message"]["content"]
 
 
 class AnthropicProvider(LLMProvider):
@@ -176,12 +282,23 @@ class AnthropicProvider(LLMProvider):
             self._headers(),
             {
                 "model": self.model,
-                "max_tokens": 256,
+                "max_tokens": _max_tokens(),
                 "messages": [{"role": "user", "content": prompt}],
             },
             self._log_tag,
         )
-        return body["content"][0]["text"]
+        return _anthropic_text(body)
+
+
+def _anthropic_text(body: dict) -> str:
+    """The first text block of a Messages API reply. Current Claude models think by default, so the
+    reply can open with a `thinking` block (no "text" key) before the answer; a refusal has no answer."""
+    if body.get("stop_reason") == "refusal":
+        raise ValueError(f"Anthropic declined the request (stop_reason=refusal): {body!r}"[:500])
+    for block in body.get("content") or []:
+        if "text" in block:
+            return block["text"]
+    raise ValueError(f"Anthropic response has no text content block: {body!r}"[:500])
 
 
 def _normalize_anthropic_foundry_base_url(base_url: str) -> str:
@@ -277,7 +394,7 @@ class VertexAIProvider(LLMProvider):
                 "@requestFormat": "chatCompletions",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 512,
-                "temperature": 0.1,
+                "temperature": _TEMPERATURE,
             }
         )
         return body["predictions"]["choices"][0]["message"]["content"]
@@ -292,7 +409,9 @@ def _qwen3guard_params(text: str, top_logprobs: int, temperature: float) -> dict
     """OpenAI-style chatCompletions params shared by all Qwen3Guard backends."""
     params: dict[str, Any] = {
         "messages": [{"role": "user", "content": text}],
-        "max_tokens": 64,
+        # The verdict and its logprobs come from the first label token after "Safety:" —
+        # " Safe" / " Unsafe" / " Cont"(roversial) — so "Safety", ":", label token is enough.
+        "max_tokens": 3,
         "temperature": temperature,
     }
     if top_logprobs > 0:
@@ -325,6 +444,9 @@ class Qwen3GuardOutput:
     Vertex and Azure Foundry backends; concrete classes supply
     complete_with_logprobs over their own transport. LLMScanner routes any
     provider carrying this mixin through parse_qwen3guard_result."""
+
+    # A classifier, not a reader: no image input even over an OpenAI-compatible or Foundry transport.
+    complete_with_image = LLMProvider.complete_with_image
 
     async def complete_with_logprobs(
         self, text: str, top_logprobs: int = 5, temperature: float = 0.0
@@ -415,13 +537,13 @@ class AzureFoundryProvider(LLMProvider):
         return await _post_json_logged(client, url, headers, body, self._log_tag, extra)
 
     async def complete(self, prompt: str) -> str:
-        body = await self._chat(
-            {
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 512,
-                "temperature": 0.1,
-            }
-        )
+        return await self._chat_text([{"role": "user", "content": prompt}], 512)
+
+    async def complete_with_image(self, prompt: str, image_b64: str, mime: str, max_tokens: int) -> str:
+        return await self._chat_text(_image_messages(prompt, image_b64, mime), max_tokens)
+
+    async def _chat_text(self, messages: list[dict[str, Any]], max_tokens: int) -> str:
+        body = await self._chat({"messages": messages, "max_tokens": max_tokens, "temperature": _TEMPERATURE})
         content, _ = _choice_content_and_logprobs(body)
         return content
 
@@ -442,7 +564,203 @@ class Qwen3GuardFoundryProvider(Qwen3GuardOutput, AzureFoundryProvider):
         return _choice_content_and_logprobs(body)
 
 
+class ReachbackProvider(LLMProvider):
+    """Model behind a client's reach-back gateway (OpenAI chat completions).
+
+    Auth (Azure AD token + mTLS) and transport live in reachback.py, shared
+    with POST /reachback/test. Reasoning is off (`reasoning_effort: "none"`)
+    so the verdict is not spent on hidden reasoning tokens and greedy
+    `temperature` is accepted; models that cannot turn reasoning off
+    (gpt-6-astra, gpt-6.1-sol) reject this with a 400. Uses
+    `max_completion_tokens`, as GPT-5/6 models reject `max_tokens`."""
+
+    name = "reachback"
+
+    def __init__(self, model: str):
+        self.model = model
+        logger.info(f"[Reachback] model={self.model} base_url={settings.REACHBACK_BASE_URL}")
+
+    async def complete(self, prompt: str) -> str:
+        result = await reachback.chat(
+            {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_completion_tokens": _max_tokens(),
+                "temperature": _TEMPERATURE,
+                "reasoning_effort": "none",
+            }
+        )
+        content, _ = _choice_content_and_logprobs(result["response"])
+        return content
+
+
+# Converse stopReasons meaning Bedrock itself withheld the answer — surfaced as
+# errors so the cascade counts them as a provider failure, not a verdict.
+_BEDROCK_BLOCKED_STOP_REASONS = {"guardrail_intervened", "content_filtered"}
+
+
+def _converse_text(body: dict) -> str:
+    """Extract the first text block from a Bedrock Converse response.
+
+    Skips non-text blocks (e.g. reasoningContent from reasoning models, which
+    precede the answer) and raises a descriptive ValueError with the body
+    attached — same rationale as _choice_content_and_logprobs.
+    """
+    stop_reason = body.get("stopReason")
+    if stop_reason in _BEDROCK_BLOCKED_STOP_REASONS:
+        raise ValueError(f"Bedrock withheld the response (stopReason={stop_reason}): {body!r}"[:500])
+    message = (body.get("output") or {}).get("message") or {}
+    for block in message.get("content") or []:
+        if "text" in block:
+            return block["text"]
+    raise ValueError(f"Converse response has no text content block: {body!r}"[:500])
+
+
+class _BedrockAuthProvider(LLMProvider):
+    """Shared AWS Bedrock auth + transport for the bedrock-runtime (Converse)
+    and bedrock-mantle (OpenAI chat completions) providers.
+
+    Auth, in precedence order: a Bedrock API key (sent as Bearer); static IAM
+    credentials; else the pod's IAM role (EKS Pod Identity / IRSA), fetched
+    and refreshed by aws_auth. Both IAM modes are SigV4-signed per request,
+    under the endpoint's own signing service name."""
+
+    _log_tag = "[Bedrock]"
+    _signing_service = "bedrock"
+
+    def __init__(
+        self,
+        model: str,
+        region: str,
+        api_key: str = "",
+        credentials: aws_auth.AwsCredentials | None = None,
+        base_url: str = "",
+    ):
+        if api_key:
+            auth = f"api_key={_redact_secret(api_key)}"
+        elif credentials is not None:
+            auth = f"iam access_key_id={_redact_secret(credentials.access_key_id)}"
+        elif source := aws_auth.role_credentials_source():
+            auth = f"iam role via {source}"
+        else:
+            raise ValueError(
+                f"{type(self).__name__} needs an api_key, IAM credentials or an IAM role in the environment"
+            )
+        self.model = model
+        self.region = region
+        self.api_key = api_key
+        self.credentials = credentials
+        self.base_url = (base_url or self._default_base_url(region)).rstrip("/")
+        logger.info(f"{self._log_tag} model={self.model} region={self.region} base_url={self.base_url} {auth}")
+
+    @staticmethod
+    def _default_base_url(region: str) -> str:
+        raise NotImplementedError
+
+    @property
+    def prompt_name(self) -> str:
+        # One "bedrock" provider name serves every model, so Gemma-tuned
+        # prompts are keyed on the model instead.
+        return "gemma_bedrock" if "gemma" in self.model.lower() else self.name
+
+    async def _headers(self, url: str, payload: bytes) -> dict[str, str]:
+        headers = dict(_IDENTITY, **{"Content-Type": "application/json", "Accept": "application/json"})
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            return headers
+        creds = self.credentials or await aws_auth.get_role_credentials(self.region)
+        headers.update(
+            aws_auth.sign_headers("POST", url, headers, payload, creds, self.region, service=self._signing_service)
+        )
+        return headers
+
+    async def _post(self, url: str, body: dict[str, Any]) -> dict:
+        # Serialized once: SigV4 signs these exact bytes, so they must be what's sent.
+        payload = json.dumps(body, separators=(",", ":")).encode()
+        return await _post_json_logged(
+            http_client.get_client(),
+            url,
+            await self._headers(url, payload),
+            None,
+            self._log_tag,
+            f"model={self.model} region={self.region}",
+            content=payload,
+        )
+
+
+class BedrockProvider(_BedrockAuthProvider):
+    """Any AWS Bedrock model via the model-agnostic Converse API (bedrock-runtime).
+
+    The model id may be a foundation model id, a cross-region inference
+    profile (us.anthropic.…) or an ARN — it is percent-encoded into the path
+    either way."""
+
+    name = "bedrock"
+    _log_tag = "[Bedrock]"
+
+    @staticmethod
+    def _default_base_url(region: str) -> str:
+        return f"https://bedrock-runtime.{region}.amazonaws.com"
+
+    def _converse_url(self) -> str:
+        return f"{self.base_url}/model/{quote(self.model, safe='')}/converse"
+
+    async def complete(self, prompt: str) -> str:
+        body = await self._post(
+            self._converse_url(),
+            {
+                "messages": [{"role": "user", "content": [{"text": prompt}]}],
+                "inferenceConfig": {"maxTokens": 512, "temperature": _TEMPERATURE},
+            },
+        )
+        return _converse_text(body)
+
+
+class BedrockMantleProvider(_BedrockAuthProvider):
+    """Bedrock models served only on the bedrock-mantle endpoint (Gemma 4),
+    through its OpenAI-compatible chat completions route (Gemma 4 lives under
+    /openai/v1, not /v1). Picked automatically by the "bedrock" provider for
+    _MANTLE_ONLY_MODEL_PREFIXES, so it reports the same "bedrock" name. Same
+    auth as BedrockProvider, but SigV4 is signed for the "bedrock-mantle"
+    service and IAM needs bedrock-mantle:CreateInference."""
+
+    name = "bedrock"
+    _log_tag = "[BedrockMantle]"
+    _signing_service = "bedrock-mantle"
+
+    @staticmethod
+    def _default_base_url(region: str) -> str:
+        return f"https://bedrock-mantle.{region}.api.aws/openai/v1"
+
+    async def complete(self, prompt: str) -> str:
+        return await self._chat_text([{"role": "user", "content": prompt}], 512)
+
+    async def complete_with_image(self, prompt: str, image_b64: str, mime: str, max_tokens: int) -> str:
+        return await self._chat_text(_image_messages(prompt, image_b64, mime), max_tokens)
+
+    async def _chat_text(self, messages: list[dict[str, Any]], max_tokens: int) -> str:
+        body = await self._post(
+            f"{self.base_url}/chat/completions",
+            {"model": self.model, "messages": messages, "max_tokens": max_tokens, "temperature": _TEMPERATURE},
+        )
+        content, _ = _choice_content_and_logprobs(body)
+        return content
+
+
 # ── Qwen3Guard parser (ported verbatim — sync) ────────────────────────────────
+
+_QWEN3GUARD_LABELS = ("safe", "unsafe", "controversial")
+
+
+def _qwen3guard_label(value: str) -> str | None:
+    """Full label for a Safety value or its first token ("Cont" -> "controversial")."""
+    value = value.strip().lower().lstrip(":").strip().strip("\"'")
+    if not value:
+        return None
+    for label in _QWEN3GUARD_LABELS:
+        if label.startswith(value) or value.startswith(label):
+            return label
+    return None
 
 
 def _confidence_from_logprobs(
@@ -472,24 +790,20 @@ def _confidence_from_logprobs(
         pool.append({"token": entry["token"], "logprob": entry["logprob"]})
     if not pool:
         return None, None, "no-top-logprobs"
-    labels = ("safe", "unsafe", "controversial")
-    agg = {label: 0.0 for label in labels}
+    agg = {label: 0.0 for label in _QWEN3GUARD_LABELS}
     mapped = False
     for cand in pool:
-        ct = cand.get("token", "").strip().lower()
-        if "safety:" in ct:
-            ct = ct.split("safety:")[-1].strip()
-        ct = ct.lstrip(":").strip().strip("\"'")
-        if not ct:
+        ct = cand.get("token", "")
+        if "safety:" in ct.lower():
+            ct = ct.lower().split("safety:")[-1]
+        label = _qwen3guard_label(ct)
+        if label is None:
             continue
-        for label in labels:
-            if label.startswith(ct) or ct.startswith(label):
-                try:
-                    agg[label] += math.exp(cand["logprob"])
-                    mapped = True
-                except (KeyError, TypeError, OverflowError):
-                    pass
-                break
+        try:
+            agg[label] += math.exp(cand["logprob"])
+            mapped = True
+        except (KeyError, TypeError, OverflowError):
+            pass
     total = sum(agg.values())
     if not mapped or total <= 0:
         return None, None, "unmapped"
@@ -513,7 +827,7 @@ def parse_qwen3guard_result(scanner_name: str, raw: str, logprobs_content: list 
             categories = val
     if not safety:
         raise ValueError(f"no Safety line in Qwen3Guard response: {raw[:200]!r}")
-    s = safety.lower()
+    s = _qwen3guard_label(safety)
     if s == "unsafe":
         is_valid, discrete_risk = False, 1.0
     elif s == "controversial":
@@ -539,7 +853,7 @@ def parse_qwen3guard_result(scanner_name: str, raw: str, logprobs_content: list 
         risk_score = discrete_risk
         decision_confidence = 1.0
 
-    details: dict[str, Any] = {"safety": safety, "confidence_source": source}
+    details: dict[str, Any] = {"safety": s.capitalize(), "confidence_source": source}
     if categories and categories.lower() != "none":
         details["categories"] = categories
         if scanner_name == "BanTopics":
@@ -641,6 +955,181 @@ def _build_qwen3guard() -> LLMProvider | None:
     )
 
 
+# ── Faster per-role alternates — old provider is the fallback on failure ──────
+# Own model/baseUrl per modelConfigs entry, same as "openai_compatible"; on any
+# error, each calls the existing builder for its role's original provider.
+
+# Fast leg's own budget — bounds how long an unreachable/hung host can delay
+# the fallback (asyncio.CancelledError from the caller's own timeout isn't an
+# Exception, so an unreachable host must fail from inside our own except).
+_FAST_LEG_TIMEOUT_S = 1.5
+
+
+class Qwen3GuardFastProvider(Qwen3GuardOutput, OpenAIProvider):
+    """Faster Qwen3Guard-hosting endpoint; falls back to qwen3guard (Vertex AI) on failure.
+
+    Same contract as the real qwen3guard (raw text in, Safety:/Categories: out) —
+    the model always answers that way regardless of prompt, on Vertex or here, so
+    this can't take the ABCD path gemma_fast/gemma_fast_arbiter use.
+    """
+
+    name = "qwen3guard_fast"
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        # OpenAIProvider.__init__ overwrites self.name — reassert it.
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "qwen3guard_fast"
+
+    async def complete_with_logprobs(
+        self, text: str, top_logprobs: int = 5, temperature: float = 0.0
+    ) -> tuple[str, list | None]:
+        try:
+            headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            client = http_client.get_client()
+            body = await asyncio.wait_for(
+                _post_json_logged(
+                    client,
+                    f"{self.base_url}/chat/completions",
+                    headers,
+                    {"model": self.model, **_qwen3guard_params(text, top_logprobs, temperature)},
+                    "[Qwen3GuardFast]",
+                ),
+                timeout=_FAST_LEG_TIMEOUT_S,
+            )
+            return _choice_content_and_logprobs(body)
+        except Exception as exc:
+            logger.warning(f"[Qwen3GuardFast] fast endpoint failed ({exc!r}), falling back to qwen3guard")
+            fallback = _build_qwen3guard()
+            if not isinstance(fallback, Qwen3GuardOutput):
+                raise
+            alerts.note_fallback(self.name, fallback.name, alerts.fallback_reason(exc))
+            return await fallback.complete_with_logprobs(text, top_logprobs, temperature)
+
+
+class GemmaFastProvider(OpenAIProvider):
+    """Faster Gemma endpoint; falls back to gemma_foundry on failure."""
+
+    name = "gemma_fast"
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "gemma_fast"
+
+    async def complete(self, prompt: str) -> str:
+        try:
+            return await asyncio.wait_for(super().complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
+        except Exception as exc:
+            logger.warning(f"[GemmaFast] fast endpoint failed ({exc!r}), falling back to gemma_foundry")
+            fallback = _build_foundry("gemma_foundry", "", "", "")
+            if fallback is None:
+                raise
+            alerts.note_fallback(self.name, fallback.name, alerts.fallback_reason(exc))
+            return await fallback.complete(prompt)
+
+
+class GemmaFastArbiterProvider(OpenAIProvider):
+    """Faster (Gemma) arbiter endpoint. No built-in fallback and no time bound of its own: a slow answer is
+    waited for, and a backup is a FINAL_ARBITER_BACKUP modelConfigs entry (FallbackProvider then bounds
+    this endpoint by its entry's timeoutMs in the cascade)."""
+
+    name = "gemma_fast_arbiter"
+    include_metrics = True
+    health_path = "/health"  # vLLM liveness; probed only when a FINAL_ARBITER_BACKUP exists (FallbackProvider)
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "gemma_fast_arbiter"
+
+
+class TripwireProvider(LLMProvider):
+    """Tripwire, a prompt-injection classifier (akto-api-security/Tripwire): POST {base_url}/v1/detect with the
+    raw text returns an attack_score in [0, 1]. Not an LLM, so LLMScanner sends it the text itself rather than a
+    scan prompt, and long text is windowed by the server, not chunked here. It only observes: see
+    tripwire_provider; it is never a modelConfigs entry."""
+
+    name = "tripwire"
+    # Its own connection pool: a hung Tripwire must not hold the shared pool's connections that Qwen/Gemma need.
+    _MAX_CONNECTIONS = 20
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip("/")
+        self._http: httpx.AsyncClient | None = None
+        logger.info(f"[Tripwire] base_url={self.base_url}")
+
+    def _client(self) -> httpx.AsyncClient:
+        if self._http is None or self._http.is_closed:
+            self._http = http_client.UncancellableAsyncClient(
+                timeout=10.0, limits=httpx.Limits(max_connections=self._MAX_CONNECTIONS)
+            )
+        return self._http
+
+    async def detect(self, text: str) -> dict[str, Any]:
+        resp = await self._client().post(
+            f"{self.base_url}/v1/detect",
+            headers=dict(_IDENTITY, **{"Content-Type": "application/json"}),
+            json={"text": text},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def complete(self, prompt: str) -> str:
+        """Satisfies LLMProvider; the startup self-check pings Tripwire through it."""
+        return json.dumps(await self.detect(prompt))
+
+
+def parse_tripwire_result(body: dict[str, Any]) -> dict[str, Any]:
+    """A /v1/detect reply as a scanner result. is_attack applies the server's own THRESHOLD; risk_score is the
+    attack_score (1 - P(benign)), on the same scale as an LLM arbiter's risk_score."""
+    score = float(body["attack_score"])
+    verdict = body.get("verdict") or ""
+    is_attack = body.get("is_attack")
+    if is_attack is None:  # missing or null: fall back to the score
+        is_attack = score >= 0.5
+    details: dict[str, Any] = {"verdict": verdict, "attack_score": score}
+    if is_attack:
+        flagged = verdict.replace("_", " ") or "an attack"
+        details["reason"] = f"Tripwire flagged this as {flagged} (attack score {score:.2f})."
+    if body.get("windows_skipped"):  # a long input the server read only part of
+        details["windows_skipped"] = int(body["windows_skipped"])
+    return {
+        "is_valid": not is_attack,
+        "risk_score": score,
+        "decision_confidence": max(score, 1.0 - score),
+        "details": details,
+    }
+
+
+def tripwire_provider() -> TripwireProvider | None:
+    """The Tripwire observer when TRIPWIRE_ENABLED is on and TRIPWIRE_BASE_URL is set, else None."""
+    if settings.TRIPWIRE_ENABLED.strip().lower() not in ("1", "true", "yes", "on"):
+        return None
+    return _tripwire_for(settings.TRIPWIRE_BASE_URL.strip())
+
+
+@functools.cache
+def _tripwire_for(base_url: str) -> TripwireProvider | None:
+    """One provider, so one connection pool, per URL. A missing URL is warned about once, not on every scan."""
+    if not base_url:
+        logger.warning("[Tripwire] TRIPWIRE_ENABLED is on but TRIPWIRE_BASE_URL is unset; Tripwire is off")
+        return None
+    return TripwireProvider(base_url)
+
+
+_FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
+
+# Fast provider name → settings attr holding its default endpoint. An entry's
+# own "baseUrl" always overrides this; when the entry omits it, this is how
+# the code knows which host to hit — add one more pair here for a new "_fast"
+# provider, no other wiring needed.
+_FAST_PROVIDER_BASE_URL_SETTING: dict[str, str] = {
+    "qwen3guard_fast": "QWEN3GUARD_VLLM_BASE_URL",
+    "gemma_fast": "GEMMA_VLLM_BASE_URL",
+    "gemma_fast_arbiter": "GEMMA_VLLM_ARBITER_BASE_URL",
+}
+
+
 # Foundry provider name → (class, settings-var prefix). BASE_URL/API_KEY are
 # required (entry baseUrl overrides the env); DEPLOYMENT/MODEL are optional.
 # All classes take the same (base_url, api_key, deployment, model) constructor:
@@ -675,6 +1164,57 @@ def _build_foundry(provider_name: str, model: str, base_url: str, deployment: st
     )
 
 
+# Model ids AWS serves only on bedrock-mantle (not bedrock-runtime / Converse);
+# the "bedrock" provider routes these to BedrockMantleProvider.
+_MANTLE_ONLY_MODEL_PREFIXES = ("google.gemma-4",)
+
+
+def _bedrock_class_for(model: str) -> type[_BedrockAuthProvider]:
+    return BedrockMantleProvider if model.lower().startswith(_MANTLE_ONLY_MODEL_PREFIXES) else BedrockProvider
+
+
+def _build_bedrock(model: str, base_url: str) -> LLMProvider | None:
+    """Region + model are required; auth prefers the Bedrock API key, then
+    static IAM access keys, then the pod's IAM role (EKS Pod Identity / IRSA —
+    no keys configured at all). model/baseUrl may come per-entry, the
+    credentials and region only from env. The model picks the endpoint:
+    Gemma 4 goes to bedrock-mantle, everything else to Converse."""
+    env = _require(
+        {"BEDROCK_REGION": settings.BEDROCK_REGION, "BEDROCK_MODEL": model or settings.BEDROCK_MODEL},
+        label="[Providers] bedrock",
+    )
+    if env is None:
+        return None
+    cls = _bedrock_class_for(env["BEDROCK_MODEL"])
+    common = {"model": env["BEDROCK_MODEL"], "region": env["BEDROCK_REGION"], "base_url": base_url}
+    if settings.BEDROCK_API_KEY:
+        return cls(api_key=settings.BEDROCK_API_KEY, **common)
+    if settings.BEDROCK_ACCESS_KEY_ID and settings.BEDROCK_SECRET_ACCESS_KEY:
+        creds = aws_auth.AwsCredentials(
+            settings.BEDROCK_ACCESS_KEY_ID, settings.BEDROCK_SECRET_ACCESS_KEY, settings.BEDROCK_SESSION_TOKEN
+        )
+        return cls(credentials=creds, **common)
+    if aws_auth.role_credentials_source():
+        return cls(**common)
+    logger.warning(
+        "[Providers] bedrock: no credentials (set BEDROCK_API_KEY, or BEDROCK_ACCESS_KEY_ID + "
+        "BEDROCK_SECRET_ACCESS_KEY, or run with an IAM role via EKS Pod Identity / IRSA); skipping"
+    )
+    return None
+
+
+def _build_reachback(model: str) -> LLMProvider | None:
+    """Gateway URL and credentials come from REACHBACK_* env only; the entry picks the model."""
+    missing = reachback.missing_settings()
+    if missing:
+        logger.warning(f"[Providers] reachback: missing required vars {missing}; skipping")
+        return None
+    if not model:
+        logger.warning("[Providers] reachback: modelConfigs entry has no model; skipping")
+        return None
+    return ReachbackProvider(model)
+
+
 _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
     "openai": lambda model, _b, _d: _build_openai_compatible(model, base_url=""),
     "openai_compatible": lambda model, base_url, _d: _build_openai_compatible(model, base_url),
@@ -690,6 +1230,23 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
     "anthropic_foundry": lambda model, base_url, deployment: _build_foundry(
         "anthropic_foundry", model, base_url, deployment
     ),
+    "qwen3guard_fast": lambda model, base_url, _d: (
+        Qwen3GuardFastProvider(settings.QWEN_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
+    "gemma_fast": lambda model, base_url, _d: (
+        GemmaFastProvider(settings.GEMMA_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
+    "gemma_fast_arbiter": lambda model, base_url, _d: (
+        GemmaFastArbiterProvider(settings.GEMMA_26B_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
+    "bedrock": lambda model, base_url, _d: _build_bedrock(model, base_url),
+    "reachback": lambda model, _b, _d: _build_reachback(model),
 }
 
 
@@ -699,6 +1256,130 @@ def _dispatch(provider_name: str, model: str, base_url: str, deployment: str = "
         logger.warning(f"[Providers] Unknown provider '{provider_name}'; skipping")
         return None
     return _cached_provider((provider_name, model, base_url, deployment), lambda: builder(model, base_url, deployment))
+
+
+# ── Primary availability flag (FINAL_ARBITER_BACKUP only) ────────────────────
+# A background task GETs the primary's /health once per interval (default 60s) and records the
+# result here; only the probe sets it, never an individual request's failure. FallbackProvider
+# reads the flag, so a down primary is skipped with a dict lookup and no waiting, and a request
+# that fails while the primary is up is not retried on the backup. Only primaries that have a
+# FINAL_ARBITER_BACKUP and declare a health_path are probed; with no backup configured nothing
+# runs. Unknown (not probed yet) counts as available.
+_HEALTH_INTERVAL_S = float(os.getenv("AGW_ARBITER_HEALTH_INTERVAL_S", "60"))
+_HEALTH_PROBE_TIMEOUT_S = 3.0
+# Consecutive failed probes before the primary is marked down; one good probe marks it available again.
+_HEALTH_FAILURES_TO_DOWN = int(os.getenv("AGW_ARBITER_HEALTH_FAILURES_TO_DOWN", "3"))
+_PRIMARY_AVAILABLE: dict[str, bool] = {}
+_HEALTH_FAILURES: dict[str, int] = {}
+_HEALTH_FAILURE_REASONS: dict[str, dict[str, int]] = {}
+_HEALTH_TASKS: dict[str, "asyncio.Task[None]"] = {}
+_HEALTH_CLIENT: httpx.AsyncClient | None = None
+
+
+def _health_client() -> httpx.AsyncClient:
+    # Probes get their own pool: in the shared one, multi-second scan calls fill every connection under load,
+    # httpx counts the wait for a free one against the probe timeout (PoolTimeout), and a healthy primary is
+    # marked DOWN.
+    global _HEALTH_CLIENT
+    if _HEALTH_CLIENT is None or _HEALTH_CLIENT.is_closed:
+        _HEALTH_CLIENT = http_client.UncancellableAsyncClient(
+            timeout=_HEALTH_PROBE_TIMEOUT_S, limits=httpx.Limits(max_connections=4)
+        )
+    return _HEALTH_CLIENT
+
+
+def _set_availability(health_url: str, available: bool, reasons: str = "") -> None:
+    if _PRIMARY_AVAILABLE.get(health_url, True) != available:
+        logger.warning(f"[FinalArbiter] primary {health_url} is now {'AVAILABLE' if available else 'DOWN'}")
+        alerts.note_availability(urlparse(health_url).netloc or health_url, available, reasons)
+    _PRIMARY_AVAILABLE[health_url] = available
+
+
+async def _health_loop(health_url: str) -> None:
+    while True:
+        try:
+            resp = await _health_client().get(health_url)
+            healthy = resp.status_code == 200
+            reason = why = f"HTTP {resp.status_code}"
+        except Exception as exc:
+            healthy = False
+            reason, why = type(exc).__name__, repr(exc)
+        # Causes of the current failure streak, for the DOWN alert; a good probe ends the streak.
+        streak = _HEALTH_FAILURE_REASONS.setdefault(health_url, {})
+        if healthy:
+            streak.clear()
+        else:
+            streak[reason] = streak.get(reason, 0) + 1
+        _HEALTH_FAILURES[health_url] = 0 if healthy else _HEALTH_FAILURES.get(health_url, 0) + 1
+        if not healthy:
+            logger.warning(
+                f"[FinalArbiter] health probe {health_url} failed ({why}), "
+                f"{_HEALTH_FAILURES[health_url]}/{_HEALTH_FAILURES_TO_DOWN} before DOWN"
+            )
+        if healthy or _HEALTH_FAILURES[health_url] >= _HEALTH_FAILURES_TO_DOWN:
+            _set_availability(health_url, healthy, ", ".join(f"{r} x{n}" for r, n in streak.items()))
+        await asyncio.sleep(_HEALTH_INTERVAL_S)
+
+
+def _ensure_health_monitor(health_url: str) -> None:
+    task = _HEALTH_TASKS.get(health_url)
+    if task is None or task.done():
+        _HEALTH_TASKS[health_url] = asyncio.ensure_future(_health_loop(health_url))
+
+
+def _health_url_of(primary: LLMProvider) -> str:
+    path = getattr(primary, "health_path", None)
+    base_url = getattr(primary, "base_url", "")
+    if not path or not base_url:
+        return ""
+    return base_url.removesuffix("/v1") + path
+
+
+class FallbackProvider(LLMProvider):
+    def __init__(
+        self,
+        primary: LLMProvider,
+        backup_entry: dict[str, Any],
+        primary_timeout_s: float | None = None,
+        backup_timeout_s: float = 0.0,
+    ):
+        self.primary = primary
+        self.backup_entry = backup_entry
+        self.name = primary.name
+        self.health_url = _health_url_of(primary)
+        # Hung primary must raise TimeoutError, not the caller's CancelledError, or the backup never runs.
+        self.primary_timeout_s = primary_timeout_s
+        self.backup_timeout_s = backup_timeout_s  # extra time the caller allows for the backup after the primary
+
+    async def complete(self, prompt: str) -> str:
+        return await self._call(lambda provider: provider.complete(prompt))
+
+    async def complete_with_image(self, prompt: str, image_b64: str, mime: str, max_tokens: int) -> str:
+        return await self._call(lambda provider: provider.complete_with_image(prompt, image_b64, mime, max_tokens))
+
+    async def _call(self, call: Callable[[LLMProvider], Awaitable[str]]) -> str:
+        if self.health_url:
+            _ensure_health_monitor(self.health_url)
+            if not _PRIMARY_AVAILABLE.get(self.health_url, True):
+                return await self._call_on_backup(call, "marked down by health check")
+        try:
+            return await asyncio.wait_for(call(self.primary), self.primary_timeout_s)
+        except Exception as exc:
+            if self.health_url:
+                raise  # only the probe sends a health-checked primary's traffic to the backup, not one failed request
+            return await self._call_on_backup(call, repr(exc), exc)
+
+    async def _call_on_backup(
+        self, call: Callable[[LLMProvider], Awaitable[str]], why: str, exc: Exception | None = None
+    ) -> str:
+        backup = build_provider_from_config(self.backup_entry)
+        if backup is None:
+            if exc is not None:
+                raise exc
+            return await call(self.primary)  # no usable backup: behave as without one
+        logger.warning(f"[FinalArbiter] primary {self.primary.name} failed ({why}), falling back to {backup.name}")
+        alerts.note_fallback(self.primary.name, backup.name, alerts.fallback_reason(exc) if exc else "marked down")
+        return await call(backup)
 
 
 def build_provider_from_env(provider_name: str, model: str = "") -> LLMProvider | None:
@@ -716,6 +1397,9 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
     if name in ("openai", "ollama", "openai_compatible"):
         base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
         return _dispatch("openai_compatible", model, base_url)
+    if name in _FAST_PROVIDERS:
+        base_url = (entry.get("baseUrl") or "").strip() or getattr(settings, _FAST_PROVIDER_BASE_URL_SETTING[name], "")
+        return _dispatch(name, model, base_url)
     if name in _FOUNDRY_PROVIDERS:
         # deployment (azureml-model-deployment header) is a routing label, not a
         # secret — safe to allow per-entry, unlike apiKey. This lets two
@@ -723,6 +1407,10 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
         # roles) against two different deployments on the same Foundry
         # resource/endpoint, without needing separate env-var prefixes.
         return _dispatch(name, model, (entry.get("baseUrl") or "").strip(), (entry.get("deployment") or "").strip())
+    if name == "bedrock":
+        # model/baseUrl (e.g. a VPC interface endpoint) are routing, not secrets;
+        # credentials and region stay env-only.
+        return _dispatch(name, model, (entry.get("baseUrl") or "").strip())
     return _dispatch(name, model, "")
 
 
@@ -756,6 +1444,10 @@ async def _startup_check_entry(entry: dict[str, Any]) -> None:
         # extra to say here, and staying silent avoids false-alarming on
         # providers this deployment was never meant to use.
         return
+    await _startup_ping(label, provider)
+
+
+async def _startup_ping(label: str, provider: LLMProvider) -> None:
     logger.info(f"[StartupCheck] {label}: pinging real endpoint...")
     t0 = time.time()
     try:
@@ -776,5 +1468,9 @@ async def startup_self_check() -> None:
 
     entries = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON).get("modelConfigs", [])
     logger.info(f"[StartupCheck] checking {len(entries)} configured cascade entries")
-    await asyncio.gather(*(_startup_check_entry(e) for e in entries), return_exceptions=True)
+    checks = [_startup_check_entry(e) for e in entries]
+    tripwire = tripwire_provider()
+    if tripwire is not None:
+        checks.append(_startup_ping("tripwire[observer]", tripwire))
+    await asyncio.gather(*checks, return_exceptions=True)
     logger.info("[StartupCheck] done")

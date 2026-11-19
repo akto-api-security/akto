@@ -1,7 +1,20 @@
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { GUARDRAIL_REMEDIATION_MARKDOWN } from "@/apps/dashboard/pages/threat_detection/constants/guardrailDescriptions";
+import { storedRemediationMarkdown } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import { buildEvidenceVulnerabilitySegments } from "@/apps/dashboard/pages/threat_detection/utils/evidenceHighlight";
+import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
+import func from "@/util/func";
 // ─── Flyout detail helpers ───────────────────────────────────────────────────────
+
+const VALUE_SECTION_LABELS = {
+    Prompt: "Prompt",
+    Tool: "Tool Call",
+    Skill: "Skill",
+    Config: "Config Value",
+    LLM: "Flagged Content",
+    Other: "Flagged Content",
+};
 
 function _parseAktoOuter(payloadStr) {
     if (!payloadStr) return null;
@@ -20,6 +33,18 @@ function _parseJson(str) {
     try { return JSON.parse(str); } catch { return null; }
 }
 
+// Some events capture only the raw request body (e.g. {"messages":[...]}) instead of the
+// {requestPayload, responsePayload, ...} envelope - that body itself is the request.
+function _isBareRequestBody(outer) {
+    return !!outer && typeof outer === "object" && !Array.isArray(outer)
+        && !func.isSampleEnvelope(outer)
+        && outer.request_body === undefined && outer.response_body === undefined;
+}
+
+function _requestFromOuter(outer) {
+    return _parseJson(outer?.requestPayload) ?? (_isBareRequestBody(outer) ? outer : null);
+}
+
 // requestPayload.body / .evidence aren't always strings — some tool calls store them as an
 // object (e.g. {toolName, toolArgs}). React crashes ("Objects are not valid as a React child")
 // if that object is rendered directly in a <Text>, so coerce to a displayable string here,
@@ -28,6 +53,38 @@ export function coerceToText(value) {
     if (value == null) return null;
     if (typeof value === "string") return value;
     try { return JSON.stringify(value); } catch { return String(value); }
+}
+
+// An empty object/array literal (e.g. a tool call captured with no arguments) carries no
+// useful information - callers treat this the same as "nothing captured" rather than showing
+// the literal "{}" as if it were the flagged content.
+export function isEmptyJsonText(text) {
+    if (typeof text !== "string") return false;
+    const trimmed = text.trim();
+    return trimmed === "{}" || trimmed === "[]";
+}
+
+// Checked before the plain req.body fallback below - a chat-shaped body ({messages: [...]})
+// must be unpacked to the actual last user message text, not dumped as raw
+// {"messages":[{"role":"user",...}]} JSON (which is what req.body != null would otherwise return).
+export function extractPromptBody(req) {
+    if (!req) return null;
+    const msgs = req.messages || req?.body?.messages;
+    if (Array.isArray(msgs) && msgs.length > 0) {
+        const lastUser = [...msgs].reverse().find(m => m.role === "user") || msgs[msgs.length - 1];
+        const content = lastUser?.content;
+        if (typeof content === "string") return content;
+        if (Array.isArray(content)) return content.map(c => c.text || "").join("\n");
+        return content;
+    }
+    if (req.body != null) return req.body;
+    // Other integrations capture the flagged text under a different single-value key instead
+    // of `body` (e.g. a ChatGPT connector event shaped {"prompt": "..."}) - recognize the common
+    // ones so the actual text shows up instead of the whole {"prompt":"..."} wrapper.
+    if (typeof req.prompt === "string") return req.prompt;
+    if (typeof req.command === "string") return req.command;
+    if (typeof req.message === "string") return req.message;
+    return null;
 }
 
 // Raw request bodies can be captured terminal output — full of ANSI colour/cursor escape
@@ -41,6 +98,54 @@ export function sanitizeDisplayText(text, max = 500) {
         .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "") // other control chars, keep \n \t
         .trim();
     return s.length > max ? `${s.slice(0, max).trim()}...` : s;
+}
+
+const METHOD_TO_TYPE = {
+    POST: "Prompt",
+    SKILL: "Skill",
+    TOOL: "Tool",
+    CONFIG: "Config",
+    LLM: "LLM",
+};
+
+export function parseAktoPayload(payloadStr) {
+    if (!payloadStr) return {};
+    try {
+        const outer = JSON.parse(payloadStr);
+        const safeJson = (s) => { try { return JSON.parse(s); } catch { return null; } };
+        const reqStr = outer.requestPayload || outer.request_body;
+        const respStr = outer.responsePayload || outer.response_body;
+        const req = reqStr ? safeJson(reqStr) : (_isBareRequestBody(outer) ? outer : null);
+        const resp = respStr ? safeJson(respStr) : null;
+        return { req, resp, raw: outer };
+    } catch {
+        return {};
+    }
+}
+
+export function deriveAgenticType(url, method) {
+    const lower = (url || "").toLowerCase();
+    if (lower.includes("tool")) return "Tool";
+    if (lower.includes("skill")) return "Skill";
+    if (lower.includes("resource")) return "Resource";
+    if (lower.includes("prompt")) return "Prompt";
+    if (lower.includes("config") || lower.includes("setting")) return "Config";
+    if (lower.includes("mcp") || lower.includes("server")) return "Tool";
+    if (lower.includes("message") || lower.includes("completion") || lower.includes("chat")) return "Prompt";
+    const m = method ? String(method).toUpperCase() : null;
+    return METHOD_TO_TYPE[m] || "Prompt";
+}
+
+// Same Evidence-column extraction the new UI uses: Prompt/Tool → last user message / body /
+// tool args; Skill → response evidence; Config → request evidence. Never uses metadata.reason.
+export function extractEvidenceText(payload, type, max = 300) {
+    const { req: reqPayload, resp: respPayload, raw: rawPayload } = parseAktoPayload(payload);
+    const isPromptOrTool = type === "Prompt" || type === "Tool";
+    const primaryValueRaw = coerceToText(isPromptOrTool
+        ? (extractPromptBody(reqPayload) ?? (type === "Tool" ? reqPayload : null) ?? rawPayload?.requestPayload ?? null)
+        : type === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null));
+    if (isEmptyJsonText(primaryValueRaw)) return "";
+    return sanitizeDisplayText(primaryValueRaw, max) || "";
 }
 
 // Request bodies are sometimes JSON-inside-JSON — a field like `requestPayload` whose value
@@ -72,13 +177,39 @@ function _unwrapNestedJsonValue(obj, depth) {
     return out;
 }
 
-// Returns { text, isJson } — pretty-printed JSON (with nested JSON-strings unwrapped) when
-// the input looks like JSON, otherwise the original text untouched.
+// A JSON-shaped string that fails to fully JSON.parse (e.g. a captured tool command whose own
+// escaping breaks the outer JSON) still reads far better with real line breaks instead of
+// literal "\n"/"\t" - do a conservative de-escape for display only. This doesn't attempt to
+// repair or validate the JSON, just make an already-broken/unparsed blob legible.
+function looseUnescapeForDisplay(text) {
+    return text.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, "\"");
+}
+
+// Returns { text, isJson } — pretty-printed JSON (with nested JSON-strings unwrapped) when the
+// input looks like JSON, otherwise the original text as-is, loosely de-escaped if JSON-shaped.
+// Same parse-or-fall-back-to-raw pattern func.requestJson() already uses for this exact
+// captured-payload data elsewhere in the app - no extra reformatting attempted on the
+// unparseable case, here or there.
 export function prettyPrintIfJson(text) {
     if (!text) return { text, isJson: false };
     const unwrapped = _unwrapNestedJson(text);
-    if (unwrapped === text) return { text, isJson: false };
+    if (unwrapped === text) {
+        const trimmed = text.trim();
+        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return { text, isJson: false };
+        return { text: looseUnescapeForDisplay(text), isJson: false };
+    }
     return { text: JSON.stringify(unwrapped, null, 2), isJson: true };
+}
+
+// Display text for a single captured prompt payload (e.g. a nearby message's queryPayload),
+// extracted the same way the Values tab's Prompt section is: the last user message when the
+// payload is chat-shaped JSON, otherwise the payload itself, pretty-printed if it's JSON.
+export function promptTextFromPayload(payload) {
+    const raw = coerceToText(payload);
+    if (!raw || isEmptyJsonText(raw)) return null;
+    const prompt = coerceToText(extractPromptBody(_parseJson(raw)));
+    const { text } = prettyPrintIfJson(prompt || raw);
+    return sanitizeDisplayText(text, Infinity) || null;
 }
 
 // Some backends pre-combine metadata.reason as "<Title>: <message>" (e.g. "Blocked: personal
@@ -151,7 +282,7 @@ export function buildFallbackDetail(row) {
 
         if (outer) {
             // Standard Akto payload: {requestPayload, responsePayload, ...}
-            const req = _parseJson(outer.requestPayload);
+            const req = _requestFromOuter(outer);
             const resp = _parseJson(outer.responsePayload);
 
             guardrailReason = _extractGuardrailReason(resp, req);
@@ -249,7 +380,7 @@ export function buildFallbackDetail(row) {
     const metaOverview = meta.overview || _metaField(row.metadata, "overview");
     const metaRemediation = meta.remediation || _metaField(row.metadata, "remediation");
     const outer = _parseAktoOuter(row.payload) || {};
-    const req = _parseJson(outer.requestPayload);
+    const req = _requestFromOuter(outer);
     const resp = _parseJson(outer.responsePayload);
 
     // metadata.reason is often empty — fall back to the guardrail's own explanation
@@ -258,15 +389,39 @@ export function buildFallbackDetail(row) {
     const reason = normalizeReasonPunctuation(meta.reason || guardrailReason) || null;
     const policyName = meta.policyName || (row.policyName && row.policyName !== "-" ? row.policyName : null);
     const isPromptOrTool = row.type === "Prompt" || row.type === "Tool";
-    const rawPrimaryValue = coerceToText(isPromptOrTool
-        ? (req?.body || null)
+    // Tool events store the request payload flat (req *is* the tool args, e.g.
+    // {file_path, content}) rather than wrapped in a {body: ...} envelope, so
+    // extractPromptBody (which only looks for req.messages/req.body) finds nothing —
+    // fall back to the whole req object itself for Tool violations. And when
+    // outer.requestPayload fails to JSON.parse at all (e.g. a captured tool call whose
+    // command text breaks JSON escaping) - req is null even though the raw string has real
+    // content - fall back to that raw string rather than showing nothing.
+    const rawPrimaryValueUntrimmed = coerceToText(isPromptOrTool
+        ? (extractPromptBody(req) ?? (row.type === "Tool" ? req : null) ?? outer.requestPayload ?? null)
         : row.type === "Skill" ? (resp?.evidence || null) : (req?.evidence || null));
+    // An empty {}/[] carries no useful info - treat it the same as nothing captured, rather
+    // than showing the empty-object literal as if it were the flagged content.
+    const rawPrimaryValue = isEmptyJsonText(rawPrimaryValueUntrimmed) ? null : rawPrimaryValueUntrimmed;
     // If the value is JSON (or JSON nested inside JSON, e.g. a proxied request captured as a
     // string field), unwrap and pretty-print it instead of showing raw escaped quotes.
     const { text: prettyPrimaryValue, isJson } = prettyPrintIfJson(rawPrimaryValue);
     const primaryValue = sanitizeDisplayText(prettyPrimaryValue, 1500);
-    const evidenceText = primaryValue || row.evidenceText || row.violation;
+    // untruncated, for Values tab
+    const primaryValueFull = sanitizeDisplayText(prettyPrimaryValue, Infinity);
+    const evidenceText = primaryValue || (row.evidenceText !== "-" ? row.evidenceText : "") || row.evidenceLine || row.violation;
     const evidenceIsMono = isJson && !!primaryValue && evidenceText === primaryValue;
+
+    // Atlas and Argus: highlight the backend evidenceLine inside the text shown, as the old side window does. Config keeps its own field highlight.
+    const evidenceHighlights = (text) => {
+        if (!(isEndpointSecurityCategory() || isAgenticSecurityCategory()) || row.type === "Config") return undefined;
+        const phrases = buildEvidenceVulnerabilitySegments(row.evidenceLine, text, "").map((segment) => segment.phrase);
+        return phrases.length > 0 ? phrases : undefined;
+    };
+    // The evidence can sit in the response instead (e.g. a tool whose output carried the PII): then show that side too.
+    const responseText = typeof outer.responsePayload === "string" ? outer.responsePayload : "";
+    const responseEvidence = responseText && (isEndpointSecurityCategory() || isAgenticSecurityCategory()) && row.type !== "Config"
+        ? buildEvidenceVulnerabilitySegments(row.evidenceLine, "", responseText).map((segment) => segment.phrase)
+        : [];
 
     // Don't repeat `reason` in the trigger line when it's already the exact text shown
     // above in the evidence box (happens when there's no body/evidence field, so evidenceText
@@ -279,7 +434,7 @@ export function buildFallbackDetail(row) {
         evidence: {
             title: "Guardrail Violation",
             text: evidenceText,
-            highlights: undefined,
+            highlights: primaryValue ? evidenceHighlights(evidenceText) : undefined,
             mono: evidenceIsMono,
             // Atlas only: row.user is a real device user there. On Argus it's a host fragment
             // (e.g. "slash2-api" from slash2-api.concierge.razorpay.com), which reads as a
@@ -302,14 +457,73 @@ export function buildFallbackDetail(row) {
         fileTabLabel: fileTabLabel || undefined,
         fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
+        promptResponse: (() => {
+            // promptBody must come only from the request/tool-call payload. Never fall back to
+            // `reason` (a response/evidence-derived explanation) here — that leaks response
+            // content into what's meant to show what was actually requested; `reason` already
+            // renders in its own "Reason" field below. Config & Skill violations show the full
+            // captured file (Config.json with the flagged field highlighted / the skill's
+            // name+description+content) instead of just the small evidence excerpt - same
+            // content the old separate Config.json/Skill Info tabs used to show.
+            const showsFullFile = row.type === "Config" || row.type === "Skill";
+            const promptBody = (showsFullFile ? fileContent : null) || primaryValueFull || undefined;
+            return {
+                valueLabel: VALUE_SECTION_LABELS[row.type] || VALUE_SECTION_LABELS.Other,
+                promptBody,
+                highlights: row.type === "Config" ? (fileHighlights || undefined) : evidenceHighlights(promptBody),
+                responseBody: responseEvidence.length > 0 ? responseText : undefined,
+                responseHighlights: responseEvidence.length > 0 ? responseEvidence : undefined,
+                behaviour: row.behaviourRaw || meta.behaviour || meta.nbehaviour || row.action || undefined,
+                blockedAt: resp?.error?.data?.blocked_at || row.detected || undefined,
+                blockedBy: resp?.error?.data?.blocked_by || policyName || undefined,
+                reason: reason || undefined,
+                message: resp?.error?.message || resp?.message || undefined,
+            };
+        })(),
         overview: row.type === "Config" ? (metaOverview || undefined) : undefined,
-        // Mirror the old UI's precedence (SampleDetails.jsx's remediationTab): per-event
-        // metadata wins; otherwise Argus/Atlas fall back to the frontend rule catalogue, then
-        // the generic template. Skill events keep the tab hidden - the generic copy adds no
-        // context there, same as the old UI.
-        remediation: metaRemediation
+        // Stored LLM markdown wins; otherwise per-event metadata, then
+        // the frontend rule catalogue / generic template. Skill events keep the tab hidden
+        // when nothing stored is present - the generic copy adds no context there.
+        remediation: storedRemediationMarkdown(row.remediation)
+            || metaRemediation
             || ((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && row.type !== "Skill"
                 ? (getGuardrailRuleInfo(row.violation, policyName)?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN)
                 : undefined),
+    };
+}
+
+export function buildViolationChatContext(row, detail) {
+    if (!row) return {};
+
+    const guardrailRuleInfo = getGuardrailRuleInfo(row.violation, row.policyName);
+    const owaspThreats = getOwaspThreatsForRule(row.violation);
+    const complianceTags = row.complianceMap
+        ? Object.entries(row.complianceMap).flatMap(([framework, clauses]) =>
+            Array.isArray(clauses) && clauses.length > 0
+                ? clauses.map((clause) => `${framework} - ${clause}`)
+                : [framework])
+        : [];
+    const guardrailRuleExplanation = guardrailRuleInfo
+        ? [guardrailRuleInfo.heading, ...(guardrailRuleInfo.overview || []).flatMap((o) => [`${o.heading}:`, o.body])]
+            .filter(Boolean)
+            .join("\n")
+        : undefined;
+
+    return {
+        violation: row.violation,
+        severity: row.severity,
+        action: row.action,
+        type: row.type,
+        policyName: row.policyName,
+        agenticAsset: row.agenticAsset || undefined,
+        detected: row.detected ? func.epochToDateTime(row.detected) : undefined,
+        deviceId: detail?.deviceId,
+        sessionId: detail?.sessionId,
+        evidenceText: detail?.evidence?.text,
+        triggerReason: detail?.triggerReason,
+        guardrailRuleExplanation,
+        owaspThreats: owaspThreats.length ? owaspThreats.map((t) => `${t.id} - ${t.name}`) : undefined,
+        complianceTags: complianceTags.length ? complianceTags : undefined,
+        remediation: detail?.remediation,
     };
 }

@@ -10,9 +10,7 @@ import Store from "../../../store";
 import dayjs from "dayjs";
 import { flags } from "./flags/index.mjs";
 import { Tooltip } from "@shopify/polaris";
-import { useSearchParams } from "react-router-dom";
-import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
-import { labelMap } from "../../../../main/labelHelperMap";
+import { isAgenticSecurityCategory, isEndpointSecurityCategory, isMCPSecurityCategory, mapLabel } from "../../../../main/labelHelper";
 import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
 import IpReputationScore from "./IpReputationScore";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
@@ -22,19 +20,26 @@ const resourceName = {
   plural: "actors",
 };
 
+const getActorColumnLabel = () => {
+  if (isEndpointSecurityCategory()) return "Username";
+  if (isAgenticSecurityCategory()) return "Actor";
+  return "Actor Id";
+};
+
 const getBaseHeaders = () => {
+  const actorLabel = getActorColumnLabel();
   const baseHeaders = [
     {
-      text: isEndpointSecurityCategory() ? "Username" : "Actor Id",
+      text: actorLabel,
       value: "actor",
-      title: isEndpointSecurityCategory() ? "Username" : "Actor Id",
+      title: actorLabel,
     },
     {
       text: "Country",
       title: "Country",
       value: "country",
     },
-    ...(!isEndpointSecurityCategory() ? [{
+    ...(!isEndpointSecurityCategory() && !isAgenticSecurityCategory() ? [{
       text: "Actor Ip",
       title: "Actor Ip",
       value: "latestIp",
@@ -56,13 +61,13 @@ const getBaseHeaders = () => {
       value: "latestHost",
     },
     {
-      text: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
-      title: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
+      text: "Latest " + mapLabel("API", PersistStore.getState().dashboardCategory),
+      title: "Latest " + mapLabel("API", PersistStore.getState().dashboardCategory),
       value: "latestApi",
     },
     {
-      text: labelMap[PersistStore.getState().dashboardCategory]["Latest Attack"],
-      title: labelMap[PersistStore.getState().dashboardCategory]["Latest Attack"],
+      text: mapLabel("Latest Attack", PersistStore.getState().dashboardCategory),
+      title: mapLabel("Latest Attack", PersistStore.getState().dashboardCategory),
       value: "latestAttack",
     },
   );
@@ -88,7 +93,7 @@ const getBaseHeaders = () => {
     {
       text: "Status",
       title: "Status",
-      value: "status",
+      value: "statusLabel",
     },
     {
       text: "Detected at",
@@ -119,7 +124,7 @@ const sortOptions = [
   },
 ];
 
-function ThreatActorTable({ data, currDateRange, handleRowClick }) {
+function ThreatActorTable({ data, currDateRange, handleRowClick, refreshCount, onStatusChange }) {
   const [loading, setLoading] = useState(false);
   const [lastCursor, setLastCursor] = useState(null);  // Track last ObjectId for cursor pagination
   const [usernameMap, setUsernameMap] = useState({});
@@ -137,14 +142,14 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [filters, setFilters] = useState([
     {
       key: 'actorId',
-      label: 'Actor Id',
+      label: getActorColumnLabel(),
       type: 'select',
       choices: [],
       multiple: true
     },
     {
       key: 'latestAttack',
-      label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
+      label: mapLabel("Latest attack sub-category", PersistStore.getState().dashboardCategory),
       type: 'select',
       choices: [],
       multiple: true
@@ -253,7 +258,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
             ruleViolated: extractRuleViolated(x.latestMetadata)
           }),
           accessType: accessTypes.length > 0 ? getAccessType(accessTypes) : "-",
-          status: "Active",
+          statusLabel: x.status === "BLOCKED" ? "Blocked" : "Active",
           country: (
             <Tooltip
               content={x.country || "Unknown"}
@@ -346,14 +351,14 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     setFilters([
       {
         key: 'actorId',
-        label: 'Actor Id',
+        label: getActorColumnLabel(),
         type: 'select',
         choices: actorIdChoices,
         multiple: true
       },
       {
         key: 'latestAttack',
-        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
+        label: mapLabel("Latest attack sub-category", PersistStore.getState().dashboardCategory),
         type: 'select',
         choices: attackTypeChoices,
         multiple: true
@@ -404,18 +409,24 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       return [];
     }
 
-    return [
-      {
-        content: `Block ${selectedIps.length} IP${selectedIps.length > 1 ? 's' : ''}`,
-        onAction: async () => {
-          try {
-            await api.bulkModifyThreatActorStatusCloudflare(selectedIps, "blocked");
-            func.setToast(true, false, `Successfully blocked ${selectedIps.length} IP(s)`);
-          } catch (e) {
-            func.setToast(true, true, "Failed to block IPs");
-          }
-        },
+    const ipLabel = `${selectedIps.length} IP${selectedIps.length > 1 ? 's' : ''}`;
+    const bulkStatusAction = (action, status) => ({
+      content: `${action} ${ipLabel}`,
+      requires: 'api/bulkModifyThreatActorStatusCloudflare',
+      onAction: async () => {
+        try {
+          await api.bulkModifyThreatActorStatusCloudflare(selectedIps, status);
+          func.setToast(true, false, `Successfully ${action.toLowerCase()}ed ${ipLabel}`);
+          onStatusChange();
+        } catch (e) {
+          func.setToast(true, true, `Failed to ${action.toLowerCase()} IPs`);
+        }
       },
+    });
+
+    return [
+      bulkStatusAction("Block", "BLOCKED"),
+      bulkStatusAction("Unblock", "ACTIVE"),
     ];
   };
 
@@ -423,6 +434,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     <GithubServerTable
       onRowClick={(data) => onRowClick(data)}
       key={key}
+      callFromOutside={refreshCount}
       pageLimit={50}
       headers={getHeaders()}
       resourceName={resourceName}

@@ -17,6 +17,9 @@ import "@shopify/polaris/build/esm/styles.css";
 import ExpiredApp from "./ExpiredApp";
 import FreeApp from "./FreeApp";
 import func from "@/util/func";
+import resetStoresOnUserChange from "./resetStoresOnUserChange";
+
+resetStoresOnUserChange();
 
 const container = document.getElementById("root");
 const root = createRoot(container);

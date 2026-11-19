@@ -2,6 +2,7 @@ import React from 'react';
 import { HorizontalStack, Link, Tag, Text } from '@shopify/polaris';
 import { useNavigate } from 'react-router-dom';
 import PersistStore from '../../../main/PersistStore';
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 /**
  * ApiGroups Component
@@ -78,7 +79,7 @@ function ApiGroups({ collectionIds, onGroupClick }) {
 
     return (
         <HorizontalStack gap="2" wrap={true} align="start">
-            <Text variant="bodyMd" color="subdued">API Groups:</Text>
+            <Text variant="bodyMd" color="subdued">{mapLabel('API Groups', getDashboardCategory())}:</Text>
             {apiGroups.map((group) => (
                 <Link
                     key={group.id}

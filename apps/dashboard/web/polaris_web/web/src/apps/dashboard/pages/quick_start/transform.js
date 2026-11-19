@@ -90,6 +90,7 @@ import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefender
 import SentinelOneConnector from "./components/SentinelOneConnector"
 import WizSource from "./components/WizSource"
 import CrowdStrikeConnector from "./components/CrowdStrikeConnector"
+import AtlasS3ExportConnector from "./components/AtlasS3ExportConnector"
 import CopilotStudioMultiEnvImport from "./components/CopilotStudioMultiEnvImport"
 import {
     CONNECTOR_NAME_COPILOT_STUDIO_MULTI_ENV,
@@ -661,6 +662,15 @@ const crowdStrikeObj = {
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-crowdstrike',
     key: "CROWDSTRIKE",
     component: <CrowdStrikeConnector/>
+}
+
+const atlasS3ExportObj = {
+    icon: '/public/aws.svg',
+    label: "Atlas Log Export to S3",
+    text: "Export Atlas traces (guardrail hits, models, token usage) in OpenTelemetry format to your S3 bucket.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/ai-agent-activity',
+    key: "ATLAS_S3_EXPORT",
+    component: <AtlasS3ExportConnector/>
 }
 
 const microsoftDefenderRunQueriesObj = {
@@ -1457,6 +1467,18 @@ const litellmImportObj = {
     />
 }
 
+const LITELLM_ATLAS_TEXT = "Bring employee coding agents and AI apps routed through your LiteLLM proxy into Atlas."
+
+// Same LiteLLM tile as Argus, described for Atlas (endpoint) traffic.
+const litellmAtlasObj = {
+    ...litellmImportObj,
+    text: LITELLM_ATLAS_TEXT,
+    component: <BannerComponent
+        content={LITELLM_ATLAS_TEXT}
+        docsUrl={litellmImportObj.docsUrl}
+    />
+}
+
 const difyImportObj = {
     icon: '/public/dify.svg',
     label: "Dify",
@@ -1488,6 +1510,19 @@ const claudeInferenceHookObj = {
     component: <BannerComponent
         content="Route every governed Claude prompt through Akto for an allow/deny verdict before inference runs."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-inference-hooks'
+    />
+}
+
+const grokBotInferenceHookObj = {
+    icon: '/public/grok_bot.svg',
+    label: "Grok Bot Inference Hooks",
+    text: "Route every governed Grok Bot prompt through Akto for an allow/deny verdict before inference runs.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/grok-bot-inference-hooks',
+    key: "GROK_BOT_INFERENCE_HOOK",
+    badge: "Beta",
+    component: <BannerComponent
+        content="Route every governed Grok Bot prompt through Akto for an allow/deny verdict before inference runs."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/grok-bot-inference-hooks'
     />
 }
 
@@ -1593,6 +1628,47 @@ const hermesHookObj = {
     component: <BannerComponent
         content="Trace Hermes Agent runs end to end and apply Akto guardrails to every agent action."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/hermes-hooks'
+    />
+}
+
+// Personal AI agents (Coming Soon)
+const openaiDotsObj = {
+    icon: '/public/openai.svg',
+    label: "OpenAI Dots (Coming Soon)",
+    text: "Discover OpenAI Dots on employee endpoints and flag personal accounts.",
+    key: "OPENAI_DOTS_AGENT",
+    component: <BannerComponent
+        content="Discover OpenAI Dots on employee endpoints and flag personal accounts."
+    />
+}
+
+const grokBotObj = {
+    icon: '/public/grok.svg',
+    label: "xAI Grok Bot (Coming Soon)",
+    text: "Discover xAI Grok Bot on employee endpoints and flag personal accounts.",
+    key: "XAI_GROK_BOT_AGENT",
+    component: <BannerComponent
+        content="Discover xAI Grok Bot on employee endpoints and flag personal accounts."
+    />
+}
+
+const metaMuseObj = {
+    icon: '/public/meta.svg',
+    label: "Meta Muse (Coming Soon)",
+    text: "Discover Meta Muse on employee endpoints and flag personal accounts.",
+    key: "META_MUSE_AGENT",
+    component: <BannerComponent
+        content="Discover Meta Muse on employee endpoints and flag personal accounts."
+    />
+}
+
+const instinctObj = {
+    icon: '/public/instinct.svg',
+    label: "Instinct (Coming Soon)",
+    text: "Discover Instinct on employee endpoints and flag personal accounts.",
+    key: "INSTINCT_AGENT",
+    component: <BannerComponent
+        content="Discover Instinct on employee endpoints and flag personal accounts."
     />
 }
 
@@ -2388,7 +2464,7 @@ const quickStartFunc = {
         // CLI-only agents. IDE/editor integrations live in agenticIdes below.
         const agenticClis = [
             claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, hermesHookObj,
-            kiroCliObj, claudeInferenceHookObj, ampHookObj, antigravityCliObj,
+            kiroCliObj, claudeInferenceHookObj, grokBotInferenceHookObj, ampHookObj, antigravityCliObj,
         ]
 
         const agenticIdes = [
@@ -2451,6 +2527,10 @@ const quickStartFunc = {
                 openaiImportObj, chatgptIdeObj, codexHookObj,
             ]
 
+            const personalAiAgents = [
+                openaiDotsObj, grokBotObj, metaMuseObj, instinctObj,
+            ]
+
             const microsoftConnectors = [
                 m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj,
             ]
@@ -2460,7 +2540,8 @@ const quickStartFunc = {
                 "Agentic IDEs & Apps": agenticIdes,
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
-                "Agentic Proxies": agenticProxies,
+                "Agentic Proxies": [...agenticProxies, litellmAtlasObj],
+                "Personal AI Agents": personalAiAgents,
                 "Claude Suite": anthropicConnectors,
                 "ChatGPT Suite": openaiConnectors,
                 "Microsoft Suite": microsoftConnectors,
@@ -2468,6 +2549,8 @@ const quickStartFunc = {
                 "Browser Extension": browserExtensions,
                 "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,
+                // SaaS only, behind the ATLAS_S3_LOG_EXPORT feature flag.
+                ...((!func.checkOnPrem() && func.checkForFeatureSaas("ATLAS_S3_LOG_EXPORT")) ? { "Log Export": [atlasS3ExportObj] } : {}),
                 "": hiddenConnectors, // Hidden category for connector lookup
             };
         } else {

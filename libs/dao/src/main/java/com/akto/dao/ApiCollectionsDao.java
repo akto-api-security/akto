@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
@@ -19,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,6 +39,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
 
     public static final ApiCollectionsDao instance = new ApiCollectionsDao();
     private static Bson projectionForApis = Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD);
+
+    // Placeholder identity for system reads; matches no RBAC row.
+    private static final int SYSTEM_USER_ID = 0;
 
     private ApiCollectionsDao() {}
 
@@ -73,6 +78,31 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.START_TS }, false);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.NAME }, true);
+
+        // custom roles' host and tag rules (RuleCollections) read these instead of every collection document
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.HOST_NAME }, true);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ApiCollection.TAGS_STRING + "." + CollectionTags.KEY_NAME, ApiCollection.TAGS_STRING + "." + CollectionTags.VALUE }, true);
+    }
+
+    /** Fields of a collection a list of collections does not need, some of them as big as every url of the collection. */
+    private static final List<String> LIST_EXCLUDED_FIELDS = Arrays.asList(
+            ApiCollection.URLS_STRING, ApiCollection.CONDITIONS_STRING, ApiCollection.SERVICE_GRAPH_EDGES,
+            ApiCollection.HOST_NAMES, ApiCollection.SAMPLE_COLLECTIONS_DROPPED, ApiCollection.REDACT,
+            ApiCollection.RUN_DEPENDENCY_ANALYSER, ApiCollection.MATCH_DEPENDENCY_WITH_OTHER_COLLECTIONS,
+            ApiCollection.SSE_CALLBACK_URL, ApiCollection.MCP_TRANSPORT_TYPE, ApiCollection.MCP_MALICIOUSNESS_LAST_CHECK,
+            ApiCollection.VXLAN_ID, ApiCollection.USER_ENV_TYPE);
+
+    /** What the collections table and the app wide id lookups read of each collection. */
+    public static final Bson LIST_PROJECTION = Projections.exclude(withServiceTag(true));
+
+    /** The same, keeping serviceTag, which the display name of a service collection is built from. */
+    public static final Bson LIST_PROJECTION_WITH_SERVICE_TAG = Projections.exclude(withServiceTag(true));
+
+    private static List<String> withServiceTag(boolean keepServiceTag) {
+        List<String> excluded = new ArrayList<>(LIST_EXCLUDED_FIELDS);
+        if (!keepServiceTag) excluded.add(ApiCollection.SERVICE_TAG);
+        return excluded;
     }
 
     public ApiCollection getMeta(int apiCollectionId) {
@@ -179,6 +209,34 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         return apiCollectionMap;
     }
 
+    /**
+     * True if the current account has at least one endpoint collection. For system callers (crons) with no
+     * request user: findAll scopes itself to ENDPOINT collections from Context.contextSource, and a null
+     * Context.userId makes that scoping silently skipped (modifyFilters swallows the NPE), so a placeholder
+     * user is set. The user has no RBAC row, so it sees every collection in the ENDPOINT scope.
+     * The isEndpointCollection() check keeps a skipped scoping from reading as "has an endpoint collection".
+     */
+    public boolean hasEndpointCollection() {
+        CONTEXT_SOURCE prevContextSource = Context.contextSource.get();
+        try {
+            Context.userId.set(SYSTEM_USER_ID);
+            Context.contextSource.set(CONTEXT_SOURCE.ENDPOINT);
+            List<ApiCollection> scoped = findAll(new BasicDBObject(), 0, 1, null,
+                    Projections.include(ApiCollection.TAGS_STRING));
+            return scoped.stream().anyMatch(ApiCollection::isEndpointCollection);
+        } finally {
+            restore(Context.contextSource, prevContextSource);
+        }
+    }
+
+    private static <V> void restore(ThreadLocal<V> threadLocal, V previous) {
+        if (previous == null) {
+            threadLocal.remove();
+        } else {
+            threadLocal.set(previous);
+        }
+    }
+
     public List<ApiCollection> fetchApiGroups() {
         return ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
     }
@@ -192,11 +250,14 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
     }
 
     public ApiCollection findByName(String name) {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        // the display name is derived from these three fields only, so match on a projection of them
+        // and load the one matching document in full; the documents carry every url of the collection
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(),
+                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection.SERVICE_TAG));
         for (ApiCollection apiCollection: apiCollections) {
             if (apiCollection.getDisplayName() == null) continue;
             if (apiCollection.getDisplayName().equalsIgnoreCase(name)) {
-                return apiCollection;
+                return ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.ID, apiCollection.getId()));
             }
         }
         return null;
@@ -447,7 +508,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                                     Bson matchFilter = Filters.and(
                                         hostHeaderFilter,
                                         Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionId),
-                                        filter
+                                        filter,
+                                        collectionId == AllAPIsGroup.ALL_APIS_GROUP_ID
+                                            ? AllAPIsGroup.visibleOwnerFilter(SingleTypeInfo._API_COLLECTION_ID) : Filters.empty()
                                     );
                                     long count = SingleTypeInfoDao.instance.getMCollection().countDocuments(matchFilter);
                                     return new Pair<>(collectionId, (int)count);
@@ -485,6 +548,12 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                             filter
                         )));
                         pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
+                        if (groupCollectionIds.contains(AllAPIsGroup.ALL_APIS_GROUP_ID)) {
+                            pipeline.add(Aggregates.match(Filters.nor(Filters.and(
+                                Filters.eq(SingleTypeInfo._COLLECTION_IDS, AllAPIsGroup.ALL_APIS_GROUP_ID),
+                                Filters.not(AllAPIsGroup.visibleOwnerFilter(SingleTypeInfo._API_COLLECTION_ID))
+                            ))));
+                        }
                         // REMOVED redundant match - unwind already filtered the documents
                         pipeline.add(Aggregates.group(
                             "$" + SingleTypeInfo._COLLECTION_IDS,
@@ -617,6 +686,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, false);
         if(lastScannedId != null){
             filterQ = Filters.and(filterQ, Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId), Filters.gte(Constants.ID, lastScannedId));
+        }
+        if (apiCollectionId == AllAPIsGroup.ALL_APIS_GROUP_ID) {
+            filterQ = Filters.and(filterQ, AllAPIsGroup.visibleOwnerFilter(SingleTypeInfo._API_COLLECTION_ID));
         }
         return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, Sorts.ascending(Constants.ID), projection);
     }

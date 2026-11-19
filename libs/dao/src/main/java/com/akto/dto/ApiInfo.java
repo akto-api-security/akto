@@ -50,6 +50,14 @@ public class ApiInfo {
     public static final String RISK_SCORE = "riskScore";
     private float riskScore;
 
+    public static final String RISK_SCORE_FACTORS = "riskScoreFactors";
+    private List<RiskScoreFactor> riskScoreFactors;
+
+    public static final String RISK_SCORE_FACTORS_SCORE = "riskScoreFactorsScore";
+    private float riskScoreFactorsScore;
+    /** True when {@link #riskScoreFactorsScore} was present on the loaded document (vs default 0). */
+    private transient boolean riskScoreFactorsScorePresent;
+
     public static final String LAST_CALCULATED_TIME = "lastCalculatedTime";
     private int lastCalculatedTime;
 
@@ -92,6 +100,9 @@ public class ApiInfo {
     public static final String IS_SKILL_BLOCKED = "isSkillBlocked";
     private boolean isSkillBlocked;
 
+    public static final String IS_CONNECTION_STRING = "isConnectionString";
+    private boolean isConnectionString;
+
     public static final String TAGS_LIST = "tagsList";
     // private List<ApiInfoTag> tagsList;
 
@@ -105,6 +116,45 @@ public class ApiInfo {
 
         private String key;
         private String value;
+    }
+
+    public static class RiskScoreFactor {
+        private float points;
+        private String label;
+        private String detail;
+
+        public RiskScoreFactor() {
+        }
+
+        public RiskScoreFactor(float points, String label, String detail) {
+            this.points = points;
+            this.label = label;
+            this.detail = detail;
+        }
+
+        public float getPoints() {
+            return points;
+        }
+
+        public void setPoints(float points) {
+            this.points = points;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public String getDetail() {
+            return detail;
+        }
+
+        public void setDetail(String detail) {
+            this.detail = detail;
+        }
     }
 
     public static class MessageFieldEntry {
@@ -151,6 +201,32 @@ public class ApiInfo {
 
     public static final String GUARDRAIL_SCHEMA = "guardrailSchema";
     private GuardrailSchema guardrailSchema;
+
+    public static class ToolInfo {
+        public static final String CAPABILITY = "capability";
+        public static final String CALCULATED_AT = "calculatedAt";
+
+        private String capability;
+        private int calculatedAt;
+
+        public ToolInfo() {}
+
+        public ToolInfo(String capability, int calculatedAt) {
+            this.capability = capability;
+            this.calculatedAt = calculatedAt;
+        }
+
+        public String getCapability() { return capability; }
+        public void setCapability(String capability) { this.capability = capability; }
+
+        public int getCalculatedAt() { return calculatedAt; }
+        public void setCalculatedAt(int calculatedAt) { this.calculatedAt = calculatedAt; }
+    }
+
+    public static final String TOOL_INFO = "toolInfo";
+    public static final String TOOL_INFO_CAPABILITY = TOOL_INFO + "." + ToolInfo.CAPABILITY;
+    public static final String TOOL_INFO_CALCULATED_AT = TOOL_INFO + "." + ToolInfo.CALCULATED_AT;
+    private ToolInfo toolInfo;
 
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP, WEBSOCKET
@@ -372,13 +448,17 @@ public class ApiInfo {
         }
         this.isSensitive = that.isSensitive || this.isSensitive;
         this.severityScore = this.severityScore + that.severityScore;
-        this.riskScore = Math.max(this.riskScore, that.riskScore);
+        if (that.riskScore > this.riskScore) {
+            this.riskScore = that.riskScore;
+            this.riskScoreFactors = that.riskScoreFactors;
+            this.riskScoreFactorsScore = that.riskScoreFactorsScore;
+            this.riskScoreFactorsScorePresent = that.riskScoreFactorsScorePresent;
+        }
         this.threatScore = Math.max(this.threatScore, that.threatScore);
 
         if (that.lastCalculatedTime > this.lastCalculatedTime) {
             this.lastCalculatedTime = that.lastCalculatedTime;
         }
-        
 
         for (String k: that.violations.keySet()) {
             if (this.violations.get(k) == null || that.violations.get(k) > this.violations.get(k)) {
@@ -410,6 +490,8 @@ public class ApiInfo {
 
         // Merge rateLimitConfidence - take the maximum confidence
         this.rateLimitConfidence = Math.max(this.rateLimitConfidence, that.rateLimitConfidence);
+
+        this.isConnectionString = this.isConnectionString || that.isConnectionString;
 
         // Merge tagsList — union; compare on keyName+value only (ignore timestamp/source)
         if (that.tagsList != null && !that.tagsList.isEmpty()) {
@@ -654,6 +736,30 @@ public class ApiInfo {
         this.riskScore = riskScore;
     }
 
+    public List<RiskScoreFactor> getRiskScoreFactors() {
+        return riskScoreFactors;
+    }
+
+    public void setRiskScoreFactors(List<RiskScoreFactor> riskScoreFactors) {
+        this.riskScoreFactors = riskScoreFactors;
+    }
+
+    public float getRiskScoreFactorsScore() {
+        return riskScoreFactorsScore;
+    }
+
+    public void setRiskScoreFactorsScore(float riskScoreFactorsScore) {
+        this.riskScoreFactorsScore = riskScoreFactorsScore;
+    }
+
+    public boolean isRiskScoreFactorsScorePresent() {
+        return riskScoreFactorsScorePresent;
+    }
+
+    public void setRiskScoreFactorsScorePresent(boolean riskScoreFactorsScorePresent) {
+        this.riskScoreFactorsScorePresent = riskScoreFactorsScorePresent;
+    }
+
     public int getLastCalculatedTime() {
         return lastCalculatedTime;
     }
@@ -753,8 +859,14 @@ public class ApiInfo {
     public boolean getIsSkillBlocked() { return isSkillBlocked; }
     public void setIsSkillBlocked(boolean isSkillBlocked) { this.isSkillBlocked = isSkillBlocked; }
 
+    public boolean getIsConnectionString() { return isConnectionString; }
+    public void setIsConnectionString(boolean isConnectionString) { this.isConnectionString = isConnectionString; }
+
     public GuardrailSchema getGuardrailSchema() { return guardrailSchema; }
     public void setGuardrailSchema(GuardrailSchema guardrailSchema) { this.guardrailSchema = guardrailSchema; }
+
+    public ToolInfo getToolInfo() { return toolInfo; }
+    public void setToolInfo(ToolInfo toolInfo) { this.toolInfo = toolInfo; }
 
     public List<CollectionTags> getTagsList() {
         return tagsList;

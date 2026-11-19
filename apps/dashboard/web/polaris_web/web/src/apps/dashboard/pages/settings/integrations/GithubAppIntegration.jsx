@@ -4,9 +4,11 @@ import func from '@/util/func';
 import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
 import UploadFile from '../../../components/shared/UploadFile';
+import { usePermissions, whenAllowed } from '@/util/permissions';
 
 function GithubAppIntegration() {
     
+    const { canCall } = usePermissions()
     const [showGithubAppModal, setShowGithubAppModal] = useState(false)
     const [githubAppId, setGithubAppId] = useState("")
     const [githubAppSecretKey, setGithubAppSecretKey] = useState("")
@@ -73,7 +75,8 @@ function GithubAppIntegration() {
             title="Are you sure?"
             primaryAction={{
                 content: githubAppIdPresent ? 'Delete Github App settings' : 'Add GitHub App settings',
-                onAction: githubAppIdPresent ? handleDeleteGithubAppSettings : handleAddGithubAppSettings
+                onAction: githubAppIdPresent ? handleDeleteGithubAppSettings : handleAddGithubAppSettings,
+                ...whenAllowed(canCall(githubAppIdPresent ? 'api/deleteGithubAppSecretKey' : 'api/addGithubAppSecretKey'))
             }}
         >
             <Modal.Section>
@@ -117,14 +120,14 @@ function GithubAppIntegration() {
     const GithubAppSecret = (
         <LegacyCard
             title="GitHub App settings"
-            primaryFooterAction={{ content: (githubAppIdPresent ? 'Delete GitHub App settings' : 'Add GitHub App settings'), onAction: () => setShowGithubAppModal(true) }}
+            primaryFooterAction={{ content: (githubAppIdPresent ? 'Delete GitHub App settings' : 'Add GitHub App settings'), onAction: () => setShowGithubAppModal(true), ...whenAllowed(canCall(githubAppIdPresent ? 'api/deleteGithubAppSecretKey' : 'api/addGithubAppSecretKey')) }}
             >
             {GithubAppComponent}
         </LegacyCard>
     )
     return (
         <>
-            <IntegrationsLayout title="GitHub App Integration" cardContent={cardContent} component={GithubAppSecret} docsUrl="" />
+            <IntegrationsLayout title="GitHub App Integration" cardContent={cardContent} component={GithubAppSecret} docsUrl="" readOnly={!canCall('api/addGithubAppSecretKey')} />
             {githubAppModal}
         </>
     )

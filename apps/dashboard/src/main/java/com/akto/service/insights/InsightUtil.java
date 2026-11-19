@@ -1,17 +1,24 @@
 package com.akto.service.insights;
 
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.GuardrailPolicies.SelectedServer;
+import com.akto.dto.McpAuditInfo;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.util.AgenticObserveUtil;
+import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.akto.util.Constants;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Static helpers shared across insight providers — number formatting, agent-description
@@ -25,7 +32,7 @@ public final class InsightUtil {
     // ── Metric formatting — the narrative model copies these strings verbatim ──────────
 
     public static String count(long n, String noun) {
-        return n + " " + (n == 1 ? singular(noun) : noun);
+        return grouped(n) + " " + (n == 1 ? singular(noun) : noun);
     }
 
     private static String singular(String noun) {
@@ -34,7 +41,12 @@ public final class InsightUtil {
     }
 
     public static String ofTotal(long n, long total, String noun) {
-        return n + " of " + total + " " + noun;
+        return grouped(n) + " of " + grouped(total) + " " + noun;
+    }
+
+    /** Thousands-grouped, e.g. 18234 -> "18,234" — every formatted count/token number a reader sees goes through this. */
+    public static String grouped(long n) {
+        return String.format(Locale.US, "%,d", n);
     }
 
     public static String percent(double fraction) {
@@ -44,6 +56,33 @@ public final class InsightUtil {
     public static String daysAgo(long epochSeconds, long nowEpochSeconds) {
         long days = Math.max(0, (nowEpochSeconds - epochSeconds) / 86400);
         return days == 0 ? "today" : days + (days == 1 ? " day ago" : " days ago");
+    }
+
+    /** A plain-language description of the report window, for headlines that otherwise state only
+     *  raw counts with no sense of the time period they cover (e.g. "N violations" vs. "N violations
+     *  in the last 2 weeks"). ctx.getStartTs()/getEndTs() &lt;= 0 both means "all time" by the same
+     *  convention PolicyHygieneProvider's isWithinWindow uses. */
+    public static String dateRangeDescription(int startTs, int endTs) {
+        if (startTs <= 0 && endTs <= 0) {
+            return "over all recorded activity";
+        }
+        if (startTs <= 0 || endTs <= 0) {
+            return "in the selected window";
+        }
+        long days = Math.max(1, Math.round((endTs - startTs) / 86400.0));
+        boolean endsNearNow = endTs >= com.akto.dao.context.Context.now() - 86400;
+        if (endsNearNow) {
+            if (days == 1) return "in the last 24 hours";
+            if (days == 7) return "in the last week";
+            if (days == 14) return "in the last 2 weeks";
+            if (days >= 28 && days <= 31) return "in the last month";
+            return "in the last " + days + " days";
+        }
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("MMM d", Locale.US);
+        java.time.ZoneId utc = java.time.ZoneId.of("UTC");
+        String startStr = java.time.Instant.ofEpochSecond(startTs).atZone(utc).format(fmt);
+        String endStr = java.time.Instant.ofEpochSecond(endTs).atZone(utc).format(fmt);
+        return "between " + startStr + " and " + endStr;
     }
 
     // ── Agent purpose (on-domain reference for insights 6/7) ───────────────────────────
@@ -93,6 +132,115 @@ public final class InsightUtil {
         return "block".equalsIgnoreCase(p.getBehaviour());
     }
 
+    /** Raw `ApiInfo.ToolInfo.capability` literals ("RESOURCE_DELETE", "CREDENTIAL_OR_PII_READ")
+     *  are what ToolClassificationCron stores — same jargon-in-the-UI problem humanizePolicyMode
+     *  solves, so a "Capability" column gets its display string from here rather than each caller
+     *  inventing one. A blank value means the classification cron hasn't reached that tool yet,
+     *  which is a real state and not an error. */
+    public static String humanizeToolCapability(String capability) {
+        if (capability == null || capability.trim().isEmpty()) {
+            return "Unclassified";
+        }
+        switch (capability.trim().toUpperCase(Locale.ROOT)) {
+            case ToolCapabilityClassifier.RESOURCE_DELETE: return "Resource delete";
+            case ToolCapabilityClassifier.CRITICAL_RESOURCE_WRITE: return "Critical resource write";
+            case ToolCapabilityClassifier.CREDENTIAL_OR_PII_READ: return "Credential / PII read";
+            case ToolCapabilityClassifier.FILE_WRITE: return "File write";
+            case ToolCapabilityClassifier.SAFE: return "Safe";
+            default: return capability.trim();
+        }
+    }
+
+    /** Raw `GuardrailPolicies.behaviour` ("block"/"warn"/"alert"/"approval") is backend jargon —
+     *  this is the one place every "Mode" column/caveat should get its display string from,
+     *  rather than each provider inventing its own fallback. A blank/unrecognized value means the
+     *  lookup missed (most commonly: the policy that fired has since been renamed or deleted), not
+     *  that the mode itself is unknown, so it says so plainly instead of "unknown". */
+    public static String humanizePolicyMode(String behaviour) {
+        if (behaviour == null || behaviour.trim().isEmpty()) {
+            return "Policy no longer exists";
+        }
+        switch (behaviour.trim().toLowerCase(Locale.ROOT)) {
+            case "block": return "Block";
+            case "warn": return "Warn";
+            case "alert": return "Alert only";
+            case "approval": return "Needs approval";
+            default: return behaviour;
+        }
+    }
+
+    // ── Taxonomy-mismatch fallback ─────────────────────────────────────────────────────
+    // On real accounts, a violation's `subCategory` frequently equals the firing policy's own
+    // name rather than the literal ("Secrets" / "PII-<type>" / "PromptInjection") several
+    // insights match against — confirmed independently across multiple real accounts. When
+    // subCategory doesn't match, fall back to asking the firing POLICY whether it has the
+    // relevant scanner enabled at all; a hit from a policy with that scanner on is real signal
+    // even when the literal it landed under doesn't say so.
+
+    public static boolean policyHasSecretsDetection(GuardrailPolicies p) {
+        return p != null && p.getSecretsDetection() != null && p.getSecretsDetection().isEnabled();
+    }
+
+    public static boolean policyHasPiiDetection(GuardrailPolicies p) {
+        return p != null && p.getPiiTypes() != null && !p.getPiiTypes().isEmpty();
+    }
+
+    private static final String PII_RULE_PREFIX = "pii-";
+    private static final List<String> LLM_DATA_RULES = Arrays.asList("userdefinedllmrule", "userdefinedllmredactionrule");
+
+    /** True when the rule that fired (a guardrail event's subCategory == rule_violated) is a data check:
+     *  a PII detection ("PII-<type>") or a custom LLM (DLP) rule. A policy's other checks, such as prompt
+     *  injection, don't count even when the same policy also detects PII. */
+    public static boolean isSensitiveDataEvent(DashboardMaliciousEvent e) {
+        if (e == null || e.getSubCategory() == null) return false;
+        // With no rule_violated the producer falls back to the policy name, which isn't a rule (e.g. "pii-policy").
+        if (e.getSubCategory().equalsIgnoreCase(e.getCategory())) return false;
+        String rule = e.getSubCategory().trim().toLowerCase(Locale.ROOT);
+        return rule.startsWith(PII_RULE_PREFIX) || LLM_DATA_RULES.contains(rule);
+    }
+
+    /** What was flagged, for display: the PII type ("PII-email" -> "email"), or the firing policy's
+     *  name for a custom LLM rule. Null for non-sensitive events. */
+    public static String sensitiveDataLabel(DashboardMaliciousEvent e) {
+        if (!isSensitiveDataEvent(e)) return null;
+        String rule = e.getSubCategory().trim();
+        if (rule.toLowerCase(Locale.ROOT).startsWith(PII_RULE_PREFIX)) return rule.substring(PII_RULE_PREFIX.length()).toLowerCase(Locale.ROOT);
+        String policy = StringUtils.isNotBlank(e.getCategory()) ? e.getCategory() : e.getFilterId();
+        return (StringUtils.isNotBlank(policy) ? policy : "Custom") + " (LLM rule)";
+    }
+
+    /** "email (12), password (3)" — most frequent first. */
+    public static String sensitiveDataLine(Map<String, Integer> countsByLabel) {
+        List<Map.Entry<String, Integer>> entries = new ArrayList<>(countsByLabel.entrySet());
+        entries.sort((x, y) -> Integer.compare(y.getValue(), x.getValue()));
+        List<String> parts = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : entries) parts.add(entry.getKey() + " (" + entry.getValue() + ")");
+        return String.join(", ", parts);
+    }
+
+    public static boolean policyHasPromptInjectionDetection(GuardrailPolicies p) {
+        return p != null && p.getContentFiltering() != null && p.getContentFiltering().get("promptAttacks") != null;
+    }
+
+    /** Raw `subCategory` literals ("PII-email", "PromptInjection") leaking into evidence tables
+     *  and caveats — this turns them into a phrase a reader doesn't need backend context for. */
+    public static String humanizeSubCategory(String subCategory) {
+        if (subCategory == null || subCategory.trim().isEmpty()) {
+            return "(no category)";
+        }
+        String s = subCategory.trim();
+        if (s.regionMatches(true, 0, "PII-", 0, 4) && s.length() > 4) {
+            return "PII (" + s.substring(4) + ")";
+        }
+        if ("PromptInjection".equalsIgnoreCase(s)) {
+            return "Prompt injection";
+        }
+        if ("Secrets".equalsIgnoreCase(s)) {
+            return "Secrets";
+        }
+        return s;
+    }
+
     public static boolean policyCoversHost(GuardrailPolicies p, String hostName) {
         if (hostName == null) return false;
         if (p.isApplyToAllServers()) return true;
@@ -124,6 +272,77 @@ public final class InsightUtil {
         return policyCoversHost(p, c.getHostName()) && policyCoversDevice(resolvedApplyToDeviceIds, deviceIdOf(c));
     }
 
+    /** True when any active policy (fleet-wide, or host-targeted onto this collection) covers it.
+     *  Device targeting is intentionally ignored here — this is a collection/agent-level coverage
+     *  check (Argus posture), not a per-device one; passing a null resolvedApplyToDeviceIds to
+     *  policyCoversDevice always resolves to "covered" for that axis, matching the "no ApiCollection
+     *  -> policy link field, host-scope is the real targeting axis" note in posture/CLAUDE.md. */
+    public static boolean collectionCoveredByAnyPolicy(ApiCollection c, List<GuardrailPolicies> policies) {
+        return c != null && hostCoveredByAnyPolicy(c.getHostName(), policies);
+    }
+
+    /** Same check as collectionCoveredByAnyPolicy, off a bare host string only. */
+    public static boolean hostCoveredByAnyPolicy(String hostName, List<GuardrailPolicies> policies) {
+        if (policies == null || hostName == null) return false;
+        for (GuardrailPolicies p : policies) {
+            if (p == null) continue;
+            if (p.isApplyToAllServers()) return true;
+            if (policyCoversHost(p, hostName)) return true;
+        }
+        return false;
+    }
+
+    /** CRITICAL first — the same rank convention InsightService's own list-sort and the Violations
+     *  grid's severity column already use. Missing/unrecognized severity sorts last. Public here so
+     *  every Argus provider that ranks findings by severity shares one implementation. */
+    public static int severityRank(String severity) {
+        if (severity == null) return 5;
+        switch (severity.toUpperCase(Locale.ROOT)) {
+            case "CRITICAL": return 1;
+            case "HIGH": return 2;
+            case "MEDIUM": return 3;
+            case "LOW": return 4;
+            default: return 5;
+        }
+    }
+
+    // ── Environment classification — moved from ArgusPostureService so any AGENTIC provider can
+    // group findings by environment without a package-crossing dependency on service/posture. ──
+
+    /** Raw env-type tag value (e.g. "PROD", "STAGING") on a collection, or null when untagged. */
+    public static String envTagValue(ApiCollection c) {
+        if (c == null || c.getEnvType() == null) return null;
+        for (CollectionTags tag : c.getEnvType()) {
+            if (tag != null && Constants.AKTO_ENV_TYPE_TAG.equalsIgnoreCase(tag.getKeyName())) return tag.getValue();
+        }
+        return null;
+    }
+
+    // ── Vendor classification for agentic findings — a superset of endpointVendorNameOfHost's
+    // "<device>.<ai-agent|chrome>.<vendor>" host shape, since an MCP-server-shaped agentic
+    // collection (e.g. a Bedrock/Kiro-hosted agent) never matches that host pattern at all. Tries
+    // the host, then the collection name, then its asset-type tag value, against the same
+    // canonicalVendorName substring map every other vendor grouping in this file already uses —
+    // so "bedrock"/"kiro"/"claude"/... resolve to the identical canonical names regardless of
+    // which field the vendor token happened to show up in. ──
+
+    public static String agenticVendorOf(ApiCollection c) {
+        if (c == null) return null;
+        // The saas-agent tag is authoritative (e.g. copilot-studio) — the host of a SaaS agent is
+        // user-named and carries no vendor token.
+        String vendor = agenticVendorToken(AgenticObserveUtil.getSaasAgentTagValue(c));
+        if (vendor == null) vendor = agenticVendorToken(c.getHostName());
+        if (vendor == null) vendor = agenticVendorToken(c.getName());
+        if (vendor == null) vendor = agenticVendorToken(AgenticObserveUtil.getAssetTagValue(c));
+        return vendor;
+    }
+
+    private static String agenticVendorToken(String raw) {
+        if (StringUtils.isBlank(raw)) return null;
+        String canonical = canonicalVendorName(raw.toLowerCase(Locale.ROOT));
+        return "unknown".equals(canonical) ? null : canonical;
+    }
+
     // ── Shared content hashing (cache keys for narrative + classification caches) ──────
 
     public static String md5(String input) {
@@ -138,13 +357,14 @@ public final class InsightUtil {
         }
     }
 
-    // ── CTA deep-link params — only these two mechanisms actually work on the frontend today ──
+    // ── CTA deep-link params — only these mechanisms actually work on the frontend today ──
     // (verified against the live pages, not assumed): Users and Devices reads a single `filters`
-    // query param shaped `key__v1,v2,...` (GithubServerTable's convention; `groupName` is the only
-    // filterKey that page declares — a bare `?username=`/`?host=` param is silently ignored).
-    // Guardrail Policies has no filtered-list deep link, only a single-policy one: `?policy=<exact
-    // name>` opens that policy's edit drawer (GuardrailPolicies.jsx's own `?policy=` handling) —
-    // `policyId`/`policyName`/`policyIds` keys are not read by that page and do nothing.
+    // query param shaped `key__v1,v2,...` (GithubServerTable's convention; `username` is the only
+    // filterKey its Users-tab `fetchData` actually consumes — `groupName` parses into a UI chip but
+    // is silently dropped before it reaches the backend query, so it must not be used here).
+    // Guardrail Policies reads `?policy=<exact name>` (opens that policy's edit drawer) and
+    // `?policyIds=id1,id2,...` (pre-selects those rows for a bulk action) — `policyId`/`policyName`
+    // keys are not read by that page and do nothing.
 
     /** Empty map (falls back to an unfiltered NAVIGATE) if usernames has no non-blank entries. */
     public static Map<String, Object> usersAndDevicesFilterParams(List<String> usernames) {
@@ -153,7 +373,7 @@ public final class InsightUtil {
             for (String u : usernames) if (u != null && !u.isEmpty()) clean.add(u);
         }
         Map<String, Object> params = new HashMap<>();
-        if (!clean.isEmpty()) params.put("filters", "groupName__" + String.join(",", clean));
+        if (!clean.isEmpty()) params.put("filters", "username__" + String.join(",", clean));
         return params;
     }
 
@@ -171,6 +391,214 @@ public final class InsightUtil {
 
     public static String deviceIdOf(ApiCollection c) { return com.akto.util.AgenticObserveUtil.extractEndpointId(c.getHostName()); }
     public static String serviceNameOf(ApiCollection c) { return com.akto.util.AgenticObserveUtil.extractServiceName(c.getHostName()); }
+
+    /** The name governance/approval grouping should actually key on: the canonicalized vendor
+     *  name for an endpoint-shield collection (matches how vendor-type allowlist entries are
+     *  stored — see loadAllowlistNames), falling back to the MCP-server-shaped serviceNameOf for
+     *  everything else. Shared by governanceBucket's allowlist check and
+     *  RiskScoreCalculator#shadowAiTopUnapprovedServices' own grouping, so shadow AI's breakdown
+     *  merges the same aliases ("chatgpt.com"/"codex" -> "openai") vendor risk's table already does. */
+    public static String governanceGroupingName(ApiCollection c) {
+        String vendorName = endpointVendorName(c);
+        return vendorName != null ? vendorName : serviceNameOf(c);
+    }
+
+    // ── Endpoint-shield vendor parsing ───────────────────────────────────────────
+    //
+    // Endpoint-shield/browser-extension collections (isEndpointCollection()) name their
+    // hostName "<device>.<ai-agent|chrome>.<vendor>...", where <vendor> is the AI provider
+    // itself (claude, deepseek, chatgpt, ...) — a different signal from serviceNameOf above,
+    // which is for MCP-server-shaped hosts. Shared by RiskScoreCalculator's vendor-risk
+    // sub-score/table and the Vendors allowlist tab's audit list — both need the identical
+    // parsing rule, so it lives here rather than being copied twice.
+
+    public static final Set<String> ENDPOINT_AGENT_HOST_MARKERS = new HashSet<>(Arrays.asList("ai-agent", "chrome"));
+
+    // "not-attached" is a real value the endpoint-shield client reports when it captured a
+    // session before the vendor's own client identified itself (e.g. very first launch) — it
+    // names no actual vendor, so it's excluded rather than counted as one.
+    private static final String VENDOR_NOT_ATTACHED = "not-attached";
+
+    /** Multiple raw hostname vendor tokens are really the same vendor under a different app/client
+     *  name (native app vs. CLI vs. web domain) — collapsed to one canonical name by substring
+     *  match so vendor-risk counting/grouping isn't split across near-duplicates. vendor is
+     *  already lowercased by the caller. Falls through to the raw token when nothing matches. */
+    /** Package-private (not private): InsightDataLoader#loadAllowlistNames applies this same
+     *  canonicalization to VENDOR-typed allowlist entries, so an approval stored under a raw alias
+     *  ("chatgpt.com") still matches traffic resolved to the canonical name ("openai"). */
+    static String canonicalVendorName(String vendor) {
+        if (vendor == null || vendor.isEmpty()) {
+            return "unknown";
+        }
+    
+        String v = vendor.toLowerCase();
+    
+        // Anthropic
+        if (v.contains("claude") ||
+            v.contains("anthropic")) {
+            return "Anthropic";
+        }
+    
+        // OpenAI
+        if (v.contains("codex") ||
+            v.contains("chatgpt") ||
+            v.contains("openai") ||
+            v.contains("gpt")) {
+            return "OpenAI";
+        }
+    
+        // Microsoft Copilot Studio — must precede the generic "copilot" match below
+        if (v.contains(Constants.COPILOT_STUDIO_AI_AGENT_NAME)) {
+            return "microsoft-copilot-studio";
+        }
+
+        // GitHub Copilot
+        if (v.contains("copilot") ||
+            v.contains("github")) {
+            return "Github-Copilot";
+        }
+    
+        // Google
+        if (v.contains("gemini") ||
+            v.contains("google-ai") ||
+            v.contains("google ai") ||
+            v.contains("vertex-ai") ||
+            v.contains("vertex ai")) {
+            return "Google";
+        }
+    
+        // AWS
+        if (v.contains("kiro") ||
+            v.contains("bedrock") ||
+            v.contains("amazon-q") ||
+            v.contains("amazon q")) {
+            return "AWS";
+        }
+    
+        // Cursor
+        if (v.contains("cursor")) {
+            return "Cursor";
+        }
+    
+        // Windsurf / Codeium
+        if (v.contains("windsurf") ||
+            v.contains("codeium")) {
+            return "Codeium-Windsurf";
+        }
+    
+        // Aider
+        if (v.contains("aider")) {
+            return "Aider";
+        }
+    
+        // OpenCode
+        if (v.contains("opencode") ||
+            v.contains("open-code")) {
+            return "OpenCode";
+        }
+    
+        // Goose
+        if (v.contains("goose") ||
+            v.contains("block-goose")) {
+            return "Goose";
+        }
+    
+        // Meta
+        if (v.contains("llama") ||
+            v.contains("meta-ai") ||
+            v.contains("meta ai")) {
+            return "Meta";
+        }
+    
+        // Mistral
+        if (v.contains("mistral") ||
+            v.contains("codestral")) {
+            return "Mistral";
+        }
+    
+        // Cohere
+        if (v.contains("cohere") ||
+            v.contains("command-r")) {
+            return "Cohere";
+        }
+    
+        // xAI
+        if (v.contains("grok") ||
+            v.contains("xai") ||
+            v.contains("x-ai")) {
+            return "xAI";
+        }
+    
+        // DeepSeek
+        if (v.contains("deepseek")) {
+            return "DeepSeek";
+        }
+    
+        // Alibaba
+        if (v.contains("qwen") ||
+            v.contains("tongyi")) {
+            return "Alibaba";
+        }
+    
+        // Perplexity
+        if (v.contains("perplexity") ||
+            v.contains("pplx")) {
+            return "Perplexity";
+        }
+    
+        // Groq
+        if (v.contains("groq")) {
+            return "Groq";
+        }
+    
+        // Together AI
+        if (v.contains("together-ai") ||
+            v.contains("together ai") ||
+            v.contains("togetherai")) {
+            return "Together-AI";
+        }
+    
+        // Ollama
+        if (v.contains("ollama")) {
+            return "Ollama";
+        }
+    
+        // LM Studio
+        if (v.contains("lmstudio") ||
+            v.contains("lm-studio") ||
+            v.contains("lm studio")) {
+            return "LM-Studio";
+        }
+    
+        // Antigravity
+        if (v.contains("antigravity")) {
+            return "Antigravity";
+        }
+    
+        return "unknown";
+    }
+    /** Null when the host doesn't match the "<device>.<ai-agent|chrome>.<vendor>..." shape, or
+     *  the parsed token isn't a real vendor ("not-attached") — nothing to classify from it. */
+    public static String endpointVendorName(ApiCollection c) {
+        if (c == null) return null;
+        // A SaaS agent's host is "<id>.ai-agent.<user-chosen bot name>", so parts[2] is not a vendor;
+        // its saas-agent tag (e.g. copilot-studio) is.
+        String saasVendor = agenticVendorToken(AgenticObserveUtil.getSaasAgentTagValue(c));
+        return saasVendor != null ? saasVendor : endpointVendorNameOfHost(c.getHostName());
+    }
+
+    /** Same as {@link #endpointVendorName(ApiCollection)}, taking a raw hostName directly — for
+     *  callers that only have a host string (e.g. a DashboardMaliciousEvent's own host, or a
+     *  HostSeverityCount), not a full ApiCollection. Extracted so both call sites can't drift on
+     *  the same "<device>.<client-type>.<vendor>..." parsing. */
+    public static String endpointVendorNameOfHost(String hostName) {
+        if (hostName == null) return null;
+        String[] parts = hostName.split("\\.");
+        if (parts.length < 3 || !ENDPOINT_AGENT_HOST_MARKERS.contains(parts[1])) return null;
+        String vendor = parts[2].trim().toLowerCase(Locale.ROOT);
+        if (vendor.isEmpty() || vendor.equals(VENDOR_NOT_ATTACHED)) return null;
+        return canonicalVendorName(vendor);
+    }
 
     public static final String TAG_LOCAL_MCP_SERVER = "local-mcp-server";
     public static final String TAG_BROWSER_LLM_ACCOUNT_TYPE = "browser-llm-account-type";
@@ -225,5 +653,54 @@ public final class InsightUtil {
 
     public static boolean everSeenObserve(ApiCollection c) {
         return tagValues(c, Constants.AKTO_GUARDRAIL_MODE).contains(Constants.AKTO_GUARDRAIL_MODE_OBSERVE);
+    }
+
+    // ── Governance classification — sanctioned vs shadow AI ────────────────────────────
+    // Extracted from UngovernedAiRatioProvider so every caller that needs "is this tool
+    // sanctioned or shadow" (the KPI banner's sanctioned-share figure, the Shadow AI panel, the
+    // Adoption panel's per-team breakdown) shares one classifier instead of three copies quietly
+    // drifting apart. UngovernedAiRatioProvider itself now calls this rather than owning the logic.
+
+    public enum GovernanceBucket {
+        MALICIOUS, REJECTED, PERSONAL, LOCAL, SANCTIONED, UNAPPROVED, SHADOW
+    }
+
+    public static Map<String, String> remarksByServiceName(List<McpAuditInfo> auditRows) {
+        Map<String, String> remarksByServiceName = new HashMap<>();
+        if (auditRows == null) return remarksByServiceName;
+        for (McpAuditInfo a : auditRows) {
+            if (a.getMcpHost() != null && a.getRemarks() != null && !a.getRemarks().isEmpty()) {
+                remarksByServiceName.put(a.getMcpHost().toLowerCase(Locale.ROOT), a.getRemarks());
+            }
+        }
+        return remarksByServiceName;
+    }
+    public static GovernanceBucket governanceBucket(ApiCollection c, Set<String> allowlistNamesLower,
+                                                      Map<String, String> remarksByServiceNameLower) {
+        if (isMaliciousMcpServer(c)) return GovernanceBucket.MALICIOUS;
+        // Audit remarks (approved/rejected via the MCP Servers/Skills review flow) are keyed by
+        // the MCP-server-shaped service name regardless of collection type — a vendor-type
+        // endpoint collection was never going to have an audit row anyway, so this lookup just
+        // misses harmlessly for those.
+        String serviceName = serviceNameOf(c);
+        String remarks = serviceName != null ? remarksByServiceNameLower.get(serviceName.toLowerCase(Locale.ROOT)) : null;
+        if (McpAuditInfo.REMARKS_REJECTED.equals(remarks)) return GovernanceBucket.REJECTED;
+        if (isPersonalAccount(c)) return GovernanceBucket.PERSONAL;
+        if (isLocalMcp(c)) return GovernanceBucket.LOCAL;
+        // The allowlist check itself uses governanceGroupingName — the canonicalized vendor name
+        // for an endpoint-shield collection — since that's the name a VENDOR-typed allowlist entry
+        // is actually stored under (see loadAllowlistNames).
+        String groupingName = governanceGroupingName(c);
+        boolean inAllowlist = groupingName != null && allowlistNamesLower.contains(groupingName.toLowerCase(Locale.ROOT));
+        if (inAllowlist || McpAuditInfo.REMARKS_APPROVED.equals(remarks)) return GovernanceBucket.SANCTIONED;
+        if (remarks == null) return GovernanceBucket.SHADOW; // no allowlist entry, no audit row at all
+        return GovernanceBucket.UNAPPROVED; // audit row exists with blank remarks -> pending
+    }
+
+    /** Connector-created collections carry a name but no hostName; policies target them by that
+     *  name, so it is the identity used for both matching and display. */
+    public static String assetIdentity(ApiCollection c) {
+        if (c == null) return null;
+        return c.getHostName() != null ? c.getHostName() : c.getName();
     }
 }

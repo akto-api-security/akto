@@ -1,14 +1,34 @@
 package com.akto.action.settings;
 
+import com.akto.utils.ArgusCollectionScope;
+import com.akto.action.AgenticObserveAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AgentUsersDao;
+import com.akto.dao.AuthTokensDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.AgenticUsers;
+import com.akto.dto.AuthToken;
 import com.akto.dto.DeviceTag;
+import com.akto.dto.monitoring.InstalledAppVulnerability;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.dto.monitoring.ModuleInfoConstants;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.service.atlas.AtlasPeopleService;
+import com.akto.service.insights.InsightContext;
+import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightService;
+import com.akto.service.insights.InsightsThreatBackendAccess;
+import com.akto.action.threat_detection.HostSeverityCount;
+import com.akto.utils.vulnerability.InstalledAppVulnerabilityAnalysis;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Field;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -17,16 +37,24 @@ import com.mongodb.client.model.Updates;
 import lombok.Getter;
 import lombok.Setter;
 
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class ModuleInfoAction extends UserAction {
     private List<ModuleInfo> moduleInfos;
@@ -69,11 +97,44 @@ public class ModuleInfoAction extends UserAction {
     @Setter private List<String> hostnames;
     @Setter private List<String> deviceIds;
     @Setter private List<String> oses;
+    @Setter private List<String> browserNames, agentVersions, statuses, providers;
     @Setter private String queryValue;
     @Setter private int startTimestamp;
     @Setter private int endTimestamp;
     @Getter private long total;
     @Getter private Map<String, Object> filterOptions;
+    @Getter private Map<String, Object> deviceStats;
+    @Setter private String deviceScope;
+    private static final LoggerMaker statsLogger = new LoggerMaker(ModuleInfoAction.class, LogDb.DASHBOARD);
+    // Modules Akto runs itself: customers don't see them in Module Info, and the Tokens tab shows them under a generic name.
+    public static final Set<String> AKTO_HOSTED_MODULE_TYPES = Collections.singleton(ModuleType.GUARDRAIL.name());
+    private final InsightService insightService = new InsightService();
+    // Builds and caches the Atlas Devices & Employees snapshot; every fetchAtlas* action delegates to it.
+    private final AtlasPeopleService atlasPeopleService = new AtlasPeopleService();
+    @Setter private String atlasQuery;
+    @Setter private List<String> atlasOs;
+    @Setter private List<String> atlasBrowsers;
+    @Setter private List<String> toolCategories;
+    @Setter private List<String> healthStates;
+    @Setter private boolean hasUnapproved;
+    @Setter private boolean usesPersonal;
+    @Setter private boolean agentIssues;
+    @Setter private boolean agentActive;
+    @Setter private boolean usesAi;
+    @Setter private boolean inferenceHooksOnly;
+    @Setter private List<String> guardrailModes;
+    @Setter private double riskMin;
+    @Setter private double riskMax = AtlasPeopleService.RISK_MAX;
+    @Setter private List<String> teams;
+    @Setter private List<String> tagPairs;
+    @Setter private List<String> violationSeverities;
+    @Getter private Map<String, Object> atlasOverview;
+    @Getter private Map<String, Object> atlasTrend;
+    @Getter private List<Map<String, Object>> atlasRows;
+    @Getter private long atlasTotal;
+    @Setter private String atlasKind;
+    @Setter private String atlasId;
+    @Getter private Map<String, Object> atlasDetail;
 
     @Override
     public String execute() {
@@ -83,16 +144,47 @@ public class ModuleInfoAction extends UserAction {
     private static final String AD_DEVICE_ID = ModuleInfo.ADDITIONAL_DATA + ".deviceId";
     private static final String AD_USERNAME = ModuleInfo.ADDITIONAL_DATA + ".username";
     private static final String AD_OS = ModuleInfo.ADDITIONAL_DATA + ".os";
+    private static final String AD_BROWSER_NAME = ModuleInfo.ADDITIONAL_DATA + ".browserName";
+    private static final String AD_PROVIDER = ModuleInfo.ADDITIONAL_DATA + ".provider";
+    private static final String AD_CURRENT_STATUS = ModuleInfo.ADDITIONAL_DATA + ".currentStatus";
+    // "Last deployed" = start of the latest deployment attempt (installStartedTs, written by
+    // the installers on every attempt), falling back to startedTs for devices installed before
+    // installers sent it. startedTs alone only ever holds the FIRST registration (setOnInsert).
+    // Computed into additionalData like currentStatus, so it can be sorted on and the UI can
+    // read it without a model change.
+    private static final String AD_LAST_DEPLOYED_TS = ModuleInfo.ADDITIONAL_DATA + ".lastDeployedTs";
+    private static final String AD_INSTALL_STARTED_TS = ModuleInfo.ADDITIONAL_DATA + ".installStartedTs";
+    private static final String AD_INSTALL_OUTCOME = ModuleInfo.ADDITIONAL_DATA + ".installOutcome";
 
     private Bson buildEndpointShieldFilter() {
         List<Bson> f = new ArrayList<>();
         f.add(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD.toString()));
-        if (startTimestamp > 0) f.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, startTimestamp));
-        if (endTimestamp > 0) f.add(Filters.lte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, endTimestamp));
+        // A failed install never heartbeats, so matching the window on lastHeartbeatReceived
+        // alone dropped exactly the docs this page's install banner, row icon and
+        // "Install failed" filter are about — they worked only on "All time". A deployment
+        // started inside the window counts as activity in it too.
+        List<Bson> heartbeatInWindow = new ArrayList<>();
+        List<Bson> deployedInWindow = new ArrayList<>();
+        if (startTimestamp > 0) {
+            heartbeatInWindow.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, startTimestamp));
+            deployedInWindow.add(Filters.gte(AD_INSTALL_STARTED_TS, startTimestamp));
+        }
+        if (endTimestamp > 0) {
+            heartbeatInWindow.add(Filters.lte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, endTimestamp));
+            deployedInWindow.add(Filters.lte(AD_INSTALL_STARTED_TS, endTimestamp));
+        }
+        if (!heartbeatInWindow.isEmpty()) {
+            f.add(Filters.or(Filters.and(heartbeatInWindow), Filters.and(deployedInWindow)));
+        }
         if (hostnames != null && !hostnames.isEmpty()) f.add(Filters.in(ModuleInfo.NAME, hostnames));
         if (usernames != null && !usernames.isEmpty()) f.add(Filters.in(AD_USERNAME, usernames));
         if (deviceIds != null && !deviceIds.isEmpty()) f.add(Filters.in(AD_DEVICE_ID, deviceIds));
-        if (oses != null && !oses.isEmpty()) f.add(Filters.in(AD_OS, oses));
+        List<Bson> osOrBrowser = new ArrayList<>();
+        if (oses != null && !oses.isEmpty()) osOrBrowser.add(Filters.in(AD_OS, oses));
+        if (browserNames != null && !browserNames.isEmpty()) osOrBrowser.add(Filters.in(AD_BROWSER_NAME, browserNames));
+        if (providers != null && !providers.isEmpty()) osOrBrowser.add(Filters.in(AD_PROVIDER, providers));
+        if (!osOrBrowser.isEmpty()) f.add(Filters.or(osOrBrowser));
+        if (agentVersions != null && !agentVersions.isEmpty()) f.add(Filters.in(ModuleInfo.CURRENT_VERSION, agentVersions));
         if (queryValue != null && !queryValue.trim().isEmpty()) {
             String q = Pattern.quote(queryValue.trim());
             f.add(Filters.or(
@@ -113,39 +205,471 @@ public class ModuleInfoAction extends UserAction {
             case "username": return AD_USERNAME;
             case "os": return AD_OS;
             case "agentVersion": return ModuleInfo.CURRENT_VERSION;
-            case "lastDeployed": return ModuleInfo.STARTED_TS;
+            case "lastDeployed": return AD_LAST_DEPLOYED_TS;
             case "lastHeartbeat":
             default: return ModuleInfo.LAST_HEARTBEAT_RECEIVED;
         }
     }
 
+    private static final int ENDPOINT_SHIELD_ACTIVE_THRESHOLD_SECONDS = 4 * 60 * 60;
+    private static final int ENDPOINT_SHIELD_INACTIVE_THRESHOLD_SECONDS = 2 * 24 * 60 * 60;
+    private static final String STATUS_FAILED = "failed";
+    private static final String STATUS_ACTIVE = "active";
+    private static final String STATUS_INACTIVE = "inactive";
+    private static final String STATUS_ERROR = "error";
+    private static final String ORIG_ID_FIELD = "origId";
+    private static final String NAME_LOWER_FIELD = "nameLower";
+
+    // A physical host can show up as multiple ModuleInfo docs per {name, os} (reinstall/reconnect) — this
+    // is the dedup key used to collapse those down to one row per host.
+    // One logical device per {name, os}; the Devices table, stats and trend all group the same way.
+    private static Bson endpointShieldGroupId() {
+        return new Document(ModuleInfo.NAME, "$" + ModuleInfo.NAME).append("os", "$" + AD_OS);
+    }
+
+    // $group's $first materializes a source field that's missing on every doc in the group as an explicit
+    // null (unlike find(), which just leaves the Java field at its default) — fine for reference-typed
+    // fields, but a null decoded into a primitive boolean/int setter NPEs on unboxing. Default it in the
+    // pipeline instead for the four primitive-backed ModuleInfo fields.
+    private static Document ifNullExpr(String fieldPath, Object defaultValue) {
+        return new Document("$ifNull", Arrays.asList("$" + fieldPath, defaultValue));
+    }
+
+    // installStatus values the installers write (install_telemetry.sh / install.ps1).
+    private static final List<String> INSTALL_IN_PROGRESS_STATUSES = Arrays.asList("pending", "installing", "postinstall");
+    private static final List<String> INSTALL_FAILED_STATUSES = Arrays.asList("failed", "verify-failed");
+
+    // Sort key for the dedup $group only; $group drops it, so it never reaches the client.
+    private static final String DEDUP_TS_FIELD = "_dedupDeployedTs";
+
+    private static Document endpointShieldLastDeployedExpr() {
+        String installStarted = "$" + AD_INSTALL_STARTED_TS;
+        return new Document("$cond", Arrays.asList(
+                new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList(installStarted, 0)), 0)),
+                installStarted,
+                new Document("$ifNull", Arrays.asList("$" + ModuleInfo.STARTED_TS, 0))));
+    }
+
+    private static Document endpointShieldCurrentStatusExpr(int now) {
+        String installStatus = "$" + ModuleInfo.ADDITIONAL_DATA + ".installStatus";
+        String installOutcome = "$" + AD_INSTALL_OUTCOME;
+        return new Document("$switch", new Document()
+                .append("branches", Arrays.asList(
+                        // postinstall is in progress too, and verify-failed (the standalone
+                        // verifier) is a failed install — both used to fall through to the
+                        // heartbeat-based statuses.
+                        new Document("case", new Document("$in", Arrays.asList(installStatus, INSTALL_IN_PROGRESS_STATUSES)))
+                                .append("then", "installing"),
+                        // installOutcome is the installer's verdict for the LATEST attempt and
+                        // the agent never overwrites it, so a deploy that failed still reads as
+                        // failed once an older agent heartbeats again. It is the latest value
+                        // that counts: a later attempt that recovers or rolls back successfully
+                        // is expected to write its own outcome/version, which then wins here.
+                        // The in-progress branch above keeps a running attempt ahead of the
+                        // previous attempt's verdict.
+                        new Document("case", new Document("$or", Arrays.asList(
+                                new Document("$in", Arrays.asList(installStatus, INSTALL_FAILED_STATUSES)),
+                                new Document("$eq", Arrays.asList(installOutcome, "failed")))))
+                                .append("then", "install_failed"),
+                        new Document("case", new Document("$eq", Arrays.asList("$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)))
+                                .append("then", STATUS_FAILED),
+                        new Document("case", new Document("$gte", Arrays.asList(
+                                "$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, now - ENDPOINT_SHIELD_ACTIVE_THRESHOLD_SECONDS)))
+                                .append("then", STATUS_ACTIVE),
+                        new Document("case", new Document("$gte", Arrays.asList(
+                                "$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, now - ENDPOINT_SHIELD_INACTIVE_THRESHOLD_SECONDS)))
+                                .append("then", STATUS_INACTIVE)
+                ))
+                .append("default", STATUS_ERROR));
+    }
+
     /**
      * Server-side paginated Endpoint Shield agent list (ATLAS). Replaces the old load-all fetchModuleInfo
      * on that page which pulled every device's full module doc at once (~10MB at 1000 devices).
+     *
+     * Collapses multiple docs per {name, os} down to the latest one (by lastHeartbeatReceived, always
+     * descending for the dedup — independent of whatever sortKey/sortOrder the UI asked for the final
+     * list order) and adds a computed additionalData.currentStatus, all inside the aggregation so
+     * skip/limit/filters still apply against the deduped set.
      */
     public String fetchEndpointShieldAgents() {
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            moduleInfos = new ArrayList<>();
+            total = 0;
+            return SUCCESS.toUpperCase();
+        }
         Bson filter = buildEndpointShieldFilter();
-        total = ModuleInfoDao.instance.count(filter);
+        Bson groupId = endpointShieldGroupId();
+
+        total = countEndpointShieldModules(filter, groupId, Context.now(), statuses);
 
         String sortField = mapEndpointShieldSortField(sortKey);
-        Bson sort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
-
+        Bson finalSort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
         int lim = (limit <= 0) ? 20 : Math.min(limit, 200);
         int sk = Math.max(skip, 0);
-        moduleInfos = ModuleInfoDao.instance.findAll(filter, sk, lim, sort);
+
+        moduleInfos = aggregateEndpointShieldModules(filter, groupId, Context.now(), statuses, finalSort, sk, lim);
+        hideTokenIds(moduleInfos);
+
         filterEnvironmentVariables(moduleInfos);
         allowedEnvFields = computeAllowedEnvFields();
         return SUCCESS.toUpperCase();
+    }
+
+    private static final String SCOPE_DESKTOP = "desktop";
+    private static final String SCOPE_BROWSER = "browser";
+
+    // Desktop means no browserName and no 'extension' version, browser is the opposite, anything else means all.
+    private static Bson endpointShieldScopeFilter(String scope) {
+        Bson isExtension = Filters.or(
+                Filters.exists(AD_BROWSER_NAME, true),
+                Filters.regex(ModuleInfo.CURRENT_VERSION, "extension"));
+        if (SCOPE_DESKTOP.equals(scope)) return Filters.nor(isExtension);
+        if (SCOPE_BROWSER.equals(scope)) return isExtension;
+        return new Document();
+    }
+
+    private InsightContext buildInsightContext() {
+        Integer userId = Context.userId.get();
+        int windowEnd = Context.now() / 300 * 300;
+        return new InsightContext(Context.accountId.get(), userId == null ? 0 : userId,
+                Context.contextSource.get(), windowEnd - AtlasPeopleService.VIOLATION_WINDOW_SECONDS, windowEnd);
+    }
+
+    // Picks the newest deployment per device group and computes live status; shared by the agents list and Atlas.
+    private static List<Bson> endpointShieldGroupedStages(Bson filter, Bson groupId, int now, List<String> statuses) {
+        return Arrays.asList(
+                Aggregates.match(filter),
+                // Dedup on the newest DEPLOYMENT, not the newest heartbeat. A reinstall that
+                // failed never heartbeats (lastHeartbeatReceived stays 0), so ordering by
+                // heartbeat alone always handed the {name, os} group to the previous, still
+                // running doc — exactly the "failed deploy while the old agent keeps running"
+                // case the banner is for, which therefore never surfaced. Heartbeat stays as
+                // the tiebreaker for docs deployed at the same second (or never deployed).
+                Aggregates.addFields(new Field<>(DEDUP_TS_FIELD, endpointShieldLastDeployedExpr())),
+                Aggregates.sort(Sorts.orderBy(
+                        Sorts.descending(DEDUP_TS_FIELD),
+                        Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED))),
+                Aggregates.group(groupId,
+                        Accumulators.first(ORIG_ID_FIELD, "$" + ModuleInfoDao.ID),
+                        Accumulators.first(ModuleInfo.MODULE_TYPE, "$" + ModuleInfo.MODULE_TYPE),
+                        Accumulators.first(ModuleInfo.CURRENT_VERSION, "$" + ModuleInfo.CURRENT_VERSION),
+                        Accumulators.first(ModuleInfo.STARTED_TS, ifNullExpr(ModuleInfo.STARTED_TS, 0)),
+                        Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
+                        Accumulators.first(ModuleInfo.NAME, "$" + ModuleInfo.NAME),
+                        Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA),
+                        Accumulators.first(ModuleInfo._REBOOT, ifNullExpr(ModuleInfo._REBOOT, false)),
+                        Accumulators.first(ModuleInfo.DELETE_TOPIC_AND_REBOOT, ifNullExpr(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false)),
+                        Accumulators.first(ModuleInfo.MINI_RUNTIME_NAME, "$" + ModuleInfo.MINI_RUNTIME_NAME)),
+                Aggregates.addFields(
+                        new Field<>(ModuleInfoDao.ID, "$" + ORIG_ID_FIELD),
+                        new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(now)),
+                        new Field<>(AD_LAST_DEPLOYED_TS, endpointShieldLastDeployedExpr())),
+                Aggregates.match(statuses == null || statuses.isEmpty() ? new Document() : Filters.in(AD_CURRENT_STATUS, statuses))
+        );
+    }
+
+    // Runs the grouped pipeline with optional sort, skip and limit (used by the agents list and the Atlas snapshot load).
+    private List<ModuleInfo> aggregateEndpointShieldModules(Bson filter, Bson groupId, int now, List<String> statuses, Bson sort, int skip, int limit) {
+        List<Bson> pipeline = new ArrayList<>(endpointShieldGroupedStages(filter, groupId, now, statuses));
+        pipeline.add(Aggregates.project(Projections.exclude(ORIG_ID_FIELD)));
+        if (sort != null) {
+            pipeline.add(Aggregates.addFields(new Field<>(NAME_LOWER_FIELD, new Document("$toLower", new Document("$ifNull", Arrays.asList("$" + ModuleInfo.NAME, ""))))));
+            pipeline.add(Aggregates.sort(sort));
+        }
+        if (skip > 0) pipeline.add(Aggregates.skip(skip));
+        if (limit > 0) pipeline.add(Aggregates.limit(limit));
+        if (sort != null) pipeline.add(Aggregates.project(Projections.exclude(NAME_LOWER_FIELD)));
+        List<ModuleInfo> modules = new ArrayList<>();
+        try (MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection()
+                .aggregate(pipeline, ModuleInfo.class).allowDiskUse(true).cursor()) {
+            while (cursor.hasNext()) modules.add(cursor.next());
+        }
+        return modules;
+    }
+
+    private long countEndpointShieldModules(Bson filter, Bson groupId, int now, List<String> statuses) {
+        List<Bson> pipeline = new ArrayList<>();
+        if (statuses == null || statuses.isEmpty()) {
+            pipeline.add(Aggregates.match(filter));
+            pipeline.add(Aggregates.group(groupId));
+        } else {
+            pipeline.addAll(endpointShieldGroupedStages(filter, groupId, now, statuses));
+        }
+        pipeline.add(Aggregates.count("total"));
+        Document result = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, Document.class).allowDiskUse(true).first();
+        return result == null ? 0 : ((Number) result.get("total")).longValue();
+    }
+
+    // Flattens a grouped ModuleInfo into the plain row AtlasPeopleService.build expects.
+    private static Document toAtlasModuleRow(ModuleInfo module) {
+        Map<String, Object> additional = module.getAdditionalData() == null ? new HashMap<>() : module.getAdditionalData();
+        return new Document("deviceName", module.getName())
+                .append("moduleId", module.getId())
+                .append("status", additional.get("currentStatus"))
+                .append("username", additional.get("username"))
+                .append("os", additional.get("os"))
+                .append("platform", additional.get("platform"))
+                .append("browserName", additional.get("browserName"))
+                .append(ModuleInfo.LAST_HEARTBEAT_RECEIVED, module.getLastHeartbeatReceived())
+                .append(ModuleInfo.CURRENT_VERSION, module.getCurrentVersion());
+    }
+
+    private Bson atlasModuleFilter() {
+        return Filters.and(buildEndpointShieldFilter(), endpointShieldScopeFilter(deviceScope));
+    }
+
+    // Loads every grouped device row (no paging) for the snapshot, each with its first-seen time.
+    private List<Document> loadEndpointShieldDeviceRows(int now) {
+        Map<String, Integer> firstSeen = loadFirstSeenByGroup();
+        List<Document> rows = new ArrayList<>();
+        for (ModuleInfo module : aggregateEndpointShieldModules(atlasModuleFilter(), endpointShieldGroupId(), now, null, null, 0, 0)) {
+            Document row = toAtlasModuleRow(module);
+            row.append(FIRST_SEEN_FIELD, firstSeen.getOrDefault(firstSeenKey(row.get("deviceName"), row.get("os")), 0));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private Map<String, String> loadLatestVersionByOs() {
+        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        return AtlasPeopleService.latestVersionByOs(settings == null ? null : settings.getEndpointShieldSettings());
+    }
+
+    // Returns the cached Atlas snapshot, loading device rows and the insights bundle on a miss.
+    private AtlasPeopleService.Snapshot loadAtlasSnapshot() {
+        int now = Context.now();
+        InsightContext ctx = buildInsightContext();
+        String cacheKey = ctx.bundleCacheKey() + "_" + deviceScope + "_" + startTimestamp + "_" + endTimestamp;
+        return atlasPeopleService.getOrBuild(cacheKey, () -> {
+            List<Document> rows = loadEndpointShieldDeviceRows(now);
+            InsightDataBundle bundle = null;
+            try {
+                bundle = insightService.getOrLoadBundle(ctx);
+            } catch (Exception e) {
+                statsLogger.error("atlas snapshot insights bundle failed: " + e.getMessage());
+            }
+            return atlasPeopleService.build(rows, bundle, loadLatestVersionByOs(), now, startTimestamp, endTimestamp);
+        });
+    }
+
+
+    // All-time per-host violation counts, cached apart from the 7-day insights bundle. A failed fetch throws (and is not cached), so the request errors instead of showing no rows.
+    private List<HostSeverityCount> loadAllTimeHostSeverityCounts() {
+        String key = Context.accountId.get() + "_" + Context.contextSource.get();
+        return atlasPeopleService.getOrLoadAllTimeHostCounts(key, () -> {
+            try {
+                return new InsightsThreatBackendAccess().hostSeverityCounts(ALL_TIME_TS, ALL_TIME_TS);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
+    // Copies the request parameters (filters, search, sort, paging) into a PeopleQuery.
+    private AtlasPeopleService.PeopleQuery buildPeopleQuery() {
+        AtlasPeopleService.PeopleQuery query = new AtlasPeopleService.PeopleQuery();
+        query.text = atlasQuery;
+        query.osList = atlasOs;
+        query.browserList = atlasBrowsers;
+        query.categories = toolCategories;
+        query.healthStates = healthStates;
+        query.hasUnapproved = hasUnapproved;
+        query.usesPersonal = usesPersonal;
+        query.agentIssues = agentIssues;
+        query.agentActive = agentActive;
+        query.usesAi = usesAi;
+        query.inferenceHooksOnly = inferenceHooksOnly;
+        query.guardrailModes = guardrailModes;
+        query.teams = teams == null ? null : teams.stream().map(team -> team.trim().toLowerCase()).collect(Collectors.toList());
+        query.tagPairs = tagPairs;
+        query.violationSeverities = violationSeverities == null ? null : violationSeverities.stream().map(severity -> severity.trim().toLowerCase()).collect(Collectors.toList());
+        query.riskMin = riskMin;
+        query.riskMax = riskMax;
+        query.sortKey = sortKey;
+        query.sortOrder = sortOrder == 0 ? -1 : sortOrder;
+        query.skip = skip;
+        query.limit = limit <= 0 ? 50 : limit;
+        return query;
+    }
+
+    // Chart data and filter options for the Atlas page.
+    public String fetchAtlasOverview() {
+        atlasOverview = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            atlasOverview = atlasPeopleService.overview(loadAtlasSnapshot());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasOverview failed: " + e.getMessage());
+            addActionError("Unable to load the Atlas overview");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    private static final String FIRST_SEEN_FIELD = "firstSeenTs";
+    // start_ts = end_ts = 0 means no detectedAt filter in the threat backend (ThreatActorService.fetchHostSeverityCounts), i.e. all time.
+    private static final int ALL_TIME_TS = 0;
+
+    // Earliest positive startedTs per device group, i.e. when its first heartbeat row was inserted.
+    private Map<String, Integer> loadFirstSeenByGroup() {
+        Document startedTs = new Document("$cond", Arrays.asList(
+                new Document("$gt", Arrays.asList(ifNullExpr(ModuleInfo.STARTED_TS, 0), 0)),
+                "$" + ModuleInfo.STARTED_TS,
+                null));
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(atlasModuleFilter()),
+                Aggregates.group(endpointShieldGroupId(), Accumulators.min(FIRST_SEEN_FIELD, startedTs)));
+        Map<String, Integer> firstSeen = new HashMap<>();
+        try (MongoCursor<Document> cursor = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, Document.class).allowDiskUse(true).cursor()) {
+            while (cursor.hasNext()) {
+                Document group = cursor.next();
+                Document id = group.get("_id", Document.class);
+                Number ts = (Number) group.get(FIRST_SEEN_FIELD);
+                if (id != null && ts != null) firstSeen.put(firstSeenKey(id.get(ModuleInfo.NAME), id.get("os")), ts.intValue());
+            }
+        }
+        return firstSeen;
+    }
+
+    private static String firstSeenKey(Object name, Object os) {
+        return (name == null ? "" : String.valueOf(name)) + "|" + (os == null ? "" : String.valueOf(os));
+    }
+
+    // Devices-over-time series for the trend chart, from the snapshot's first-seen dates.
+    public String fetchAtlasTrend() {
+        atlasTrend = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            atlasTrend = atlasPeopleService.trend(loadAtlasSnapshot(), startTimestamp, endTimestamp, Context.now());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasTrend failed: " + e.getMessage());
+            addActionError("Unable to load the device trend");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Paged Employees tab; always served from the in-memory snapshot.
+    public String fetchAtlasEmployees() {
+        atlasRows = new ArrayList<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            long[] total = new long[1];
+            atlasRows = atlasPeopleService.pageEmployees(loadAtlasSnapshot(), buildPeopleQuery(), total);
+            atlasTotal = total[0];
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasEmployees failed: " + e.getMessage());
+            addActionError("Unable to load employees");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Devices tab: filtered, sorted and paged from the cached snapshot.
+    public String fetchAtlasDevices() {
+        atlasRows = new ArrayList<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            long[] total = new long[1];
+            AtlasPeopleService.Snapshot snapshot = loadAtlasSnapshot();
+            AtlasPeopleService.PeopleQuery query = buildPeopleQuery();
+            // The severity donut counts all time, so its drill-down filters on all-time counts, not the snapshot's 7-day ones.
+            if (query.violationSeverities != null && !query.violationSeverities.isEmpty()) {
+                query.violationsOverride = atlasPeopleService.violationsByDeviceKey(snapshot, loadAllTimeHostSeverityCounts());
+            }
+            atlasRows = atlasPeopleService.pageDevices(snapshot, query, total);
+            atlasTotal = total[0];
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasDevices failed: " + e.getMessage());
+            addActionError("Unable to load devices");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Stat card totals (managed devices, active agents, unapproved, monitor-only) from the snapshot.
+    public String fetchEndpointShieldStats() {
+        deviceStats = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            deviceStats = atlasPeopleService.stats(loadAtlasSnapshot());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchEndpointShieldStats failed: " + e.getMessage());
+            addActionError("Unable to load device stats");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Flyout detail for one device or employee.
+    public String fetchAtlasPersonDetail() {
+        atlasDetail = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            Map<String, Object> detail = atlasPeopleService.detail(loadAtlasSnapshot(), atlasKind, atlasId);
+            if (detail == null) {
+                addActionError("Not found");
+                return ERROR.toUpperCase();
+            }
+            atlasDetail = detail;
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasPersonDetail failed: " + e.getMessage());
+            addActionError("Unable to load details");
+            return ERROR.toUpperCase();
+        }
     }
 
     /** Distinct filter-dropdown values across ALL endpoint-shield agents (for the paginated table). */
     public String fetchEndpointShieldFilterOptions() {
         Bson base = Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD.toString());
         filterOptions = new HashMap<>();
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            filterOptions.put("hostnames", new ArrayList<>());
+            filterOptions.put("usernames", new ArrayList<>());
+            filterOptions.put("deviceIds", new ArrayList<>());
+            filterOptions.put("oses", new ArrayList<>());
+            return SUCCESS.toUpperCase();
+        }
         filterOptions.put("hostnames", distinctStrings(ModuleInfo.NAME, base));
         filterOptions.put("usernames", distinctStrings(AD_USERNAME, base));
         filterOptions.put("deviceIds", distinctStrings(AD_DEVICE_ID, base));
         filterOptions.put("oses", distinctStrings(AD_OS, base));
+        filterOptions.put("browserNames", distinctStrings(AD_BROWSER_NAME, base));
+        filterOptions.put("agentVersions", distinctStrings(ModuleInfo.CURRENT_VERSION, base));
+        filterOptions.put("providers", distinctStrings(AD_PROVIDER, base));
+        filterOptions.put("statuses", distinctStatuses(base));
+        return SUCCESS.toUpperCase();
+    }
+
+    @Setter private List<Map<String, String>> installedAppsToCheck; // [{name, version}, ...]
+    @Getter private Map<String, InstalledAppVulnerability> installedAppVulnerabilities;
+
+    /**
+     * Known-vulnerability check for the "Apps" tab of the agent details flyout — one cache-or-compute
+     * lookup per {name, version} pair (see InstalledAppVulnerabilityAnalysis), keyed in the response by
+     * "{name}#{version}" so the frontend can match each row back to its verdict. Runs sequentially and
+     * calls out to OSV.dev on every cache miss, so a host's first-ever check (dozens of apps) is slower
+     * than repeat checks once the cache is warm.
+     */
+    public String checkInstalledAppVulnerabilities() {
+        installedAppVulnerabilities = new HashMap<>();
+        if (installedAppsToCheck == null) {
+            return SUCCESS.toUpperCase();
+        }
+
+        for (Map<String, String> app : installedAppsToCheck) {
+            String name = app == null ? null : app.get("name");
+            String version = app == null ? null : app.get("version");
+            InstalledAppVulnerability info = InstalledAppVulnerabilityAnalysis.getVulnerabilityInfo(name, version);
+            if (info != null) {
+                installedAppVulnerabilities.put(info.getId(), info);
+            }
+        }
+
         return SUCCESS.toUpperCase();
     }
 
@@ -159,6 +683,11 @@ public class ModuleInfoAction extends UserAction {
      * "projected" response was still ~3MB at 1000-device scale.
      */
     public String fetchEndpointShieldUserMetadata() {
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            moduleInfos = new ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
         Bson filter = Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD.toString());
         Bson projection = Projections.include(
                 ModuleInfoDao.ID, ModuleInfo.NAME,
@@ -192,8 +721,21 @@ public class ModuleInfoAction extends UserAction {
             ad.put("mcpServerCollectionNames", collectionNames);
         }
 
+        hideTokenIds(infos);
         moduleInfos = infos;
         return SUCCESS.toUpperCase();
+    }
+
+    private List<String> distinctStatuses(Bson base) {
+        List<String> out = new ArrayList<>();
+        try {
+            for (Document d : ModuleInfoDao.instance.getMCollection().aggregate(Arrays.asList(
+                    Aggregates.match(base),
+                    Aggregates.group(endpointShieldCurrentStatusExpr(Context.now()))), Document.class)) {
+                if (d.get("_id") instanceof String) out.add((String) d.get("_id"));
+            }
+        } catch (Exception ignored) {}
+        return out;
     }
 
     private List<String> distinctStrings(String field, Bson filter) {
@@ -258,9 +800,12 @@ public class ModuleInfoAction extends UserAction {
             int deltaTime = Context.now() - heartbeatThresholdSeconds;
             filters.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTime));
         }
+        filters.add(Filters.nin(ModuleInfo.MODULE_TYPE, new ArrayList<>(AKTO_HOSTED_MODULE_TYPES)));
 
         Bson finalFilter = filters.isEmpty() ? Filters.empty() : Filters.and(filters);
         moduleInfos = ModuleInfoDao.instance.findAll(finalFilter);
+        markRevokedTokens(moduleInfos);
+        hideTokenIds(moduleInfos);
 
         // Filter environment variables to only expose whitelisted keys
         filterEnvironmentVariables(moduleInfos);
@@ -283,6 +828,40 @@ public class ModuleInfoAction extends UserAction {
 
     public List<Map<String, String>> getAllowedEnvFields() {
         return allowedEnvFields;
+    }
+
+    // Flags modules whose auth token is revoked, in memory only and without exposing token details.
+    private void markRevokedTokens(List<ModuleInfo> modules) {
+        if (modules == null) {
+            return;
+        }
+        try {
+            Set<String> tokenIds = modules.stream().map(ModuleInfo::getTokenId).filter(Objects::nonNull).collect(Collectors.toSet());
+            if (tokenIds.isEmpty()) {
+                return;
+            }
+            Set<String> revoked = AuthTokensDao.instance.findAll(
+                    Filters.and(Filters.in(AuthToken.ID, tokenIds), Filters.eq(AuthToken.STATUS, AuthToken.STATUS_REVOKED)),
+                    Projections.include(AuthToken.ID)).stream().map(AuthToken::getId).collect(Collectors.toSet());
+            for (ModuleInfo module : modules) {
+                if (module.getTokenId() == null || !revoked.contains(module.getTokenId())) {
+                    continue;
+                }
+                if (module.getAdditionalData() == null) {
+                    module.setAdditionalData(new HashMap<>());
+                }
+                module.getAdditionalData().put("tokenRevoked", true);
+            }
+        } catch (Exception e) {
+            statsLogger.errorAndAddToDb(e, "Failed to flag revoked module tokens: " + e.getMessage());
+        }
+    }
+
+    // The token id is only a server-side join key, so it never reaches the browser.
+    private static void hideTokenIds(List<ModuleInfo> modules) {
+        if (modules != null) {
+            modules.forEach(module -> module.setTokenId(null));
+        }
     }
 
     private List<Map<String, String>> computeAllowedEnvFields() {
@@ -312,7 +891,8 @@ public class ModuleInfoAction extends UserAction {
                 key.equals("AGGREGATION_RULES_ENABLED") ||
                 key.equals("SKIP_THREAT") ||
                 key.equals("APPLY_GUARDRAILS_TO_SSE") ||
-                key.equals("ENABLE_CLAUDE_SETTINGS_CONFIG_SCAN")) {
+                key.equals("ENABLE_CLAUDE_SETTINGS_CONFIG_SCAN") ||
+                key.equals("UPDATE_TO_LATEST_VERSION")) {
             return "boolean";
         }
         return "text";
@@ -433,6 +1013,7 @@ public class ModuleInfoAction extends UserAction {
         String identityUserName = AgentUsersDao.instance.ensureDashboardIdentity(username, userEmail, getSUser().getLogin());
         AgentUsersDao.instance.mergeDeviceTags(identityUserName, DeviceTag.SOURCE_MANUAL,
                 tags != null ? tags : Collections.emptyMap(), getSUser().getLogin());
+        AgenticObserveAction.invalidateTagsByUsernameCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -448,35 +1029,155 @@ public class ModuleInfoAction extends UserAction {
             String identityUserName = AgentUsersDao.instance.ensureDashboardIdentity(u, null, updatedBy);
             AgentUsersDao.instance.mergeDeviceTags(identityUserName, DeviceTag.SOURCE_MANUAL, tagsToApply, updatedBy);
         }
+        AgenticObserveAction.invalidateTagsByUsernameCache();
         return SUCCESS.toUpperCase();
     }
 
     public String fetchAgenticUsers() {
-        agenticUsers = AgentUsersDao.instance.findAll(Filters.empty());
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            agenticUsers = new ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
+        // The list is the plain union of both identity sources — every agent_users doc plus every
+        // username reporting a device in module_info — deduped by username. A user with no device
+        // in either source still belongs in the list: they are a real identity that can be tagged,
+        // they just have nothing to enforce against yet. Devices are therefore merged (stored ∪
+        // reported), never overwritten, so a source that happens to be empty can never delete a
+        // user from the list.
+        Map<String, AgenticUsers> byUsername = new LinkedHashMap<>();
+        // Org-scoped identities, keyed by their full userId, emitted ALONGSIDE the username-deduped
+        // rows above rather than instead of them. A Claude login writes one agent_users doc per org
+        // ("<email>_<orgUuid>"), all sharing a single userName — folding those together is the right
+        // default, but on its own it leaves no way to target one org, so the org term the validator
+        // already evaluates (orgUUIDFromUserID in validator/claude_org_match.go) is unreachable from
+        // the UI. These extra entries are what make it selectable.
+        Map<String, AgenticUsers> byOrgUserId = new LinkedHashMap<>();
+        for (AgenticUsers u : AgentUsersDao.instance.findAll(Filters.empty())) {
+            String username = u.getUserName() == null ? "" : u.getUserName().trim();
+            // Nothing to key or display on, and its devices are pre-migration raw machine IDs that
+            // never match at enforcement — dropping it is what dedupe by username means.
+            if (username.isEmpty()) continue;
+            u.setUserName(username);
+            u.setDevices(u.getDevices() == null ? new ArrayList<>() : new ArrayList<>(new LinkedHashSet<>(u.getDevices())));
 
-        // AgenticUsers.devices is only ever backfilled once by a startup migration and never
-        // kept in sync afterwards — overwrite with live devices from module_info (updated every
-        // heartbeat) instead of trusting the stored field.
-        Map<String, Set<String>> liveDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
-        for (AgenticUsers u : agenticUsers) {
-            Set<String> liveDevices = liveDevicesByUsername.remove(u.getUserName());
-            // Inference-hooks-tagged identities have no heartbeat to overwrite from, so their stored devices are kept and unioned with any live ones.
-            boolean fromInferenceHooks = u.getDeviceTags() != null
-                    && u.getDeviceTags().stream().anyMatch(t -> DeviceTag.SOURCE_INFERENCE_HOOKS.equals(t.getSource()));
-            Set<String> devices = new HashSet<>();
-            if (liveDevices != null) devices.addAll(liveDevices);
-            if (fromInferenceHooks && u.getDevices() != null) devices.addAll(u.getDevices());
-            u.setDevices(new ArrayList<>(devices));
+            if (AgenticUsers.orgUuidFromUserId(u.getUserId()) != null) {
+                // A copy, never the same object: this doc may also become the byUsername slot below,
+                // where mergeInto mutates it in place — sharing it would leak every sibling org's
+                // devices and tags into what is supposed to be one org's row.
+                byOrgUserId.putIfAbsent(u.getUserId(), copyOf(u));
+            }
+
+            AgenticUsers existing = byUsername.get(username);
+            if (existing == null) {
+                byUsername.put(username, u);
+            } else {
+                mergeInto(existing, u);
+            }
         }
-        // Any username reporting devices but with no team/role ever assigned has no AgenticUsers
-        // doc yet — synthesize a lightweight entry so it still shows up as filterable/previewable.
-        for (Map.Entry<String, Set<String>> entry : liveDevicesByUsername.entrySet()) {
-            AgenticUsers synthetic = new AgenticUsers();
-            synthetic.setUserName(entry.getKey());
-            synthetic.setDevices(new ArrayList<>(entry.getValue()));
-            agenticUsers.add(synthetic);
+
+        Map<String, Set<String>> reportedDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
+        // module_info is the only place an email exists for an identity that has no agent_users
+        // doc (e.g. a browser extension or the Claude Desktop app, which reports
+        // additionalData.email but is never explicitly tagged) — without this, such an identity
+        // would show up in the Users picker with no email at all.
+        Map<String, String> reportedEmailByUsername = ModuleInfoDao.instance.fetchUsernameToEmailForEndpointShield();
+        for (Map.Entry<String, Set<String>> entry : reportedDevicesByUsername.entrySet()) {
+            AgenticUsers existing = byUsername.get(entry.getKey());
+            if (existing == null) {
+                // Reporting a device but never tagged, so no agent_users doc exists — synthesize a
+                // lightweight entry so the identity still shows up as filterable/previewable.
+                AgenticUsers synthetic = new AgenticUsers();
+                synthetic.setUserName(entry.getKey());
+                synthetic.setDevices(new ArrayList<>(entry.getValue()));
+                synthetic.setUserEmail(reportedEmailByUsername.get(entry.getKey()));
+                byUsername.put(entry.getKey(), synthetic);
+            } else {
+                addDevices(existing, entry.getValue());
+                if (existing.getUserEmail() == null) {
+                    existing.setUserEmail(reportedEmailByUsername.get(entry.getKey()));
+                }
+            }
         }
+
+        // A username row stands for the person in EVERY org they belong to, so it must not carry an
+        // org-scoped userId — whichever duplicate doc Mongo happened to return first can supply one.
+        // The validator ORs the org term rather than narrowing with it (see orgMatchesAny), so an
+        // org id here would quietly widen the policy to that entire org's Claude traffic instead of
+        // just this person. Cleared, the row matches on email alone, which is what it means.
+        for (AgenticUsers u : byUsername.values()) {
+            if (AgenticUsers.orgUuidFromUserId(u.getUserId()) != null) u.setUserId(null);
+        }
+
+        agenticUsers = new ArrayList<>(byUsername.values());
+        agenticUsers.addAll(byOrgUserId.values());
         return SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Shallow copy with its own mutable collections, so folding duplicates into one row can never
+     * reach through into a copy kept elsewhere (see byOrgUserId in fetchAgenticUsers).
+     */
+    private static AgenticUsers copyOf(AgenticUsers u) {
+        AgenticUsers copy = new AgenticUsers();
+        copy.setUserName(u.getUserName());
+        copy.setUserEmail(u.getUserEmail());
+        copy.setUserId(u.getUserId());
+        copy.setLastUpdatedAt(u.getLastUpdatedAt());
+        copy.setLastUpdatedBy(u.getLastUpdatedBy());
+        copy.setOrganizationName(u.getOrganizationName());
+        copy.setOrganizationType(u.getOrganizationType());
+        copy.setDevices(u.getDevices() == null ? new ArrayList<>() : new ArrayList<>(u.getDevices()));
+        copy.setDeviceTags(u.getDeviceTags() == null ? null : new ArrayList<>(u.getDeviceTags()));
+        return copy;
+    }
+
+    /** Folds a duplicate agent_users row into the one already kept for that username. */
+    private static void mergeInto(AgenticUsers target, AgenticUsers duplicate) {
+        addDevices(target, duplicate.getDevices());
+        if (duplicate.getDeviceTags() != null) {
+            List<DeviceTag> tags = target.getDeviceTags() == null ? new ArrayList<>() : new ArrayList<>(target.getDeviceTags());
+            for (DeviceTag t : duplicate.getDeviceTags()) {
+                boolean alreadyPresent = tags.stream().anyMatch(
+                        e -> Objects.equals(e.getKey(), t.getKey()) && Objects.equals(e.getValue(), t.getValue()));
+                if (!alreadyPresent) tags.add(t);
+            }
+            target.setDeviceTags(tags);
+        }
+        if (target.getUserEmail() == null) target.setUserEmail(duplicate.getUserEmail());
+        if (target.getUserId() == null) target.setUserId(duplicate.getUserId());
+    }
+
+    private static void addDevices(AgenticUsers target, Collection<String> devices) {
+        if (devices == null || devices.isEmpty()) return;
+        Set<String> merged = new LinkedHashSet<>(target.getDevices() == null ? Collections.emptyList() : target.getDevices());
+        merged.addAll(devices);
+        target.setDevices(new ArrayList<>(merged));
+    }
+
+    // Shared by updateModuleEnvAndReboot (one module) and bulkUpdateModuleEnvAndReboot (many) —
+    // same allowed-key/secret-redaction rules and reboot flag either way, just a different filter.
+    private List<Bson> buildEnvUpdates(Map<String, String> envData) {
+        List<Bson> updates = new ArrayList<>();
+
+        // Write directly to additionalData.env — same field the Go module writes at startup.
+        // Go module only writes env vars once at startup (not on every heartbeat), so no race condition.
+        for (Map.Entry<String, String> entry : envData.entrySet()) {
+            boolean isAllowedKey = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.values().stream()
+                .anyMatch(moduleEnvMap -> moduleEnvMap.containsKey(entry.getKey()));
+
+            if (isAllowedKey) {
+                // Skip secret fields if the user submitted the redacted placeholder unchanged
+                if (ModuleInfoConstants.SECRET_ENV_KEYS.contains(entry.getKey())
+                        && ModuleInfoConstants.REDACTED_PLACEHOLDER.equals(entry.getValue())) {
+                    continue;
+                }
+                updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
+            }
+        }
+
+        updates.add(Updates.set(ModuleInfo._REBOOT, true));
+        return updates;
     }
 
     public String updateModuleEnvAndReboot() {
@@ -490,31 +1191,30 @@ public class ModuleInfoAction extends UserAction {
 
         try {
             Bson moduleFilter = Filters.eq(ModuleInfoDao.ID, moduleId);
+            ModuleInfoDao.instance.updateMany(moduleFilter, Updates.combine(buildEnvUpdates(envData)));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+    }
 
+    // Bulk counterpart of updateModuleEnvAndReboot, for the Endpoint Shield table's multi-select
+    // (e.g. enabling/disabling system proxy for several agents at once) — reuses the existing
+    // moduleIds field (already used by deleteModuleInfo/rebootModules) and envData, same allowed-
+    // key rules, one updateMany instead of looping per id.
+    public String bulkUpdateModuleEnvAndReboot() {
+        if (moduleIds == null || moduleIds.isEmpty()) {
+            return ERROR.toUpperCase();
+        }
 
-            List<Bson> updates = new ArrayList<>();
+        if (envData == null || envData.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
 
-            // Write directly to additionalData.env — same field the Go module writes at startup.
-            // Go module only writes env vars once at startup (not on every heartbeat), so no race condition.
-            for (Map.Entry<String, String> entry : envData.entrySet()) {
-                boolean isAllowedKey = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.values().stream()
-                    .anyMatch(moduleEnvMap -> moduleEnvMap.containsKey(entry.getKey()));
-
-                if (isAllowedKey) {
-                    // Skip secret fields if the user submitted the redacted placeholder unchanged
-                    if (ModuleInfoConstants.SECRET_ENV_KEYS.contains(entry.getKey())
-                            && ModuleInfoConstants.REDACTED_PLACEHOLDER.equals(entry.getValue())) {
-                        continue;
-                    }
-                    updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
-                }
-            }
-
-            updates.add(Updates.set(ModuleInfo._REBOOT, true));
-
-
-            ModuleInfoDao.instance.updateMany(moduleFilter, Updates.combine(updates));
-
+        try {
+            Bson moduleFilter = Filters.in(ModuleInfoDao.ID, moduleIds);
+            ModuleInfoDao.instance.updateMany(moduleFilter, Updates.combine(buildEnvUpdates(envData)));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();

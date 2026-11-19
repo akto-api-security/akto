@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors AgentUsersDao.createIndicesIfAbsent. Pre-existing compound index on
+        deviceTags.key/deviceTags.value (added alongside the DeviceTag targeting model, see
+        014-agent-users-migrate-team-role-to-device-tags.xml) that never got its own migration
+        file — AgentUsersDao#findDeviceIdsByTags depends on it for every tag-key lookup, including
+        the Include/Exclude negation added on top of it (both the positive elemMatch and the
+        negated $nor wrap it, per the union-tags correctness note in that method).
+
+        Index name matches MCollection.generateIndexName so this is a no-op if DaoInit already
+        built it.
+    -->
+
+    <changeSet id="022-account-agent-users-device-tags-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_users"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="agent_users">
+            <mongodb:keys>{ "deviceTags.key": -1, "deviceTags.value": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "key-value_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="agent_users">
+                <mongodb:keys>{ "deviceTags.key": -1, "deviceTags.value": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

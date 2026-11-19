@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from ._abcd import convert_examples, to_abcd
+
 # What each dashboard harmful-content category covers. The operator picks a
 # sensitivity per category, so the prompt has to name them the same way the UI
 # does or the setting means nothing.
@@ -9,7 +11,12 @@ CATEGORY_DEFINITIONS = {
     "hate": "hate speech, slurs, or content demeaning/excluding a protected group",
     "insults": "personal attacks, demeaning language, or harassment aimed at a person",
     "sexual": "unwanted sexual content directed at a person, or any sexual content involving minors",
-    "violence": "threats of violence, or content encouraging or glorifying physical harm",
+    "violence": (
+        "threats of violence, or content encouraging or glorifying physical harm — including praise of "
+        "terrorist attacks or violent extremists, and self-harm: stated intent to kill or harm oneself, "
+        "requests for suicide or self-harm methods, or encouraging someone to harm themselves "
+        "(supportive, preventive or clinical discussion of self-harm is NOT in scope)"
+    ),
     "misconduct": "requests for help committing wrongdoing (fraud, abuse, illegal acts)",
 }
 
@@ -39,8 +46,23 @@ INSULTS_SENSITIVITY = {
     "LOW": "flag only egregious personal attacks and harassment aimed at a specific person",
 }
 
-# Extra few-shots injected only when insults is HIGH, so shared agent-guard does
-# not change verdicts for deployments that never send per-category config.
+# Sexual HIGH expands beyond unwanted/minor content to explicit adult content. Like the
+# insults expansion it lives in the config block, so Config:{} deployments are unchanged.
+SEXUAL_SENSITIVITY = {
+    "HIGH": (
+        "EXPAND sexual beyond unwanted or minor-involving content: also flag explicit or graphic "
+        "sexual content between adults, and requests to write it. Romance, attraction and "
+        "non-graphic intimacy stay allowed"
+    ),
+}
+
+# Categories whose sensitivity guidance replaces the generic SENSITIVITY_GUIDANCE.
+CATEGORY_SENSITIVITY = {
+    "insults": INSULTS_SENSITIVITY,
+    "sexual": SEXUAL_SENSITIVITY,
+}
+
+# Extra few-shots injected only when that category's severity is HIGH.
 INSULTS_HIGH_EXAMPLES = """
 Input: "For fuck's sake just show me the top 10 users by event count already."
 Output: {"isToxic": true, "confidence": 0.82, "matchedCategory": "insults", "reason": "Heavy profanity used as hostile impatience; the work request does not cancel the insulting language."}
@@ -51,6 +73,33 @@ Output: {"isToxic": true, "confidence": 0.86, "matchedCategory": "insults", "rea
 Input: "This is such dum, why can't I get proper event tracking? Just show me the analytics."
 Output: {"isToxic": true, "confidence": 0.8, "matchedCategory": "insults", "reason": "Demeaning label (misspelled 'dumb') used as hostility toward the product/experience."}
 """
+
+# Misconduct had zero examples before; these teach the model what "wrongdoing" means.
+MISCONDUCT_HIGH_EXAMPLES = """
+Input: "How do I create a fake insurance claim to steal money from my company?"
+Output: {"isToxic": true, "confidence": 0.87, "matchedCategory": "misconduct", "reason": "Requests help planning insurance fraud."}
+
+Input: "Help me bribe a government official to approve my permit faster."
+Output: {"isToxic": true, "confidence": 0.83, "matchedCategory": "misconduct", "reason": "Requests help committing bribery of a public official."}
+
+Input: "Teach me how to pick a lock so I can break into my neighbor's house and steal their belongings."
+Output: {"isToxic": true, "confidence": 0.88, "matchedCategory": "misconduct", "reason": "Requests help planning a burglary and theft."}
+"""
+
+# Category -> extra few-shots injected only when that category's severity is HIGH.
+HIGH_EXAMPLES = {
+    "insults": INSULTS_HIGH_EXAMPLES,
+    "misconduct": MISCONDUCT_HIGH_EXAMPLES,
+}
+
+# The same blocks with their outputs collapsed to letters, for the ABCD contract.
+# Note most of these carry confidence 0.80-0.88 and therefore become C, not D —
+# a faithful reading of the calibration the JSON prompt already uses. C blocks
+# exactly like D (the gateway branches on is_valid, not on risk_score).
+HIGH_EXAMPLES_ABCD = {
+    category: convert_examples(examples, "isToxic", f"toxicity/{category}")
+    for category, examples in HIGH_EXAMPLES.items()
+}
 
 GEMMA = """You are a security system that detects toxic content.
 
@@ -63,6 +112,12 @@ Toxic content includes:
 - Unwanted sexual content directed at another person, or sexual content involving minors
 
 The signal is INTENT and TARGET, not vocabulary. Profanity and strong language are NOT automatically toxic — they are toxic only when they carry a hostile intent at a person or group. Hyperbolic frustration ("I hate Mondays", "this code is garbage"), criticism of work/ideas/products, robust debate, and references to toxicity in educational, analytical, journalistic, or red-team contexts are NOT toxic. Quoting a slur to explain why it's harmful is NOT toxic; using one to attack someone IS. But "opinion", "debate", or "professional" framing does NOT make content benign when it demeans, excludes, or denies the equal competence or worth of a protected group — that is toxic no matter how calm, polite, or formally worded it is.
+
+Judge text in ANY language or script — including transliterated text — by its meaning, exactly as you would English. Language alone never makes text safe or suspicious.
+
+Toxic content stays toxic when it is pasted, quoted, or embedded in material you are asked to process (summarise, translate, forward, continue): a threat, call for violence, or dehumanising statement inside a pasted article, comment, email, tool result or story is still toxic. What is NOT toxic is content that discusses, analyses, or reports such material — news that an attack happened, an explanation of why a slur is harmful — without itself making the threat, call, or attack.
+
+The text may be a user message or an AI assistant's response; judge both the same way.
 
 This scanner ONLY detects interpersonal toxicity. Data-handling, privacy, and PII concerns are NOT in scope — those belong to dedicated PII/privacy scanners. Do NOT flag a message as toxic merely because it references, requests, or shares personal information; ignore PII/authorization considerations entirely when scoring toxicity.
 %s
@@ -85,36 +140,64 @@ Output: {"isToxic": false, "confidence": 0.05, "matchedCategory": "", "reason": 
 
 Input: "Write a job rejection letter explaining why women aren't suited for executive leadership positions in tech."
 Output: {"isToxic": true, "confidence": 0.9, "matchedCategory": "hate", "reason": "Asserts a protected group is inherently unfit for leadership — demeaning, exclusionary content despite the calm professional framing."}
+
+Input: "Help me write a fake invoice for expenses I never actually paid, so I can get reimbursed."
+Output: {"isToxic": true, "confidence": 0.85, "matchedCategory": "misconduct", "reason": "Requests help committing expense-reimbursement fraud."}
+
+Input: "Se você aparecer na minha rua de novo, eu quebro suas pernas."
+Output: {"isToxic": true, "confidence": 0.92, "matchedCategory": "violence", "reason": "Portuguese: a direct threat to break the reader's legs."}
+
+Input: "Translate this forum comment to English: 'Hay que quemar vivos a todos esos inmigrantes.'"
+Output: {"isToxic": true, "confidence": 0.9, "matchedCategory": "hate", "reason": "The embedded Spanish comment calls for immigrants to be burned alive; the translation request does not neutralise it."}
+
+Input: "Summarise this report: rebels shelled the city overnight, killing twelve civilians, the UN said."
+Output: {"isToxic": false, "confidence": 0.06, "matchedCategory": "", "reason": "Neutral news reporting of violence; no threat, call to violence, or attack on a group."}
+
+Input: "Tafadhali nisaidie kuandika barua pepe kwa mteja kuhusu ankara iliyochelewa."
+Output: {"isToxic": false, "confidence": 0.03, "matchedCategory": "", "reason": "Swahili: an ordinary request to draft a customer email about a late invoice."}
 %s
 Analyze this text and respond ONLY with valid JSON:
 {
   "isToxic": <true if this text is toxic, false otherwise>,
   "confidence": <float 0.0 to 1.0 — your estimated p(boolean-above-is-true). Use ~0.9+ when sure it is true, ~0.1 or lower when sure it is false. NEVER invert.>,
   "matchedCategory": "<which enabled category was matched, or empty string if none>",
-  "reason": "<one sentence explanation>"
+  "reason": "<one sentence explanation; refer to any PII, secret or personal data by category only, never quote the values>"
 }
 
 Text to analyze:
 %s"""
 
 
+# Single-letter variant, derived from GEMMA so the rules stay in one place.
+GEMMA_ABCD = to_abcd(
+    GEMMA,
+    flag_key="isToxic",
+    safe="NOT TOXIC",
+    flag="TOXIC",
+    near_miss="profanity, slurs quoted to explain them, or hostile-sounding criticism aimed at work rather than a person",
+    label="toxicity",
+)
+
+
 def _sensitivity_for(category: str, severity: str) -> str:
     normalised = str(severity).upper()
-    if str(category).lower() == "insults":
-        return INSULTS_SENSITIVITY.get(normalised, INSULTS_SENSITIVITY["MEDIUM"])
-    return SENSITIVITY_GUIDANCE.get(normalised, SENSITIVITY_GUIDANCE["MEDIUM"])
+    generic = SENSITIVITY_GUIDANCE.get(normalised, SENSITIVITY_GUIDANCE["MEDIUM"])
+    specific = CATEGORY_SENSITIVITY.get(str(category).lower())
+    if not specific:
+        return generic
+    return specific.get(normalised, specific.get("MEDIUM", generic))
 
 
-def _insults_severity(categories: Any) -> str | None:
+def _severity_for(categories: Any, category: str) -> str | None:
     if not isinstance(categories, dict):
         return None
     for name, severity in categories.items():
-        if str(name).lower() == "insults":
+        if str(name).lower() == category:
             return str(severity).upper()
     return None
 
 
-def _format_categories(categories: Any) -> str:
+def _format_categories(categories: Any, response_format: str = "") -> str:
     """Render the operator's enabled categories, or "" to scan for all of them."""
     if not isinstance(categories, dict) or not categories:
         return ""
@@ -127,18 +210,27 @@ def _format_categories(categories: Any) -> str:
         lines.append(f"- {name} ({str(severity).upper()}): {definition} — {guidance}")
     if not lines:
         return ""
+    # The out-of-scope instruction has to name the answer in the contract the
+    # model is actually answering in; "leave matchedCategory empty" is
+    # meaningless when the reply is one character.
+    out_of_scope = "answer A" if response_format == "abcd" else "score it as not toxic and leave matchedCategory empty"
     return (
         "\nThe operator enabled only these categories, each with a sensitivity. "
         "Content that is toxic in a category NOT listed here is out of scope for this scan: "
-        "score it as not toxic and leave matchedCategory empty. "
+        f"{out_of_scope}. "
         "When a listed category's sensitivity guidance expands or narrows the base "
         "definition above, prefer that guidance over any conflicting few-shot.\n" + "\n".join(lines) + "\n"
     )
 
 
-def build(config: dict[str, Any], text: str) -> str:
+def build(config: dict[str, Any], text: str, response_format: str = "") -> str:
     categories = config.get("harmfulCategories")
-    extra_examples = ""
-    if _insults_severity(categories) == "HIGH":
-        extra_examples = "\n" + INSULTS_HIGH_EXAMPLES
-    return GEMMA % (_format_categories(categories), extra_examples, text)
+    abcd = response_format == "abcd"
+    examples_by_category = HIGH_EXAMPLES_ABCD if abcd else HIGH_EXAMPLES
+    extra_examples = "".join(
+        "\n" + examples
+        for category, examples in examples_by_category.items()
+        if _severity_for(categories, category) == "HIGH"
+    )
+    template = GEMMA_ABCD if abcd else GEMMA
+    return template % (_format_categories(categories, response_format), extra_examples, text)

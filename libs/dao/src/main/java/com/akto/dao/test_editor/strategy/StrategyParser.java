@@ -24,6 +24,11 @@ public class StrategyParser {
             strategy.setInsertVulnApi((boolean) insertVulnApi);
         }
 
+        Object demerge = metadataMap.get("demerge");
+        if (demerge != null) {
+            strategy.setDemerge((Boolean) demerge);
+        }
+
         return strategy;
     }
 

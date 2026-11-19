@@ -27,6 +27,8 @@ import {
     CodeDetectionConfig,
     CustomGuardrailsStep,
     CustomGuardrailsConfig,
+    RogueAgentsStep,
+    RogueAgentsConfig,
     UsageGuardrailsStep,
     UsageGuardrailsConfig,
     AnomalyDetectionStep,
@@ -44,6 +46,12 @@ import {
     resolveStoredPolicyBehaviour
 } from '../utils';
 import func from "@/util/func";
+import { withPermissions } from "@/util/permissions";
+import {
+    PREDEFINED_CUSTOM_PROMPTS,
+    composeLlmPrompt,
+    splitPresetFromPrompt
+} from './predefinedCustomPrompts';
 
 const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, isEditMode = false }) => {
     // Step management
@@ -65,11 +73,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
     const [harmfulCategoriesSettings, setHarmfulCategoriesSettings] = useState({
-        hate: "HIGH",
-        insults: "HIGH",
-        sexual: "HIGH",
-        violence: "HIGH",
-        misconduct: "HIGH",
+        hate: "none",
+        insults: "none",
+        sexual: "none",
+        violence: "none",
+        misconduct: "none",
         useForResponses: false
     });
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
@@ -103,9 +111,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [enableBanCode, setEnableBanCode] = useState(false);
     const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
 
+
     // Step 6: Custom Guardrails
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
+    const [presetPrompts, setPresetPrompts] = useState({});
+    const selectedTemplateIds = Object.keys(presetPrompts);
+    // The preset's prompt is applied on save/test without being shown in the detection instruction box.
+    const effectiveLlmPrompt = composeLlmPrompt(enableLlmPrompt ? llmPrompt : "", presetPrompts);
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
     const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
@@ -176,6 +189,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         codeFilterLevel,
         enableBanCode,
         banCodeConfidenceScore,
+        // Predefined custom prompts
+        selectedTemplateIds,
         // Step 6
         enableLlmPrompt,
         llmPrompt,
@@ -244,6 +259,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: CustomGuardrailsConfig.title,
                 summary: CustomGuardrailsConfig.getSummary(storedStateData),
                 ...CustomGuardrailsConfig.validate(storedStateData)
+            },
+            {
+                number: RogueAgentsConfig.number,
+                title: RogueAgentsConfig.title,
+                summary: RogueAgentsConfig.getSummary(storedStateData),
+                ...RogueAgentsConfig.validate(storedStateData)
             },
             {
                 number: UsageGuardrailsConfig.number,
@@ -354,11 +375,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setDeniedTopics([]);
         setEnableHarmfulCategories(false);
         setHarmfulCategoriesSettings({
-            hate: "HIGH",
-            insults: "HIGH",
-            sexual: "HIGH",
-            violence: "HIGH",
-            misconduct: "HIGH",
+            hate: "none",
+            insults: "none",
+            sexual: "none",
+            violence: "none",
+            misconduct: "none",
             useForResponses: false
         });
         setEnableBasePromptRule(false);
@@ -387,6 +408,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setBanCodeConfidenceScore(0.7);
         setEnableLlmPrompt(false);
         setLlmPrompt("");
+        setPresetPrompts({});
         setLlmConfidenceScore(0.5);
         setEnableExternalModel(false);
         setUrl("");
@@ -477,12 +499,16 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
         // LLM prompt
         if (policy.llmRule) {
-            setEnableLlmPrompt(policy.llmRule.enabled || !!policy.llmRule.userPrompt);
-            setLlmPrompt(policy.llmRule.userPrompt || "");
+            const savedLlmPrompt = policy.llmRule.userPrompt || "";
+            const { presetPrompts: savedPresetPrompts, customPrompt: savedCustomPrompt } = splitPresetFromPrompt(savedLlmPrompt);
+            setPresetPrompts(savedPresetPrompts);
+            setEnableLlmPrompt((policy.llmRule.enabled || !!policy.llmRule.userPrompt) && !!savedCustomPrompt);
+            setLlmPrompt(savedCustomPrompt);
             setLlmConfidenceScore(policy.llmRule.confidenceScore !== undefined ? policy.llmRule.confidenceScore : 0.5);
         } else {
             setEnableLlmPrompt(false);
             setLlmPrompt("");
+        setPresetPrompts({});
             setLlmConfidenceScore(0.5);
         }
 
@@ -613,20 +639,24 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 },
                 deniedTopics,
                 wordFilters,
-                piiFilters: piiTypes,
-                regexPatterns: regexPatterns
-                    .filter(r => r && r.pattern)
-                    .map(r => r.pattern),
-                regexPatternsV2: regexPatterns
-                    .filter(r => r && r.pattern && r.behavior)
-                    .map(r => ({
-                        pattern: r.pattern,
-                        behavior: r.behavior.toLowerCase()
-                    })),
-                ...(enableLlmPrompt && llmPrompt && llmPrompt.trim() ? {
+                piiFilters: enablePiiTypes ? piiTypes : [],
+                regexPatterns: enableRegexPatterns
+                    ? regexPatterns
+                        .filter(r => r && r.pattern)
+                        .map(r => r.pattern)
+                    : [],
+                regexPatternsV2: enableRegexPatterns
+                    ? regexPatterns
+                        .filter(r => r && r.pattern && r.behavior)
+                        .map(r => ({
+                            pattern: r.pattern,
+                            behavior: r.behavior.toLowerCase()
+                        }))
+                    : [],
+                ...(effectiveLlmPrompt ? {
                     llmRule: {
                         enabled: true,
-                        userPrompt: llmPrompt.trim(),
+                        userPrompt: effectiveLlmPrompt,
                         confidenceScore: llmConfidenceScore
                     }
                 } : {}),
@@ -697,6 +727,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             });
         }
     }, [currentStep]);
+
+    const togglePredefinedTemplate = (id) => {
+        const template = PREDEFINED_CUSTOM_PROMPTS.find((t) => t.id === id);
+        if (!template) return;
+        if (id in presetPrompts) {
+            const { [id]: _removed, ...rest } = presetPrompts;
+            setPresetPrompts(rest);
+        } else {
+            setPresetPrompts({ ...presetPrompts, [id]: template.prompt });
+        }
+    };
+
+    const changePresetPrompt = (id, text) => setPresetPrompts((prev) => ({ ...prev, [id]: text }));
 
     const handleStepClick = (stepNumber) => {
         if (stepNumber === currentStep) {
@@ -902,6 +945,15 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setConfidenceScore={setConfidenceScore}
                     />
                 );
+            case 14:
+                return (
+                    <RogueAgentsStep
+                        selectedTemplateIds={selectedTemplateIds}
+                        onToggleTemplate={togglePredefinedTemplate}
+                        presetPrompts={presetPrompts}
+                        onChangePresetPrompt={changePresetPrompt}
+                    />
+                );
             case 7:
                 return (
                     <UsageGuardrailsStep
@@ -994,7 +1046,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 open={isOpen}
                 onClose={handleClose}
                 title={`${isEditMode ? 'Edit' : 'Create'} guardrail`}
-                primaryAction={getPrimaryAction()}
+                primaryAction={withPermissions({ ...getPrimaryAction(), requires: 'api/createGuardrailPolicy' })}
                 secondaryActions={[
                     {
                         content: "Cancel",

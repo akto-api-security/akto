@@ -84,6 +84,19 @@ public final class PiiPatterns {
 
     private PiiPatterns() {}
 
+    /** Canonical key for comparing a PII type name across the two places it is written: an Akto
+     *  data type name as SingleTypeInfo/AktoDataType store it ("PHONE_NUMBER"), and the same name
+     *  as the guardrail policy builder persists it into GuardrailPolicies.PiiType.type — lowercased
+     *  with whitespace collapsed to underscores (see SensitiveInfoStep.jsx's own piiOptions mapper).
+     *  Normalise both sides through this so the two spellings can never drift apart.
+     *
+     *  isCheckable/rawPatternPresent deliberately keep their own toLowerCase: adding the
+     *  whitespace rule there would change which types LikelyFalsePositivesProvider matches. */
+    public static String piiTypeKey(String piiType) {
+        if (piiType == null) return "";
+        return piiType.trim().toLowerCase(java.util.Locale.US).replaceAll("\\s+", "_");
+    }
+
     /** Null if this PII type has no mirrored pattern (unsupported/excluded — see class doc), not
      *  "never matches" — callers must treat those as not independently checkable. */
     public static boolean isCheckable(String piiType) {

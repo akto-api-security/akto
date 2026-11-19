@@ -10,7 +10,7 @@ import { buildEvidenceColumnDefs } from "./insightsHelpers";
 // keys the backend actually sent, so this works for every insight's evidence shape unchanged.
 // A row is navigable when it carries one of the same identifying fields the insight's own CTAs
 // deep-link on (see InsightUtil.usersAndDevicesFilterParams/guardrailPolicyParams):
-//   - host   -> that asset's inventory page (hostNameMap, PersistStore, is collectionId ->
+//   - host/mcpHost -> that asset's inventory page (hostNameMap, PersistStore, is collectionId ->
 //               hostName, so it's inverted here to resolve the other way)
 //   - user   -> Users and Devices, filtered to that user (same `?filters=groupName__` param
 //               the view_users CTAs use)
@@ -33,13 +33,17 @@ export default function InsightEvidenceTable({ evidence }) {
 
     const resolveRowTarget = useCallback((row) => {
         if (!row) return undefined;
-        if (row.host && collectionIdByHost[row.host]) {
-            return `/dashboard/observe/inventory/${collectionIdByHost[row.host]}`;
+        const host = row.host || row.mcpHost;
+        if (host && collectionIdByHost[host]) {
+            return `/dashboard/observe/inventory/${collectionIdByHost[host]}`;
         }
         if (row.user) {
             return `/dashboard/observe/users-and-devices?filters=${encodeURIComponent(`groupName__${row.user}`)}`;
         }
-        if (row.Policy) {
+        // A "Policy" cell can hold a comma-joined list when a host has more than one non-blocking
+        // policy covering it (see GuardrailCoverageGapProvider) — that string is display-only,
+        // not a real policy name, so it's not safe to navigate on.
+        if (row.Policy && row.Policy !== "-" && !row.Policy.includes(",")) {
             return `/dashboard/guardrails/policies?policy=${encodeURIComponent(row.Policy)}`;
         }
         return undefined;

@@ -128,7 +128,24 @@ curl -X POST http://localhost:8080/api/validate/file \
   -F "contextSource=AGENTIC"
 ```
 
-Response includes `allowed`, `reason`, `totalChunks`, `failedChunkIndex`, and optionally `chunkResults`. See `scripts/test-validate-file.sh` for a quick test script.
+The response uses the same `ValidationResult` shape as `/validate/request` and `/validate/response`: `allowed`, and on a block the `reason` and `behaviour` that stopped the upload (the verdict from the failing chunk). `modifiedPayload` is always empty — this endpoint enforces by blocking and never returns rewritten file content.
+
+```json
+{
+  "allowed": false,
+  "reason": "file contains sensitive content redacted by guardrail policy (mask)",
+  "behaviour": "mask"
+}
+```
+
+This endpoint never rejects a request: it always answers `200` with a verdict, and `allowed: false` only ever comes from a guardrail policy (including redaction, when `FILE_VALIDATE_BLOCK_ON_REDACTION` is on). Everything that stops content from being inspected fails open and is logged with a `skipReason`:
+
+- **Nothing applies** — before any content is read, the service checks whether any policy applies to the caller (context source plus `Host`/installer user email). With none, it allows immediately without fetching, extracting or inspecting. If the policy list can't be loaded, content is inspected rather than allowed.
+- **Per input** — unreadable uploads, files over the per-type size limit, unparseable URLs, non-`http(s)` schemes, unsupported or missing extensions, URL-fetch failures and non-200 responses, parsing errors and empty extracted text all allow that one input. The other inputs are still inspected.
+- **Whole request** — an unparseable multipart body (including one past the max body size) allows, since there is nothing left to inspect.
+- **Over a limit** — inputs past `FILE_VALIDATE_MAX_FILES` and chunks past `FILE_VALIDATE_MAX_CHUNKS` are dropped uninspected; whatever fits under the limit is still inspected, so padding a request cannot switch inspection off for the rest of it.
+
+Uploads and `url` fields may be combined in one request (uploads are taken first). Policy blocks always take precedence over a fail-open input elsewhere in the same request.
 
 ### Health Check
 ```bash
@@ -144,7 +161,7 @@ GET /health
 | `SERVER_PORT` | HTTP server port | `8080` |
 | `DATABASE_ABSTRACTOR_SERVICE_URL` | Database abstractor service URL | `https://cyborg.akto.io` |
 | `DATABASE_ABSTRACTOR_SERVICE_TOKEN` | JWT token for authentication | **Required** |
-| `AGENT_GUARD_ENGINE_URL` | Agent Guard Engine URL for NLP | `https://akto-agent-guard-engine.billing-53a.workers.dev` |
+| `SCANNER_API_URL` | agent-guard base URL: text scans (`/scan`) and image OCR (`/ocr`) | Akto SaaS |
 | `THREAT_BACKEND_URL` | Threat backend service URL | `https://tbs.akto.io` |
 | `THREAT_BACKEND_TOKEN` | Token for threat reporting | **Required** |
 | `LOG_LEVEL` | Logging level (debug, info, warn, error) | `info` |
@@ -187,7 +204,7 @@ docker run -p 8080:8080 \
   -e DATABASE_ABSTRACTOR_SERVICE_TOKEN="your-token" \
   -e DATABASE_ABSTRACTOR_SERVICE_URL="http://database-abstractor:9000" \
   -e THREAT_BACKEND_TOKEN="your-token" \
-  -e AGENT_GUARD_ENGINE_URL="https://akto-agent-guard-engine.billing-53a.workers.dev" \
+  -e SCANNER_API_URL="http://agent-guard:8090" \
   guardrails-service
 ```
 
@@ -205,7 +222,7 @@ services:
       - DATABASE_ABSTRACTOR_SERVICE_URL=http://database-abstractor:9000
       - DATABASE_ABSTRACTOR_SERVICE_TOKEN=${DATABASE_ABSTRACTOR_SERVICE_TOKEN}
       - THREAT_BACKEND_TOKEN=${THREAT_BACKEND_TOKEN}
-      - AGENT_GUARD_ENGINE_URL=https://akto-agent-guard-engine.billing-53a.workers.dev
+      - SCANNER_API_URL=http://agent-guard:8090
       - LOG_LEVEL=info
 ```
 
@@ -357,7 +374,7 @@ guardrails-service/
 ### Agent Guard Engine
 - **Purpose**: Heavy NLP computations for content analysis
 - **Integration**: Automatic via akto-gateway library
-- **Configuration**: `AGENT_GUARD_ENGINE_URL` environment variable
+- **Configuration**: `SCANNER_API_URL` (text scans and image OCR)
 
 ### Threat Backend Service
 - **Purpose**: Receives and displays threat reports in dashboard

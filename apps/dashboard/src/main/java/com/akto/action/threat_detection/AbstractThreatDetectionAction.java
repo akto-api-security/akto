@@ -3,43 +3,69 @@ package com.akto.action.threat_detection;
 import com.akto.ProtoMessageUtils;
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
-import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.utils.ArgusCollectionScope;
+import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.HttpMessage;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import okhttp3.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class AbstractThreatDetectionAction extends UserAction {
 
+  // Skills Evaluations / Misconfigured Settings partition modes ("only" | "exclude"), sent to
+  // the threat backend as headers.
+  @Getter @Setter String skillEvaluationMode;
+  @Getter @Setter String configEvaluationMode;
+
   private Map<Integer, String> tokens = new HashMap<>();
-  private String backendUrl;
   private static final ObjectMapper objectMapper = new ObjectMapper();
   private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
 
+  // fetchAllMaliciousReq's own cache — a raw-event fetch this heavy (up to MAX_THREAT_FETCH_LIMIT
+  // events, full payload/metadata per row) is routinely called more than once for the same
+  // account/window/filters within a few seconds of each other (e.g. SecurityPostureAction's
+  // fetchPostureSummary and fetchRiskScoreBreakdown both fetch the identical current-window
+  // allThreats when someone opens the risk score flyout right after the page loads). 2 minutes,
+  // per accountId+params, same tradeoff InsightService's own 60s bundle cache already accepts for
+  // "this account's data can be a couple minutes stale on a dashboard read".
+  private static final long MALICIOUS_EVENTS_CACHE_TTL_MS = 120_000;
+  private static final Map<String, CachedMaliciousEventResponse> maliciousEventsCache = new ConcurrentHashMap<>();
+
+  private static final class CachedMaliciousEventResponse {
+    final MaliciousEventResponse response;
+    final long loadedAtMs;
+    CachedMaliciousEventResponse(MaliciousEventResponse response, long loadedAtMs) {
+      this.response = response;
+      this.loadedAtMs = loadedAtMs;
+    }
+  }
+
   public AbstractThreatDetectionAction() {
     super();
-    this.backendUrl = System.getenv().getOrDefault("THREAT_DETECTION_BACKEND_URL", "https://tbs.akto.io");
   }
 
   public String getApiToken() {
+    int accountId = Context.accountId.get();
+    if (tokens.containsKey(accountId)) {
+      return tokens.get(accountId);
+    }
     try {
-      int accountId = Context.accountId.get();
-      if (tokens.containsKey(accountId)) {
-        return tokens.get(accountId);
-      }
-
-      Map<String, Object> claims = new HashMap<>();
-      claims.put("accountId", accountId);
-      String token = JwtAuthenticator.createJWT(claims, "Akto", "access_tbs", Calendar.MINUTE, 1);
+      String token = ThreatDetectionBackendClient.apiToken(accountId);
       tokens.put(accountId, token);
-
       return token;
     } catch (Exception e) {
       System.out.println(e);
@@ -48,7 +74,34 @@ public class AbstractThreatDetectionAction extends UserAction {
   }
 
   public String getBackendUrl() {
-    return backendUrl;
+    return ThreatDetectionBackendClient.backendUrl();
+  }
+
+  /**
+   * POSTs a JSON body to one of the threat backend's dashboard endpoints and parses its proto
+   * response. Null when the call fails, or when the backend does not have the endpoint (an older
+   * backend answers 404), so a caller can tell "no data" apart from "no answer".
+   */
+  protected <T extends com.google.protobuf.Message> T postDashboardApi(String path, Map<String, Object> body, Class<T> responseClass) {
+    try {
+      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+      Request request = new Request.Builder()
+          .url(String.format("%s/api/dashboard/%s", this.getBackendUrl(), path))
+          .post(RequestBody.create(objectMapper.valueToTree(body).toString(), MediaType.parse("application/json; charset=utf-8")))
+          .addHeader("Authorization", "Bearer " + this.getApiToken())
+          .addHeader("Content-Type", "application/json")
+          .addHeader("x-context-source", contextSourceValue)
+          .build();
+      try (Response resp = httpClient.newCall(request).execute()) {
+        if (!resp.isSuccessful()) {
+          return null;
+        }
+        String responseBody = resp.body() != null ? resp.body().string() : "";
+        return ProtoMessageUtils.toProtoMessage(responseClass, responseBody).orElse(null);
+      }
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   /**
@@ -64,7 +117,13 @@ public class AbstractThreatDetectionAction extends UserAction {
       int endTimestamp,
       int limit,
       Map<String, Object> additionalFilters) {
-    return fetchAllMaliciousEvents(startTimestamp, endTimestamp, limit, additionalFilters, null);
+      MaliciousEventResponse dbObject = fetchAllMaliciousReq(startTimestamp, endTimestamp, limit, additionalFilters, null);
+      return dbObject.getEvents();
+  }
+
+  public long getTotalEvents(int startTimestamp,int endTimestamp, Map<String, Object> additionalFilters){
+    MaliciousEventResponse dbObject = fetchAllMaliciousReq(startTimestamp, endTimestamp, 1, additionalFilters, null);
+    return dbObject.getTotalEvent();
   }
 
   /**
@@ -74,102 +133,208 @@ public class AbstractThreatDetectionAction extends UserAction {
    * additionalFilters. "only" narrows to just /skills/&lt;name&gt; events; "exclude" (or null)
    * behaves like the header was never sent.
    */
+
+  @Getter 
+  @Setter 
+  @AllArgsConstructor 
+  @NoArgsConstructor 
+  private class MaliciousEventResponse {
+    private List<DashboardMaliciousEvent> events;
+    private long totalEvent;
+  }
+
   public List<DashboardMaliciousEvent> fetchAllMaliciousEvents(
+    int startTimestamp,
+    int endTimestamp,
+    int limit,
+    Map<String, Object> additionalFilters,
+    String skillEvalMode
+  ){
+    MaliciousEventResponse res = fetchAllMaliciousReq(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode);
+    return res.getEvents();
+  }
+
+  /**
+   * Same as the 5-arg overload, plus minimalFields — true drops payload/metadata/
+   * owaspCategories/remediation/evidenceLine/humanResponse from each event (see
+   * ThreatDetectionBackendClient#listMaliciousRequests's minimalFields doc). For a caller like
+   * SecurityPostureAction that only reads filterId/category/host off these events, not one that
+   * displays them (e.g. a violations table), which should keep using the 4/5-arg overloads.
+   */
+  public List<DashboardMaliciousEvent> fetchAllMaliciousEvents(
+    int startTimestamp,
+    int endTimestamp,
+    int limit,
+    Map<String, Object> additionalFilters,
+    String skillEvalMode,
+    boolean minimalFields
+  ){
+    MaliciousEventResponse res = fetchAllMaliciousReq(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
+    return res.getEvents();
+  }
+
+  public MaliciousEventResponse fetchAllMaliciousReq(
       int startTimestamp,
       int endTimestamp,
       int limit,
       Map<String, Object> additionalFilters,
       String skillEvalMode) {
-    final List<DashboardMaliciousEvent> result = new ArrayList<>();
-    try {
-      String url = String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl());
-      MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-
-      Map<String, Object> filter = new HashMap<>();
-
-      // Time range filter
-      Map<String, Integer> time_range = new HashMap<>();
-      if (startTimestamp > 0) {
-        time_range.put("start", startTimestamp);
-      }
-      if (endTimestamp > 0) {
-        time_range.put("end", endTimestamp);
-      }
-      // Always put time_range (even if empty) to match existing pattern
-      filter.put("detected_at_time_range", time_range);
-
-      // Add any additional filters
-      if (additionalFilters != null && !additionalFilters.isEmpty()) {
-        filter.putAll(additionalFilters);
-      }
-
-      Map<String, Object> body = new HashMap<String, Object>() {
-        {
-          put("skip", 0);
-          put("limit", limit);
-          put("sort", new HashMap<String, Integer>() {{ put("detectedAt", -1); }});
-          put("filter", filter);
-        }
-      };
-
-      String msg = objectMapper.valueToTree(body).toString();
-      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
-
-      RequestBody requestBody = RequestBody.create(msg, JSON);
-      Request.Builder requestBuilder = new Request.Builder()
-          .url(url)
-          .post(requestBody)
-          .addHeader("Authorization", "Bearer " + this.getApiToken())
-          .addHeader("Content-Type", "application/json")
-          .addHeader("x-context-source", contextSourceValue);
-      if (skillEvalMode != null && !skillEvalMode.isEmpty()) {
-        requestBuilder.addHeader("x-skill-eval-mode", skillEvalMode);
-      }
-      Request request = requestBuilder.build();
-
-      try (Response resp = httpClient.newCall(request).execute()) {
-        String responseBody = resp.body() != null ? resp.body().string() : "";
-
-        ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
-            ListMaliciousRequestsResponse.class, responseBody
-        ).ifPresent(m -> {
-          result.addAll(m.getMaliciousEventsList().stream()
-              .map(smr -> new DashboardMaliciousEvent(
-                  smr.getId(),
-                  smr.getActor(),
-                  smr.getFilterId(),
-                  smr.getEndpoint(),
-                  com.akto.dto.type.URLMethods.Method.fromString(smr.getMethod()),
-                  smr.getApiCollectionId(),
-                  smr.getIp(),
-                  smr.getCountry(),
-                  smr.getDestCountry(),
-                  smr.getDetectedAt(),
-                  smr.getType(),
-                  smr.getRefId(),
-                  smr.getCategory(),
-                  smr.getSubCategory(),
-                  smr.getEventTypeVal(),
-                  smr.getPayload(),
-                  smr.getMetadata(),
-                  smr.getSuccessfulExploit(),
-                  smr.getStatus(),
-                  smr.getLabel(),
-                  smr.getHost(),
-                  smr.getJiraTicketUrl(),
-                  smr.getSeverity(),
-                  smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : ""
-              ))
-              .collect(Collectors.toList())
-          );
-        });
-      }
-    } catch (Exception e) {
-      // Error handling is left to the caller - return empty list on error
-    }
-    return result;
+    return fetchAllMaliciousReq(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, false);
   }
 
+  public MaliciousEventResponse fetchAllMaliciousReq(
+      int startTimestamp,
+      int endTimestamp,
+      int limit,
+      Map<String, Object> additionalFilters,
+      String skillEvalMode,
+      boolean minimalFields) {
+    // Users limited to specific collections only see activity of their own agents. Applied before the
+    // cache key, so the key carries the user's hosts and one user's results are never served to another.
+    if (isLimitedToOwnAgents()) {
+      Map<String, Object> scopedFilters = additionalFilters == null ? new HashMap<>() : new HashMap<>(additionalFilters);
+      if (!ArgusCollectionScope.scopeActivityFilters(getSUser(), scopedFilters)) {
+        return new MaliciousEventResponse(new ArrayList<>(), 0);
+      }
+      additionalFilters = scopedFilters;
+    }
+    String cacheKey = maliciousEventsCacheKey(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
+    CachedMaliciousEventResponse cached = maliciousEventsCache.get(cacheKey);
+    if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < MALICIOUS_EVENTS_CACHE_TTL_MS) {
+      return cached.response;
+    }
+    MaliciousEventResponse fresh = fetchAllMaliciousReqUncached(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
+    if (fresh == null) {
+      // a failed fetch is not "no events": don't cache it, so the next request tries again
+      return new MaliciousEventResponse(new ArrayList<>(), 0);
+    }
+    maliciousEventsCache.put(cacheKey, new CachedMaliciousEventResponse(fresh, System.currentTimeMillis()));
+    return fresh;
+  }
+
+  /** Users limited to specific collections (Argus) - see ArgusCollectionScope. */
+  protected boolean isLimitedToOwnAgents() {
+    return ArgusCollectionScope.isLimited(getSUser());
+  }
+
+  protected static final int OWN_EVENTS_LIMIT = 100_000;
+
+  // when an older threat backend last rejected the host scope field (400); limited users then use their own events
+  // for a while and the field is tried again after HOST_SCOPE_RETRY_SECONDS, so an upgraded backend is picked up
+  private static volatile int hostScopeRejectedAt = 0;
+  private static final int HOST_SCOPE_RETRY_SECONDS = 10 * 60;
+
+  private static boolean backendAcceptsHostScope() {
+    return hostScopeRejectedAt == 0 || Context.now() - hostScopeRejectedAt > HOST_SCOPE_RETRY_SECONDS;
+  }
+
+  /*
+   * Host scope for a user limited to specific collections, so the threat backend counts only their agents.
+   * Null when the user isn't limited, sees nothing, or the backend doesn't accept the field yet.
+   */
+  protected Map<String, Object> backendHostScope() {
+    if (!backendAcceptsHostScope() || !isLimitedToOwnAgents()) {
+      return null;
+    }
+    Map<String, Object> scope = new HashMap<>();
+    return ArgusCollectionScope.scopeActivityFilters(getSUser(), scope) ? scope : null;
+  }
+
+  /** True when an older threat backend rejected the host scope; remembered for a while, so the caller (and later requests) use own events. */
+  protected static boolean hostScopeRejected(Map<String, Object> hostScope, int statusCode) {
+    if (hostScope != null && statusCode == 400) {
+      hostScopeRejectedAt = Context.now();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * All-time events of the user's own agents (host-scoped, minimal fields, cached), or null if the
+   * user is not limited to specific collections. Used to check that an event opened or changed by id
+   * belongs to the user.
+   */
+  protected List<DashboardMaliciousEvent> fetchOwnEventsIfLimited() {
+    if (!isLimitedToOwnAgents()) {
+      return null;
+    }
+    return fetchAllMaliciousEvents(0, 0, OWN_EVENTS_LIMIT, null, null, true);
+  }
+
+  /** accountId (the cache is static/shared across every action instance) + every param that
+   *  changes the query, so two different windows/filters never collide. additionalFilters'
+   *  Map#toString() is good enough here — every current caller passes either null or a small,
+   *  literal-keyed map, not something where key-order instability would matter. minimalFields is
+   *  part of the key too — a minimal-fields response must never be served to a caller that asked
+   *  for full rows (or vice versa: caching a full response wouldn't be wrong, just wasteful). */
+  private static String maliciousEventsCacheKey(int startTimestamp, int endTimestamp, int limit,
+                                                 Map<String, Object> additionalFilters, String skillEvalMode,
+                                                 boolean minimalFields) {
+    return Context.accountId.get() + "|" + startTimestamp + "|" + endTimestamp + "|" + limit
+        + "|" + additionalFilters + "|" + skillEvalMode + "|" + minimalFields;
+  }
+
+  private MaliciousEventResponse fetchAllMaliciousReqUncached(
+      int startTimestamp,
+      int endTimestamp,
+      int limit,
+      Map<String, Object> additionalFilters,
+      String skillEvalMode,
+      boolean minimalFields) {
+    final List<DashboardMaliciousEvent> result = new ArrayList<>();
+    long total = 0;
+    try {
+      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+      ListMaliciousRequestsResponse m = ThreatDetectionBackendClient.listMaliciousRequests(
+          Context.accountId.get(), startTimestamp, endTimestamp, limit, additionalFilters,
+          contextSourceValue, skillEvalMode, minimalFields);
+
+      if (m != null) {
+        total = m.getTotal();
+        result.addAll(m.getMaliciousEventsList().stream()
+            .map(smr -> {
+              DashboardMaliciousEvent event = new DashboardMaliciousEvent(
+                smr.getId(),
+                smr.getActor(),
+                smr.getFilterId(),
+                smr.getEndpoint(),
+                com.akto.dto.type.URLMethods.Method.fromString(smr.getMethod()),
+                smr.getApiCollectionId(),
+                smr.getIp(),
+                smr.getCountry(),
+                smr.getDestCountry(),
+                smr.getDetectedAt(),
+                smr.getType(),
+                smr.getRefId(),
+                smr.getCategory(),
+                smr.getSubCategory(),
+                smr.getEventTypeVal(),
+                smr.getPayload(),
+                smr.getMetadata(),
+                smr.getSuccessfulExploit(),
+                smr.getStatus(),
+                smr.getLabel(),
+                smr.getHost(),
+                smr.getJiraTicketUrl(),
+                smr.getSeverity(),
+                smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : ""
+              );
+              event.setRemediation(smr.getRemediation());
+              event.setHumanResponse(smr.getHumanResponse());
+              event.setCaseOwner(smr.getCaseOwner());
+              event.setBehaviour(smr.getBehaviour());
+              event.setFirstTriagedAt(smr.getFirstTriagedAt());
+              return event;
+            })
+            .collect(Collectors.toList())
+        );
+      }
+    } catch (Exception e) {
+      // null tells the caller the fetch failed, so the failure is not cached as "no events"
+      return null;
+    }
+    return new MaliciousEventResponse(result, total);
+  }
   /**
    * Per-month violation totals, bucketed server-side by the threat-detection-backend (a single
    * cheap $bucket aggregation, not a raw-event fetch) — lets a caller build a trend sparkline
@@ -180,6 +345,15 @@ public class AbstractThreatDetectionAction extends UserAction {
    *     asset's hostNames) instead of the whole account.
    * @return one count per monthBoundaries entry, or an empty list on any error/empty input.
    */
+  protected void addEvaluationModeHeaders(HttpMessage request) {
+    if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
+      request.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
+    }
+    if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
+      request.addHeader("x-config-eval-mode", this.configEvaluationMode);
+    }
+  }
+
   protected List<Integer> fetchViolationsMonthlyTotals(
       int startTimestamp, int endTimestamp, List<Integer> monthBoundaries, List<String> hostFilter) {
     if (monthBoundaries == null || monthBoundaries.isEmpty()) return new ArrayList<>();
@@ -227,40 +401,52 @@ public class AbstractThreatDetectionAction extends UserAction {
    */
   protected List<com.akto.action.threat_detection.HostSeverityCount> fetchHostSeverityCounts(int startTimestamp, int endTimestamp) {
     try {
-      String url = String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl());
-      MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-
-      Map<String, Object> body = new HashMap<String, Object>() {
-        {
-          put("start_ts", startTimestamp);
-          put("end_ts", endTimestamp);
-        }
-      };
-      String msg = objectMapper.valueToTree(body).toString();
-      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
-
-      RequestBody requestBody = RequestBody.create(msg, JSON);
-      Request request = new Request.Builder()
-          .url(url)
-          .post(requestBody)
-          .addHeader("Authorization", "Bearer " + this.getApiToken())
-          .addHeader("Content-Type", "application/json")
-          .addHeader("x-context-source", contextSourceValue)
-          .build();
-
-      try (Response resp = httpClient.newCall(request).execute()) {
-        String responseBody = resp.body() != null ? resp.body().string() : "";
-        return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse>toProtoMessage(
-            com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse.class,
-            responseBody
-        ).map(m -> m.getHostCountsList().stream()
-            .map(smr -> new com.akto.action.threat_detection.HostSeverityCount(
-                smr.getHost(), smr.getCritical(), smr.getHigh(), smr.getMedium(), smr.getLow()))
-            .collect(Collectors.toList()))
-         .orElse(new ArrayList<>());
-      }
+      return fetchHostSeverityCountsOrThrow(startTimestamp, endTimestamp);
     } catch (Exception e) {
       return new ArrayList<>();
+    }
+  }
+
+  /**
+   * Same call as fetchHostSeverityCounts, but a failure (network error, non-2xx, unparseable body)
+   * throws instead of coming back as an empty list, so a caller can tell "the threat backend
+   * failed" apart from "no violations" (InsightDataLoader turns the throw into threatBackendAvailable=false).
+   */
+  protected List<com.akto.action.threat_detection.HostSeverityCount> fetchHostSeverityCountsOrThrow(int startTimestamp, int endTimestamp) throws IOException {
+    String url = String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl());
+    MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTimestamp);
+        put("end_ts", endTimestamp);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+    String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+
+    RequestBody requestBody = RequestBody.create(msg, JSON);
+    Request request = new Request.Builder()
+        .url(url)
+        .post(requestBody)
+        .addHeader("Authorization", "Bearer " + this.getApiToken())
+        .addHeader("Content-Type", "application/json")
+        .addHeader("x-context-source", contextSourceValue)
+        .build();
+
+    try (Response resp = httpClient.newCall(request).execute()) {
+      if (!resp.isSuccessful()) {
+        throw new IOException("get_host_severity_counts returned HTTP " + resp.code());
+      }
+      String responseBody = resp.body() != null ? resp.body().string() : "";
+      return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse>toProtoMessage(
+          com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse.class,
+          responseBody
+      ).orElseThrow(() -> new IOException("get_host_severity_counts returned an unparseable body"))
+          .getHostCountsList().stream()
+          .map(smr -> new com.akto.action.threat_detection.HostSeverityCount(
+              smr.getHost(), smr.getCritical(), smr.getHigh(), smr.getMedium(), smr.getLow()))
+          .collect(Collectors.toList());
     }
   }
 
@@ -274,6 +460,12 @@ public class AbstractThreatDetectionAction extends UserAction {
    */
   protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
       int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter) {
+    return fetchSubcategoryWiseCounts(startTimestamp, endTimestamp, latestAttack, statusFilter, null);
+  }
+
+  // hostScope: see backendHostScope(); null counts the whole account. Null result when the backend rejected the host scope.
+  protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
+      int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter, Map<String, Object> hostScope) {
     try {
       String url = String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl());
       MediaType JSON = MediaType.parse("application/json; charset=utf-8");
@@ -284,6 +476,7 @@ public class AbstractThreatDetectionAction extends UserAction {
           put("end_ts", endTimestamp);
           put("latestAttack", latestAttack);
           if (statusFilter != null && !statusFilter.isEmpty()) put("status", statusFilter);
+          if (hostScope != null) put("hostScope", hostScope);
         }
       };
       String msg = objectMapper.valueToTree(body).toString();
@@ -299,6 +492,9 @@ public class AbstractThreatDetectionAction extends UserAction {
           .build();
 
       try (Response resp = httpClient.newCall(request).execute()) {
+        if (hostScopeRejected(hostScope, resp.code())) {
+          return null;
+        }
         String responseBody = resp.body() != null ? resp.body().string() : "";
         return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse>toProtoMessage(
             com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse.class,

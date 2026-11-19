@@ -6,12 +6,15 @@ import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
 import func from "../../../../../util/func"
 import WorkflowTestBuilder from "../../testing/workflow_test/WorkflowTestBuilder"
 import UploadFile from "../../../components/shared/UploadFile"
+import AllowedAction from "../../../components/shared/AllowedAction"
+import { usePermissions } from "@/util/permissions"
 
 function WorkflowTests({ apiCollectionId, endpointsList }) {
     const [workflowTests, setWorkflowTests] = useState([])
     const [showWorkflowBuilder, setShowWorkflowbuilder] = useState(false)
     const [workflowTest, setWorkflowTest] = useState(null)
     const [loading, setLoading] = useState(false)
+    const { canCall } = usePermissions()
 
     async function fetchWorkflowTests() {
         setLoading(true)
@@ -80,6 +83,7 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
                     setWorkflowTest(item)
                     setShowWorkflowbuilder(true)
                 },
+                requires: 'api/editWorkflowTest'
             }]
         }]
     }
@@ -123,19 +127,21 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
                 </ButtonGroup>
             }
             >
-                <UploadFile
+                {canCall('api/uploadWorkflowJson') ? <UploadFile
                         fileFormat=".json"
                         fileChanged={file => handleFileChange(file)}
                         tooltipText="Upload workflow(.json)"
                         label="Upload workflow"
-                        primary={false} />
+                        primary={false} /> : <AllowedAction allowed={false}><Button plain>Upload workflow</Button></AllowedAction>}
             </LegacyCard.Header> :
             <LegacyCard.Header title="Workflow tests">
+                <AllowedAction allowed={canCall('api/createWorkflowTest')}>
                 <Button
                     onClick={() => setShowWorkflowbuilder(true)}
                 >
                     Create workflow
                 </Button>
+                </AllowedAction>
             </LegacyCard.Header>
     )
 

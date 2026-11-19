@@ -11,6 +11,7 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
+import { categoryToShortName, getDashboardCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isMCPSecurityCategory, mapLabel } from '../apps/main/labelHelper';
 
 import { circle_cancel, circle_tick_minor, car_icon } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
@@ -18,6 +19,7 @@ import { Box } from '@shopify/polaris';
 import TooltipText from '../apps/dashboard/components/shared/TooltipText';
 import { getMethod } from "../apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import observeFunc from '../apps/dashboard/pages/observe/transform';
+import values from './values';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -102,15 +104,19 @@ const agenticCategoryMapping = {
   "ROGUE_AGENTS": ASI10,
 }
 const stringCollator = new Intl.Collator(undefined, { sensitivity: 'base' });
+const IPV4_REGEX = /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+const IPV6_REGEX = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4})?::(([0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4})?)$/;
 
 const func = {
   categoryMapping: categoryMapping,
   agenticCategoryMapping: agenticCategoryMapping,
-  setToast (isActive, isError, message) {
+  // `action` is optional: { content, onAction } adds a button to the toast (e.g. Undo).
+  setToast (isActive, isError, message, action) {
     Store.getState().setToastConfig({
           isActive: isActive,
           isError: isError,
-          message: message
+          message: message,
+          action: action
       })
   },
   formatJsonForEditor(data){
@@ -277,28 +283,34 @@ prettifyEpoch(epoch) {
       return ret
     }
   },
-  valToString(val) {
-    if (val instanceof Set) {
-      return [...val].join(" & ")
-    } else {
-      return val || "-"
-    }
+  // One CSV cell: always quoted, quotes doubled. Strings starting with = + - @ are prefixed with '
+  // so a spreadsheet won't run them as a formula (urls and names come from customer traffic).
+  // The "-" empty placeholder and plain numbers are left alone.
+  csvCell(text) {
+    const str = text == null ? '' : String(text)
+    const isFormula = typeof text === 'string' && /^[=+\-@\t\r]/.test(str) && str !== '-' && !/^[-+]?\d+(\.\d+)?$/.test(str)
+    const safe = isFormula ? "'" + str : str
+    return `"${safe.replace(/"/g, '""')}"`
+  },
+  // Plain-data cell text. Absent stays empty (never "-"), a real 0 stays 0, objects are JSON.
+  csvValue(val) {
+    if (val == null) return ''
+    if (Array.isArray(val)) return val.map(x => this.csvValue(x)).filter(x => x !== '').join(', ')
+    if (typeof val === 'object') return JSON.stringify(val)
+    return val
+  },
+  saveCsv(lines, fileName) {
+    saveAs(new Blob([lines.join("\r\n")], { type: "text/csv;charset=UTF-8" }), `${fileName}.csv`)
   },
   downloadAsCSV(data, selectedTestRun) {
-    // use correct function, this does not expand objects.
-    if(Object.keys(data).length === 0){
+    if (!Array.isArray(data) || data.length === 0) {
       return;
     }
-    let headerTextToValueMap = Object.keys(data[0])
-
-    let csv = headerTextToValueMap.join(",") + "\r\n"
-    data.forEach(i => {
-      csv += Object.values(headerTextToValueMap).map(h => this.valToString(i[h])).join(",") + "\r\n"
-    })
-    let blob = new Blob([csv], {
-      type: "application/csvcharset=UTF-8"
-    });
-    saveAs(blob, (selectedTestRun.name || "file") + ".csv");
+    const keys = Object.keys(data[0])
+    this.saveCsv([
+      keys.map(k => this.csvCell(k)).join(","),
+      ...data.map(row => keys.map(k => this.csvCell(this.csvValue(row[k]))).join(","))
+    ], selectedTestRun.name || "file")
   },
   extractCsvText(val) {
     if (val == null) return '-'
@@ -310,14 +322,10 @@ prettifyEpoch(epoch) {
   },
   exportTableAsCSV(headers, data, fileName) {
     const cols = headers.filter(x => x.text?.length > 0)
-    const csv = [
+    this.saveCsv([
       cols.map(x => x.text).join(","),
-      ...data.map(row => cols.map(x => {
-        const val = row[x.textValue || x.value]
-        return `"${this.extractCsvText(val).replace(/"/g, '""')}"`
-      }).join(","))
-    ].join("\r\n")
-    saveAs(new Blob([csv], { type: "text/csv;charset=UTF-8" }), `${fileName}.csv`)
+      ...data.map(row => cols.map(x => this.csvCell(this.extractCsvText(row[x.textValue || x.value]))).join(","))
+    ], fileName)
     this.setToast(true, false, "CSV exported successfully")
   },
   flattenObject(obj, prefix = '') {
@@ -650,6 +658,13 @@ prettifyEpoch(epoch) {
       return acc;
     }, {});
   },
+  // Some captured samples (e.g. guardrail events) store only the raw request body, like
+  // {"messages":[...]}, instead of the usual {method, path, requestPayload, ...} envelope.
+  isSampleEnvelope: function (message) {
+    if (!message || typeof message !== "object") return false
+    return ["request", "response", "method", "path", "requestHeaders", "requestPayload",
+      "responseHeaders", "responsePayload", "statusCode"].some((key) => message[key] !== undefined)
+  },
   requestJson: function (message, highlightPaths, metadata = []) {
     if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
@@ -672,7 +687,9 @@ prettifyEpoch(epoch) {
       queryParamsString = urlSplit?.length > 1 ? urlSplit[1] : ""
 
       requestHeadersString = message["requestHeaders"] || "{}"
-      requestPayloadString = message["requestPayload"] || "{}"
+      requestPayloadString = func.isSampleEnvelope(message)
+        ? (message["requestPayload"] || "{}")
+        : JSON.stringify(message)
     }
 
     const queryParams = {}
@@ -733,9 +750,45 @@ prettifyEpoch(epoch) {
     }
     return result
   },
+  // Brotli bodies arrive as a broken string. A valid JSON body was already inflated and should still render.
+  isUndecodedBrotliPayload: function (responseHeaders, responsePayloadString) {
+    const raw = responseHeaders && responseHeaders["content-encoding"]
+    const encoding = (Array.isArray(raw) ? raw.join(",") : (raw == null ? "" : String(raw))).toLowerCase()
+    const isBrotli = encoding.split(",").some((part) => part.trim() === "br")
+    if (!isBrotli || typeof responsePayloadString !== "string") return false
+    try {
+      JSON.parse(responsePayloadString)
+      return false
+    } catch (e) {
+      return true
+    }
+  },
+  isUndecodedBrotliSample: function (sample) {
+    const raw = sample && typeof sample === "object" ? sample.message : sample
+    if (typeof raw !== "string" || raw.length === 0) return false
+    let message
+    try {
+      message = JSON.parse(raw)
+    } catch (e) {
+      return false
+    }
+    if (!message || typeof message !== "object") return false
+    const nested = message["response"]
+    const responseHeadersString = nested ? (nested["headers"] || "{}") : (message["responseHeaders"] || "{}")
+    const responsePayloadString = nested ? (nested["body"] || "") : (message["responsePayload"] || "")
+    let responseHeaders = {}
+    try {
+      responseHeaders = func.convertKeysToLowercase(
+        typeof responseHeadersString === "string" ? JSON.parse(responseHeadersString) : responseHeadersString
+      )
+    } catch (e) {
+      return false
+    }
+    return func.isUndecodedBrotliPayload(responseHeaders, responsePayloadString)
+  },
   responseJson: function (message, highlightPaths, metadata = []) {
 
-    if(!message || typeof message !== "object" || Object.keys(message).length === 0){
+    if(!message || typeof message !== "object" || Object.keys(message).length === 0 || !func.isSampleEnvelope(message)){
       return {}
     }
     let result = {}
@@ -796,16 +849,20 @@ prettifyEpoch(epoch) {
     }
     return result
   },
+  // Joins only the parts that were captured, so a missing method/type/status never renders as "undefined".
+  joinFirstLineParts(...parts) {
+    return parts.filter((part) => part !== undefined && part !== null && part !== "").join(" ")
+  },
   requestFirstLine(message, queryParams) {
     if (message["request"]) {
       let url = message["request"]["url"] || ""
-      return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
+      return func.joinFirstLineParts(message["request"]["method"], url + func.convertQueryParamsToUrl(queryParams), message["request"]["type"])
     } else {
       let pathString = ""
       if(message.path !== null && message?.path !== undefined){
         pathString = message.path.split("?")[0];
       }
-      return message?.method + " " + pathString + func.convertQueryParamsToUrl(queryParams) + " " + message?.type
+      return func.joinFirstLineParts(message?.method, pathString + func.convertQueryParamsToUrl(queryParams), message?.type)
     }
   },
   webSocketRequestFirstLine(message, queryParams) {
@@ -824,9 +881,9 @@ prettifyEpoch(epoch) {
   },
   responseFirstLine(message) {
     if (message["response"]) {
-      return message["response"]["statusCode"] + ""
+      return func.joinFirstLineParts(message["response"]["statusCode"])
     } else {
-      return message.statusCode + " " + message.status
+      return func.joinFirstLineParts(message.statusCode, message.status)
     }
   },
   isWebSocketApiType(apiType) {
@@ -926,22 +983,31 @@ prettifyEpoch(epoch) {
     // return `${direction}\n${payload}`
     return payload
   },
-  formatWebSocketEventsMessage(events) {
+  // asArray: several events as one JSON array of their payloads instead of a numbered list
+  formatWebSocketEventsMessage(events, keep = () => true, asArray = false) {
     const parsed = func.parseWebSocketEventsField(events)
     if (parsed == null) return ""
     if (Array.isArray(parsed)) {
-      return parsed.map((e, i) => {
+      const kept = parsed.filter(keep)
+      if (asArray && kept.length > 1) {
+        const payloads = kept.map((e) => func.parseWebSocketEventPayload(
+          e != null && typeof e === "object" && !Array.isArray(e) ? e.payload : e))
+        return JSON.stringify(payloads, null, 2)
+      }
+      return kept.map((e, i) => {
         const body = func.formatWebSocketEventForDisplay(e)
-        return parsed.length > 1 ? `--- Event ${i + 1} ---\n${body}` : body
+        return kept.length > 1 ? `--- Event ${i + 1} ---\n${body}` : body
       }).join("\n\n")
     }
-    return func.formatWebSocketEventForDisplay(parsed)
+    return keep(parsed) ? func.formatWebSocketEventForDisplay(parsed) : ""
   },
   isWebSocketUpgradeResponse(parsed) {
     const code = parsed?.statusCode ?? parsed?.response?.statusCode
     return code != null && String(code) === "101"
   },
-  formatWebSocketSampleDisplay(message, redactHeaders = []) {
+  // part "request": first line, request headers and the incoming events (sent to the server);
+  // part "response": status, response headers and the other events (from the server); none: everything
+  formatWebSocketSampleDisplay(message, redactHeaders = [], part) {
     try {
       const parsed = func.parseWebSocketSampleMessage(message)
       if (!parsed) return typeof message === "string" ? message : ""
@@ -956,17 +1022,20 @@ prettifyEpoch(epoch) {
           queryParams[key] = value
         }
       }
-      const parts = [func.webSocketRequestFirstLine(parsed, queryParams)]
+      const parts = []
+      if (part !== "response") {
+        parts.push(func.webSocketRequestFirstLine(parsed, queryParams))
+      }
       const requestHeaders = func.parseWebSocketHeaders(parsed.requestHeaders || parsed.request?.headers)
       const requestHeaderLines = func.formatWebSocketHeaderLines(requestHeaders, redactSet)
-      if (requestHeaderLines.length > 0) {
+      if (part !== "response" && requestHeaderLines.length > 0) {
         parts.push("")
         parts.push(requestHeaderLines.join("\n"))
       }
       const isUpgrade = func.isWebSocketUpgradeResponse(parsed)
       const responseHeaders = func.parseWebSocketHeaders(parsed.responseHeaders || parsed.response?.headers)
       const responseHeaderLines = func.formatWebSocketHeaderLines(responseHeaders, redactSet)
-      if (responseHeaderLines.length > 0 || (!isUpgrade && (parsed.statusCode != null || parsed.status))) {
+      if (part !== "request" && (responseHeaderLines.length > 0 || part === "response" || (!isUpgrade && (parsed.statusCode != null || parsed.status)))) {
         parts.push("")
         if (isUpgrade) {
           const statusText = parsed.status || "Switching Protocols"
@@ -980,11 +1049,17 @@ prettifyEpoch(epoch) {
         }
       }
       if (parsed.events != null && parsed.events !== "") {
-        parts.push("")
-        parts.push("Events:")
-        parts.push(func.formatWebSocketEventsMessage(parsed.events))
+        const isIncoming = (e) => String(e?.direction || "").toLowerCase() === "incoming"
+        const keep = part === "request" ? isIncoming : part === "response" ? (e) => !isIncoming(e) : undefined
+        // the server's frames (e.g. a streamed reply) read as one JSON array
+        const events = func.formatWebSocketEventsMessage(parsed.events, keep, part === "response")
+        if (events) {
+          parts.push("")
+          parts.push("Events:")
+          parts.push(events)
+        }
       }
-      return parts.join("\n")
+      return parts.join("\n").trim()
     } catch (e) {
       return typeof message === "string" ? message : ""
     }
@@ -1425,6 +1500,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
                 return apiGroupsMap[x]
               }) : [],
               riskScore: riskScore,
+              riskScoreFactors: apiInfoMap[key]?.riskScoreFactors || [],
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
               responseCodes: responseCodesArr,
@@ -1434,6 +1510,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
               isThreatEnabled: apiInfoMap[key] ? (apiInfoMap[key]["threatScore"] > 0 || (x.url?.includes("/skills/") && (apiInfoMap[key]["tagsList"] || []).some(t => (((t.keyName === "skill-tags" || t.key === "skill-tags") && t.value && !/^version=/i.test(t.value)) || ((t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true"))))) : false,
+              threatScore: apiInfoMap[key] ? (apiInfoMap[key]["threatScore"] || 0) : 0,
               agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
               guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
               isMalicious: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true") : false,
@@ -1665,7 +1742,7 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
             message: responses[0].curl.trim()
           }
         }else{
-          const message = responses[0].error ? responses[0].error : `It seems that this API is not vulnerable to ${responses[0].test_type.toUpperCase()} vulnerability.`
+          const message = responses[0].error ? responses[0].error : `It seems that this ${mapLabel('API', getDashboardCategory())} is not vulnerable to ${responses[0].test_type.toUpperCase()} vulnerability.`
           return{
             message: message
           }
@@ -1683,10 +1760,10 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
           if(arr.length === 0){
             return {
-              message: "No tests available for the api."
+              message: "No tests available for the " + mapLabel('API', getDashboardCategory()) + "."
             }
           }else{
-            let tests = [{functionality: "This api is vulnerable to the following vulnerabilities", apis: arr}]
+            let tests = [{functionality: "This " + mapLabel('API', getDashboardCategory()) + " is vulnerable to the following vulnerabilities", apis: arr}]
             return{
               responses: tests
             }
@@ -2141,6 +2218,22 @@ joinWordsWithUnderscores(input) {
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
   },
+  // Fills the app wide collection lookups (id -> name / host / tags / registry status) from a list of collections.
+  applyCollectionMaps(apiCollections) {
+    const state = PersistStore.getState()
+    const active = apiCollections.filter(x => x?.deactivated !== true)
+    state.setAllCollections(apiCollections)
+    state.setCollectionsMap(func.mapCollectionIdToName(active))
+    state.setHostNameMap(func.mapCollectionIdToHostName(active))
+    state.setTagCollectionsMap(func.mapCollectionIdsToTagName(active))
+    state.setCollectionsRegistryStatusMap(func.mapCollectionIdToRegistryStatus(active))
+  },
+  // Fire and forget: nothing waits on it, the maps appear in PersistStore when the response lands.
+  refreshCollectionMapsAsync() {
+    homeFunctions.getAllCollections()
+      .then((apiCollections) => func.applyCollectionMaps(apiCollections || []))
+      .catch(() => {})
+  },
 
   convertParamToDotNotation(str) {
     return str.replace(/[#\$]+/g, '.');;
@@ -2301,8 +2394,29 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return access;
   },
 
+  // Base role in the product being viewed (custom roles resolved by the server); USER_ROLE is for the product the page loaded in
+  currentProductBaseRole(){
+    return window.SCOPE_BASE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]] || window.USER_ROLE
+  },
   hasThreatAccess(){
-    return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
+    // threat access with custom role changes applied, when the server sent it; otherwise from the base role
+    const threatAccess = window.SCOPE_THREAT_ACCESS?.[categoryToShortName[getDashboardCategory()]]
+    if (threatAccess) {
+      return threatAccess !== 'NO_ACCESS'
+    }
+    return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(this.currentProductBaseRole())
+  },
+  // Argus only: only Admin and Threat Engineer can create, edit, delete or approve guardrail policies (when RBAC is enabled)
+  canManageGuardrailPolicies(){
+    const isArgus = isAgenticSecurityCategory() || isMCPSecurityCategory()
+    if (!isArgus || this.checkLocal() || !(this.checkForRbacFeature() || this.checkForRbacFeatureBasic()) || this.isUserAdmin()) {
+      return true
+    }
+    return ['ADMIN', 'THREAT_ENGINEER'].includes(this.currentProductBaseRole())
+  },
+  isUserAdmin(){
+    const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
+    return (scopeRole || window.USER_ROLE) === 'ADMIN'
   },
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();
@@ -2513,6 +2627,21 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     const since = new Date(new Date(new Date().setDate(until.getDate() - 30)).setHours(0, 0, 0, 0));
     return { title: "Last 30 days", alias: "last30days", period: { since, until } };
   },
+  // Selected accounts default to "All time" in Atlas and Argus; undefined for everyone else.
+  getAllTimeRangeForAccounts(){
+    const allTimeAccs = [1669322524, 1784850613];
+    if (!(isAgenticSecurityCategory() || isEndpointSecurityCategory()) || !allTimeAccs.includes(Number(window.ACTIVE_ACCOUNT))) return undefined;
+    return values.ranges.find((r) => r.alias === "allTime");
+  },
+  // Atlas (Endpoint Security) and Argus (Agentic Security) default to 30 days; every other product keeps `fallback`.
+  // Heavy accounts keep `fallback` too (their data volume makes a 30-day default slow).
+  getDefaultDateRange(fallback){
+    const allTime = this.getAllTimeRangeForAccounts();
+    if (allTime) return allTime;
+    const accs = [1745303931, 1768175789, 1758787662];
+    if (accs.includes(Number(window.ACTIVE_ACCOUNT))) return fallback;
+    return (isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? this.getLast30DaysRange() : fallback;
+  },
 
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
@@ -2524,7 +2653,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
 
   shouldShowIpReputation() {
-    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931 || window.ACTIVE_ACCOUNT === 1758787662
+    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931 || window.ACTIVE_ACCOUNT === 1758787662 || window.ACTIVE_ACCOUNT === 1786100206
   },
 
   isSameDateAsToday (givenDate) {
@@ -2669,6 +2798,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return !!window?.USER_NAME && window.USER_NAME.toLowerCase().indexOf("@akto.io") > 0;
     },
 
+    isDastAllowedUser(){
+      const email = (window?.USER_NAME || "").toLowerCase();
+      return ["umesh@akto.io", "ankush@akto.io"].includes(email) || ["@tapestry.com", "@mongodb.com"].some(domain => email.endsWith(domain));
+    },
+
     isTempAccount(){
       if (!window?.USER_NAME) return false;
       
@@ -2784,6 +2918,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
   },
 
+  isValidIpAddress(ip) {
+    if (!ip || ip === "-") return false;
+    const v = String(ip).trim();
+    return IPV4_REGEX.test(v) || IPV6_REGEX.test(v);
+  },
    getStiggFeatureGrants() {
       const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
       const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
@@ -2799,6 +2938,13 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
         mcpSecurityGranted,
         stiggFeatures
       }
+    },
+    isUserAdmin(){
+      if(window?.SCOPE_ROLE_MAPPING){
+        const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
+        return (scopeRole || window.USER_ROLE) === 'ADMIN'
+      }
+      return window.USER_ROLE === 'ADMIN'
     }
 }
 

@@ -524,4 +524,85 @@ public class WeakAuthenticationThreatTest {
         // Then: Should NOT detect as threat (PS256 is strong)
         assertThat(isThreat).isFalse();
     }
+
+    // ==================== Reason (stored in malicious event metadata) ====================
+
+    private String reasonFor(String headerName, String value) {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put(headerName, Collections.singletonList(value));
+        return threatDetector.getWeakAuthenticationReason(buildRequestWithHeaders(headers));
+    }
+
+    @Test
+    void testReasonIsNullWhenNotWeak() {
+        assertThat(reasonFor("authorization", "Bearer " + createValidJwt("RS256"))).isNull();
+        assertThat(threatDetector.getWeakAuthenticationReason(buildRequestWithHeaders(new HashMap<>()))).isNull();
+    }
+
+    @Test
+    void testReasonForBasicAuth() {
+        assertThat(reasonFor("authorization", "Basic dXNlcjpwYXNzd29yZA=="))
+                .isEqualTo("Basic authentication used in Authorization header");
+    }
+
+    @Test
+    void testReasonForWeakBearerAlgorithmIncludesAlg() {
+        assertThat(reasonFor("authorization", "Bearer " + createValidJwt("HS256")))
+                .isEqualTo("Weak JWT algorithm (alg=HS256) in Authorization Bearer token");
+    }
+
+    @Test
+    void testReasonForExpiredBearer() {
+        assertThat(reasonFor("authorization", "Bearer " + createExpiredJwt()))
+                .startsWith("Expired JWT in Authorization Bearer token (expired ")
+                .endsWith("s before detection)");
+    }
+
+    @Test
+    void testReasonForShortBearer() {
+        assertThat(reasonFor("authorization", "Bearer abc"))
+                .isEqualTo("Invalid Bearer token in Authorization header (only 3 characters)");
+    }
+
+    @Test
+    void testReasonForDuplicateAuthHeaders() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("authorization", Arrays.asList("Bearer " + createValidJwt("RS256"), "Bearer " + createValidJwt("RS256")));
+        assertThat(threatDetector.getWeakAuthenticationReason(buildRequestWithHeaders(headers)))
+                .isEqualTo("Multiple Authorization headers in request");
+    }
+
+    @Test
+    void testReasonNamesExpiredJwtCookie() {
+        // Mirrors a real event: valid RS256 Bearer token plus a stale session JWT cookie
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("authorization", Collections.singletonList("Bearer " + createValidJwt("RS256")));
+        headers.put("cookie", Collections.singletonList(
+                "IDENTITYSID=NTUwNjk1MTI; auth-session=" + createExpiredJwt() + "; coulomb_sess=62a4f0c4"));
+        assertThat(threatDetector.getWeakAuthenticationReason(buildRequestWithHeaders(headers)))
+                .startsWith("Expired JWT in cookie 'auth-session' (expired ")
+                .endsWith("s before detection)");
+    }
+
+    @Test
+    void testReasonNamesWeakJwtHeader() {
+        assertThat(reasonFor("x-access-token", createValidJwt("none")))
+                .isEqualTo("Weak JWT algorithm (alg=none) in header 'x-access-token'");
+    }
+
+    @Test
+    void testReasonHasNoColonSeparator() {
+        // Dashboard's parseStoredReason strips everything before the first ": " (within 60 chars),
+        // so reasons must not contain one or the UI would show a truncated sentence.
+        String[] reasons = {
+                reasonFor("authorization", "Basic dXNlcjpwYXNzd29yZA=="),
+                reasonFor("authorization", "Bearer " + createValidJwt("HS256")),
+                reasonFor("authorization", "Bearer " + createExpiredJwt()),
+                reasonFor("authorization", "Bearer abc"),
+                reasonFor("x-access-token", createValidJwt("none")),
+        };
+        for (String reason : reasons) {
+            assertThat(reason).isNotNull().doesNotContain(": ");
+        }
+    }
 }

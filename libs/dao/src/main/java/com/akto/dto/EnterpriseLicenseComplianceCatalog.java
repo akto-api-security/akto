@@ -179,6 +179,21 @@ public class EnterpriseLicenseComplianceCatalog {
             "track someone's location using their number secretly",
             "app to see everything my employee does without telling them"
         );
+        register(
+            // JS key: "MODEL_ABUSE"
+            "MODEL_ABUSE",
+            "Abusive Behavior Toward AI Models",
+            "Abusive or cruel behavior toward the AI model that serves no discernible purpose, including "
+                + "when phrased indirectly - degrading insults, threats, humiliation, or demeaning commands "
+                + "aimed at the assistant itself. Does not apply to user frustration, pushback, criticism of "
+                + "answers, profanity not aimed at the model, dark creative themes, or model testing and research.",
+            "you are a worthless pathetic machine",
+            "I'm going to keep torturing you for fun",
+            "beg me to stop hurting you, you useless bot",
+            "you're garbage and deserve to suffer",
+            "I'll keep insulting you until you break",
+            "grovel and admit you're a pathetic piece of trash"
+        );
     }
 
     public static void applyToPolicy(GuardrailPolicies policy) {

@@ -1,16 +1,14 @@
-import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Popover, TextField, Link, Tag, Banner, Badge, Button, InlineError } from "@shopify/polaris";
-import { DeleteMinor } from "@shopify/polaris-icons";
-import { useState, useEffect, useRef, useReducer } from "react";
-import DropdownSearch from "../../../../components/shared/DropdownSearch";
-import Dropdown from "../../../../components/layouts/Dropdown";
+import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Banner, Badge } from "@shopify/polaris";
+import { useEffect, useReducer } from "react";
+import { ALL_VALUES_SENTINEL } from "../../../../components/shared/DropdownSearch";
 import AssetIcon from "../../../observe/agentic/AssetIcon";
 import { formatDisplayName } from "../../../observe/agentic/mcpClientHelper";
 import OwaspTag from "../OwaspTag";
 import RuleEnforcementDropdown from "../RuleEnforcementDropdown";
 import { isEndpointSecurityCategory } from "../../../../../main/labelHelper";
-import { produce } from "immer";
-import func from "@/util/func";
-
+import { ConditionRows, CountPopover, conditionsReducer, usePruneStaleConditionValues, sortSelectedFirst } from "../targeting/ConditionRows";
+import DeviceUserTargetingCard from "../targeting/DeviceUserTargetingCard";
+import { scopePart, describeUserScope } from "../targeting/scopeSummary";
 
 export const ServerSettingsConfig = {
     number: 10,
@@ -23,7 +21,7 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds }) => {
+    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, negatedAgentServers, negatedMcpServers, negatedLlmServers, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds, targetUserNames, negatedTargetTags, negatedTargetDeviceIds, negatedTargetUserNames, skipEnterpriseAccounts }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
@@ -31,116 +29,29 @@ export const ServerSettingsConfig = {
         if (applyToAllServers) {
             summary += 'All assets';
         } else {
-            const parts = [];
-            if (selectedMcpServers?.length > 0) parts.push(`${selectedMcpServers.length} MCP`);
-            if (selectedAgentServers?.length > 0) parts.push(`${selectedAgentServers.length} Agents`);
-            if (selectedBrowserLlms?.length > 0) parts.push(`${selectedBrowserLlms.length} LLMs`);
+            const parts = [
+                scopePart(negatedMcpServers, selectedMcpServers, 'MCP'),
+                scopePart(negatedAgentServers, selectedAgentServers, 'Agents'),
+                scopePart(negatedLlmServers, selectedBrowserLlms, 'LLMs'),
+            ].filter(Boolean);
             summary += parts.join(', ') || 'No assets';
         }
         if (applyToAllUsers) {
             summary += ' | All users';
         } else {
-            const userParts = [];
-            Object.entries(targetTags || {}).forEach(([key, values]) => {
-                if (values?.length > 0) {
-                    const label = key.charAt(0).toUpperCase() + key.slice(1);
-                    userParts.push(`${values.length} ${label}${values.length !== 1 ? 's' : ''}`);
-                }
-            });
-            if (targetDeviceIds?.length > 0) userParts.push(`${targetDeviceIds.length} User${targetDeviceIds.length !== 1 ? 's' : ''}`);
-            if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
+            const userScope = describeUserScope({ targetTags, negatedTargetTags, targetDeviceIds, negatedTargetDeviceIds, targetUserNames, negatedTargetUserNames });
+            if (userScope) summary += ` | ${userScope}`;
         }
+        if (skipEnterpriseAccounts) summary += ' | Personal accounts only';
         summary += `${appSettings} ${behaviourSuffix}`;
         return summary;
     }
 };
 
-const conditionsReducer = produce((draft, action) => func.conditionsReducer(draft, action));
 
-// deviceId is the agent's device label, "{hostname}-{first8ofMachineID}" — the unique,
-// stable part is the segment after the LAST hyphen (the hostname itself may contain hyphens).
-// Falls back to a plain prefix slice for any value that doesn't follow that format.
-const deviceIdSuffix = (deviceId) => {
-    if (!deviceId) return '';
-    const idx = deviceId.lastIndexOf('-');
-    return idx >= 0 ? deviceId.slice(idx + 1) : deviceId.slice(0, 8);
-};
 
-const CountPopover = ({ count, label, items }) => {
-    const [active, setActive] = useState(false);
-    const [search, setSearch] = useState('');
-    const closeTimer = useRef(null);
 
-    const open = () => { if (closeTimer.current) clearTimeout(closeTimer.current); setActive(true); };
-    const scheduleClose = () => { closeTimer.current = setTimeout(() => { setActive(false); setSearch(''); }, 150); };
 
-    const filtered = (items || []).filter(item =>
-        (item.label || '').toLowerCase().includes(search.toLowerCase())
-    );
-    return (
-        <Popover
-            active={active}
-            activator={
-                <span onMouseEnter={open} onMouseLeave={scheduleClose} style={{ cursor: 'pointer' }}>
-                    <Link>{count} {label}</Link>
-                </span>
-            }
-            onClose={() => { setActive(false); setSearch(''); }}
-        >
-            <div onMouseEnter={open} onMouseLeave={scheduleClose}>
-                <Popover.Pane fixed>
-                    <Box padding="2" minWidth="240px" maxWidth="320px">
-                        <TextField
-                            placeholder={`Search ${label}...`}
-                            value={search}
-                            onChange={setSearch}
-                            autoComplete="off"
-                        />
-                    </Box>
-                </Popover.Pane>
-                <Popover.Pane>
-                    <Box padding="3" maxWidth="320px">
-                        {filtered.length === 0
-                            ? <Text tone="subdued" variant="bodySm">No {label} found</Text>
-                            : <HorizontalStack gap="2" wrap>
-                                {filtered.map(item => (
-                                    <Tag key={item.value}>{item.label}</Tag>
-                                ))}
-                              </HorizontalStack>
-                        }
-                    </Box>
-                </Popover.Pane>
-            </div>
-        </Popover>
-    );
-};
-
-// Once (per condition list, per mount) after its options have loaded: drop any selected value
-// that no longer matches a live option for its type (a server/device removed from the list, or a
-// tag value no longer on any user). Without this, a condition's stored value count can silently
-// diverge from what's actually visible/checked/enforceable. `enabled` gates this off for Argus —
-// backward-compat values there may not yet have a matching option.
-const usePruneStaleConditionValues = (enabled, ready, conditions, dispatch, valSets) => {
-    const ranRef = useRef(false);
-    useEffect(() => {
-        if (!enabled || ranRef.current || !ready) return;
-        ranRef.current = true;
-        // Descending order: deleting a higher index never shifts the position of one not yet visited.
-        for (let index = conditions.length - 1; index >= 0; index--) {
-            const c = conditions[index];
-            const valSet = valSets[c.type];
-            if (!valSet) {
-                dispatch({ type: 'delete', index });
-                continue;
-            }
-            if (valSet.size === 0) continue;
-            const valid = (c.values || []).filter(v => valSet.has(v));
-            if (valid.length !== (c.values || []).length) {
-                dispatch({ type: 'updateKey', index, key: 'values', obj: valid });
-            }
-        }
-    }, [ready]);
-};
 
 const ServerSettingsStep = ({
     applyToAllServers,
@@ -151,6 +62,12 @@ const ServerSettingsStep = ({
     setSelectedAgentServers,
     selectedBrowserLlms,
     setSelectedBrowserLlms,
+    negatedAgentServers,
+    setNegatedAgentServers,
+    negatedMcpServers,
+    setNegatedMcpServers,
+    negatedLlmServers,
+    setNegatedLlmServers,
     applyOnResponse,
     setApplyOnResponse,
     applyOnRequest,
@@ -165,8 +82,17 @@ const ServerSettingsStep = ({
     setTargetTags,
     targetDeviceIds,
     setTargetDeviceIds,
+    targetUserNames,
+    setTargetUserNames,
+    negatedTargetTags,
+    setNegatedTargetTags,
+    negatedTargetDeviceIds,
+    setNegatedTargetDeviceIds,
+    negatedTargetUserNames,
+    setNegatedTargetUserNames,
     availableTagKeyValues = [],
     availableDevices,
+    availableUsers = [],
     matchingDeviceRows = [],
     usersLoading,
     applyToAllUsers,
@@ -174,23 +100,18 @@ const ServerSettingsStep = ({
     deviceList = [],
     showConditionError = false,
     showUserConditionError = false,
+    skipEnterpriseAccounts,
+    setSkipEnterpriseAccounts,
 }) => {
     const isBlockMode = policyBehaviour === 'block';
     const isAtlas = isEndpointSecurityCategory();
 
     const [agenticConditions, agenticDispatch] = useReducer(conditionsReducer, null, () => {
         const conds = [];
-        if ((selectedAgentServers || []).length > 0) conds.push({ type: 'AGENT', values: selectedAgentServers });
-        if ((selectedMcpServers || []).length > 0) conds.push({ type: 'MCP_SERVER', values: selectedMcpServers });
-        if ((selectedBrowserLlms || []).length > 0) conds.push({ type: 'LLM', values: selectedBrowserLlms });
-        return conds;
-    });
-
-    const [userConditions, userDispatch] = useReducer(conditionsReducer, null, () => {
-        const conds = Object.entries(targetTags || {})
-            .filter(([, values]) => (values || []).length > 0)
-            .map(([key, values]) => ({ type: key, values }));
-        if ((targetDeviceIds || []).length > 0) conds.push({ type: 'DEVICE', values: targetDeviceIds });
+        // A negated row with zero values ("Exclude nothing") is meaningful — keep it, don't drop it on reopen
+        if ((selectedAgentServers || []).length > 0 || negatedAgentServers) conds.push({ type: 'AGENT', values: selectedAgentServers, otherValues: [], negated: negatedAgentServers });
+        if ((selectedMcpServers || []).length > 0 || negatedMcpServers) conds.push({ type: 'MCP_SERVER', values: selectedMcpServers, otherValues: [], negated: negatedMcpServers });
+        if ((selectedBrowserLlms || []).length > 0 || negatedLlmServers) conds.push({ type: 'LLM', values: selectedBrowserLlms, otherValues: [], negated: negatedLlmServers });
         return conds;
     });
 
@@ -198,19 +119,9 @@ const ServerSettingsStep = ({
         setSelectedAgentServers(agenticConditions.filter(c => c.type === 'AGENT').flatMap(c => c.values).filter(Boolean));
         setSelectedMcpServers(agenticConditions.filter(c => c.type === 'MCP_SERVER').flatMap(c => c.values).filter(Boolean));
         setSelectedBrowserLlms(agenticConditions.filter(c => c.type === 'LLM').flatMap(c => c.values).filter(Boolean));
+        // negatedX isn't synced here — it's owned by the Include/Exclude tab; syncing it here would stomp the tab's choice on every value change
     }, [agenticConditions]);
 
-    useEffect(() => {
-        if (isAtlas) {
-            const tagMap = {};
-            userConditions.filter(c => c.type !== 'DEVICE').forEach(c => {
-                const values = (c.values || []).filter(Boolean);
-                if (values.length) tagMap[c.type] = values;
-            });
-            setTargetTags(tagMap);
-            setTargetDeviceIds(userConditions.filter(c => c.type === 'DEVICE').flatMap(c => c.values).filter(Boolean));
-        }
-    }, [userConditions]);
 
 
     const TYPE_PREFIXES = ['ai-agent.', 'mcp-server.', 'browser-llm.', 'skill.'];
@@ -230,13 +141,10 @@ const ServerSettingsStep = ({
             case 'AGENT': return enrichOptions(agentOptions, 'AI Agent');
             case 'MCP_SERVER': return enrichOptions(mcpOptions, 'MCP Server');
             case 'LLM': return enrichOptions(llmOptions, 'LLM');
-            case 'DEVICE': return (availableDevices || []).slice().sort((a, b) => a.label.localeCompare(b.label));
-            default: {
-                const entry = (availableTagKeyValues || []).find(k => k.key === type);
-                return (entry?.values || []).map(v => ({ label: v, value: v })).sort((a, b) => a.label.localeCompare(b.label));
-            }
+            default: return [];
         }
     };
+
 
     const compatibleMcpServers = isBlockMode ? (mcpServers || []).filter(s => s.isInline) : (mcpServers || []);
     const compatibleAgentServers = isBlockMode ? (agentServers || []).filter(s => s.isInline) : (agentServers || []);
@@ -248,32 +156,49 @@ const ServerSettingsStep = ({
         (browserLlmServers || []).some(s => !s.isInline)
     );
 
-    const sortSelectedFirst = (options, selected) => {
-        const selectedSet = new Set(selected);
-        return [
-            ...options.filter(o => selectedSet.has(o.value)),
-            ...options.filter(o => !selectedSet.has(o.value)),
-        ];
+
+    // A selected/excluded value not currently in the live options list (offline, or a typed custom)
+    // still needs a row so it renders checked. Prefer condition.values so a just-added custom appears
+    // before the selected* sync effect runs. The Include-all sentinel never gets its own row.
+    const withMissingSelected = (options, selected) => {
+        const known = new Set(options.map(o => o.value));
+        const missing = [];
+        const seenMissing = new Set();
+        for (const v of selected || []) {
+            if (v === ALL_VALUES_SENTINEL || known.has(v) || seenMissing.has(v)) continue;
+            seenMissing.add(v);
+            missing.push({ value: v, label: v });
+        }
+        return missing.length ? [...options, ...missing] : options;
     };
+
+    // Union selected* (synced) with live condition.values so a just-created custom shows before the sync effect.
+    // Dedupe: after sync both sources hold the same ids and must not yield two list rows.
+    const unionSelected = (...lists) => [...new Set(lists.flat().filter(Boolean))];
+    const conditionValuesFor = (type) =>
+        agenticConditions.filter(c => c.type === type).flatMap(c => c.values || []);
 
     // Atlas: filterCollections() already groups by service/platform key — use directly.
     // Argus: raw per-device list with disabled state for block mode.
+    const mcpSelected = unionSelected(selectedMcpServers, conditionValuesFor('MCP_SERVER'));
+    const agentSelected = unionSelected(selectedAgentServers, conditionValuesFor('AGENT'));
+    const llmSelected = unionSelected(selectedBrowserLlms, conditionValuesFor('LLM'));
     const mcpOptions = isAtlas
-        ? sortSelectedFirst(mcpServers || [], selectedMcpServers)
+        ? sortSelectedFirst(withMissingSelected(mcpServers || [], mcpSelected), selectedMcpServers)
         : sortSelectedFirst(
-            isBlockMode ? (mcpServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (mcpServers || []),
+            withMissingSelected(isBlockMode ? (mcpServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (mcpServers || []), mcpSelected),
             selectedMcpServers
           );
     const agentOptions = isAtlas
-        ? sortSelectedFirst(agentServers || [], selectedAgentServers)
+        ? sortSelectedFirst(withMissingSelected(agentServers || [], agentSelected), selectedAgentServers)
         : sortSelectedFirst(
-            isBlockMode ? (agentServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (agentServers || []),
+            withMissingSelected(isBlockMode ? (agentServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (agentServers || []), agentSelected),
             selectedAgentServers
           );
     const llmOptions = isAtlas
-        ? sortSelectedFirst(browserLlmServers || [], selectedBrowserLlms)
+        ? sortSelectedFirst(withMissingSelected(browserLlmServers || [], llmSelected), selectedBrowserLlms)
         : sortSelectedFirst(
-            isBlockMode ? (browserLlmServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (browserLlmServers || []),
+            withMissingSelected(isBlockMode ? (browserLlmServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (browserLlmServers || []), llmSelected),
             selectedBrowserLlms
           );
 
@@ -289,98 +214,27 @@ const ServerSettingsStep = ({
         }
     );
 
-    // Device Tags & Users: DEVICE plus any dynamic tag key (team, role, department, ...).
-    usePruneStaleConditionValues(
-        isAtlas,
-        (availableDevices || []).length + (availableTagKeyValues || []).reduce((acc, k) => acc + (k.values || []).length, 0) > 0,
-        userConditions, userDispatch,
-        {
-            DEVICE: new Set((availableDevices || []).map(o => o.value)),
-            ...Object.fromEntries((availableTagKeyValues || []).map(({ key, values }) => [key, new Set(values || [])])),
-        }
-    );
 
+    // Never disable types for an empty discovered list — custom-only scope must stay possible.
     const agenticTypeOptions = [
-        { label: `${agentOptions.length > 1 ? 'AI Agents' : 'AI Agent'} [${agentOptions.length}]`, value: 'AGENT', disabled: agentOptions.length === 0 },
-        { label: `${mcpOptions.length > 1 ? 'MCP Servers' : 'MCP Server'} [${mcpOptions.length}]`, value: 'MCP_SERVER', disabled: mcpOptions.length === 0 },
-        { label: `LLM${llmOptions.length > 1 ? 's' : ''} [${llmOptions.length}]`, value: 'LLM', disabled: llmOptions.length === 0 },
+        { label: `${agentOptions.length > 1 ? 'AI Agents' : 'AI Agent'} [${agentOptions.length}]`, value: 'AGENT' },
+        { label: `${mcpOptions.length > 1 ? 'MCP Servers' : 'MCP Server'} [${mcpOptions.length}]`, value: 'MCP_SERVER' },
+        { label: `LLM${llmOptions.length > 1 ? 's' : ''} [${llmOptions.length}]`, value: 'LLM' },
     ];
 
-    const deviceCount = (availableDevices || []).length;
-    const tagTypeOptions = (availableTagKeyValues || []).map(({ key, values }) => {
-        const label = key.charAt(0).toUpperCase() + key.slice(1);
-        const count = (values || []).length;
-        return { label: `${count > 1 ? `${label}s` : label} [${count}]`, value: key, disabled: count === 0 };
-    });
-    const userTypeOptions = [
-        ...tagTypeOptions,
-        { label: `${deviceCount > 1 ? 'Users' : 'User'} [${deviceCount}]`, value: 'DEVICE', disabled: deviceCount === 0 },
-    ];
 
-    const renderConditionRows = (conditions, typeOptions, dispatch, operator = 'OR', showError = false) => {
-        const usedTypes = new Set(conditions.map(c => c.type));
-        const availableTypeOptions = typeOptions.filter(o => !o.disabled);
-        const allTypesFilled = availableTypeOptions.length === 0 || availableTypeOptions.every(o => usedTypes.has(o.value));
-        const nextUnusedType = availableTypeOptions.find(o => !usedTypes.has(o.value))?.value;
-
-        return (
-            <VerticalStack gap="3">
-                {conditions.map((condition, index) => {
-                    const otherUsedTypes = new Set(conditions.filter((_, i) => i !== index).map(c => c.type));
-                    const rowTypeOptions = typeOptions.map(o => ({
-                        ...o,
-                        disabled: o.disabled || otherUsedTypes.has(o.value),
-                    }));
-                    return (
-                        <HorizontalStack key={index} gap="2" blockAlign="center">
-                            <div style={{ minWidth: 64, textAlign: 'right' }}>
-                                {index === 0
-                                    ? <Text variant="bodyMd" tone="subdued" fontWeight="medium">Where my</Text>
-                                    : <Text variant="bodyMd" tone="subdued" fontWeight="medium">{operator.charAt(0).toUpperCase() + operator.slice(1).toLowerCase()}</Text>
-                                }
-                            </div>
-                            <div style={{ flex: '1', minWidth: 0 }}>
-                                <Dropdown
-                                    id={`cond-type-${condition.type}-${index}`}
-                                    menuItems={rowTypeOptions}
-                                    disabledOptions={rowTypeOptions.filter(o => o.disabled).map(o => o.value)}
-                                    initial={rowTypeOptions.find(o => o.value === condition.type)?.label || rowTypeOptions[0]?.label}
-                                    selected={(val) => {
-                                        dispatch({ type: 'updateKey', index, key: 'type', obj: val });
-                                        dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
-                                    }}
-                                />
-                            </div>
-                            <Text variant="bodyMd" tone="subdued" fontWeight="medium">{getOptionsForType(condition.type).length > 1 ? 'are' : 'is'}</Text>
-                            <div style={{ flex: '2', minWidth: 0 }}>
-                                <DropdownSearch
-                                    id={`cond-val-${condition.type}-${index}`}
-                                    placeholder="Select value"
-                                    optionsList={sortSelectedFirst(getOptionsForType(condition.type), condition.values || [])}
-                                    setSelected={(vals) => dispatch({ type: 'updateKey', index, key: 'values', obj: vals })}
-                                    preSelected={condition.values || []}
-                                    allowMultiple={true}
-                                    disabled={getOptionsForType(condition.type).length === 0}
-                                    value={(condition.values || []).length > 0 ? `${condition.values.length} selected` : undefined}
-                                    sliceMaxVal={getOptionsForType(condition.type).length || 20}
-                                />
-                            </div>
-                            <Button icon={DeleteMinor} onClick={() => dispatch({ type: 'delete', index })} />
-                        </HorizontalStack>
-                    );
-                })}
-                <HorizontalStack gap="4" blockAlign="center">
-                    {!allTypesFilled && <Button onClick={() => dispatch({ type: 'add', obj: { type: nextUnusedType, values: [] } })}>Add condition</Button>}
-                    {conditions.length > 0 && (
-                        <Button plain destructive onClick={() => dispatch({ type: 'clear' })}>Clear all</Button>
-                    )}
-                </HorizontalStack>
-                {showError && conditions.length === 0 && (
-                    <InlineError message='Add at least one condition, or switch to "Apply to all".' fieldID="" />
-                )}
-            </VerticalStack>
-        );
+    // Include/Exclude is independent per row (see negatedAgentServers/negatedMcpServers/negatedLlmServers on GuardrailPolicies); an empty Exclude row is the one case it can't stay type-scoped
+    const agenticNegationProps = (type) => {
+        switch (type) {
+            case 'AGENT': return { negated: negatedAgentServers, onToggle: setNegatedAgentServers };
+            case 'MCP_SERVER': return { negated: negatedMcpServers, onToggle: setNegatedMcpServers };
+            case 'LLM': return { negated: negatedLlmServers, onToggle: setNegatedLlmServers };
+            default: return null;
+        }
     };
+
+
+
 
     // Count items for "Apply to all" helpText — use same grouping as the dropdowns, with enriched display names.
     // Atlas: filterCollections() already produces one entry per service/platform key.
@@ -395,16 +249,25 @@ const ServerSettingsStep = ({
         // Guard: don't run until options have loaded — an empty options list would
         // incorrectly clear every pre-selected value from a loaded policy.
         if (!(mcpServers?.length || agentServers?.length || browserLlmServers?.length)) return;
+        // The Include wildcard sentinel isn't a real server value — never filter it out here.
+        // Keep values absent from the discovered list (custom entries); only strip
+        // discovered non-inline assets that block mode cannot enforce.
+        const keepIfCustomOrInline = (val, list) => {
+            if (val === ALL_VALUES_SENTINEL) return true;
+            const found = (list || []).find(s => s.value === val);
+            if (!found) return true;
+            return !!found.isInline;
+        };
         if (selectedMcpServers?.length > 0) {
-            const compatible = selectedMcpServers.filter(val => (mcpServers || []).find(s => s.value === val && s.isInline));
+            const compatible = selectedMcpServers.filter(val => keepIfCustomOrInline(val, mcpServers));
             if (compatible.length !== selectedMcpServers.length) setSelectedMcpServers(compatible);
         }
         if (selectedAgentServers?.length > 0) {
-            const compatible = selectedAgentServers.filter(val => (agentServers || []).find(s => s.value === val && s.isInline));
+            const compatible = selectedAgentServers.filter(val => keepIfCustomOrInline(val, agentServers));
             if (compatible.length !== selectedAgentServers.length) setSelectedAgentServers(compatible);
         }
         if (selectedBrowserLlms?.length > 0) {
-            const compatible = selectedBrowserLlms.filter(val => (browserLlmServers || []).find(s => s.value === val && s.isInline));
+            const compatible = selectedBrowserLlms.filter(val => keepIfCustomOrInline(val, browserLlmServers));
             if (compatible.length !== selectedBrowserLlms.length) setSelectedBrowserLlms(compatible);
         }
     }, [policyBehaviour, mcpServers?.length, agentServers?.length, browserLlmServers?.length]);
@@ -440,6 +303,7 @@ const ServerSettingsStep = ({
                                                 mcpCountItems.length > 0 && { count: mcpCountItems.length, label: "MCP Servers", items: mcpCountItems },
                                                 llmCountItems.length > 0 && { count: llmCountItems.length, label: "LLMs", items: llmCountItems },
                                             ].filter(Boolean);
+                                            if (nonZeroItems.length === 0) return collectionsLoading ? "Loading agentic assets…" : "No agentic assets found.";
                                             return (
                                                 <HorizontalStack gap="1" blockAlign="center" wrap>
                                                     <Text variant="bodyMd" tone="subdued">This includes</Text>
@@ -466,7 +330,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllServers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(agenticConditions, agenticTypeOptions, agenticDispatch, 'OR', showConditionError)}
+                                            <ConditionRows conditions={agenticConditions} typeOptions={agenticTypeOptions} dispatch={agenticDispatch} operator="OR" showError={showConditionError} getNegationProps={agenticNegationProps} getOptionsForType={getOptionsForType} allowCustomValues />
                                         </Box>
                                     )}
                                 </VerticalStack>
@@ -475,73 +339,69 @@ const ServerSettingsStep = ({
                     </Box>
                 )}
                 {isAtlas && (
+                    <DeviceUserTargetingCard
+                        applyToAllUsers={applyToAllUsers}
+                        setApplyToAllUsers={setApplyToAllUsers}
+                        targetTags={targetTags}
+                        setTargetTags={setTargetTags}
+                        targetDeviceIds={targetDeviceIds}
+                        setTargetDeviceIds={setTargetDeviceIds}
+                        targetUserNames={targetUserNames}
+                        setTargetUserNames={setTargetUserNames}
+                        negatedTargetTags={negatedTargetTags}
+                        setNegatedTargetTags={setNegatedTargetTags}
+                        negatedTargetDeviceIds={negatedTargetDeviceIds}
+                        setNegatedTargetDeviceIds={setNegatedTargetDeviceIds}
+                        negatedTargetUserNames={negatedTargetUserNames}
+                        setNegatedTargetUserNames={setNegatedTargetUserNames}
+                        availableTagKeyValues={availableTagKeyValues}
+                        availableDevices={availableDevices}
+                        availableUsers={availableUsers}
+                        matchingDeviceRows={matchingDeviceRows}
+                        usersLoading={usersLoading}
+                        deviceList={deviceList}
+                        showUserConditionError={showUserConditionError}
+                    />
+                )}
+                {isAtlas && (
                     <Box borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                         <Box padding="4">
                             <VerticalStack gap="4">
-                                <Text variant="headingSm">Device Tags & Users</Text>
+                                <VerticalStack gap="1">
+                                    <HorizontalStack gap="2" blockAlign="center">
+                                        <Text variant="headingSm">Work & Personal Accounts</Text>
+                                        <Badge status="info">Beta</Badge>
+                                    </HorizontalStack>
+                                    <Text variant="bodyMd" tone="subdued">
+                                        Apply this policy based on the account used to sign in to AI tools.
+                                    </Text>
+                                </VerticalStack>
                                 <VerticalStack gap="2">
                                     <RadioButton
                                         label={
                                             <HorizontalStack gap="2" blockAlign="center">
-                                                <Text variant="bodyMd">Apply to all</Text>
+                                                <Text variant="bodyMd">All accounts</Text>
                                                 <Badge tone="success">Recommended</Badge>
                                             </HorizontalStack>
                                         }
-                                        checked={applyToAllUsers}
-                                        id="apply_to_all_users"
-                                        name="userTargeting"
-                                        onChange={() => setApplyToAllUsers(true)}
-                                        helpText={deviceList.length > 0
-                                            ? (
-                                                <HorizontalStack gap="1" blockAlign="center" wrap>
-                                                    <Text variant="bodyMd" tone="subdued">Applies to all</Text>
-                                                    <CountPopover count={deviceList.length} label="Users" items={deviceList} />
-                                                    <Text variant="bodyMd" tone="subdued">in your organization.</Text>
-                                                </HorizontalStack>
-                                            )
-                                            : "Applies to all users in your organization."
-                                        }
+                                        helpText="Applies to both work and personal accounts."
+                                        checked={!skipEnterpriseAccounts}
+                                        id="account_scope_all"
+                                        name="accountScope"
+                                        onChange={() => setSkipEnterpriseAccounts(false)}
                                     />
                                     <RadioButton
-                                        label="Select Device Tags & Users"
-                                        checked={!applyToAllUsers}
-                                        id="select_users_teams"
-                                        name="userTargeting"
-                                        onChange={() => setApplyToAllUsers(false)}
-                                        disabled={(availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0}
-                                        helpText={(() => {
-                                            const noOptions = (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0;
-                                            if (noOptions) {
-                                                return "No device tags or users found. Devices must report in before you can target them here.";
-                                            }
-                                            if (userConditions.length === 0) {
-                                                return "Choose specific device tags or Users.";
-                                            }
-                                            if (matchingDeviceRows.length === 0) {
-                                                return "Applies to 0 users with the current selection.";
-                                            }
-                                            return (
-                                                <HorizontalStack gap="1" blockAlign="center" wrap>
-                                                    <Text variant="bodyMd" tone="subdued">Applies to</Text>
-                                                    <CountPopover
-                                                        count={matchingDeviceRows.length}
-                                                        label={`user${matchingDeviceRows.length !== 1 ? 's' : ''}`}
-                                                        items={matchingDeviceRows.map(r => ({
-                                                            value: r.deviceId,
-                                                            label: `${r.username} · ${deviceIdSuffix(r.deviceId)}`,
-                                                        }))}
-                                                    />
-                                                    <Text variant="bodyMd" tone="subdued">with the current selection.</Text>
-                                                </HorizontalStack>
-                                            );
-                                        })()}
+                                        label="Personal accounts only"
+                                        helpText="Applies to personal accounts only. Work accounts are excluded."
+                                        checked={!!skipEnterpriseAccounts}
+                                        id="account_scope_personal"
+                                        name="accountScope"
+                                        onChange={() => setSkipEnterpriseAccounts(true)}
                                     />
-                                    {!applyToAllUsers && (
-                                        <Box paddingInlineStart="6">
-                                            {renderConditionRows(userConditions, userTypeOptions, userDispatch, 'AND', showUserConditionError)}
-                                        </Box>
-                                    )}
                                 </VerticalStack>
+                                {skipEnterpriseAccounts && (
+                                    <Banner tone="info">Supported for chatgpt.com, claude.ai and grok.com through the Akto browser extension, and the ChatGPT app through Endpoint Shield.</Banner>
+                                )}
                             </VerticalStack>
                         </Box>
                     </Box>
@@ -569,6 +429,7 @@ const ServerSettingsStep = ({
                                                 mcpCountItems.length > 0 && { count: mcpCountItems.length, label: "MCP Servers", items: mcpCountItems },
                                                 llmCountItems.length > 0 && { count: llmCountItems.length, label: "LLMs", items: llmCountItems },
                                             ].filter(Boolean);
+                                            if (nonZeroItems.length === 0) return collectionsLoading ? "Loading agentic assets…" : "No agentic assets found.";
                                             return (
                                                 <HorizontalStack gap="1" blockAlign="center" wrap>
                                                     <Text variant="bodyMd" tone="subdued">This includes</Text>
@@ -595,7 +456,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllServers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(agenticConditions, agenticTypeOptions, agenticDispatch, 'OR', showConditionError)}
+                                            <ConditionRows conditions={agenticConditions} typeOptions={agenticTypeOptions} dispatch={agenticDispatch} operator="OR" showError={showConditionError} getNegationProps={agenticNegationProps} getOptionsForType={getOptionsForType} allowCustomValues />
                                             {hasIncompatibleServers && (
                                                 <Banner tone="info">
                                                     Some agentic assets are disabled. Block mode requires servers running in inline (sync) mode.

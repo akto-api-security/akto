@@ -18,7 +18,7 @@ const TYPE_TAG_TO_DISPLAY = {
 // entry — e.g. all Claude CLI installs report different tag values depending on config source.
 const KNOWN_CLIENTS = {
     claude: { displayName: 'Claude', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
-    claude1: { displayName: 'Claude Desktop', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT, variants: ['claude-desktop'] },
+    claude1: { displayName: 'Claude Desktop', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT, variants: ['claude-desktop', 'claude-app'] },
     claude2: {
         displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT,
         variants: ['claude', 'claudecli', 'claude-cli', 'claude-cli-user', 'claude-cli-project', 'claude-cli-local', 'claude-cli-enterprise', 'claude-plugin', 'claude-code'],
@@ -40,6 +40,7 @@ const KNOWN_CLIENTS = {
     vscopilot: { displayName: 'Visual Studio Copilot', domain: 'visualstudio.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['visual-studio-copilot'] },
     cursor: { displayName: 'Cursor', domain: 'cursor.com', agentType: CLIENT_TYPES.AI_AGENT },
     grok: { displayName: 'Grok', domain: 'x.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    grokbot: { displayName: 'Grok Bot', domain: 'x.ai', agentType: CLIENT_TYPES.AI_AGENT, variants: ['grok-bot'] },
     cody: { displayName: 'Cody', domain: 'sourcegraph.com', agentType: CLIENT_TYPES.AI_AGENT },
     windsurf: { displayName: 'Windsurf', domain: 'codeium.com', agentType: CLIENT_TYPES.AI_AGENT },
     codeium: { displayName: 'Codeium', domain: 'codeium.com', agentType: CLIENT_TYPES.AI_AGENT },

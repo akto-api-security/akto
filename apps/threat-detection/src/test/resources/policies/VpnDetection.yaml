@@ -1,0 +1,22 @@
+id: VpnDetection
+filter:
+  url:
+    regex: ".*"
+
+info:
+  name: "VpnDetection"
+  description: "Detects API traffic coming from VPN or Tor IP addresses."
+  details: "The source IP of each request is checked against a merged IP intelligence database (VPN and Tor flags). Requests from a VPN or Tor IP are counted per source IP, and an alert is raised once 5 such requests are seen within 10 minutes."
+  impact: "VPN and Tor exits hide the real origin of a client. They are commonly used for credential stuffing, scraping and evading IP based blocking."
+  category:
+    name: "VpnDetection"
+    displayName: "VPN / Tor Access"
+  subCategory: "VPN or Tor IP"
+  severity: MEDIUM
+
+aggregation_rules:
+  - rule:
+      name: "Rule 1"
+      condition:
+        matchCount: 5
+        windowThreshold: 10

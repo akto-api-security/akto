@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, Badge } from "@shopify/polaris"
+import { Box, Button, Popover, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, Badge, List } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import ApiGroups from "../../../components/shared/ApiGroups";
@@ -23,8 +23,9 @@ import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
 import ForbiddenRole from "../../../components/shared/ForbiddenRole";
-import MarkdownViewer from "../../../components/shared/MarkdownViewer";
-import { stripMarkdownLinks } from "../../../components/shared/markdownUtils";
+import SkillMarkdownViewer from "../agentic/SkillEvidenceView";
+import { parseSkillSample } from "../agentic/SkillComponentsView";
+import { usePermissions, permissions, withPermissions } from "@/util/permissions";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
@@ -72,6 +73,7 @@ function ApiDetails(props) {
     // const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
     const [showMoreActions, setShowMoreActions] = useState(false)
+    const { canCall } = usePermissions()
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
     const allCollections = PersistStore(state => state.allCollections)
     const [disabledTabs, setDisabledTabs] = useState([])
@@ -92,6 +94,7 @@ function ApiDetails(props) {
     const [selectedTabId, setSelectedTabId] = useState('values');
     const [showForbidden, setShowForbidden] = useState(false);
     const [detectedBasePrompt, setDetectedBasePrompt] = useState(null);
+    const [endpointRiskScoreFactors, setEndpointRiskScoreFactors] = useState([]);
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -205,7 +208,7 @@ function ApiDetails(props) {
             ]);
     
             const boxPlotSeries = [{
-                name: "API Call Distribution",
+                name: mapLabel('API', getDashboardCategory()) + " Call Distribution",
                 type: "boxplot",
                 data,
                 color: "#1E90FF",
@@ -279,6 +282,9 @@ function ApiDetails(props) {
             setLoading(true)
             const { apiCollectionId, endpoint, method, description } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
+            // Clear stale factors before the fetch so an out-of-order response cannot win.
+            setEndpointRiskScoreFactors([]);
+            const fetchKey = `${apiCollectionId}|${method}|${endpoint}`;
             
             // Fetch ApiInfo to get detectedBasePrompt
             try {
@@ -287,6 +293,10 @@ function ApiDetails(props) {
                     method: method,
                     apiCollectionId: apiCollectionId
                 });
+                const stillSelected = apiDetail?.apiCollectionId === apiCollectionId
+                    && apiDetail?.method === method
+                    && apiDetail?.endpoint === endpoint;
+                if (!stillSelected) return;
                 // Check both apiInfoResp.data and apiInfoResp.data.apiInfo (depending on response structure)
                 const detectedPrompt = apiInfoResp?.data?.detectedBasePrompt || apiInfoResp?.detectedBasePrompt;
                 if (detectedPrompt && detectedPrompt.trim().length > 0) {
@@ -294,9 +304,19 @@ function ApiDetails(props) {
                 } else {
                     setDetectedBasePrompt(null);
                 }
+                const factors = apiInfoResp?.apiInfo?.riskScoreFactors
+                    || apiInfoResp?.riskScoreFactors
+                    || apiInfoResp?.data?.riskScoreFactors
+                    || [];
+                if (fetchKey === `${apiDetail?.apiCollectionId}|${apiDetail?.method}|${apiDetail?.endpoint}`) {
+                    setEndpointRiskScoreFactors(Array.isArray(factors) ? factors : []);
+                }
             } catch (error) {
                 console.error("Error fetching ApiInfo:", error);
-                setDetectedBasePrompt(null);
+                if (fetchKey === `${apiDetail?.apiCollectionId}|${apiDetail?.method}|${apiDetail?.endpoint}`) {
+                    setDetectedBasePrompt(null);
+                    setEndpointRiskScoreFactors([]);
+                }
             }
             
             try {
@@ -332,7 +352,7 @@ function ApiDetails(props) {
             }, 100)
             headers.forEach((header) => {
                 if (header.value === "description") {
-                    header.action = () => setIsEditingDescription(true)
+                    header.action = permissions.canCall('api/saveEndpointDescription') ? () => setIsEditingDescription(true) : undefined
                 }
             })
 
@@ -642,36 +662,69 @@ function ApiDetails(props) {
     }
     const isSkillEndpoint = apiDetail?.endpoint?.includes('/skills/')
 
-    let skillMarkdown = null
-    if (isSkillEndpoint && sampleData.length > 0) {
-        try {
-            const parsedMsg = JSON.parse(sampleData[0].message)
-            const bodyStr = parsedMsg?.request?.body || parsedMsg?.requestPayload || '{}'
-            const body = JSON.parse(bodyStr)
-            if (body.skill_name) {
-                skillMarkdown = `# ${stripMarkdownLinks(body.skill_name)}\n\n` +
-                    (body.skill_description ? `**${stripMarkdownLinks(body.skill_description)}**\n\n` : '') +
-                    stripMarkdownLinks(body.skill_content || '')
-            }
-        } catch (_) {}
-    }
+    const skillSample = isSkillEndpoint && sampleData.length > 0 ? parseSkillSample(sampleData[0].message) : null
+    const skillMarkdown = skillSample?.markdown || null
+
+    // Prefer cron-written factors; fall back to collection baseRiskScoreReason until the writer backfills.
+    const riskScoreFactors = (() => {
+        if (Array.isArray(endpointRiskScoreFactors) && endpointRiskScoreFactors.length > 0) {
+            return endpointRiskScoreFactors;
+        }
+        if (Array.isArray(apiDetail?.riskScoreFactors) && apiDetail.riskScoreFactors.length > 0) {
+            return apiDetail.riskScoreFactors;
+        }
+        return [];
+    })();
+    const showLegacyAgentBreakdown = riskScoreFactors.length === 0
+        && apiDetail?.baseRiskScore != null
+        && !!apiDetail?.baseRiskScoreReason;
 
     const ValuesTab = {
         id: 'values',
         content: "Values",
         component: isSkillEndpoint && skillMarkdown
-            ? <MarkdownViewer markdown={skillMarkdown} />
+            ? <Box paddingBlockStart={"4"}><SkillMarkdownViewer markdown={skillMarkdown} evidence={skillSample.evidence} /></Box>
             : sampleData.length > 0 && <Box paddingBlockStart={"4"}>
-                <SampleDataList
-                    key="Sample values"
-                    sampleData={sampleData}
-                    heading={"Sample values"}
-                    minHeight={"35vh"}
-                    vertical={true}
-                    isAPISampleData={true}
-                    isWebSocket={isWebSocket}
-                    metadata={headersWithData.map(x => x.split(" ")[0])}
-                />
+                <VerticalStack gap="4">
+                    {riskScoreFactors.length > 0 && (
+                        <VerticalStack gap="3">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Text variant='headingMd'>Risk Score Breakdown</Text>
+                                <Badge status={transform.getStatus(apiDetail?.riskScore)} size="small">{apiDetail?.riskScore}</Badge>
+                            </HorizontalStack>
+                            <List type="bullet">
+                                {riskScoreFactors.map((factor, index) => (
+                                    <List.Item key={index}>
+                                        <Text variant="bodyMd" color="subdued" as="span">
+                                            {factor.points} -&gt; {factor.label}{factor.detail ? ` — ${factor.detail}` : ""}
+                                        </Text>
+                                    </List.Item>
+                                ))}
+                            </List>
+                        </VerticalStack>
+                    )}
+                    {showLegacyAgentBreakdown && (
+                        <VerticalStack gap="3">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Text variant='headingMd'>Agent's Risk Score Breakdown</Text>
+                                <Badge status={transform.getStatus(apiDetail?.riskScore)} size="small">{apiDetail?.riskScore}</Badge>
+                            </HorizontalStack>
+                            <Text variant="bodyMd" color="subdued">
+                                Base score: {apiDetail.baseRiskScore} — {apiDetail.baseRiskScoreReason}
+                            </Text>
+                        </VerticalStack>
+                    )}
+                    <SampleDataList
+                        key="Sample values"
+                        sampleData={sampleData}
+                        heading={"Sample values"}
+                        minHeight={"35vh"}
+                        vertical={true}
+                        isAPISampleData={true}
+                        isWebSocket={isWebSocket}
+                        metadata={headersWithData.map(x => x.split(" ")[0])}
+                    />
+                </VerticalStack>
             </Box>,
     }
     const DependencyTab = {
@@ -755,7 +808,7 @@ function ApiDetails(props) {
                             areaFillHex='true'
                             height='330'
                             title={mapLabel('Api', getDashboardCategory()) + ' Call Count'}
-                            subtitle='Number of API calls over time'
+                            subtitle={'Number of ' + mapLabel('API', getDashboardCategory()) + ' calls over time'}
                             defaultChartOptions={defaultChartOptions(false)}
                             backgroundColor='#ffffff'
                             text='true'
@@ -867,7 +920,7 @@ function ApiDetails(props) {
                             filtered={true}
                             useLocalSubCategoryData={useLocalSubCategoryData}
                             preActivator={false}
-                            disabled={window.USER_ROLE === "GUEST"}
+                            disabled={!canCall('api/startTest')}
                         />
                     )}
                     {!isEndpointSecurityCategory() && (
@@ -888,10 +941,10 @@ function ApiDetails(props) {
                         >
                             <Popover.Pane fixed>
                                 <ActionList
-                                    items={[
+                                    items={withPermissions([
                                         // isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : {},
-                                        isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : {},
-                                    ]}
+                                        isDemergingActive ? { content: "De-merge", onAction: deMergeApis, requires: 'api/deMergeApi' } : {},
+                                    ])}
                                 />
                             </Popover.Pane>
                         </Popover> : null

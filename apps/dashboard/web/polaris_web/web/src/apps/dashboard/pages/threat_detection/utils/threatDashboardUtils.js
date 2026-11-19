@@ -1,10 +1,11 @@
 import { flags } from "../components/flags/index.mjs";
 import SessionStore from "../../../../main/SessionStore";
 import PersistStore from "../../../../main/PersistStore";
-import { getDashboardCategory, categoryToShortName } from "../../../../main/labelHelper";
+import { getDashboardCategory, categoryToShortName, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import values from "@/util/values";
 import GUARDRAIL_RULE_DEFINITIONS from "../constants/guardrailRuleDefinitions";
 import { formatDisplayName } from "../../observe/agentic/mcpClientHelper";
+import api from "../api";
 
 // New tab starts with a fresh PersistStore, so carry the category via ?category= (see ThreatReport.jsx).
 const getCategoryParam = () => categoryToShortName[getDashboardCategory()];
@@ -14,6 +15,16 @@ const getCategoryParam = () => categoryToShortName[getDashboardCategory()];
 // both destination pages resolve ?range= before the timestamp params.
 const allTimeRange = values.ranges.find((r) => r.alias === "allTime");
 const allTimeStartTs = allTimeRange ? Math.floor(allTimeRange.period.since.getTime() / 1000) : 1;
+
+export const ACTIVITY_TAB = {
+    ACTIVE: "ACTIVE",
+    UNDER_REVIEW: "UNDER_REVIEW",
+    IGNORED: "IGNORED",
+    SKILLS_EVALUATIONS: "skills_evaluations",
+    MISCONFIGURED_SETTINGS: "misconfigured_settings",
+};
+export const CRITICAL_SEVERITY = "CRITICAL";
+export const SKILL_URL_PREFIX = "/skills/";
 
 const setTimeRangeParams = (params, filters, startKey, endKey) => {
     if (!filters.startTimestamp || !filters.endTimestamp) return;
@@ -164,32 +175,86 @@ export const applyThreatActivityTableFilter = (filterKey, filterValue) => {
     return { resolvedValue, filterStr };
 };
 
-const openActivityPage = (path, filters) => {
+// Config/settings-risk categories belong on the "Misconfigured Settings" tab.
+const isMisconfigurationCategory = (filterId) =>
+    isEndpointSecurityCategory() && /_(config|settings)_risk$/i.test(filterId || "");
+
+const activityLink = (path, filters) => {
     const params = new URLSearchParams();
     const filterParts = [];
     if (filters.host) filterParts.push(`host__${filters.host}`);
+    // An Atlas discovered tool; the page narrows to its hosts.
+    if (filters.atlasTool) {
+        params.set("tool", filters.atlasTool);
+        if (filters.atlasToolName) params.set("toolName", filters.atlasToolName);
+    }
+    let resolvedFilterId = null;
     if (filters.latestAttack) {
-        const filterId = subCategoryToFilterId(filters.latestAttack);
-        filterParts.push(`latestAttack__${filterId}`);
+        resolvedFilterId = subCategoryToFilterId(filters.latestAttack);
+        filterParts.push(`latestAttack__${resolvedFilterId}`);
     }
     if (filters.actor) filterParts.push(`actor__${filters.actor}`);
     if (filters.url) filterParts.push(`url__${filters.url}`);
     if (filters.severity) filterParts.push(`severity__${filters.severity}`);
     if (filterParts.length > 0) params.set("filters", filterParts.join("&"));
-    if (filters.eventStatus) params.set("eventStatus", filters.eventStatus);
+    const eventStatus = filters.eventStatus
+        || (isMisconfigurationCategory(resolvedFilterId) ? ACTIVITY_TAB.MISCONFIGURED_SETTINGS : null);
+    if (eventStatus) params.set("eventStatus", eventStatus);
     setTimeRangeParams(params, filters, "startTimestamp", "endTimestamp");
     const categoryParam = getCategoryParam();
     if (categoryParam) params.set("category", categoryParam);
-    const url = `${window.location.origin}${path}?${params.toString()}`;
-    window.open(url, "_blank");
+    return `${path}?${params.toString()}`;
 };
+
+const openActivityPage = (path, filters) => window.open(`${window.location.origin}${activityLink(path, filters)}`, "_blank");
 
 export const openThreatActivityPage = (filters = {}) =>
     openActivityPage("/dashboard/protection/threat-activity", filters);
 
 // Guardrail Activity is the same table on its own route (see LeftNav), so it takes the same filters.
+export const GUARDRAIL_ACTIVITY_PATH = "/dashboard/guardrails/activity";
+
 export const openGuardrailActivityPage = (filters = {}) =>
-    openActivityPage("/dashboard/guardrails/activity", filters);
+    openActivityPage(GUARDRAIL_ACTIVITY_PATH, filters);
+
+// In-app link to Guardrail Activity, for a same-tab navigate.
+export const guardrailActivityLink = (filters = {}) => activityLink(GUARDRAIL_ACTIVITY_PATH, filters);
+
+// Drops the filters saved for an activity page (every tab), so a link into it starts from only its own filters.
+export const clearSavedActivityFilters = (path) => {
+    const { filtersMap, setFiltersMap } = PersistStore.getState();
+    setFiltersMap(Object.fromEntries(Object.entries(filtersMap || {}).filter(([pageKey]) => !pageKey.startsWith(`${path}/`))));
+};
+
+// Same-tab link into Guardrail Activity with the filters applied. The table ignores the filters in the URL once the
+// page has been reloaded (the browser keeps that navigation type for every in-app move after it), so they are also
+// saved under the table's own page key, which it reads every time it opens.
+export const goToGuardrailActivity = (navigate, filters = {}) => {
+    clearSavedActivityFilters(GUARDRAIL_ACTIVITY_PATH);
+    const link = guardrailActivityLink(filters);
+    const urlFilters = new URLSearchParams(link.split("?")[1]).get("filters") || "";
+    const saved = urlFilters.split("&").filter(Boolean).map((part) => {
+        const [key, values = ""] = part.split("__");
+        return { key, value: values.split(",").filter(Boolean) };
+    });
+    if (saved.length > 0) {
+        const { filtersMap, setFiltersMap } = PersistStore.getState();
+        setFiltersMap({ ...filtersMap, [`${GUARDRAIL_ACTIVITY_PATH}/`]: { filters: saved, sort: [] } });
+    }
+    navigate(link);
+};
+
+// The Agentic Guardrail Activity page (charts and table); its saved filters live under this path.
+export const THREAT_ACTIVITY_PATH = "/dashboard/protection/threat-activity";
+
+// In-app link to Agentic Guardrail Activity, for a same-tab navigate.
+export const threatActivityLink = (filters = {}) => activityLink(THREAT_ACTIVITY_PATH, filters);
+
+// Active-tab row count for one Atlas tool, same query as the tab; null on failure.
+export const fetchActiveToolViolationCount = (atlasToolKey, startTimestamp, endTimestamp) =>
+    api.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude", undefined, undefined, undefined, false, { atlasToolKey })
+        .then((resp) => resp?.total ?? null)
+        .catch(() => null);
 
 export const openThreatActorsPage = (filters = {}) => {
     const params = new URLSearchParams();
@@ -202,4 +267,25 @@ export const openThreatActorsPage = (filters = {}) => {
     if (categoryParam) params.set("category", categoryParam);
     const url = `${window.location.origin}/dashboard/protection/threat-actor?${params.toString()}`;
     window.open(url, "_blank");
+};
+
+// Atlas (ENDPOINT) violation counts, counted exactly the way the Guardrails Activity tabs count their
+// own rows (list query, limit 1, read .total) — so every page that shows a violation total agrees with
+// the Activity page by construction. Active excludes the Skills Evaluations and Misconfigured Settings
+// partitions; Misconfigured Settings is deduped to one row per host/user/setting. A count whose
+// request fails comes back null so callers can fall back.
+export const fetchEndpointViolationCounts = async (startTimestamp, endTimestamp) => {
+    const countRows = (status, skillEvaluationMode, configEvaluationMode) =>
+        api.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, status, undefined, undefined, undefined, undefined, undefined, false, [], skillEvaluationMode, configEvaluationMode)
+            .then((resp) => resp?.total ?? null)
+            .catch(() => null);
+    const [active, skillsEvaluations, misconfiguredSettings, underReview, ignored] = await Promise.all([
+        countRows("ACTIVE", "exclude", "exclude"),
+        countRows("ACTIVE", "only", undefined),
+        countRows("ACTIVE", undefined, "only"),
+        countRows("UNDER_REVIEW"),
+        countRows("IGNORED"),
+    ]);
+    const total = [active, skillsEvaluations, misconfiguredSettings, underReview, ignored].reduce((sum, c) => sum + (c || 0), 0);
+    return { active, skillsEvaluations, misconfiguredSettings, underReview, ignored, total };
 };

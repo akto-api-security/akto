@@ -10,12 +10,13 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon } from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Modal, Text } from "@shopify/polaris";
 import { FileMinor } from '@shopify/polaris-icons';
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
 import threatDetectionFunc from "./transform";
 import InfoCard from "../dashboard/new_components/InfoCard";
+import SpinnerCentered from "../../components/progress/SpinnerCentered";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
@@ -29,9 +30,11 @@ import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
 import { applyThreatActivityTableFilter } from "./utils/threatDashboardUtils";
 import { redactSampleDataByKeywords } from "./utils/redactSampleData";
+import { downloadMaliciousEventsAsJson, downloadMaliciousEventsAsCsv } from "./utils/exportEvents";
 import { resolveComplianceClauseMap, extractBehaviour } from "./utils/formatUtils";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
+import { withPermissions } from "@/util/permissions";
 
 // Opened in a fresh tab (e.g. "View All"), so apply ?category= before first render, same as ThreatReport.jsx.
 const categoryOverride = shortNameToCategory[getReportCategoryShortName()]
@@ -146,19 +149,20 @@ const flaggedData = [
     }
 ]
 
-const ChartComponent = ({ categoryCount, severityCountMap, onThreatTypeClick, onSeverityClick }) => {
+const ChartComponent = ({ categoryCount, severityCountMap, categoryLoading, severityLoading, onThreatTypeClick, onSeverityClick }) => {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
           <TopThreatTypeChart
             key={"top-threat-types"}
             data={categoryCount}
+            loading={categoryLoading}
             onBarClick={onThreatTypeClick}
           />
           <InfoCard
                 title={`${mapLabel("Threat", getDashboardCategory())} by severity`}
                 titleToolTip={`Number of ${mapLabel("APIs", getDashboardCategory())} per each category`}
-                component={
+                component={severityLoading ? <SpinnerCentered height="280px" /> :
                     <BarGraph
                         data={severityCountMap}
                         areaFillHex="true"
@@ -223,7 +227,8 @@ const initialEventState = {
     moreInfoData: {},
     currentEventId: '',
     currentEventStatus: '',
-    currentJiraTicketUrl: ''
+    currentJiraTicketUrl: '',
+    currentHumanResponse: ''
 };
 
 function ThreatDetectionPage() {
@@ -234,9 +239,10 @@ function ThreatDetectionPage() {
     // Consolidate query parameters into a single object
     const queryParams = useMemo(() => {
         const eventStatusFromQuery = searchParams.get("eventStatus");
-        // Support legacy 'filters' param for backward compatibility
+        // Legacy 'filters' is a status only when it's a bare token, not "key__value".
         const legacyFilters = searchParams.get("filters");
-        const statusValue = eventStatusFromQuery || (legacyFilters ? legacyFilters.replace(/#/g, "").toUpperCase() : "");
+        const legacyStatus = legacyFilters && !legacyFilters.includes("__") ? legacyFilters.replace(/#/g, "").toUpperCase() : "";
+        const statusValue = eventStatusFromQuery || legacyStatus;
         return {
             refId: searchParams.get("refId"),
             eventType: searchParams.get("eventType"),
@@ -326,7 +332,7 @@ function ThreatDetectionPage() {
         }
         const specialAccounts = [1776384040, 1776625569, 1776626846];
         if (specialAccounts.includes(Number(window.ACTIVE_ACCOUNT))) return values.ranges[4];
-        return func.getLast30DaysRange();
+        return func.getDefaultDateRange(values.ranges[2]);
     }, [location.state, searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 
@@ -342,10 +348,14 @@ function ThreatDetectionPage() {
         }
     }, [searchParams]);
     const [showDetails, setShowDetails] = useState(false);
+    const applyPayloadSearchRef = useRef(() => {});
+    const applyExportRef = useRef(async () => ({ maliciousEvents: [] }));
     const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)
     const [categoryCount, setCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
+    const [categoryLoading, setCategoryLoading] = useState(true);
+    const [severityLoading, setSeverityLoading] = useState(true);
     const [moreActions, setMoreActions] = useState(false);
     const [webhookIntegrationModalOpen, setWebhookIntegrationModalOpen] = useState(false);
     const [webhookIntegrationData, setWebhookIntegrationData] = useState(null);
@@ -353,14 +363,20 @@ function ThreatDetectionPage() {
     const [detailsLoading, setDetailsLoading] = useState(false);
     const pollingIntervalRef = useRef(null);
     const [pendingRowContext, setPendingRowContext] = useState(null);
+    const [revealedRefId, setRevealedRefId] = useState(null);
+    const [revealing, setRevealing] = useState(false);
+    // Content access is audited only for Argus and Atlas, not API Security.
+    const revealRequired = isEndpointSecurityCategory() || isAgenticSecurityCategory();
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
     const showNewLayoutToggle = isEndpointSecurityCategory() || isAgenticSecurityCategory();
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
+    // Captured once at mount so a later URL cleanup (clearEventState) can't flip this.
+    const hadDashboardFilterLinkRef = useRef(Boolean(searchParams.get("filters") || searchParams.get("eventStatus") || searchParams.get("tool")));
     useEffect(() => {
-        if (showNewLayoutToggle && newLayout) {
+        if (showNewLayoutToggle && newLayout && !hadDashboardFilterLinkRef.current) {
             navigate("/dashboard/guardrails/violations", { replace: true });
         }
     }, [navigate, showNewLayoutToggle, newLayout]);
@@ -418,6 +434,7 @@ function ThreatDetectionPage() {
     const handleDetailsVisibility = useCallback((visible) => {
         setShowDetails(visible);
         if (!visible) {
+            setRevealedRefId(null);
             clearEventState();
         }
     }, [clearEventState]);
@@ -449,6 +466,8 @@ function ThreatDetectionPage() {
             templateId: data.filterId,
             status: data.status || '',
             eventId: data.id || '',
+            // A grouped activity's events, shown as its attempts.
+            groupEventIds: data.groupCount > 1 ? (data.groupEventIds || []) : [],
             jiraTicketUrl: data.jiraTicketUrl || '',
             severity: data.severity || '',
             sessionId: data.sessionId || '',
@@ -456,7 +475,10 @@ function ThreatDetectionPage() {
             complianceMapData: data.complianceMapData || {},
             metadata: data.metadata || '',
             behaviourRaw: data.behaviourRaw || extractBehaviour(data.metadata) || '',
-            host: data.host || ''
+            host: data.host || '',
+            remediation: data.remediation || '',
+            humanResponse: data.humanResponse || '',
+            evidenceLineFull: data.evidenceLineFull || '',
         });
 
         setShowDetails(true);
@@ -476,11 +498,15 @@ function ThreatDetectionPage() {
                 complianceMap: data.complianceMapData || {},
                 metadata: data.metadata || '',
                 behaviour: data.behaviourRaw || extractBehaviour(data.metadata) || '',
-                host: data.host || ''
+                refId: data.refId || '',
+                host: data.host || '',
+                remediation: data.remediation || '',
+                evidenceLine: data.evidenceLineFull || ''
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
-            currentJiraTicketUrl: data.jiraTicketUrl || ''
+            currentJiraTicketUrl: data.jiraTicketUrl || '',
+            currentHumanResponse: data.humanResponse || ''
         });
         if (data.nextUrl) {
             navigate(data.nextUrl, { replace: eventState.currentRefId === data.refId });
@@ -505,12 +531,17 @@ function ThreatDetectionPage() {
 
       useEffect(() => {
         const fetchThreatCategoryCount = async () => {
-            const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
-            const finalObj = threatDetectionFunc.getGraphsData(res);
-            // categoryCountRes groups by policy name (category), not the generic rule-type
-            // subCategory (e.g. "UserDefinedLLMRule" shared by many distinct policies) — same
-            // source ThreatApiPage.jsx already uses for this same chart.
-            setCategoryCount(finalObj.categoryCountRes);
+            setCategoryLoading(true);
+            try {
+                const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
+                const finalObj = threatDetectionFunc.getGraphsData(res);
+                // categoryCountRes groups by policy name (category), not the generic rule-type
+                // subCategory (e.g. "UserDefinedLLMRule" shared by many distinct policies) — same
+                // source ThreatApiPage.jsx already uses for this same chart.
+                setCategoryCount(finalObj.categoryCountRes);
+            } finally {
+                setCategoryLoading(false);
+            }
           };
 
           const fetchCountBySeverity = async () => {
@@ -520,11 +551,16 @@ function ThreatDetectionPage() {
                 MEDIUM: 0,
                 LOW: 0,
             }
-            const res = await api.fetchCountBySeverity(startTimestamp, endTimestamp);
-            res.categoryCounts.forEach(({ subCategory, count }) => {
-                severityMap[subCategory] = count;
-            });
-            setSeverityCountMap(convertToGraphData(severityMap));
+            setSeverityLoading(true);
+            try {
+                const res = await api.fetchCountBySeverity(startTimestamp, endTimestamp);
+                res.categoryCounts.forEach(({ subCategory, count }) => {
+                    severityMap[subCategory] = count;
+                });
+                setSeverityCountMap(convertToGraphData(severityMap));
+            } finally {
+                setSeverityLoading(false);
+            }
         };
 
         const DEMO_ACCOUNT_ID = 1669322524;
@@ -641,7 +677,8 @@ function ThreatDetectionPage() {
             queryParams.refId,
             queryParams.eventType,
             queryParams?.actor || "",
-            queryParams.filterId
+            queryParams.filterId,
+            rowContext?.groupEventIds || []
           );
 
           if (!isMountedRef.current) {
@@ -668,7 +705,10 @@ function ThreatDetectionPage() {
               ruleViolated: rowContext?.ruleViolated || queryParams.ruleViolated || '-',
               metadata: rowContext?.metadata || '',
               behaviour: rowContext?.behaviourRaw || extractBehaviour(rowContext?.metadata) || '',
+              refId: queryParams.refId || '',
               host: rowContext?.host || '',
+              remediation: rowContext?.remediation || '',
+              evidenceLine: rowContext?.evidenceLineFull || '',
               complianceMap: rowContext?.complianceMapData || (() => {
                 if (!queryParams.filterId) return {};
                 const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();
@@ -682,7 +722,8 @@ function ThreatDetectionPage() {
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',
-            currentJiraTicketUrl: rowContext?.jiraTicketUrl || ''
+            currentJiraTicketUrl: rowContext?.jiraTicketUrl || '',
+            currentHumanResponse: rowContext?.humanResponse || ''
           });
         } catch (error) {
           console.error('Error fetching event:', error);
@@ -710,7 +751,7 @@ function ThreatDetectionPage() {
           urlParams.get("filterId")
         );
         
-        if (!hasParams || !queryParams.hasQueryEvent) {
+        if (!hasParams || !queryParams.hasQueryEvent || (revealRequired && revealedRefId !== queryParams.refId)) {
             return;
         }
         
@@ -719,13 +760,30 @@ function ThreatDetectionPage() {
         return () => {
             isMountedRef.current = false;
         };
-      }, [queryParams.hasQueryEvent, queryParams.refId, fetchEventDetails, location.search]);
+      }, [queryParams.hasQueryEvent, queryParams.refId, fetchEventDetails, location.search, revealedRefId, revealRequired]);
+
+      const revealPending = revealRequired && queryParams.hasQueryEvent && revealedRefId !== queryParams.refId;
+
+      const confirmReveal = async () => {
+        if (revealing) return;
+        setRevealing(true);
+        try {
+            await threatDetectionRequests.auditContentView(queryParams.refId, pendingRowContext?.eventId);
+            setRevealedRefId(queryParams.refId);
+        } catch (e) {
+            func.setToast(true, true, 'Could not record this access in audit data. Please try again.');
+        } finally {
+            setRevealing(false);
+        }
+      };
 
     // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent
             categoryCount={categoryCount}
             severityCountMap={severityCountMap}
+            categoryLoading={categoryLoading}
+            severityLoading={severityLoading}
             onThreatTypeClick={handleThreatTypeClick}
             onSeverityClick={handleSeverityClick}
         />,
@@ -740,12 +798,15 @@ function ThreatDetectionPage() {
                 latencyData={latencyData}
             />
         ] : []),
-        <SusDataTable key={`sus-data-table-${triggerTableRefresh}`}
+        <SusDataTable
             currDateRange={currDateRange}
             rowClicked={rowClicked}
             triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
+            refreshNonce={triggerTableRefresh}
             initialTab={queryParams.status ? queryParams.status.toLowerCase() : undefined}
             label={LABELS.THREAT}
+            onRegisterPayloadSearch={(fn) => { applyPayloadSearchRef.current = fn; }}
+            onRegisterExport={(fn) => { applyExportRef.current = fn; }}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}
@@ -755,7 +816,7 @@ function ThreatDetectionPage() {
             key={"sus-sample-details"}
         /> :  <SampleDetails
                 title={"Attacker payload"}
-                showDetails={showDetails}
+                showDetails={showDetails && !revealPending}
                 setShowDetails={handleDetailsVisibility}
                 data={eventState.rowDataList}
                 key={`sus-sample-details-${eventState.currentRefId || 'default'}`}
@@ -765,58 +826,37 @@ function ThreatDetectionPage() {
                 eventStatus={eventState.currentEventStatus}
                 onStatusUpdate={handleStatusUpdate}
                 jiraTicketUrl={eventState.currentJiraTicketUrl}
+                humanResponse={eventState.currentHumanResponse}
                 loading={detailsLoading}
-            />
-            
-
+                onAddAsSearchFilter={(text, side, line) => applyPayloadSearchRef.current?.(text, side, line)}
+            />,
+        <Modal
+            key="reveal-content"
+            open={revealPending}
+            onClose={() => { if (!revealing) handleDetailsVisibility(false); }}
+            title="Show Guardrail Activity?"
+            primaryAction={{ content: "Show content", onAction: confirmReveal, loading: revealing }}
+            secondaryActions={[{ content: "Cancel", onAction: () => handleDetailsVisibility(false), disabled: revealing }]}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd">
+                    Guardrail Activity can contain sensitive data. Your email, IP address and the time of
+                    this access will be recorded in audit data.
+                </Text>
+            </Modal.Section>
+        </Modal>
     ]
 
+    // Both reuse the exact filters/tab/search currently applied on the table (registered by
+    // SusDataTable via onRegisterExport), instead of dumping every event regardless of filters.
     const exportJson = async () => {
-        const jsonFileName = "malicious_events.json"
-        const res = await api.fetchSuspectSampleData(
-            0,
-            [],
-            [],
-            [],
-            [],
-            {detectedAt: -1},
-            startTimestamp,
-            endTimestamp,
-            [],
-            2000,
-            'EVENTS',
-            null,
-            LABELS.THREAT // Filter for threat protection (not guardrail)
-        );
-        // Transform to match the mongoDB format
-        let jsonData = (res?.maliciousEvents || []).map(ev => ({
-            _id: ev.id, // or whatever unique id you have
-            actor: ev.actor,
-            category: ev.category,
-            country: ev.country,
-            detectedAt: { $numberLong: String(ev.timestamp) || String(ev.detectedAt) },
-            eventType: ev.eventType,
-            filterId: ev.filterId,
-            latestApiCollectionId: ev.apiCollectionId || ev.latestApiCollectionId,
-            latestApiEndpoint: ev.url || ev.latestApiEndpoint,
-            latestApiIp: ev.ip || ev.latestApiIp,
-            latestApiMethod: ev.method || ev.latestApiMethod,
-            subCategory: ev.subCategory,
-            type: ev.type,
-            refId: ev.refId,
-            severity: ev.severity,
-            latestApiOrig:
-              ev.payload != null || ev.latestApiOrig != null
-                ? redactSampleDataByKeywords(ev.payload ?? ev.latestApiOrig)
-                : ev.payload ?? ev.latestApiOrig,
-            metadata: ev.metadata,
-        }));
+        const res = await applyExportRef.current();
+        downloadMaliciousEventsAsJson(res?.maliciousEvents, `malicious_events_${res?.tab || 'active'}.json`);
+    }
 
-        let blob = new Blob([JSON.stringify(jsonData, null, 2)], {
-            type: "application/json;charset=UTF-8"
-        });
-        saveAs(blob, jsonFileName);
-        func.setToast(true, false, "JSON exported successfully");
+    const exportCsv = async () => {
+        const res = await applyExportRef.current();
+        downloadMaliciousEventsAsCsv(res?.maliciousEvents, `malicious_events_${res?.tab || 'active'}`);
     }
 
     const exportToAdx = async () => {
@@ -879,23 +919,30 @@ function ThreatDetectionPage() {
                     <ActionList
                         actionRole="menuitem"
                         sections={
-                            [
+                            withPermissions([
                                 {
                                     title: 'Export',
                                     items: [
                                         {
                                             content: 'Download Threat Report',
                                             onAction: () => downloadThreatReport(),
+                                            requires: 'api/generateThreatReport',
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
-                                            content: 'Export',
+                                            content: 'Export as JSON',
                                             onAction: () => exportJson(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
+                                        {
+                                            content: 'Export as CSV',
+                                            onAction: () => exportCsv(),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
                                             content: 'Export to ADX(Azure Data Explorer)',
                                             onAction: exportToAdx,
+                                            requires: ['api/exportGuardrailActivityToAdx', 'api/getAdxExportStatus'],
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
@@ -923,6 +970,7 @@ function ThreatDetectionPage() {
                                                 }
                                                 setWebhookIntegrationModalOpen(true);
                                             },
+                                            requires: ['api/fetchThreatActivityWebhookIntegration', 'api/addThreatActivityWebhookIntegration'],
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
@@ -937,7 +985,7 @@ function ThreatDetectionPage() {
                                         }
                                     ]
                                 },
-                            ]
+                            ])
                         }
                     />
                 </Popover.Pane>

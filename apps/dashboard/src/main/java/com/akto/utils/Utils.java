@@ -304,7 +304,7 @@ public class Utils {
         return sb.toString();
     }
 
-    public static Pair<Map<String, String>, List<FileUploadError>> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap, String miniTestingName) {
+    public static Pair<Map<String, String>, List<FileUploadError>> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap, String miniTestingName, boolean forceCreateCollection) {
         Pair<Map<String, String>, List<String>> resp;
         List<FileUploadError> errors = new ArrayList<>();
         try {
@@ -415,6 +415,22 @@ public class Utils {
 
                 JsonNode statusNode = response.get("status");
                 status = statusNode != null ? statusNode.asText() : "";
+
+                if (forceCreateCollection) {
+                    int statusCodeInt;
+                    try {
+                        statusCodeInt = Integer.parseInt(statusCode);
+                    } catch (NumberFormatException e) {
+                        statusCodeInt = 0;
+                    }
+
+                    if (!HttpResponseParams.validHttpResponseCode(statusCodeInt)) {
+                        statusCode = "200";
+                        status = "OK";
+                        responsePayload = "";
+                        responseHeadersString = "{}";
+                    }
+                }
             }
 
             result.put("responseHeaders", responseHeadersString);
@@ -570,7 +586,9 @@ public class Utils {
     /*
      * this function is used primarily for non-automated traffic collection, like
      * postman, har and openAPI.
-     * Thus, we can skip advanced traffic filters for these cases.
+     * skipAdvancedFilters lets a caller opt out of advanced traffic filters for these cases.
+     * When they are applied, imported traffic is only enriched by them (see
+     * HttpCallParser.isImportedTraffic) and never dropped for not matching a filter.
      */
 
     public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg, boolean skipAdvancedFilters) throws Exception {
@@ -926,64 +944,6 @@ public class Utils {
         }
 
         return testResult;
-    }
-
-    public static ApiInfoKeyResult fetchUniqueApiInfoKeys(
-            MongoCollection<Document> collection,
-            Bson matchFilter,
-            String apiInfoKeyPath,
-            boolean showApiInfo
-    ) {
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(apiInfoKeyPath + ".apiCollectionId");
-        List<Integer> collectionIds;
-        try {
-            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if (collectionIds == null) {
-                return new ApiInfoKeyResult(0, showApiInfo ? new ArrayList<>() : null);
-            }
-        } catch (Exception e) {
-            return new ApiInfoKeyResult(0, showApiInfo ? new ArrayList<>() : null);
-        }
-
-        // Combine filters: exclude unwanted, include only allowed
-        Bson combinedFilter = Filters.and(
-                matchFilter,
-                filterQ,
-                Filters.in(apiInfoKeyPath + ".apiCollectionId", collectionIds)
-        );
-
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(combinedFilter));
-        pipeline.add(Aggregates.project(Projections.include(
-                apiInfoKeyPath + ".apiCollectionId",
-                apiInfoKeyPath + ".url",
-                apiInfoKeyPath + ".method"
-        )));
-        pipeline.add(Aggregates.group(
-                new BasicDBObject("apiCollectionId", "$" + apiInfoKeyPath + ".apiCollectionId")
-                        .append("url", "$" + apiInfoKeyPath + ".url")
-                        .append("method", "$" + apiInfoKeyPath + ".method"),
-                Accumulators.first("apiInfoKey", "$" + apiInfoKeyPath)
-        ));
-
-        Set<ApiInfo.ApiInfoKey> apiInfoKeys = new HashSet<>();
-        List<ApiInfo> apiInfoList = new ArrayList<>();
-        List<Document> results = collection.aggregate(pipeline, Document.class).into(new ArrayList<>());
-        for (Document doc : results) {
-            Document keyDoc = (Document) doc.get("apiInfoKey");
-            if (keyDoc != null) {
-                ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(
-                        keyDoc.getInteger("apiCollectionId"),
-                        keyDoc.getString("url"),
-                        URLMethods.Method.fromString(keyDoc.getString("method"))
-                );
-                apiInfoKeys.add(key);
-                if (showApiInfo) {
-                    apiInfoList.add(new ApiInfo(key));
-                }
-            }
-        }
-        return new ApiInfoKeyResult(apiInfoKeys.size(), showApiInfo ? apiInfoList : null);
     }
 
     public static String fetchDefaultInviteRole(int accountId, String fallbackDefault){

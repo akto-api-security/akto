@@ -26,13 +26,22 @@ export const REDACTED_SAMPLE_KEYWORDS = [
 
 export const REDACT_PLACEHOLDER = "****";
 
+const SHOW_AUTHORIZATION_ACCOUNTS = [1786100206];
+
+function getRedactedSampleKeywords() {
+    if (SHOW_AUTHORIZATION_ACCOUNTS.includes(Number(window.ACTIVE_ACCOUNT))) {
+        return REDACTED_SAMPLE_KEYWORDS.filter((k) => k.toLowerCase() !== "authorization");
+    }
+    return REDACTED_SAMPLE_KEYWORDS;
+}
+
 /**
  * Redacts values for sensitive JSON keys and protobuf-style `key: "name" ... values: "..."` blocks
  * inside a single text blob (e.g. mirror/protobuf payloads that are not valid top-level JSON).
  */
 export function redactEmbeddedSensitiveStrings(
     text,
-    redactedKeywords = REDACTED_SAMPLE_KEYWORDS,
+    redactedKeywords = getRedactedSampleKeywords(),
     placeholder = REDACT_PLACEHOLDER
 ) {
     if (typeof text !== "string" || text.length === 0) {
@@ -63,7 +72,7 @@ export function redactEmbeddedSensitiveStrings(
     return result;
 }
 
-export function redactSampleDataByKeywords(data, redactedKeywords = REDACTED_SAMPLE_KEYWORDS) {
+export function redactSampleDataByKeywords(data, redactedKeywords = getRedactedSampleKeywords()) {
     const placeholder = REDACT_PLACEHOLDER;
     try {
         const keySet = new Set(redactedKeywords.map((k) => String(k).toLowerCase()));

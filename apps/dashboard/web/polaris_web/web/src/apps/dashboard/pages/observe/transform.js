@@ -1,14 +1,15 @@
 import func from "@/util/func";
 import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
+import RiskScoreTooltipContent from "./RiskScoreTooltipContent";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import CopyEndpoint from "./api_collections/component/CopyEndpoint"
 import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor, ArrowUpMinor, ArrowDownMinor } from "@shopify/polaris-icons"
-import api from "./api";
 import GetPrettifyEndpoint, { MethodBox } from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
-import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../main/labelHelper";
+import CollectionTagsList from "./api_collections/component/CollectionTagsList";
+import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, isAgenticSecurityCategory, isApiSecurityCategory, isDastCategory, isEndpointSecurityCategory, isMCPSecurityCategory, mapLabel } from "../../../main/labelHelper";
 import { CollectionIcon } from "../../components/shared/CollectionIcon";
 
 const standardHeaders = [
@@ -52,7 +53,7 @@ const apiDetailsHeaders = [
         value: 'apiCollectionName',
         itemOrder: 3,
         icon: DynamicSourceMinor,
-        iconTooltip: "Api collection name"
+        iconTooltip: mapLabel('Api', getDashboardCategory()) + " collection name"
     },
     {
         text: 'Tags',
@@ -71,7 +72,7 @@ const apiDetailsHeaders = [
         itemOrder: 3,
         value: 'hostName',
         icon: GlobeMinor,
-        iconTooltip: "Hostname of the api collection"
+        iconTooltip: "Hostname of the " + mapLabel('API', getDashboardCategory()) + " collection"
     },
     {
         text: 'Last Seen',
@@ -86,7 +87,7 @@ const apiDetailsHeaders = [
         icon: InfoMinor,
         itemOrder: 3,
         showFilter: true, 
-        iconTooltip: "Access type of the API"
+        iconTooltip: "Access type of the " + mapLabel('API', getDashboardCategory())
     },
     {
         text: 'Auth Type',
@@ -94,21 +95,21 @@ const apiDetailsHeaders = [
         icon: LockMinor,
         itemOrder: 3,
         showFilter: true,
-        iconTooltip: "Auth type of the API"
+        iconTooltip: "Auth type of the " + mapLabel('API', getDashboardCategory())
     },
     {
         text: "Discovered",
         value: 'added',
         icon: ClockMinor,
         itemOrder: 3,
-        iconTooltip: "Discovered time of API"
+        iconTooltip: "Discovered time of " + mapLabel('API', getDashboardCategory())
     },
     {
         text: 'Changes',
         value: 'changes',
         icon: InfoMinor,
         itemOrder: 3,
-        iconTooltip: "Changes in API"
+        iconTooltip: "Changes in " + mapLabel('API', getDashboardCategory())
     },
     {
         text: "",
@@ -191,17 +192,6 @@ const paramHeaders = [
         showFilterMenu: true
     }
 ]
-
-const lastFetchedInfo = PersistStore.getState().lastFetchedInfo
-const lastFetchedResp = PersistStore.getState().lastFetchedResp
-const lastFetchedSeverityResp = PersistStore.getState().lastFetchedSeverityResp
-const lastCalledSensitiveInfo = PersistStore.getState().lastCalledSensitiveInfo
-const lastFetchedSensitiveResp = PersistStore.getState().lastFetchedSensitiveResp
-const setLastFetchedInfo = PersistStore.getState().setLastFetchedInfo
-const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
-const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
-const setLastCalledSensitiveInfo = PersistStore.getState().setLastCalledSensitiveInfo
-const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
 
 const transform = {
     prepareEndpointData: (apiCollectionMap, res) => {
@@ -433,16 +423,29 @@ const transform = {
         }
     },
 
-    // Suppressed when either score is 0/falsy — a "0" risk-score badge showing a non-zero base
-    // score (or vice versa) in its tooltip reads as contradictory, so both have to be meaningfully
-    // non-zero before the extra context is worth surfacing.
-    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason){
+    // Prefer riskScoreFactors saved with the score when present. Fall back to the older
+    // baseRiskScoreReason string used on inventory / collection pages.
+    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason, riskScoreFactors, scope = "asset"){
+        if (riskScore && Array.isArray(riskScoreFactors) && riskScoreFactors.length > 0) {
+            return (
+                <Tooltip dismissOnMouseOut content={
+                    <RiskScoreTooltipContent
+                        riskScore={Number(riskScore)}
+                        status={transform.getStatus(Number(riskScore))}
+                        factors={riskScoreFactors}
+                        scope={scope}
+                    />
+                }>
+                    {badge}
+                </Tooltip>
+            );
+        }
         if(!baseRiskScoreReason || !riskScore || !baseRiskScore) return badge;
         return (
             <Tooltip dismissOnMouseOut content={
                 <Box>
-                    <Text>Base score: {baseRiskScore}</Text>
-                    <Text>Remarks: {baseRiskScoreReason}</Text>
+                    {/* <Text>Base score: {baseRiskScore}</Text> */}
+                    <Text>{baseRiskScoreReason}</Text>
                 </Box>
             }>
                 {badge}
@@ -468,20 +471,35 @@ const transform = {
         )
     },
 
-    getCollectionTypeList(envType, maxItems, wrap){
+    getCollectionTypeList(envType, maxItems, wrap, expandable = false){
         if(envType == null || envType.length === 0){
             return <></>
         }
 
-        // Sort tags to prioritize 'privatecloud.agoda.com/service' first
+        const aiAgentEmailKey = 'ai-agent-email'
+
+        // Sort tags to prioritize 'ai-agent-email', then 'privatecloud.agoda.com/service'
         const sortedEnvType = [...envType].sort((a, b) => {
             const aKey = a.split('=')[0];
             const bKey = b.split('=')[0];
 
+            if (aKey === aiAgentEmailKey) return -1;
+            if (bKey === aiAgentEmailKey) return 1;
             if (aKey === 'privatecloud.agoda.com/service') return -1;
             if (bKey === 'privatecloud.agoda.com/service') return 1;
             return 0;
         });
+
+        if (expandable) {
+            return (
+                <CollectionTagsList
+                    itemsArr={sortedEnvType}
+                    maxItems={maxItems}
+                    wrap={wrap}
+                    getItemStatus={(item) => item.split('=')[0] === aiAgentEmailKey ? 'success' : 'info'}
+                />
+            )
+        }
 
         return (
             <ShowListInBadge
@@ -491,6 +509,7 @@ const transform = {
                 useTooltip={true}
                 wrap={wrap}
                 allowFullWidth={true}
+                getItemStatus={(item) => item.split('=')[0] === aiAgentEmailKey ? 'success' : 'info'}
             />
         )
     },
@@ -535,7 +554,8 @@ const transform = {
         )
     },
 
-    prettifyCollectionsData(newData, isLoading, selectedTab, filterType){
+    // detailsLoading: the coverage column has not arrived yet (it loads after the rows)
+    prettifyCollectionsData(newData, isLoading, selectedTab, filterType, detailsLoading = false){
         const category = getDashboardCategory();
         const isEndpointSecurity = category === CATEGORY_ENDPOINT_SECURITY;
 
@@ -604,7 +624,7 @@ const transform = {
             const riskScoreBadge = <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>;
             const riskScoreComp = isUntrackedTab
                 ? <Text></Text>
-                : (isLoading ? loadingComp : this.wrapRiskScoreTooltip(riskScoreBadge, c.riskScore, c.baseRiskScore, c.baseRiskScoreReason));
+                : (isLoading ? loadingComp : this.wrapRiskScoreTooltip(riskScoreBadge, c.riskScore, c.baseRiskScore, c.baseRiskScoreReason, c.riskScoreFactors));
 
             // Create iconComp for collections if not already present
             const showIcon = isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || ((isApiSecurityCategory() || isDastCategory()) && c.hostName);
@@ -628,15 +648,15 @@ const transform = {
                 descriptionComp: descriptionComp,
                 outOfTestingScopeComp: outOfTestingScopeComp,
                 riskScoreComp: riskScoreComp,
-                coverage: calcCoverage,
-                issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
+                coverage: detailsLoading ? '...' : (c.coverageUnavailable ? '-' : calcCoverage),
+                issuesArr: isLoading ? loadingComp : (c.issuesUnavailable ? '-' : this.getIssuesList(c.severityInfo)),
                 issuesArrVal: this.getIssuesListText(c.severityInfo),
                 sensitiveSubTypes: isLoading ? loadingComp : this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
                 lastTraffic: isLoading ? '...' : c.detected,
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : this.getCollectionTypeList(c.envType, 1, false),
+                envTypeComp: isLoading ? loadingComp : this.getCollectionTypeList(c.envType, 1, false, true),
                 sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })
@@ -784,7 +804,14 @@ const transform = {
                 methodComp: <MethodBox method={url.method} url={url.endpoint} apiType={url.apiType} methodBoxWidth="48px" />,
                 endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} apiType={url.apiType} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} isMalicious={url.isMalicious || false} isMisconfigured={url.isMisconfigured || false} skillTags={url.skillTags || []} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
-                riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
+                riskScoreComp: this.wrapRiskScoreTooltip(
+                    <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
+                    url.riskScore,
+                    null,
+                    null,
+                    url.riskScoreFactors,
+                    "row",
+                ),
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,
@@ -827,69 +854,6 @@ const transform = {
 
     getParamHeaders(){
         return paramHeaders;
-    },
-
-    async fetchRiskScoreInfo(){
-        let tempRiskScoreObj = lastFetchedResp
-        let tempSeverityObj = lastFetchedSeverityResp
-        await api.lastUpdatedInfo().then(async(resp) => {
-            if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap >= lastFetchedInfo.lastSensitiveInfo){
-                try {
-                    await api.getRiskScoreInfo().then((res) =>{
-                        const newObj = {
-                            criticalUrls: res.criticalEndpointsCount,
-                            riskScoreMap: res.riskScoreOfCollectionsMap, 
-                        }
-                        tempRiskScoreObj = JSON.parse(JSON.stringify(newObj));
-                        setLastFetchedResp(newObj);
-                    })
-                } catch (error) {
-                    func.setToast(true, false, error.message)
-                }
-                
-            }
-            if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo){
-                try {
-                    await api.getSeverityInfoForCollections().then((resp) => {
-                        tempSeverityObj = JSON.parse(JSON.stringify(resp))
-                        setLastFetchedSeverityResp(resp)
-                    })
-                } catch (error) {
-                    func.setToast(true, false, error.message)
-                }
-                
-            }
-            setLastFetchedInfo({
-                lastRiskScoreInfo: func.timeNow() >= resp.lastUpdatedSeverity ? func.timeNow() : resp.lastUpdatedSeverity,
-                lastSensitiveInfo: func.timeNow() >= resp.lastUpdatedSensitiveMap ? func.timeNow() : resp.lastUpdatedSensitiveMap,
-            })
-        })
-        let finalObj = {
-            riskScoreObj: tempRiskScoreObj,
-            severityObj: tempSeverityObj
-        }
-        return finalObj
-    },
-
-    async fetchSensitiveInfo(){
-        let tempSensitiveInfo = lastFetchedSensitiveResp
-        if((func.timeNow() - (5 * 60)) >= lastCalledSensitiveInfo){
-            try {
-                await api.getSensitiveInfoForCollections().then((resp) => {
-                    const sensitiveObj = {
-                        sensitiveUrls: resp.sensitiveUrlsInResponse,
-                        sensitiveInfoMap: resp.sensitiveSubtypesInCollection
-                    }
-                    setLastCalledSensitiveInfo(func.timeNow())
-                    setLastFetchedSensitiveResp(sensitiveObj)
-                    tempSensitiveInfo = JSON.parse(JSON.stringify(sensitiveObj))
-                })
-            } catch (error) {
-                return tempSensitiveInfo
-            }
-            
-        }
-        return tempSensitiveInfo; 
     },
 
     convertToPrettifyData(c){

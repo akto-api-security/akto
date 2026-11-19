@@ -62,6 +62,35 @@ export function buildCtaHref(cta) {
     return query ? `${cta.route}?${query}` : cta.route;
 }
 
+const MAX_AI_CHAT_MARKDOWN_CHARS = 4000;
+
+// Ask Akto chat context for one insight (see McpAgentAction.chatAndStoreConversation's
+// "insight_result" branch) — sends the exact fields already rendered on this page (metrics,
+// evidence, concern/impact/remediation, the AI narrative) rather than an id to re-fetch, so the
+// chat is grounded in precisely what the user is looking at right now.
+export function buildInsightChatMetadata(detail) {
+    const markdown = detail?.markdown || "";
+    return {
+        type: "insight_result",
+        data: {
+            title: detail?.title,
+            headline: detail?.headline,
+            status: detail?.status,
+            severity: detail?.severity,
+            metrics: detail?.metrics || [],
+            evidence: detail?.evidence || [],
+            caveats: detail?.caveats || [],
+            dataGaps: detail?.dataGaps || [],
+            concern: detail?.concern,
+            impact: detail?.impact,
+            remediation: detail?.remediation,
+            markdown: markdown.length > MAX_AI_CHAT_MARKDOWN_CHARS
+                ? markdown.slice(0, MAX_AI_CHAT_MARKDOWN_CHARS) + "…"
+                : markdown,
+        },
+    };
+}
+
 function humanizeColumnKey(key) {
     const spaced = String(key || "").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
     return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();

@@ -106,6 +106,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.TrafficUpdates;
+import com.akto.notifications.SensitiveDataThresholdAlerts;
 import com.akto.notifications.TrafficUpdates.AlertResult;
 import com.akto.notifications.TrafficUpdates.AlertType;
 import com.akto.notifications.slack.DailyUpdate;
@@ -185,6 +186,9 @@ public class InitializerListener implements ServletContextListener {
     TokenGeneratorCron tokenGeneratorCron = new TokenGeneratorCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
     AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
+    ToolClassificationCron toolClassificationCron = new ToolClassificationCron();
+    AgenticPostureScoreCron agenticPostureScoreCron = new AgenticPostureScoreCron();
+    EndpointDefaultGuardrailsCron endpointDefaultGuardrailsCron = new EndpointDefaultGuardrailsCron();
     UserAnalysisCron userAnalysisCron = new UserAnalysisCron();
     AgentGuardCorpusLabelingCron agentGuardCorpusLabelingCron = new AgentGuardCorpusLabelingCron();
 
@@ -1007,6 +1011,7 @@ public class InitializerListener implements ServletContextListener {
          *
          * TRAFFIC_ALERTS type webhooks have a separate cron.
          * PENDING_TESTS_ALERTS type webhooks have a separate job
+         * SENSITIVE_DATA_THRESHOLD_ALERTS type webhooks have a separate cron.
          */
 
 
@@ -1017,7 +1022,9 @@ public class InitializerListener implements ServletContextListener {
                         || webhook.getSelectedWebhookOptions()
                                 .contains(CustomWebhook.WebhookOptions.TRAFFIC_ALERTS)
             || webhook.getSelectedWebhookOptions()
-                .contains(WebhookOptions.PENDING_TESTS_ALERTS))) {
+                .contains(WebhookOptions.PENDING_TESTS_ALERTS)
+            || webhook.getSelectedWebhookOptions()
+                .contains(WebhookOptions.SENSITIVE_DATA_THRESHOLD_ALERTS))) {
             return;
         }
 
@@ -1468,6 +1475,10 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         webhookSender();
+                        // Same hourly cadence and the same set of accounts, so this rides along
+                        // rather than scanning every account a second time. webhookSender swallows
+                        // its own exceptions, so a webhook failure cannot stop the alerts running.
+                        SensitiveDataThresholdAlerts.run();
                     }
                 }, "webhook-sender");
             }
@@ -2576,6 +2587,7 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
 
                 endpointStatViewCron.setUpEndpointInfoViewCronScheduler();
+                endpointDefaultGuardrailsCron.setUpEndpointDefaultGuardrailsCronScheduler();
 
                 if (runJobFunctions > 0 || runJobFunctionsAnyway) {
 
@@ -2613,6 +2625,8 @@ public class InitializerListener implements ServletContextListener {
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
+                        toolClassificationCron.setUpToolClassificationCronScheduler();
+                        agenticPostureScoreCron.setUpAgenticPostureScoreCronScheduler();
                         setupAutomatedApiGroupsScheduler();
                     }
 
@@ -3698,6 +3712,22 @@ public class InitializerListener implements ServletContextListener {
     // ModuleInfoAction.fetchAgenticUsers, instead of once per process lifetime like the startup path.
     private static final Set<Integer> attemptedTeamTagsMigrationForAccount = Collections.synchronizedSet(new HashSet<>());
 
+    private static void safeMigrateTestScriptsToLibrary(BackwardCompatibility backwardCompatibility){
+        try {
+            if(backwardCompatibility.getMigrateTestScriptsToLibrary() == 0){
+                int copied = BackwardCompatibilityUtils.migrateTestScriptsToLibrary();
+                BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MIGRATE_TEST_SCRIPTS_TO_LIBRARY, Context.now())
+                );
+                logger.infoAndAddToDb("migrateTestScriptsToLibrary copied " + copied + " script(s)", LogDb.DASHBOARD);
+            }
+        } catch (Exception e) {
+            // flag stays unset, so the next startup retries; runs keep using the legacy fallback meanwhile
+            logger.errorAndAddToDb(e, "error in migrateTestScriptsToLibrary: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
     private static void safeMigrateTeamRoleToDeviceTags(BackwardCompatibility backwardCompatibility){
         try {
             if(backwardCompatibility.getMigrateTeamRoleToDeviceTags() == 0){
@@ -3749,12 +3779,32 @@ public class InitializerListener implements ServletContextListener {
     }
 
 
+    private static final Set<Integer> attemptedTestScriptsMigrationForAccount = Collections.synchronizedSet(new HashSet<>());
+
+    /**
+     * Lazy fallback for safeMigrateTestScriptsToLibrary, called when the Scripts page lists the library,
+     * so an account whose dashboard never ran the startup pass still sees its pre-library script.
+     * At most one attempt per account per process; the migration itself is idempotent.
+     */
+    public static void ensureTestScriptsMigrated(){
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || !attemptedTestScriptsMigrationForAccount.add(accountId)) return;
+        try {
+            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+            if (backwardCompatibility == null) return;
+            safeMigrateTestScriptsToLibrary(backwardCompatibility);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in ensureTestScriptsMigrated: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         // Run first and individually guarded — setBackwardCompatibilities has no per-call isolation,
         // so an unrelated hook throwing further down would otherwise silently prevent every hook
         // after it (including these two) from ever running, with no migration-specific error.
         safeMigrateTeamRoleToDeviceTags(backwardCompatibility);
         safeMigrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
+        safeMigrateTestScriptsToLibrary(backwardCompatibility);
 
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);

@@ -2,10 +2,11 @@ import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, 
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import SampleData from "../../../components/shared/SampleData";
-import { EvidenceBlock } from "@/apps/dashboard/pages/guardrails/violations/ViolationFlyoutSections";
+import { EvidenceBlock, HumanApprovalActions, isHumanApprovalPending as isPendingHumanResponse } from "@/apps/dashboard/pages/guardrails/violations/ViolationFlyoutSections";
+import NearbyMessages from "./NearbyMessages";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import testingApi from "../../testing/api"
 import threatDetectionApi from "../api"
 import guardrailApi from "../../guardrails/api"
@@ -20,13 +21,21 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
-import { extractOverviewAndRemediation, extractBehaviour } from "../utils/formatUtils";
+import { extractOverviewAndRemediation, extractBehaviour, isBackfillRefId, extractRuleViolated, resolveComplianceClauseMap, storedRemediationMarkdown } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
 import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
+import { buildEvidenceVulnerabilitySegments } from "../utils/evidenceHighlight";
+import sampleDataTransform from "../../../components/shared/customDiffEditor";
+import { usePermissions, withPermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
+import ReviewCaseModal from "../../guardrails/components/ReviewCaseModal";
+import CasePanel from "../../guardrails/components/CasePanel";
+import useCaseOwners from "../utils/useCaseOwners";
+import { applyCaseUpdate, buildCaseTimeline } from "../utils/caseManagement";
 
 // For config-scan events: pull evidence/message/config_content out of the sample's raw orig.
 // requestPayload is normally valid JSON (repaired server-side if PII redaction corrupted it);
@@ -75,6 +84,7 @@ function _configFromOrig(orig, ruleViolated) {
 // Self-contained approve button + modal. Kept as its own component so typing the duration
 // re-renders only this small tree, not the whole SampleDetails flyout (which caused a flash).
 function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
+    const { canCall } = usePermissions();
     const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
     const [modalActive, setModalActive] = useState(false);
     const [mode, setMode] = useState("ALWAYS"); // ALWAYS | DURATION
@@ -83,6 +93,10 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
 
     if (alreadyApproved) {
         return <Badge tone="success">Approved</Badge>;
+    }
+
+    if (!func.canManageGuardrailPolicies()) {
+        return null;
     }
 
     const openModal = () => { setMode("ALWAYS"); setDays("7"); setModalActive(true); };
@@ -122,7 +136,7 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
 
     return (
         <Modal
-            activator={<Button size="slim" onClick={openModal}>Approve server</Button>}
+            activator={<AllowedAction allowed={canCall('api/approveServerForPolicy')}><Button size="slim" onClick={openModal}>Approve server</Button></AllowedAction>}
             open={modalActive}
             onClose={() => setModalActive(false)}
             primaryAction={{ content: "Approve", loading, onAction: handleApprove }}
@@ -161,8 +175,33 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
 }
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
+    const { showDetails, setShowDetails, data, title, moreInfoData: rowInfo, threatFiltersMap, eventId, eventStatus, onStatusUpdate, onAddAsSearchFilter, humanResponse: humanResponseProp } = props
+
+    // Several attempts (e.g. a grouped activity's events): show the selected attempt's own details,
+    // derived the same way as for its table row. Actions still apply to the row.
+    const [attemptIndex, setAttemptIndex] = useState(0);
+    const attempt = Array.isArray(data) && data.length > 1 ? data[attemptIndex] : null;
+    const moreInfoData = useMemo(() => {
+        if (!attempt?.filterId) return rowInfo;
+        const { guardrailComplianceMap } = SessionStore.getState();
+        return {
+            ...rowInfo,
+            templateId: attempt.filterId,
+            refId: attempt.refId || rowInfo?.refId,
+            severity: attempt.severity || rowInfo?.severity,
+            url: attempt.endpoint || rowInfo?.url,
+            method: attempt.method || rowInfo?.method,
+            metadata: attempt.metadata,
+            ruleViolated: extractRuleViolated(attempt.metadata),
+            behaviour: extractBehaviour(attempt.metadata),
+            evidenceLine: attempt.evidenceLine,
+            remediation: attempt.remediation,
+            complianceMap: resolveComplianceClauseMap({ filterId: attempt.filterId, metadata: attempt.metadata },
+                isAgenticSecurityCategory() || isEndpointSecurityCategory(), threatFiltersMap || {}, guardrailComplianceMap || {}),
+        };
+    }, [rowInfo, attempt, threatFiltersMap]);
     const resolvedThreatFiltersMap = threatFiltersMap || {};
+    const { canCall, canCallAll } = usePermissions();
 
     // Determine if we should use hardcoded guardrail descriptions
     const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
@@ -250,6 +289,39 @@ function SampleDetails(props) {
     const [showModal, setShowModal] = useState(false);
     const [triageLoading, setTriageLoading] = useState(false);
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
+    const [humanResponse, setHumanResponse] = useState((humanResponseProp || "PENDING").toUpperCase());
+
+    useEffect(() => {
+        setHumanResponse((humanResponseProp || "PENDING").toUpperCase());
+    }, [eventId, humanResponseProp]);
+
+    // Case management (an event marked for review): owner, notes and the status/owner/notes history. Read from the
+    // event's fetched payload when it has one (so a flyout opened from a link or after a reload is complete), else
+    // from the table row. Changes made here are applied on top at once, until the event is opened again.
+    const { owners: caseOwners } = useCaseOwners();
+    const [reviewOpen, setReviewOpen] = useState(false);
+    const [caseEdits, setCaseEdits] = useState(null);
+    const loadedCase = useMemo(() => {
+        const first = Array.isArray(data) ? data[0] : null;
+        const source = first && first.caseOwner !== undefined ? first : rowInfo;
+        return { caseOwner: source?.caseOwner || "", caseNotes: source?.caseNotes || "", caseTimeline: source?.caseTimeline || [] };
+    }, [data, rowInfo]);
+    useEffect(() => { setCaseEdits(null); }, [eventId, data]);
+    const caseData = caseEdits || loadedCase;
+    const hasCase = eventStatus === 'UNDER_REVIEW' || !!caseData.caseOwner || !!caseData.caseNotes;
+    // A grouped activity is one case: its owner and notes apply to every event in it.
+    const caseEventIds = (Array.isArray(data) ? data.map((d) => d?.eventId).filter(Boolean) : []).length > 0
+        ? data.map((d) => d?.eventId).filter(Boolean)
+        : [eventId];
+    const detectedAt = (Array.isArray(data) && data[0]?.ts) || rowInfo?.detectedAt;
+    // The change the server just saved ({ status?, caseOwner?, caseNotes? }), with the history entries it adds.
+    const applyCaseChange = (update) => {
+        setCaseEdits(applyCaseUpdate(
+            { status: eventStatus, caseOwner: caseData.caseOwner, caseNotes: caseData.caseNotes, caseTimeline: caseData.caseTimeline },
+            update,
+            window.USER_NAME,
+        ));
+    };
 
     // Approve-server: modal/mode/days state lives in the small ApproveServerButton component
     // (not here) so typing the duration re-renders only that button, not the whole flyout.
@@ -432,13 +504,49 @@ function SampleDetails(props) {
         setLatestActivity(activityEvents)
     }
 
-    const timelineTab = data.length > 0 && {
+    // The timeline. On Threat Activity the case history (status, owner and notes changes) shares it with the
+    // attack activity; the Guardrails page has no attack activity, so there it is the case history alone.
+    const isGuardrailsPage = window.location.href.indexOf("guardrails") > -1;
+    const timelineActivity = isGuardrailsPage
+        ? buildCaseTimeline(caseData.caseTimeline, detectedAt, caseOwners)
+        : [...latestActivity, ...buildCaseTimeline(caseData.caseTimeline, null, caseOwners)].sort((a, b) => a.timestamp - b.timestamp);
+
+    // A case is one tab: its owner and notes, with the timeline below them.
+    const caseTab = hasCase && {
+        id: "case",
+        content: "Review case",
+        component: (
+            <CasePanel
+                eventIds={caseEventIds}
+                caseOwner={caseData.caseOwner}
+                caseNotes={caseData.caseNotes}
+                activity={timelineActivity}
+                onSaved={(fields) => { applyCaseChange(fields); onStatusUpdate?.(eventStatus); }}
+            />
+        )
+    }
+    // Any other event keeps a plain Timeline tab (on the Guardrails page, once it has some history).
+    const timelineTab = !hasCase && (isGuardrailsPage ? caseData.caseTimeline.length > 0 : data.length > 0) && {
         id: "timeline",
         content: "Timeline",
-        component: <ActivityTracker latestActivity={latestActivity} />
+        component: <ActivityTracker latestActivity={timelineActivity} />
     }
 
     const configValues = data.length > 0 ? _configFromOrig(data[0]?.orig, moreInfoData?.ruleViolated) : null;
+    const valuesTabRedactHeaders = window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : [];
+    // Built once per set of attempts: the pager goes back to the first attempt whenever this list changes,
+    // so paging (which re-renders with the selected attempt's details) must not rebuild it.
+    const attemptSamples = useMemo(() => (Array.isArray(data) ? data : []).map((result) => {
+        let vulnerabilitySegments = [];
+        if (useGuardrailDescription) {
+            const { requestText, responseText } = sampleDataTransform.buildRenderedText(
+                { message: result.orig, highlightPaths: [] },
+                { redactHeaders: valuesTabRedactHeaders }
+            );
+            vulnerabilitySegments = buildEvidenceVulnerabilitySegments(result.evidenceLine || rowInfo?.evidenceLine, requestText, responseText);
+        }
+        return { message: result.orig, highlightPaths: [], metadata: result.metadata, vulnerabilitySegments }
+    }), [data, rowInfo?.evidenceLine]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const ValuesTab = data.length > 0 && {
         id: 'values',
@@ -478,6 +586,8 @@ function SampleDetails(props) {
                             currLine={configValues.fieldLine || undefined}
                             readOnly
                             wordWrap
+                            onAddAsSearchFilter={onAddAsSearchFilter}
+                            searchSide="any"
                         />
                     </VerticalStack>
                 </VerticalStack>
@@ -486,19 +596,29 @@ function SampleDetails(props) {
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <SampleDataList
                     key={`Sample values-${eventId || 'default'}`}
+                    onPageChange={setAttemptIndex}
                     heading={"Attempt"}
                     minHeight={"30vh"}
                     vertical={true}
                     isWebSocket={func.isWebSocketApiType(moreInfoData?.apiType)}
-                    sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
-                        return { message: result.orig, highlightPaths: [], metadata: result.metadata }
-                    }) : []}
-                    redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
+                    sampleData={attemptSamples}
+                    redactHeaders={valuesTabRedactHeaders}
+                    evidenceLine={useGuardrailDescription ? moreInfoData?.evidenceLine : undefined}
+                    onAddAsSearchFilter={onAddAsSearchFilter}
+                    showDetectionReason
                 />
             </Box>)
     }
 
     const remediationTab = (() => {
+        const storedMarkdown = storedRemediationMarkdown(moreInfoData?.remediation);
+        if (storedMarkdown) {
+            return {
+                id: "remediation",
+                content: "Remediation",
+                component: (<MarkdownViewer markdown={storedMarkdown} />)
+            };
+        }
         // Live per-event remediation (settings-scanner, skill detector) takes priority
         // over any static template, for any event type.
         if (liveMetadata.remediation) {
@@ -794,15 +914,24 @@ function SampleDetails(props) {
                         </>
                     )}
 
+                    {/* No usable session for this event: show the nearest messages on the same host
+                        instead, falling back to the plain single-prompt note when there are none. */}
                     {!isSessionBased && (
-                        <>
-                            <Divider />
-                            <Box padding={"3"} background="bg-surface-secondary" borderRadius="200">
-                                <Text variant="bodyMd" color="subdued">
-                                    This threat was detected based on a single prompt analysis without session context.
-                                </Text>
-                            </Box>
-                        </>
+                        <NearbyMessages
+                            host={moreInfoData?.host}
+                            anchorTimestamp={data?.[0]?.ts}
+                            enabled={!sessionLoading}
+                            fallback={
+                                <>
+                                    <Divider />
+                                    <Box padding={"3"} background="bg-surface-secondary" borderRadius="200">
+                                        <Text variant="bodyMd" color="subdued">
+                                            This threat was detected based on a single prompt analysis without session context.
+                                        </Text>
+                                    </Box>
+                                </>
+                            }
+                        />
                     )}
                 </VerticalStack>
             </Box>
@@ -850,15 +979,17 @@ function SampleDetails(props) {
         window.open(navigateUrl, "_blank")
     }
 
-    const handleStatusChange = async (newStatus) => {
+    // caseFields: { caseOwner?, caseNotes? } from the "Mark for review" dialog, saved together with the status.
+    const handleStatusChange = async (newStatus, caseFields = {}) => {
         if (!eventId) return;
 
         setActionPopoverActive(false);
-        
+
         setTriageLoading(true);
         try {
-            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: eventId, status: newStatus });
+            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: eventId, status: newStatus, ...caseFields });
             if (response?.updateSuccess) {
+                applyCaseChange({ status: newStatus, ...caseFields });
                 // Update parent state instead of refreshing page
                 if (onStatusUpdate) {
                     onStatusUpdate(newStatus);
@@ -870,6 +1001,28 @@ function SampleDetails(props) {
                 func.setToast(true, true, 'Failed to update event status');
             }
         } catch (error) {
+        } finally {
+            setTriageLoading(false);
+        }
+    }
+
+    const isHumanApprovalEvent = String(eventStatus || "").toUpperCase() === "HUMAN_APPROVAL";
+    const isHumanApprovalPending = isHumanApprovalEvent && isPendingHumanResponse(humanResponse);
+
+    const handleHumanApproval = async (response) => {
+        if (!eventId) return;
+        setTriageLoading(true);
+        try {
+            const result = await threatDetectionApi.updateMaliciousEventStatus({ eventIds: [eventId], humanResponse: response });
+            if (result?.updateSuccess) {
+                setHumanResponse(response);
+                onStatusUpdate?.(eventStatus);
+                func.setToast(true, false, `Event ${response === "APPROVED" ? "approved" : "blocked"}`);
+            } else {
+                func.setToast(true, true, "Failed to update human approval");
+            }
+        } catch {
+            func.setToast(true, true, "Failed to update human approval");
         } finally {
             setTriageLoading(false);
         }
@@ -1142,9 +1295,11 @@ Reference URL: ${window.location.href}`.trim();
                             <div className={`badge-wrapper-${severity}`}>
                                 <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                             </div>
+                            {isBackfillRefId(moreInfoData?.refId) && <Badge size="small" status="info">Backfill</Badge>}
                         </HorizontalStack>
                     </Box>
                     <HorizontalStack gap={"2"} wrap={false}>
+                        {!isHumanApprovalEvent && (
                         <Popover
                             active={actionPopoverActive}
                             activator={
@@ -1161,24 +1316,40 @@ Reference URL: ${window.location.href}`.trim();
                             onClose={() => setActionPopoverActive(false)}
                         >
                             <ActionList
-                                items={[
+                                items={withPermissions([
                                     eventStatus === 'UNDER_REVIEW' || eventStatus === 'TRIAGE' ? {
                                         content: 'Reactivate',
                                         onAction: () => handleStatusChange('ACTIVE'),
+                                        requires: 'api/updateMaliciousEventStatus',
                                     } : {
                                         content: 'Mark for Review',
-                                        onAction: () => handleStatusChange('UNDER_REVIEW'),
+                                        onAction: () => { setActionPopoverActive(false); setReviewOpen(true); },
+                                        requires: 'api/updateMaliciousEventStatus',
                                     },
                                     eventStatus === 'IGNORED' ? {
                                         content: 'Reactivate',
                                         onAction: () => handleStatusChange('ACTIVE'),
+                                        requires: 'api/updateMaliciousEventStatus',
                                     } : {
                                         content: 'Ignore',
                                         onAction: () => handleStatusChange('IGNORED'),
+                                        requires: 'api/updateMaliciousEventStatus',
                                     }
-                                ].filter(item => item)}
+                                ].filter(item => item))}
                             />
                         </Popover>
+                        )}
+                        {isHumanApprovalEvent ? (
+                            <HumanApprovalActions
+                                pending={isHumanApprovalPending}
+                                response={humanResponse}
+                                loading={triageLoading}
+                                allowed={canCall('api/updateMaliciousEventStatus')}
+                                onApprove={() => handleHumanApproval("APPROVED")}
+                                onBlock={() => handleHumanApproval("BLOCKED")}
+                            />
+                        ) : (
+                        <>
                         {isApprovalEvent && (
                             <ApproveServerButton
                                 policyName={approvePolicyName}
@@ -1207,13 +1378,15 @@ Reference URL: ${window.location.href}`.trim();
                         ) : (
                             <JiraTicketCreationModal
                                 activator={
-                                    <Button
-                                        size="slim"
-                                        onClick={handleJiraClick}
-                                        disabled={window.JIRA_INTEGRATED !== "true"}
-                                    >
-                                        Create Jira Ticket
-                                    </Button>
+                                    <AllowedAction allowed={canCallAll('api/fetchIntegration', 'api/createGeneralJiraTicket')}>
+                                        <Button
+                                            size="slim"
+                                            onClick={handleJiraClick}
+                                            disabled={window.JIRA_INTEGRATED !== "true"}
+                                        >
+                                            Create Jira Ticket
+                                        </Button>
+                                    </AllowedAction>
                                 }
                                 modalActive={modalActive}
                                 setModalActive={setModalActive}
@@ -1238,13 +1411,15 @@ Reference URL: ${window.location.href}`.trim();
                         ) : (
                             <JiraTicketCreationModal
                                 activator={
-                                    <Button
-                                        size="slim"
-                                        onClick={handleAzureBoardClick}
-                                        disabled={window.AZURE_BOARDS_INTEGRATED !== "true"}
-                                    >
-                                        Create Work Item
-                                    </Button>
+                                    <AllowedAction allowed={canCallAll('api/fetchAzureBoardsIntegration', 'api/createGeneralAzureBoardsWorkItem')}>
+                                        <Button
+                                            size="slim"
+                                            onClick={handleAzureBoardClick}
+                                            disabled={window.AZURE_BOARDS_INTEGRATED !== "true"}
+                                        >
+                                            Create Work Item
+                                        </Button>
+                                    </AllowedAction>
                                 }
                                 modalActive={boardsModalActive}
                                 setModalActive={setBoardsModalActive}
@@ -1257,6 +1432,8 @@ Reference URL: ${window.location.href}`.trim();
                                 issueId={eventId}
                                 isAzureModal={true}
                             />
+                        )}
+                        </>
                         )}
                     </HorizontalStack>
                 </HorizontalStack>
@@ -1288,9 +1465,11 @@ Reference URL: ${window.location.href}`.trim();
     const tabsComponent = (
         <LayoutWithTabs
             key={`tabs-comp-${eventId || 'default'}`}
-            tabs={ window.location.href.indexOf("guardrails") > -1
-                ? (showSessionContext ? [overviewTab, ValuesTab, sessionContextTab] : [overviewTab, ValuesTab]).filter(Boolean)
-                : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]).filter(Boolean)}
+            tabs={ isHumanApprovalEvent
+                ? [overviewTab, ValuesTab].filter(Boolean)
+                : isGuardrailsPage
+                ? (showSessionContext ? [overviewTab, ValuesTab, timelineTab, sessionContextTab, caseTab] : [overviewTab, ValuesTab, timelineTab, caseTab]).filter(Boolean)
+                : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab, caseTab] : [overviewTab, timelineTab, ValuesTab, remediationTab, caseTab]).filter(Boolean)}
             currTab = {() => {}}
         />
     )
@@ -1299,12 +1478,24 @@ Reference URL: ${window.location.href}`.trim();
         <TitleComponent/>, tabsComponent
     ]
 
-    return <FlyLayout
-        title={title || ""}
-        show={showDetails}
-        setShow={setShowDetails}
-        components={currentComponents}
-    />
+    return (
+        <>
+            <FlyLayout
+                title={title || ""}
+                show={showDetails}
+                setShow={setShowDetails}
+                components={currentComponents}
+            />
+            {/* Outside the flyout's components, which are rebuilt on every render and would reset what is typed. */}
+            <ReviewCaseModal
+                open={reviewOpen}
+                onClose={() => setReviewOpen(false)}
+                onConfirm={(caseFields) => { setReviewOpen(false); handleStatusChange('UNDER_REVIEW', caseFields); }}
+                initialOwner={caseData.caseOwner}
+                initialNotes={caseData.caseNotes}
+            />
+        </>
+    )
 }
 
 export default SampleDetails;

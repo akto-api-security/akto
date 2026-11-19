@@ -1,5 +1,6 @@
 package com.akto.action.monitoring;
 
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.action.UserAction;
 import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
@@ -12,6 +13,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.Log;
 import com.akto.dao.context.Context;
+import com.akto.utils.search.SearchClientFactory;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -22,6 +24,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -36,7 +39,12 @@ public class EndpointShieldAgentAction extends UserAction {
     private List<Log> agentLogs;
     private int startTime;
     private int endTime;
-    private String logKey; // optional filter: "agent-logs", "proxy-logs", "installation-logs", etc.
+    private String logKey; // optional filter: "agent-logs", "proxy-logs", "system-proxy-logs", "installation-logs", etc.
+    // optional filter: MINIMUM severity — "critical", "error", "warn", "info" or
+    // "debug" (or empty/"all" for no filter). "error" returns error + critical rows:
+    // a failed install's Install tab is 1-2.5k rows, and the lines that explain the
+    // failure are a handful of them.
+    private String level;
     private String afterId;  // ObjectId hex cursor — fetch logs older than this document
     private int pageSize;    // number of logs per page; defaults to DEFAULT_PAGE_SIZE
     private long totalCount; // total matching logs (without cursor), for display
@@ -49,11 +57,30 @@ public class EndpointShieldAgentAction extends UserAction {
     private List<UserAnalysisData> userAnalysisList = new ArrayList<>();
 
     public String fetchUserAnalysisList() {
-        userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty(),
-                Projections.include(UserAnalysisData.USER_NAME, UserAnalysisData.LAST_UPDATED_AT,
-                        UserAnalysisData.TOTAL_INPUT_TOKENS,
-                        UserAnalysisData.TOTAL_OUTPUT_TOKENS, UserAnalysisData.AI_SUMMARY,
-                        UserAnalysisData.HARMFUL_TOPICS));
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            userAnalysisList = new ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
+        // startTime > 0 means a real range was picked (endTime is always nonzero, even for "All
+        // time" — see AgenticAssetsPage.jsx), so branch on startTime alone to keep "All time" on
+        // the cheap lifetime-counter path below instead of an on-the-fly query.
+        if (startTime > 0) {
+            long startMs = startTime > 0 ? startTime * 1000L : 0L;
+            long endMs = endTime > 0 ? endTime * 1000L : System.currentTimeMillis();
+            long t0 = System.currentTimeMillis();
+            userAnalysisList = SearchClientFactory.instance()
+                    .fetchUserAnalysisTokenTotals(Context.accountId.get(), startMs, endMs);
+            loggerMaker.warnAndAddToDb("[fetchUserAnalysisList-timing] on-the-fly query TOTAL="
+                    + (System.currentTimeMillis() - t0) + "ms, rows=" + userAnalysisList.size()
+                    + ", rangeMs=" + (endMs - startMs));
+        } else {
+            userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty(),
+                    Projections.include(UserAnalysisData.USER_NAME, UserAnalysisData.LAST_UPDATED_AT,
+                            UserAnalysisData.TOTAL_INPUT_TOKENS,
+                            UserAnalysisData.TOTAL_OUTPUT_TOKENS, UserAnalysisData.AI_SUMMARY,
+                            UserAnalysisData.HARMFUL_TOPICS));
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -222,6 +249,7 @@ public class EndpointShieldAgentAction extends UserAction {
             if (logKey != null && !logKey.isEmpty()) {
                 baseFilter = Filters.and(baseFilter, Filters.eq("key", logKey));
             }
+            baseFilter = withLevelFilter(baseFilter);
 
             // Add ObjectId cursor for paged requests — _id < afterId fetches older logs.
             // Using _id instead of timestamp avoids skipping logs that share the same second.
@@ -299,6 +327,7 @@ public class EndpointShieldAgentAction extends UserAction {
             if (logKey != null && !logKey.isEmpty()) {
                 filter = Filters.and(filter, Filters.eq("key", logKey));
             }
+            filter = withLevelFilter(filter);
 
             Bson sort = Sorts.descending("_id");
             Bson projection = Projections.include("log", "timestamp", "key", "agentId", "deviceId", "level");
@@ -337,6 +366,66 @@ public class EndpointShieldAgentAction extends UserAction {
 
     public void setEndTime(int endTime) {
         this.endTime = endTime;
+    }
+
+    // Severity order, lowest first. Each entry lists the spellings senders use for
+    // that level ("warn" from the Go logger, "warning" elsewhere).
+    private static final String[][] LEVELS_BY_SEVERITY = {
+        {"debug"}, {"info"}, {"warn", "warning"}, {"error"}, {"critical"}
+    };
+    private static final int INFO_SEVERITY = 1; // index of {"info"} above
+
+    // Rank of any spelling of a level, or -1 for one we do not rank.
+    private static int severityOf(String name) {
+        for (int i = 0; i < LEVELS_BY_SEVERITY.length; i++) {
+            for (String spelling : LEVELS_BY_SEVERITY[i]) {
+                if (spelling.equals(name)) return i;
+            }
+        }
+        return -1;
+    }
+
+    // Spellings ranked strictly below minLevel. Null = nothing to exclude, so no filter.
+    static List<String> levelsBelow(String minLevel) {
+        if (minLevel == null) return null;
+        String wanted = minLevel.trim().toLowerCase();
+        if (wanted.isEmpty() || wanted.equals("all")) return null;
+        int from = severityOf(wanted);
+        if (from <= 0) return null; // unknown threshold, or "debug" with nothing below it
+        List<String> out = new ArrayList<>();
+        for (int i = 0; i < from; i++) {
+            out.addAll(Arrays.asList(LEVELS_BY_SEVERITY[i]));
+        }
+        return out;
+    }
+
+    // Keep rows at or above minLevel by excluding what ranks below it, rather than
+    // matching an allowlist: a level we do not rank ("fatal", "panic", "SEVERE")
+    // then stays visible instead of silently disappearing from both the page and
+    // totalCount. Matching is case-insensitive, since senders differ ("ERROR" from
+    // the agent, "error" from the installers).
+    private Bson withLevelFilter(Bson filter) {
+        List<String> below = levelsBelow(level);
+        if (below == null) return filter;
+        List<Bson> clauses = new ArrayList<>();
+        clauses.add(filter);
+        clauses.add(Filters.not(Filters.regex("level", "^(" + String.join("|", below) + ")$", "i")));
+        if (severityOf(level.trim().toLowerCase()) > INFO_SEVERITY) {
+            // The UI labels a row with no level as INFO, so from "warn" up it has to
+            // drop out too — $not above keeps unset fields, which is right only while
+            // INFO itself is still wanted.
+            clauses.add(Filters.ne("level", null));
+            clauses.add(Filters.ne("level", ""));
+        }
+        return Filters.and(clauses);
+    }
+
+    public String getLevel() {
+        return level;
+    }
+
+    public void setLevel(String level) {
+        this.level = level;
     }
 
     public String getLogKey() {
@@ -378,6 +467,11 @@ public class EndpointShieldAgentAction extends UserAction {
         if (this.username == null || this.username.isEmpty()) {
             addActionError("Username is required");
             return ERROR.toUpperCase();
+        }
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            userAnalysis = null;
+            return SUCCESS.toUpperCase();
         }
 
         userAnalysis = UserAnalysisDataDao.instance.findOne(

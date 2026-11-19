@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack, HorizontalStack, Tabs } from "@shopify/polaris";
+import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack, HorizontalStack, Tabs, Pagination } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
 import agenticObserveApi from "./agenticObserveApi";
 import { buildMcpComponentsFromStis } from "./agenticPageBuilders";
 import observeApi from "../api";
-import SampleDataList from "../../../components/shared/SampleDataList";
+import SampleData from "../../../components/shared/SampleData";
+import { parseAktoPayload } from "../../guardrails/violations/violationsData";
 import ApiIssuesTab from "../api_collections/ApiIssuesTab";
-import MarkdownViewer from "../../../components/shared/MarkdownViewer";
+import SkillMarkdownViewer from "./SkillEvidenceView";
 import { fetchSkillMarkdownFromCollections, getOwningPluginNameForCollection } from "./SkillComponentsView";
 
 // ── Shared detail panel helpers ───────────────────────────────────────────────
@@ -24,21 +25,63 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 const TRAFFIC_LOADING = <Box padding="4"><Spinner accessibilityLabel="Loading traffic" size="small" /></Box>;
 const TRAFFIC_EMPTY  = <Box padding="8"><VerticalStack gap="1" inlineAlign="center"><Text variant="bodySm" fontWeight="semibold">No captured traffic</Text><Text variant="bodySm" color="subdued">No request/response samples recorded for this component.</Text></VerticalStack></Box>;
 
-// Renders captured samples as paginated request + response cards — reuses the legacy ApiDetails
-// "Values" tab component (SampleDataList) so padding, pagination and cards match the old flyout.
+// One captured sample's request/response, pretty-printed — same friendly presentation the
+// Guardrails Violations flyout's Values tab uses (PromptResponseSection), not the old flyout's
+// raw HTTP-with-headers viewer.
+function TrafficSample({ raw }) {
+    const { req, resp } = parseAktoPayload(raw);
+    return (
+        <VerticalStack gap="4">
+            <VerticalStack gap="2">
+                <Text variant="headingSm" color="subdued">Request</Text>
+                <SampleData
+                    data={{ message: req ? JSON.stringify(req, null, 2) : "No request captured" }}
+                    editorLanguage="json"
+                    minHeight="200px"
+                    readOnly
+                    wordWrap
+                />
+            </VerticalStack>
+            <VerticalStack gap="2">
+                <Text variant="headingSm" color="subdued">Response</Text>
+                <SampleData
+                    data={{ message: resp ? JSON.stringify(resp, null, 2) : "No response captured" }}
+                    editorLanguage="json"
+                    minHeight="200px"
+                    readOnly
+                    wordWrap
+                />
+            </VerticalStack>
+        </VerticalStack>
+    );
+}
+
 function TrafficView({ traffic, loading }) {
+    const [page, setPage] = useState(0);
+    useEffect(() => { setPage(0); }, [traffic]);
+
     if (loading) return TRAFFIC_LOADING;
     if (!traffic?.length) return TRAFFIC_EMPTY;
-    const sampleData = traffic.map((s) => ({ message: typeof s === "string" ? s : JSON.stringify(s) }));
+
+    const current = traffic[Math.min(page, traffic.length - 1)];
+    const raw = typeof current === "string" ? current : JSON.stringify(current);
+
     return (
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "16px" }}>
-            <SampleDataList
-                sampleData={sampleData}
-                heading="Sample values"
-                minHeight="35vh"
-                vertical={true}
-                isAPISampleData={true}
-            />
+            <VerticalStack gap="3">
+                {traffic.length > 1 && (
+                    <HorizontalStack align="end">
+                        <Pagination
+                            label={`${page + 1} of ${traffic.length}`}
+                            hasPrevious={page > 0}
+                            onPrevious={() => setPage(p => p - 1)}
+                            hasNext={page < traffic.length - 1}
+                            onNext={() => setPage(p => p + 1)}
+                        />
+                    </HorizontalStack>
+                )}
+                <TrafficSample raw={raw} />
+            </VerticalStack>
         </div>
     );
 }
@@ -106,41 +149,43 @@ const SKILL_VALUE_EMPTY = <Box padding="8"><VerticalStack gap="1" inlineAlign="c
 // the skill's own apiCollectionId when the caller doesn't have the full collection set on hand.
 function useSkillMarkdown(skill, collectionIds, fetchMarkdown = fetchSkillMarkdownFromCollections) {
     const [markdown, setMarkdown] = useState(null);
+    const [evidence, setEvidence] = useState(null);
     const [owningPluginName, setOwningPluginName] = useState(null);
     const [loading, setLoading] = useState(true);
     const ids = collectionIds?.length ? collectionIds : [skill?.apiCollectionId].filter(Boolean);
     useEffect(() => {
-        if (!ids.length) { setMarkdown(""); setLoading(false); return; }
+        if (!ids.length) { setMarkdown(""); setEvidence(null); setLoading(false); return; }
         let cancelled = false;
         setLoading(true);
         fetchMarkdown(ids, skill?.rawName || skill?.name)
-            .then(({ markdown: found, collectionId }) => {
+            .then(({ markdown: found, collectionId, evidence: foundEvidence }) => {
                 if (cancelled) return;
                 setMarkdown(found || "");
+                setEvidence(foundEvidence || null);
                 setOwningPluginName(getOwningPluginNameForCollection(collectionId));
             })
-            .catch(() => { if (!cancelled) { setMarkdown(""); setOwningPluginName(null); } })
+            .catch(() => { if (!cancelled) { setMarkdown(""); setEvidence(null); setOwningPluginName(null); } })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [skill?.name, skill?.rawName, ids.join(","), fetchMarkdown]);
-    return { markdown, owningPluginName, loading };
+    return { markdown, evidence, owningPluginName, loading };
 }
 
-function SkillValueView({ markdown, loading }) {
+function SkillValueView({ markdown, evidence, loading }) {
     if (loading) return SKILL_VALUE_LOADING;
     if (!markdown) return SKILL_VALUE_EMPTY;
     return (
         <Box className="agentic-flex-fill">
             <Box paddingBlockStart="5" paddingBlockEnd="5" paddingInlineStart="5" paddingInlineEnd="5">
-                <MarkdownViewer markdown={markdown} />
+                <SkillMarkdownViewer markdown={markdown} evidence={evidence} />
             </Box>
         </Box>
     );
 }
 
 export function SkillDetailPanel({ skill, collectionIds, hideOwningPlugin, fetchMarkdown, entityLabel = "skill" }) {
-    const { markdown, owningPluginName, loading } = useSkillMarkdown(skill, collectionIds, fetchMarkdown);
+    const { markdown, evidence, owningPluginName, loading } = useSkillMarkdown(skill, collectionIds, fetchMarkdown);
     const [selectedTab, setSelectedTab] = useState(0);
     const isThreatEnabled = skill?.isThreatEnabled || false;
 
@@ -171,7 +216,7 @@ export function SkillDetailPanel({ skill, collectionIds, hideOwningPlugin, fetch
                 </Box>
             )}
             {activeTab === 0 ? (
-                <SkillValueView markdown={markdown} loading={loading} />
+                <SkillValueView markdown={markdown} evidence={evidence} loading={loading} />
             ) : (
                 <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "16px" }}>
                     <ApiIssuesTab

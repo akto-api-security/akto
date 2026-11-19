@@ -1,7 +1,8 @@
 import { Modal, Text } from '@shopify/polaris'
 import React from 'react'
+import { whenAllowed } from '@/util/permissions'
 
-function DeleteModal({showDeleteModal, setShowDeleteModal, SsoType, onAction}) {
+function DeleteModal({showDeleteModal, setShowDeleteModal, SsoType, onAction, allowed = true}) {
 
     const deleteText = "Are you sure you want to remove " + SsoType + "SSO Integration? This might take away access from existing Akto users. This action cannot be undone."
     return (
@@ -11,7 +12,8 @@ function DeleteModal({showDeleteModal, setShowDeleteModal, SsoType, onAction}) {
             title="Are you sure?"
             primaryAction={{
                 content: 'Delete ' + SsoType + ' SSO',
-                onAction: onAction
+                onAction: onAction,
+                ...whenAllowed(allowed)
             }}
         >
             <Modal.Section>

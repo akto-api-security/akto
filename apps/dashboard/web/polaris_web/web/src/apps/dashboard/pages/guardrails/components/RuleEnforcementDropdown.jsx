@@ -1,8 +1,11 @@
-import { HorizontalStack, VerticalStack, Text, Box, Banner } from "@shopify/polaris";
+import { HorizontalStack, VerticalStack, Text, Box, Banner, List } from "@shopify/polaris";
 import Dropdown from "../../../components/layouts/Dropdown";
 import GuardrailEnforcementInfoIcon from "./GuardrailEnforcementInfoIcon";
 import { GUARDRAIL_BEHAVIOUR, GUARDRAIL_BEHAVIOUR_OPTIONS, normalizeBehaviourValue } from "../utils";
-import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
+import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
+import Store from "../../../store";
+
+const WARN_ENABLED_ACCOUNT_IDS = ['1726615470', '1000000', '1669322524'];
 
 export default function RuleEnforcementDropdown({
     id,
@@ -12,13 +15,21 @@ export default function RuleEnforcementDropdown({
     disabled = false,
 }) {
     const initial = normalizeBehaviourValue(value);
-    // "Approval" behaviour is Endpoint (Atlas) only — hide the option for Agentic/other categories.
-    const menuItems = isEndpointSecurityCategory()
-        ? GUARDRAIL_BEHAVIOUR_OPTIONS
-        : GUARDRAIL_BEHAVIOUR_OPTIONS.filter((o) => o.value !== GUARDRAIL_BEHAVIOUR.APPROVAL);
+    const isAtlas = isEndpointSecurityCategory();
+    const isArgus = isAgenticSecurityCategory();
+    const activeAccount = Store(state => state.activeAccount);
+    const isWarnEnabled = WARN_ENABLED_ACCOUNT_IDS.includes(String(activeAccount));
+    // "Approval" (Atlas server-preapproval) is Endpoint-only; "Human Approval" (Argus per-call
+    // pending/poll) is Agentic-only — each category only ever sees its own option.
+    const menuItems = GUARDRAIL_BEHAVIOUR_OPTIONS.filter((o) => {
+        if (o.value === GUARDRAIL_BEHAVIOUR.APPROVAL) return isAtlas;
+        if (o.value === GUARDRAIL_BEHAVIOUR.HUMAN_APPROVAL) return isArgus;
+        if (o.value === GUARDRAIL_BEHAVIOUR.WARN) return isAtlas && isWarnEnabled;
+        return true;
+    });
     const showLabelRow = typeof label === "string" && label.trim().length > 0;
-    const showEndpointOnlyNote = initial === GUARDRAIL_BEHAVIOUR.ALERT
-        || initial === GUARDRAIL_BEHAVIOUR.APPROVAL;
+    const showEndpointOnlyNote = isAtlas && initial === GUARDRAIL_BEHAVIOUR.APPROVAL;
+    const showWarnNote = initial === GUARDRAIL_BEHAVIOUR.WARN;
 
     return (
         <VerticalStack gap="2">
@@ -40,10 +51,25 @@ export default function RuleEnforcementDropdown({
                 />
             </Box>
             {showEndpointOnlyNote && (
-                <Banner tone="info">
+                <Banner status="info">
                     <Text variant="bodyMd">
-                        In the browser extension, <Text as="span" fontWeight="bold">Alert</Text> and <Text as="span" fontWeight="bold">Human Approval</Text> behave the same as <Text as="span" fontWeight="bold">Block</Text>.
+                        In the browser extension, <Text as="span" fontWeight="bold">{menuItems.find((o) => o.value === initial)?.label}</Text> behaves the same as <Text as="span" fontWeight="bold">Block</Text>.
                     </Text>
+                </Banner>
+            )}
+            {showWarnNote && (
+                <Banner tone="info">
+                    <List type="bullet">
+                        <List.Item>
+                            A flagged prompt is held and a warning is shown. Resend the same prompt to proceed.
+                        </List.Item>
+                        <List.Item>
+                            Flagged tool calls need your approval to run. Supported only on Claude CLI, Copilot CLI, and VS Code.
+                        </List.Item>
+                        <List.Item>
+                            Agent responses aren't supported yet. Flagged responses are blocked.
+                        </List.Item>
+                    </List>
                 </Banner>
             )}
         </VerticalStack>

@@ -3,14 +3,18 @@
 Async sinks, all no-ops when their target isn't configured:
   - post_slack(...)         → Slack incoming webhook (SLACK_WEBHOOK_URL)
   - store_results(...)      → DB abstractor /api/storeGuardrailModelResults
+  - store_tripwire_result() → one JSON blob per Tripwire answer (TRIPWIRE_RESULTS_BLOB_URL)
 
 All are scheduled via the runtime's fire-and-forget hook (waitUntil on
 Cloudflare, asyncio.create_task on the container) so they never block the scan
 response. None ever raises into the caller.
 """
 
+import json
 import logging
 import time
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -24,6 +28,16 @@ _IDENTITY = {"Accept-Encoding": "identity"}
 _SLACK_TIMEOUT_S = 5.0
 _STORE_TIMEOUT_S = 10.0
 _TEXT_PREVIEW_CHARS = 1500
+_BLOB_CLIENT: httpx.AsyncClient | None = None
+
+
+def _blob_client() -> httpx.AsyncClient:
+    # One client for every Tripwire upload, so each answer reuses a connection to Blob Storage instead of paying
+    # a new TCP + TLS handshake.
+    global _BLOB_CLIENT
+    if _BLOB_CLIENT is None or _BLOB_CLIENT.is_closed:
+        _BLOB_CLIENT = httpx.AsyncClient(timeout=_STORE_TIMEOUT_S, limits=httpx.Limits(max_connections=20))
+    return _BLOB_CLIENT
 
 
 def _fmt_num(v: Any) -> str:
@@ -121,3 +135,107 @@ async def store_results(completed: list[dict[str, Any]], scanner_name: str) -> N
     except Exception as exc:
         metrics_push.COUNTS["alert_errors"].increment(f"store_results:{type(exc).__name__}")
         logger.warning(f"[Store] failed for scanner={scanner_name}: {exc}")
+
+
+async def store_tripwire_result(record: dict[str, Any]) -> None:
+    """Upload one Tripwire record as its own JSON blob (Azure Put Blob, authorised by the SAS token in
+    TRIPWIRE_RESULTS_BLOB_URL). Blobs are named <yyyy>/<mm>/<dd>/<hh>/<time>-<id>.json, so an hour or a day
+    lists together. The URL carries the SAS token, so it is never logged: not here, and not by httpx, which
+    every runtime keeps at WARNING (scan_diag.quiet_http_client_logs)."""
+    container = (settings.TRIPWIRE_RESULTS_BLOB_URL or "").strip()
+    if not container:
+        return
+    now = datetime.now(UTC)
+    name = f"{now:%Y/%m/%d/%H}/{now:%Y%m%dT%H%M%S%f}Z-{uuid.uuid4().hex[:12]}.json"
+    base, _, sas = container.partition("?")
+    url = f"{base.rstrip('/')}/{name}" + (f"?{sas}" if sas else "")
+    started = time.perf_counter()
+    try:
+        resp = await _blob_client().put(
+            url,
+            headers={"x-ms-blob-type": "BlockBlob", "Content-Type": "application/json"},
+            content=json.dumps(record),
+        )
+        metrics_push.SAMPLES["alert"].record("tripwire_blob", (time.perf_counter() - started) * 1000.0)
+        if resp.status_code >= 400:
+            metrics_push.COUNTS["alert_errors"].increment(f"tripwire_blob:status_{resp.status_code}")
+            logger.warning(f"[TripwireBlob] upload of {name} returned {resp.status_code}")
+    except Exception as exc:
+        metrics_push.COUNTS["alert_errors"].increment(f"tripwire_blob:{type(exc).__name__}")
+        logger.warning(f"[TripwireBlob] upload of {name} failed: {type(exc).__name__}")  # not exc: it may hold the URL
+
+
+# ── Model-fallback alerts (FALLBACK_SLACK_WEBHOOK_URL) ────────────────────────
+# Providers only *record* a fallback (synchronous, no I/O on the scan path);
+# scan_handler flushes the records through the runtime's fire-and-forget hook.
+# The first fallback of a (primary, backup) pair posts at once, then at most one
+# summary per window, so a dead or slow primary can't flood the channel.
+# Health-check flips (primary DOWN / AVAILABLE again) post at once. State is
+# per process (per isolate on Cloudflare).
+_FALLBACK_WINDOW_S = 600.0
+_fallbacks: dict[tuple[str, str], dict[str, Any]] = {}
+_transitions: list[str] = []
+
+
+def _fallback_webhook() -> str:
+    return (settings.FALLBACK_SLACK_WEBHOOK_URL or "").strip()
+
+
+def fallback_reason(exc: BaseException) -> str:
+    """Short, groupable cause of a fallback: 'timeout', 'HTTP <status>', or the exception type."""
+    if isinstance(exc, (TimeoutError, httpx.TimeoutException)):
+        return "timeout"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code}"  # 400 (too long) and 503 (down) need different fixes
+    return type(exc).__name__
+
+
+def note_fallback(primary: str, backup: str, reason: str) -> None:
+    """A request meant for `primary` was answered by `backup`. Never raises."""
+    if not _fallback_webhook():
+        return
+    new = {"count": 0, "reasons": {}, "since": time.time(), "last_sent": 0.0}
+    entry = _fallbacks.setdefault((primary, backup), new)
+    entry["count"] += 1
+    entry["reasons"][reason] = entry["reasons"].get(reason, 0) + 1
+
+
+def note_availability(target: str, available: bool, reasons: str = "") -> None:
+    """The health check changed a primary's state (called only on a change); `reasons` are the failed probes' causes."""
+    if _fallback_webhook():
+        cause = f" ({reasons})" if reasons else ""
+        _transitions.append(
+            f"✅ primary `{target}` is AVAILABLE again"
+            if available
+            else f"🔴 primary `{target}` is DOWN{cause}, requests go to its backup"
+        )
+
+
+def has_pending_fallback_alerts() -> bool:
+    now = time.time()
+    return bool(_transitions) or any(
+        e["count"] and now - e["last_sent"] >= _FALLBACK_WINDOW_S for e in _fallbacks.values()
+    )
+
+
+async def flush_fallback_alerts() -> None:
+    """Post what is due. State is taken and reset before the first await: concurrent flushes can't double-post."""
+    now = time.time()
+    lines, _transitions[:] = list(_transitions), []
+    for (primary, backup), e in _fallbacks.items():
+        if e["count"] and now - e["last_sent"] >= _FALLBACK_WINDOW_S:
+            reasons = ", ".join(f"{r} x{n}" for r, n in sorted(e["reasons"].items(), key=lambda kv: -kv[1]))
+            minutes = max(1, round((now - e["since"]) / 60))
+            lines.append(f"⚠️ `{primary}` fell back to `{backup}` {e['count']}x in the last {minutes} min ({reasons})")
+            e.update(count=0, reasons={}, since=now, last_sent=now)
+    webhook = _fallback_webhook()
+    if not webhook or not lines:
+        return
+    try:
+        payload = {"text": "*agent-guard model fallback*\n" + "\n".join(lines)}
+        async with httpx.AsyncClient(timeout=_SLACK_TIMEOUT_S) as client:
+            resp = await client.post(webhook, headers=_IDENTITY, json=payload)
+        if resp.status_code >= 400:
+            logger.warning(f"[Slack] fallback webhook returned {resp.status_code}")
+    except Exception as exc:
+        logger.warning(f"[Slack] fallback post failed: {exc}")

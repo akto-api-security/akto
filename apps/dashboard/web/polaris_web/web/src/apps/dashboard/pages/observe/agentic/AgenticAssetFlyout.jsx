@@ -1,43 +1,71 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Tabs, Box, VerticalStack, Text, Divider, Spinner } from "@shopify/polaris";
+import { Badge, Box, Divider, HorizontalStack, Button, Spinner, Tabs, Text } from "@shopify/polaris";
+import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
+import DetailPanelHeader from "@/apps/dashboard/components/shared/DetailPanelHeader";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
-import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
-import AgenticFlyoutShell from "./AgenticFlyoutShell";
-import AiChatSection from "./AiChatSection";
-import { buildAgentInlineTopologyComponents, countAgentComponentsTab } from "./agenticPageBuilders";
-import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
-import { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
-import api from "../api";
+import { usePermissions } from "@/util/permissions";
 import func from "@/util/func";
-import OverviewTab from "./OverviewTab";
+import AgenticFlyoutShell from "./AgenticFlyoutShell";
+import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
+import AssetOverview from "./AssetOverview";
+import AssetIcon from "./AssetIcon";
 import ViolationsTab from "./ViolationsTab";
 import McpComponentsView from "./McpComponentsView";
 import AgentComponentsView from "./AgentComponentsView";
 import SkillComponentsView from "./SkillComponentsView";
 import PluginComponentsView from "./PluginComponentsView";
+import { ApprovalStatusBadge, RiskScoreCellRenderer } from "./AgenticCellRenderers";
+import { buildAgentInlineTopologyComponents, countAgentComponentsTab } from "./agenticPageBuilders";
+import { APPROVAL_ACTIONS, approvalActionApplies, approvalActionRequires, canTargetGuardrail } from "./agenticObserveApi";
+import { typeLabelOf } from "./inventoryCategories";
+import api from "../api";
 import "../../../components/layouts/style.css";
 
 // ─── Devices tab (small, kept inline) ────────────────────────────────────────
 
-const DEVICES_COL_DEFS = [
+const DEVICES_BASE_COL_DEFS = [
     { field: "username", headerName: "User",       flex: 1,  minWidth: 120, cellStyle: { display: "flex", alignItems: "center" }, valueFormatter: p => p.value || "-" },
     { field: "riskScore", headerName: "Risk Score", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: RiskScoreCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
     { field: "lastSeen", headerName: "Last Seen",  width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", color: "#6D7175" }, valueFormatter: p => p.value || "-", comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.lastSeenEpoch || 0) - (nodeB?.data?.lastSeenEpoch || 0) },
 ];
 
+// "unknown"/unset reads as disabled — an unreported status isn't proof a plugin is active.
+const isPluginEnabled = (status) => String(status).toLowerCase() === "enabled";
+
+const PLUGIN_STATUS_COL_DEF = {
+    field: "pluginStatus", headerName: "Plugin Status", width: 130,
+    suppressHeaderMenuButton: true, suppressHeaderFilterButton: true,
+    cellStyle: { display: "flex", alignItems: "center" },
+    cellRenderer: (p) => (
+        <Badge size="small" status={isPluginEnabled(p.value) ? "success" : "warning"}>
+            {isPluginEnabled(p.value) ? "enabled" : "disabled"}
+        </Badge>
+    ),
+};
+
+const PLUGIN_SCOPE_COL_DEF = {
+    field: "pluginScope", headerName: "Plugin Scope", width: 130,
+    suppressHeaderMenuButton: true, suppressHeaderFilterButton: true,
+    cellStyle: { display: "flex", alignItems: "center" },
+    valueFormatter: p => p.value || "-",
+};
+
+const getDevicesColDefs = (assetType) =>
+    assetType === "Plugin" ? [...DEVICES_BASE_COL_DEFS, PLUGIN_STATUS_COL_DEF, PLUGIN_SCOPE_COL_DEF] : DEVICES_BASE_COL_DEFS;
+
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
-function DevicesTab({ asset, enrichMaps = {} }) {
+function DevicesTab({ asset, enrichMaps = {}, startTimestamp, endTimestamp }) {
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
         const deviceId = e.data.deviceId || e.data.endpoint;
-        window.open(`/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`, "_blank");
+        window.location.href = `/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`;
     }, []);
 
     // Server-side paginated — scoped to this one asset's own apiCollectionIds (cheap), never the
     // whole account. See AgenticObserveAction.fetchAgenticAssetDevicesPage.
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
-        const { trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap } = enrichMaps;
+        const { trafficMap, riskScoreMap } = enrichMaps;
         return api.fetchAgenticAssetDevicesPage({
             apiCollectionIds: asset.collectionIds || [],
             skip,
@@ -45,7 +73,7 @@ function DevicesTab({ asset, enrichMaps = {} }) {
             sortKey,
             sortOrder: sortOrder ? -sortOrder : -1,
             queryValue: searchString || undefined,
-            trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap,
+            trafficMap, riskScoreMap, startTimestamp, endTimestamp,
         }).then((res) => ({
             value: (res.devices || []).map((d) => ({
                 ...d,
@@ -53,12 +81,12 @@ function DevicesTab({ asset, enrichMaps = {} }) {
             })),
             total: res.total || 0,
         }));
-    }, [asset.collectionIds, enrichMaps]);
+    }, [asset.collectionIds, enrichMaps, startTimestamp, endTimestamp]);
 
     return (
         <AgGridTable
             key={asset.id}
-            columnDefs={DEVICES_COL_DEFS}
+            columnDefs={getDevicesColDefs(asset.type)}
             defaultColDef={GRID_DEFAULT_COL}
             onServerFetch={onServerFetch}
             serverSideRowModel
@@ -76,13 +104,12 @@ function DevicesTab({ asset, enrichMaps = {} }) {
 
 // ─── Components tab router ────────────────────────────────────────────────────
 
-function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset, configViolations, configRows }) {
+function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset }) {
     if (asset.type === "MCP Server") return <McpComponentsView asset={asset} onNavChange={onNavChange} />;
-    if (asset.type === "AI Agent")   return <AgentComponentsView asset={asset} onNavChange={onNavChange} onNavigateToAsset={onNavigateToAsset} configViolations={configViolations} configRows={configRows} />;
+    if (asset.type === "AI Agent")   return <AgentComponentsView asset={asset} onNavChange={onNavChange} onNavigateToAsset={onNavigateToAsset} />;
     // Skills: fetch from parent collections then show the skill's own traffic
     if (asset.type === "Skill") return <SkillComponentsView asset={asset} />;
-    // Plugins: discovery-only — components tab lists the bundled MCP servers/skills (same
-    // list/drill-down idiom as an AI Agent's), metadata itself now lives in the Overview tab.
+    // Plugins: discovery-only — lists the bundled MCP servers/skills (same list/drill-down idiom as an AI Agent's).
     if (asset.type === "Plugin") return <PluginComponentsView asset={asset} onNavChange={onNavChange} />;
     // LLMs: their collectionIds are their own collections — show actual LLM API endpoints
     if (asset.type === "LLM") return <McpComponentsView asset={asset} onNavChange={onNavChange} />;
@@ -90,26 +117,33 @@ function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset, configVio
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
+// Tabs: Overview (AI inventory panel design — AssetOverview), Components, Violations (page date
+// range) and Devices. Each tab loads its own data only when selected; the tab counts come from the
+// grid row and the asset detail already fetched below.
 
 export default function AgenticAssetFlyout({
     asset: rawAsset,
     show,
     onClose,
+    // (assetRow) => void — opens another asset (e.g. an MCP server from an agent's components).
     onNavigateToAsset,
-    agenticTreeData = [],
-    agenticFlatData = [],
     enrichMaps = {},
-    collections = [],
-    // Left undefined (not defaulted to []) when the parent hasn't loaded raw violation rows yet, so
-    // ViolationsTab can tell "not loaded" apart from "confirmed zero violations" via Array.isArray.
-    // selectConfigViolationRows below has its own internal default and handles undefined safely.
-    agenticViolationRows,
     startTimestamp,
     endTimestamp,
+    // (rows, APPROVAL_ACTIONS entry) => Promise — status actions in the header; omitted = no buttons.
+    onApprovalChange,
+    // (rows) => void — "Create guardrail policy" once the asset is approved; omitted = not offered.
+    onCreateGuardrail,
 }) {
-    const [selectedTab,    setSelectedTab]    = useState(0);
-    const [topNav,         setTopNav]         = useState(null);
-    const [topNavPicker,   setTopNavPicker]   = useState(null);
+    const { canCall } = usePermissions();
+    const [approvalUpdating, setApprovalUpdating] = useState(null);
+    const [selectedTab, setSelectedTab] = useState(0);
+    // Components drill-down breadcrumb (set by the components views); replaces the header and tabs.
+    const [topNav, setTopNav] = useState(null);
+    const [topNavPicker, setTopNavPicker] = useState(null);
+    // The row's violation count is an exact-hostName join and can undercount vs. ViolationsTab's own
+    // query; once the tab is opened and reports its real total, prefer that.
+    const [violationsTotal, setViolationsTotal] = useState(null);
 
     // hostNames/collectionIds/skillCount/mcpServers/mcpServerCollectionIds/devices no longer come
     // with the grid row (see AgenticObserveAction.GroupSummary.toSummaryResponse()'s and
@@ -124,10 +158,10 @@ export default function AgenticAssetFlyout({
         let cancelled = false;
         (async () => {
             try {
-                const { trafficMap, riskScoreMap, userAnalysisFlatMap } = enrichMaps;
+                const { trafficMap, riskScoreMap } = enrichMaps;
                 const detail = await api.fetchAgenticAssetDetail({
                     groupKey: rawAsset.groupKey, rowType: rawAsset.rowType,
-                    trafficMap, riskScoreMap, userAnalysisFlatMap,
+                    trafficMap, riskScoreMap, startTimestamp, endTimestamp,
                 });
                 if (!cancelled) setAssetDetail(detail);
             } catch {
@@ -144,54 +178,11 @@ export default function AgenticAssetFlyout({
         return { ...rawAsset, ...assetDetail };
     }, [rawAsset, assetDetail]);
 
-    // Id-keyed map for OverviewTab's existing contract (built from the lazily-fetched
-    // asset.deviceSample — a small capped sample, NOT the full per-device list; see
-    // AgenticObserveAction's assetDeviceCount/assetDeviceSample comment — instead of being threaded
-    // in as a prop from the grid — there's only ever one asset open at a time in this flyout). The
-    // real total lives separately on asset.deviceCount (OverviewTab's "Devices: N" stat uses that,
-    // not this sample's length).
-    const assetDevices = useMemo(() => (
-        asset ? { [asset.id]: asset.deviceSample || [] } : {}
-    ), [asset]);
-
-    // True only for the brief window between opening an asset and its lazy detail landing — the
-    // shell/header (name, riskScore — cheap scalars, always present on the row) render immediately;
-    // only tab content needs to wait, since every tab needs asset.collectionIds/hostNames for its
-    // own data fetch.
+    // True only between opening an asset and its lazy detail landing — the header renders from the
+    // grid row immediately; the body needs asset.collectionIds/hostNames for its own fetches.
     const detailLoading = !!rawAsset && !assetDetail;
 
-    useEffect(() => { setSelectedTab(0); setTopNav(null); setTopNavPicker(null); }, [asset?.id]);
-
-    // Both computed server-side now (AgenticObserveAction.fetchAgenticAssetDetail, scoped to just
-    // this asset's own collections) — no more browser-side STI fetch/derivation. asset.hasInlineLlm/
-    // inlineToolNames/mcpComponentCount default to false/[]/0 until assetDetail lands (detailLoading
-    // gates all tab content on that anyway, see below).
-    const inlineTopology = useMemo(
-        () => (asset?.type === "AI Agent" ? buildAgentInlineTopologyComponents(asset.hasInlineLlm, asset.inlineToolNames, asset) : []),
-        [asset],
-    );
-    const mcpComponentCount = asset?.mcpComponentCount || 0;
-
-    const chatMetadata = useMemo(() => {
-        if (!asset) return null;
-        return buildAgenticObserveChatMetadata("asset", {
-            assetName:    asset.name,
-            assetType:    asset.type,
-            collectionId: asset.collectionIds || [],
-            assetTagValue: asset.assetTagValue,
-        });
-    }, [asset]);
-
-    // Claude config/settings violations attributed to this asset's devices (host-matched, not the
-    // agent total). Drives the accurate "Claude Settings" row count + its threat-activity deep link.
-    const configRows = useMemo(
-        () => (asset?.type === "AI Agent" ? selectConfigViolationRows(agenticViolationRows, asset, collections) : []),
-        [asset, agenticViolationRows, collections],
-    );
-    const configViolations = useMemo(() => {
-        const summary = summarizeViolations(configRows);
-        return summary.total > 0 ? summary : null;
-    }, [configRows]);
+    useEffect(() => { setSelectedTab(0); setTopNav(null); setTopNavPicker(null); setViolationsTotal(null); }, [rawAsset?.id]);
 
     const handleTabSelect = useCallback((tab) => {
         setSelectedTab(tab);
@@ -206,101 +197,117 @@ export default function AgenticAssetFlyout({
 
     const tabs = useMemo(() => {
         if (!asset) return [];
-        const totalV   = (asset.violations?.critical || 0) + (asset.violations?.high || 0) + (asset.violations?.medium || 0) + (asset.violations?.low || 0);
-        // endpointsCount is a cheap scalar already present on the grid row (before the lazy detail
-        // fetch lands), same number asset.deviceCount would give once loaded — avoids the tab
-        // badge flashing 0 while assetDetail is still in flight.
-        const devCount = asset.endpointsCount || 0;
+        const v = asset.violations || {};
+        const totalV = violationsTotal ?? ((v.critical || 0) + (v.high || 0) + (v.medium || 0) + (v.low || 0));
         let componentCount = 0;
         if (asset.type === "AI Agent") {
-            componentCount = countAgentComponentsTab(asset, {
-                inlineComponents: inlineTopology,
-                configViolations,
-            });
+            const inlineComponents = buildAgentInlineTopologyComponents(asset.hasInlineLlm, asset.inlineToolNames, asset);
+            componentCount = countAgentComponentsTab(asset, { inlineComponents });
         } else if (asset.type === "MCP Server") {
-            componentCount = mcpComponentCount;
+            componentCount = asset.mcpComponentCount || 0;
         } else if (asset.type === "Plugin") {
             componentCount = (asset.pluginMcpServers || []).length + (asset.pluginSkills || []).length;
         }
         return [
             { id: "overview",   content: "Overview" },
-            { id: "components", content: (componentCount > 0 && asset.type !== "Skill") ? `Components (${componentCount})` : "Components" },
+            { id: "components", content: componentCount > 0 && asset.type !== "Skill" ? `Components (${componentCount})` : "Components" },
             { id: "violations", content: `Violations (${totalV})` },
-            { id: "devices",    content: `Devices (${devCount})` },
+            { id: "devices",    content: `Devices (${asset.endpointsCount || 0})` },
         ];
-    }, [asset, assetDevices, inlineTopology, mcpComponentCount, configViolations]);
+    }, [asset, violationsTotal]);
+
+
+    const handleApproval = useCallback(async (action) => {
+        setApprovalUpdating(action.label);
+        try {
+            await onApprovalChange([rawAsset], action);
+        } finally {
+            setApprovalUpdating(null);
+        }
+    }, [onApprovalChange, rawAsset]);
 
     if (!asset) return null;
 
-    return (
-        <AgenticFlyoutShell
-            show={show}
-            width={800}
-            header={
-                <>
-                    <FlyoutBreadcrumb
-                        items={topNav
-                            ? [{ label: asset.name, badge: asset.riskScore, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]
-                            : [{ label: asset.name, badge: asset.riskScore }]
-                        }
-                        onClose={onClose}
-                        subtitle={!topNav ? asset.description : null}
+    // Mockup order: primary first (Create guardrail policy once approved, else Approve), then the
+    // remaining status actions.
+    const approvalActions = onApprovalChange ? Object.values(APPROVAL_ACTIONS).filter((action) => approvalActionApplies(action, rawAsset)) : [];
+    const showCreateGuardrail = onCreateGuardrail && rawAsset.approvalStatus === "Approved" && canTargetGuardrail(rawAsset);
+    const approvalAllowed = canCall(approvalActionRequires([rawAsset]));
+    const headerActions = (
+        <HorizontalStack gap="2">
+            {showCreateGuardrail && <Button primary onClick={() => onCreateGuardrail([rawAsset])}>Create guardrail policy</Button>}
+            {approvalActions.map((action) => (
+                <AllowedAction key={action.label} allowed={approvalAllowed}>
+                    <Button
+                        primary={action.primary && !showCreateGuardrail}
+                        loading={approvalUpdating === action.label}
+                        disabled={!!approvalUpdating}
+                        onClick={() => handleApproval(action)}
                     >
-                        {topNavPicker && (
-                            <>
-                                <Text variant="bodySm" color="subdued">/</Text>
-                                {topNavPicker}
-                            </>
-                        )}
-                    </FlyoutBreadcrumb>
-                    {!topNav && (
-                        <>
-                            <Box paddingInlineStart="1" paddingInlineEnd="1">
-                                <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabSelect} />
-                            </Box>
-                            <Divider />
-                        </>
-                    )}
-                </>
-            }
-            footer={
-                <AiChatSection
-                    placeholder="Ask anything about this agentic asset..."
-                    resetKey={asset?.id}
-                    conversationType="AGENTIC_OBSERVE"
-                    chatMetadata={chatMetadata}
-                />
-            }
+                        {action.label}
+                    </Button>
+                </AllowedAction>
+            ))}
+        </HorizontalStack>
+    );
+
+    const header = topNav ? (
+        <FlyoutBreadcrumb
+            items={[{ label: asset.name, badge: asset.riskScore, badgeFactors: asset.riskScoreFactors, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]}
+            onClose={onClose}
         >
-            <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+            {topNavPicker && (
+                <>
+                    <Text variant="bodySm" color="subdued">/</Text>
+                    {topNavPicker}
+                </>
+            )}
+        </FlyoutBreadcrumb>
+    ) : (
+        <>
+            <DetailPanelHeader
+                icon={<AssetIcon type={asset.type} assetTagValue={asset.assetTagValue} size={36} />}
+                title={asset.name}
+                badge={(
+                    <HorizontalStack gap="2" blockAlign="center">
+                        {asset.approvalStatus ? <ApprovalStatusBadge status={asset.approvalStatus} /> : null}
+                        {asset.riskScore != null ? <RiskScoreCellRenderer value={asset.riskScore} data={asset} /> : null}
+                    </HorizontalStack>
+                )}
+                subtitle={[typeLabelOf(asset) || asset.type, asset.subtitle]}
+                actions={headerActions}
+                onClose={onClose}
+            />
+            <Box paddingInlineStart="1" paddingInlineEnd="1">
+                <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabSelect} />
+            </Box>
+            <Divider />
+        </>
+    );
+
+    return (
+        <AgenticFlyoutShell show={show} width={800} header={header}>
+            <Box style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
                 {detailLoading ? (
                     <Box padding="8"><Spinner accessibilityLabel="Loading asset details" size="large" /></Box>
                 ) : (
                     <>
-                        {selectedTab === 0 && (
-                            <OverviewTab
-                                asset={asset}
-                                onTabChange={handleTabSelect}
-                                assetDevices={assetDevices}
-                                agenticTreeData={agenticTreeData}
-                                agenticFlatData={agenticFlatData}
-                                mcpComponentCount={mcpComponentCount}
-                                inlineComponents={inlineTopology}
-                            />
-                        )}
+                        {selectedTab === 0 && <AssetOverview asset={asset} enrichMaps={enrichMaps} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
                         {selectedTab === 1 && (
-                            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                                <AgenticComponentsTab
-                                    asset={asset}
-                                    onNavChange={handleNavChange}
-                                    onNavigateToAsset={onNavigateToAsset}
-                                    configViolations={configViolations}
-                                    configRows={configRows}
-                                />
-                            </div>
+                            <Box padding="2" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                                <AgenticComponentsTab asset={asset} onNavChange={handleNavChange} onNavigateToAsset={onNavigateToAsset} />
+                            </Box>
                         )}
-                        {selectedTab === 2 && <ViolationsTab asset={asset} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} />}
-                        {selectedTab === 3 && <DevicesTab asset={asset} enrichMaps={enrichMaps} />}
+                        {selectedTab === 2 && (
+                            <Box padding="2" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                                <ViolationsTab asset={asset} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset.type === "Skill" ? () => handleTabSelect(1) : undefined} onTotalChange={setViolationsTotal} />
+                            </Box>
+                        )}
+                        {selectedTab === 3 && (
+                            <Box padding="2" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                                <DevicesTab asset={asset} enrichMaps={enrichMaps} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />
+                            </Box>
+                        )}
                     </>
                 )}
             </Box>

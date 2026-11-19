@@ -4,13 +4,18 @@ import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Updates.set;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.CustomRole;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.rbac.CollectionRule;
+import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,6 +54,11 @@ public class RBACDao extends CommonContextDao<RBAC> {
         rbacEntryCache.remove(key);
     }
 
+    /** Drops every cached RBAC entry of the account (see RbacCacheVersionDao). */
+    public static void clearAccountCache(int accountId) {
+        rbacEntryCache.keySet().removeIf(key -> key.getSecond() != null && key.getSecond() == accountId);
+    }
+
     /*
      * Base roles whose threat access is decided by the role itself. Admin and the threat
      * roles always keep it, guest never gets it, and a custom role built on any of them
@@ -57,50 +67,70 @@ public class RBACDao extends CommonContextDao<RBAC> {
     private static final Set<Role> FIXED_THREAT_ACCESS_ROLES = new HashSet<>(java.util.Arrays.asList(
             Role.ADMIN, Role.GUEST, Role.THREAT_ENGINEER, Role.THREAT_VIEWER));
 
+    /** The user's current custom role, or null for built-in roles. */
+    public static CustomRole currentCustomRole(int userId, int accountId) {
+        RBAC rbac = getCurrentRBACForUser(userId, accountId);
+        if (rbac == null) {
+            return null;
+        }
+        String currentRole = instance.fetchRole(rbac);
+        /*
+         * Custom role names cannot collide with built-in ones (RoleAction rejects
+         * reserved keywords), so a built-in role can skip the lookup entirely.
+         */
+        if (currentRole == null || currentRole.isEmpty() || Role.fromName(currentRole) != null) {
+            return null;
+        }
+        return CustomRoleDao.instance.findRoleByNameCached(currentRole);
+    }
+
     /*
-     * A custom role on any other base role may be granted threat protection by its toggle.
+     * Access to a feature for the user's current role: the base role's access, then for threat
+     * features the custom role's threat toggle, then any per-feature override on the custom role.
      * The toggle can only ever add access, never remove what the base role already gives.
-     * Callers should invoke this only for Feature.THREAT_PROTECTION, since it costs a
-     * custom role lookup.
      */
-    public static ReadWriteAccess resolveThreatAccess(int userId, int accountId, ReadWriteAccess baseRoleAccess) {
+    public static ReadWriteAccess resolveFeatureAccess(int userId, int accountId, Feature feature, ReadWriteAccess baseRoleAccess) {
         try {
-            RBAC rbac = getCurrentRBACForUser(userId, accountId);
-            if (rbac == null) {
-                return baseRoleAccess;
-            }
-
-            String currentRole = instance.fetchRole(rbac);
-            if (currentRole == null || currentRole.isEmpty()) {
-                return baseRoleAccess;
-            }
-
-            /*
-             * Custom role names cannot collide with built-in ones (RoleAction rejects
-             * reserved keywords), so a built-in role can skip the lookup entirely.
-             */
-            try {
-                Role.valueOf(currentRole);
-                return baseRoleAccess;
-            } catch (IllegalArgumentException builtInRoleNotFound) {
-                // not a built-in role, so it may be a custom one
-            }
-
-            CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
-            if (customRole == null || customRole.getBaseRole() == null) {
-                return baseRoleAccess;
-            }
-
-            // the base role decides on its own; the toggle is not consulted
-            if (FIXED_THREAT_ACCESS_ROLES.contains(Role.valueOf(customRole.getBaseRole()))) {
-                return baseRoleAccess;
-            }
-
-            return Boolean.TRUE.equals(customRole.getThreatProtectionEnabled())
-                    ? ReadWriteAccess.READ_WRITE : baseRoleAccess;
+            return accessFor(currentCustomRole(userId, accountId), feature, baseRoleAccess);
         } catch (Exception e) {
             return baseRoleAccess;
         }
+    }
+
+    /** Access a custom role gives to a feature, given its base role's access (null role: the base role's access). */
+    public static ReadWriteAccess accessFor(CustomRole customRole, Feature feature, ReadWriteAccess baseRoleAccess) {
+        if (customRole == null || customRole.getBaseRole() == null) {
+            return baseRoleAccess;
+        }
+
+        ReadWriteAccess override = customRole.overrideFor(feature);
+        if (override == null && feature == Feature.THREAT_SETTINGS) {
+            // threat settings follow threat protection unless changed on their own
+            override = customRole.overrideFor(Feature.THREAT_PROTECTION);
+        }
+        if (override != null) {
+            return override;
+        }
+
+        boolean threatFeature = feature == Feature.THREAT_PROTECTION || feature == Feature.THREAT_SETTINGS;
+        // the base role decides on its own; the toggle is not consulted
+        if (!threatFeature || FIXED_THREAT_ACCESS_ROLES.contains(Role.fromName(customRole.getBaseRole()))) {
+            return baseRoleAccess;
+        }
+
+        return Boolean.TRUE.equals(customRole.getThreatProtectionEnabled())
+                ? ReadWriteAccess.READ_WRITE : baseRoleAccess;
+    }
+
+    /** Access a built-in or custom role gives to a feature; unknown roles give none. */
+    public static ReadWriteAccess accessFor(String roleName, Feature feature, boolean fresh) {
+        Role role = Role.fromName(roleName);
+        if (role != null) {
+            return role.getReadWriteAccessForFeature(feature);
+        }
+        CustomRole customRole = fresh ? CustomRoleDao.instance.findRoleByName(roleName) : CustomRoleDao.instance.findRoleByNameCached(roleName);
+        Role baseRole = customRole == null ? null : Role.fromName(customRole.getBaseRole());
+        return baseRole == null ? ReadWriteAccess.NO_ACCESS : accessFor(customRole, feature, baseRole.getReadWriteAccessForFeature(feature));
     }
 
     public static Role getCurrentRoleForUser(int userId, int accountId){
@@ -112,17 +142,37 @@ public class RBACDao extends CommonContextDao<RBAC> {
             if(currentRole == null){
                 return Role.MEMBER;
             }
-            CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
-            if (customRole != null) {
-                actualRole = Role.valueOf(customRole.getBaseRole());
-            } else {
-                actualRole = Role.valueOf(currentRole);
+            Role resolvedRole = Role.fromName(currentRole);
+            if (resolvedRole == null) {
+                CustomRole customRole = CustomRoleDao.instance.findRoleByNameCached(currentRole);
+                resolvedRole = customRole == null ? null : Role.fromName(customRole.getBaseRole());
             }
+            if (resolvedRole == null) {
+                // unknown or deleted role: no access instead of an exception (which callers treated as full access)
+                logger.error(String.format("Unknown role %s for userId: %d accountId: %d", currentRole, userId, accountId));
+                resolvedRole = Role.NO_ACCESS;
+            }
+            actualRole = resolvedRole;
         }
         return actualRole;
     }
 
+    /** True when the user's role in the current product is a custom role that no longer exists (e.g. deleted while still in an SSO mapping). */
+    public static boolean hasMissingRole(int userId, int accountId) {
+        RBAC rbac = getCurrentRBACForUser(userId, accountId);
+        if (rbac == null || rbac.hasAccessExpired()) {
+            return false;
+        }
+        String currentRole = instance.fetchRole(rbac);
+        return currentRole != null && !currentRole.isEmpty() && Role.fromName(currentRole) == null
+                && CustomRoleDao.instance.findRoleByNameCached(currentRole) == null;
+    }
+
     public String fetchRole (RBAC userRbac) {
+        // time-bound access has ended: no access in any product until someone extends it
+        if (userRbac.hasAccessExpired()) {
+            return Role.NO_ACCESS.getName();
+        }
 
         String currentRole = null;
         if (userRbac.getScopeRoleMapping() != null && !userRbac.getScopeRoleMapping().isEmpty()) {
@@ -149,6 +199,14 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
     
     public List<Integer> getUserCollectionsById(int userId, int accountId) {
+        return getUserCollectionsById(userId, accountId, true);
+    }
+
+    /*
+     * includeRules=false gives only the explicit grants (role and user collection ids), for screens that
+     * edit and save those grants back; rule matches must never be saved as fixed per-user grants.
+     */
+    private List<Integer> getUserCollectionsById(int userId, int accountId, boolean includeRules) {
         RBAC rbac = getCurrentRBACForUser(userId, accountId);
 
         if (rbac == null) {
@@ -156,14 +214,9 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return new ArrayList<>();
         }
 
+        // the role in the current product decides; the older single role field is used by fetchRole only when there is no per-product mapping
         String currentRole = fetchRole(rbac);
-        if(currentRole != null && !currentRole.isEmpty()){
-            if(currentRole.equals(Role.ADMIN.getName())){
-                logger.debug(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
-                return null;
-            }
-        }
-         if (RBAC.Role.ADMIN.name().equals(rbac.getRole())) {
+        if (currentRole != null && Role.fromName(currentRole) == Role.ADMIN) {
             logger.debug(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
             return null;
         }
@@ -177,10 +230,16 @@ public class RBACDao extends CommonContextDao<RBAC> {
             currentRole = rbac.getRole();
         }
 
-        CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
+        CustomRole customRole = CustomRoleDao.instance.findRoleByNameCached(currentRole);
         Set<Integer> apiCollectionsId = new HashSet<>();
+        boolean hasRules = includeRules && customRole != null && customRole.getCollectionRules() != null && !customRole.getCollectionRules().isEmpty();
         if (customRole != null) {
-            apiCollectionsId.addAll(customRole.getApiCollectionsId());
+            if (customRole.getApiCollectionsId() != null) {
+                apiCollectionsId.addAll(customRole.getApiCollectionsId());
+            }
+            if (hasRules) {
+                apiCollectionsId.addAll(RuleCollections.idsFor(customRole));
+            }
         }
 
         if (rbac.getApiCollectionsId() == null) {
@@ -190,7 +249,47 @@ public class RBACDao extends CommonContextDao<RBAC> {
             apiCollectionsId.addAll(rbac.getApiCollectionsId());
         }
 
+        // an empty list means all collections, so a role limited by rules that match nothing yet must still see nothing,
+        // and so must a custom role that no longer exists (e.g. deleted while still named in an SSO group mapping)
+        boolean unknownRole = customRole == null && currentRole != null && Role.fromName(currentRole) == null;
+        if ((hasRules || unknownRole) && apiCollectionsId.isEmpty()) {
+            apiCollectionsId.add(NO_COLLECTION_ID);
+        }
+
         return new ArrayList<>(apiCollectionsId);
+    }
+
+    /** Collection id that matches no collection; keeps a limited user limited when nothing matches. */
+    public static final int NO_COLLECTION_ID = Integer.MIN_VALUE;
+
+    /** Collections matching host / tag rules, straight from the DB (callers use the ids saved on the role, see RuleCollections). */
+    public static Set<Integer> matchRules(List<CollectionRule> rules) {
+        List<Bson> filters = new ArrayList<>();
+        for (CollectionRule rule : rules) {
+            if (rule == null || rule.validate() != null) {
+                continue;
+            }
+            if (rule.getHostRegex() != null && !rule.getHostRegex().trim().isEmpty()) {
+                // collections without a host (created by hand or from a file) are matched by their name instead
+                Bson noHost = Filters.or(Filters.exists(ApiCollection.HOST_NAME, false), Filters.eq(ApiCollection.HOST_NAME, null), Filters.eq(ApiCollection.HOST_NAME, ""));
+                filters.add(Filters.or(
+                        Filters.regex(ApiCollection.HOST_NAME, rule.getHostRegex()),
+                        Filters.and(noHost, Filters.regex(ApiCollection.NAME, rule.getHostRegex()))));
+            } else {
+                filters.add(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                        Filters.eq(CollectionTags.KEY_NAME, rule.getTagKey()),
+                        Filters.eq(CollectionTags.VALUE, rule.getTagValue()))));
+            }
+        }
+        Set<Integer> ids = new HashSet<>();
+        if (!filters.isEmpty()) {
+            // raw query: the RBAC-filtered DAO methods resolve the user's collections through the rules
+            for (ApiCollection collection : ApiCollectionsDao.instance.getMCollection()
+                    .find(Filters.or(filters)).projection(Projections.include(ApiCollection.ID))) {
+                ids.add(collection.getId());
+            }
+        }
+        return ids;
     }
 
     public HashMap<Integer, List<Integer>> getAllUsersCollections(int accountId) {
@@ -199,7 +298,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
         List<Integer> userList = UsersDao.instance.getAllUsersIdsForTheAccount(accountId);
 
         for (int userId : userList) {
-            collectionList.put(userId, getUserCollectionsById(userId, accountId));
+            collectionList.put(userId, getUserCollectionsById(userId, accountId, false));
         }
 
         return collectionList;

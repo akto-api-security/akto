@@ -6,12 +6,17 @@ import PersistStore from '../../../../main/PersistStore'
 import GetPrettifyEndpoint from '../../observe/GetPrettifyEndpoint'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import TitleWithInfo from '../../../components/shared/TitleWithInfo'
+import { usePermissions, whenAllowed } from '@/util/permissions'
+import AllowedAction from '../../../components/shared/AllowedAction'
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const UndoDemergedApis = () => {
     const [mergedApis, setMergedApis] = useState([])
     const [loading, setLoading] = useState(false)
     
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const { canCall } = usePermissions()
+    const canUndo = canCall('api/undoDemergedApis')
 
     const fetchMergedApis = async () => {
         setLoading(true)
@@ -19,7 +24,7 @@ const UndoDemergedApis = () => {
             setMergedApis(res || [])
             setLoading(false)
         }).catch((err) => {
-            func.setToast(true, true, 'Something went wrong while fetching de-merged APIs')
+            func.setToast(true, true, 'Something went wrong while fetching de-merged ' + mapLabel('APIs', getDashboardCategory()))
             setLoading(false)
         })
     }
@@ -36,10 +41,10 @@ const UndoDemergedApis = () => {
         setLoading(true)
         await settingRequests.undoDemergedApis(mergedApis).then((res) => {
             setLoading(false)
-            func.setToast(true, false, 'Successfully undone de-merged APIs')
+            func.setToast(true, false, 'Successfully undone de-merged ' + mapLabel('APIs', getDashboardCategory()))
             fetchMergedApis()
         }).catch((err) => {
-            func.setToast(true, true, 'Something went wrong while undoing de-merged APIs')
+            func.setToast(true, true, 'Something went wrong while undoing de-merged ' + mapLabel('APIs', getDashboardCategory()))
             setLoading(false)
         })
     }
@@ -50,8 +55,9 @@ const UndoDemergedApis = () => {
 
         const shortcutActions = [
             {
-                content: <Button plain>Undo</Button>,
-                onAction: () => undoDemergedApis([item])
+                content: <Button plain disabled={!canUndo}>Undo</Button>,
+                onAction: () => undoDemergedApis([item]),
+                ...whenAllowed(canUndo)
             }
         ]
 
@@ -76,10 +82,10 @@ const UndoDemergedApis = () => {
             {
                 mergedApis && mergedApis?.length > 0 ?
                 <ResourceList
-                    resourceName={{ singular: 'merged api', plural: 'merged apis' }}
+                    resourceName={{ singular: 'merged ' + mapLabel('API', getDashboardCategory()), plural: 'merged ' + mapLabel('APIs', getDashboardCategory()) }}
                     items={mergedApis}
                     renderItem={resourceListRenderItems}
-                    headerContent={`Showing ${mergedApis.length} merged api${mergedApis.length > 1 ? 's': ''}`}
+                    headerContent={`Showing ${mergedApis.length} merged ${mergedApis.length > 1 ? mapLabel('APIs', getDashboardCategory()) : mapLabel('API', getDashboardCategory())}`}
                     showHeader
                     loading={loading}
                 /> : 
@@ -92,8 +98,8 @@ const UndoDemergedApis = () => {
 
     const secondaryActionsComp = (
         <HorizontalStack gap={"2"}>
-            <Button disabled={mergedApis?.length === 0} onClick={() => undoDemergedApis(mergedApis)}>Undo All De-merged APIs</Button>
-                {window.USER_NAME?.toLowerCase()?.includes("@akto.io") ? <Button onClick={() => deleteDuplicateEntries()}>Delete duplicates</Button> : null}
+            <AllowedAction allowed={canUndo}><Button disabled={mergedApis?.length === 0} onClick={() => undoDemergedApis(mergedApis)}>Undo All De-merged {mapLabel('APIs', getDashboardCategory())}</Button></AllowedAction>
+                {window.USER_NAME?.toLowerCase()?.includes("@akto.io") ? <AllowedAction allowed={canCall('api/deleteDuplicateEntries')}><Button onClick={() => deleteDuplicateEntries()}>Delete duplicates</Button></AllowedAction> : null}
         </HorizontalStack>
         
     )
@@ -102,8 +108,8 @@ const UndoDemergedApis = () => {
         <PageWithMultipleCards
             title={
                 <TitleWithInfo
-                    tooltipContent={"Undo a de-merged API"}
-                    titleText={"Undo De-merged APIs"} 
+                    tooltipContent={"Undo a de-merged " + mapLabel('API', getDashboardCategory())}
+                    titleText={"Undo De-merged " + mapLabel('APIs', getDashboardCategory())} 
                     docsUrl={"https://docs.akto.io/api-inventory/how-to/de-merge-api"}
                 />
             }

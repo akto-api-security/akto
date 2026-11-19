@@ -328,7 +328,13 @@ function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTi
         const params = new URLSearchParams(window.location.search);
         const deviceId = params.get("device");
         if (!deviceId) return;
-        openDeviceFlyout({ deviceId, path: [deviceId] });
+        // Deep link (?device=...): fetch the device's own row the same way the grid does -
+        // {deviceId, path:[deviceId]} alone has no username/os/lastSeen/violations, which used
+        // to render the flyout with every field blank. deviceId has its own exact-match column
+        // filter in the grid (buildDeviceColDefs), so it's a real, already-supported filter key.
+        onServerFetch({ skip: 0, limit: 1, filters: { deviceId: [deviceId] } }).then((res) => {
+            openDeviceFlyout(res?.value?.[0] || { deviceId, path: [deviceId] });
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -341,7 +347,7 @@ function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTi
         }
         const assetId = data.rawServiceName || data.endpoint;
         const params = new URLSearchParams({ asset: assetId, type: data.type || "" });
-        window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
+        window.location.href = `/dashboard/observe/agentic-assets?${params}`;
     }, [openDeviceFlyout]);
 
     const isServerSideGroup = useCallback((data) => (data.path || []).length === 1, []);
@@ -425,7 +431,7 @@ export default function DeviceEndpoints() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[4],
+        func.getAllTimeRangeForAccounts() || values.ranges[4],
     );
     const startTimestamp = Math.floor(Date.parse(currDateRange.period.since) / 1000);
     const endTimestamp = Math.floor(Date.parse(currDateRange.period.until) / 1000);
@@ -443,7 +449,7 @@ export default function DeviceEndpoints() {
     }, [navigate, setAgenticNewLayout]);
 
     const enrichRef = useRef({
-        trafficMap: {}, riskScoreMap: {}, usernameMap: {}, userMetadataMap: {},
+        trafficMap: {}, riskScoreMap: {}, userMetadataMap: {},
         deviceMetadataMap: {}, violationsByCollectionId: {},
     });
 
@@ -466,7 +472,7 @@ export default function DeviceEndpoints() {
                 const shieldResult = settledValue(shieldSettled, {});
                 const hostCounts = settledValue(hostCountsSettled, {});
                 const { collections = [], trafficMap = {}, riskScoreMap = {} } = collectionsBundle || {};
-                const { usernameMap = {}, userMetadataMap = {}, moduleInfos = [] } = shieldResult || {};
+                const { userMetadataMap = {}, moduleInfos = [] } = shieldResult || {};
                 const violationsByCollectionId = aggregateViolationCountsByCollectionId(hostCounts, collections);
                 const deviceMetadataMap = buildModuleDeviceMap(moduleInfos);
                 const severitySums = { critical: 0, high: 0, medium: 0, low: 0 };
@@ -477,7 +483,7 @@ export default function DeviceEndpoints() {
                     severitySums.low += c.low || 0;
                 });
                 enrichRef.current = {
-                    trafficMap, riskScoreMap, usernameMap, userMetadataMap, deviceMetadataMap, violationsByCollectionId,
+                    trafficMap, riskScoreMap, userMetadataMap, deviceMetadataMap, violationsByCollectionId,
                 };
                 setCollections(collections);
                 setViolationsBySeverity([
@@ -502,8 +508,7 @@ export default function DeviceEndpoints() {
 
     const loadStats = useCallback(async () => {
         try {
-            const { usernameMap, deviceMetadataMap } = enrichRef.current;
-            const result = await api.fetchDeviceEndpointsStats({ usernameMap, deviceMetadataMap, startTimestamp, endTimestamp });
+            const result = await api.fetchDeviceEndpointsStats({ startTimestamp, endTimestamp });
             setStats(result);
         } catch (e) {
             // eslint-disable-next-line no-console
@@ -543,16 +548,13 @@ export default function DeviceEndpoints() {
     }, [refreshKey, stats.deviceIds]);
 
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, groupKeys, filters }) => {
-        const { trafficMap, riskScoreMap, usernameMap, userMetadataMap, deviceMetadataMap, violationsByCollectionId } = enrichRef.current;
+        const { trafficMap, riskScoreMap, violationsByCollectionId } = enrichRef.current;
         const mappedSortKey = SORT_FIELD_MAP[sortKey] || "riskScore";
         const mongoSortOrder = sortOrder === -1 ? 1 : -1; // AG Grid asc=-1/desc=1 is inverted vs Mongo
         const parentDeviceId = groupKeys && groupKeys.length === 1 ? groupKeys[0] : undefined;
-        const tagsByUsername = Object.fromEntries(
-            Object.entries(userMetadataMap || {}).map(([u, m]) => [u, m.tags || []])
-        );
         return api.fetchDeviceEndpointsSummary({
             parentDeviceId, skip, limit, sortKey: mappedSortKey, sortOrder: mongoSortOrder, queryValue: searchString,
-            trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername,
+            trafficMap, riskScoreMap, violationsByCollectionId, filters,
         }).then((res) => ({ value: (res.rows || []).map(shapeRow), total: res.total || 0 }));
     }, []);
 

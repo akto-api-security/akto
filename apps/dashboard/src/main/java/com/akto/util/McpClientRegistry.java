@@ -1,8 +1,11 @@
 package com.akto.util;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -52,7 +55,7 @@ public final class McpClientRegistry {
         String MCP_SERVER = AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER;
 
         register("claude", "Claude", AI_AGENT);
-        register("claude1", "Claude Desktop", AI_AGENT, "claude-desktop");
+        register("claude1", "Claude Desktop", AI_AGENT, "claude-desktop", "claude-app");
         register("claude2", "Claude CLI", AI_AGENT,
                 "claude", "claudecli", "claude-cli", "claude-cli-user", "claude-cli-project",
                 "claude-cli-local", "claude-cli-enterprise", "claude-plugin", "claude-code");
@@ -73,6 +76,7 @@ public final class McpClientRegistry {
         register("vscopilot", "Visual Studio Copilot", AI_AGENT, "visual-studio-copilot");
         register("cursor", "Cursor", AI_AGENT);
         register("grok", "Grok", AI_AGENT);
+        register("grokbot", "Grok Bot", AI_AGENT, "grok-bot");
         register("cody", "Cody", AI_AGENT);
         register("windsurf", "Windsurf", AI_AGENT);
         register("codeium", "Codeium", AI_AGENT);
@@ -98,6 +102,33 @@ public final class McpClientRegistry {
         register("litellm", "LiteLLM", AI_AGENT);
         register("filesystem", "Filesystem", MCP_SERVER);
         register("universal", "Universal", MCP_SERVER);
+    }
+
+    // AI inventory only (server-side, no JS mirror): agents shown as IDE assistants rather than CLIs.
+    // Keyed by KNOWN_CLIENTS key. Follows the Connectors page's "Agentic IDEs & Apps" category
+    // (quick_start/transform.js agenticIdes), which includes desktop apps (Claude Desktop, Claude
+    // Cowork), plus IDEs it doesn't list yet.
+    private static final Set<String> IDE_ASSISTANT_KEYS = new HashSet<>(Arrays.asList(
+            "cursor", "windsurf", "codeium", "vscode", "vs", "githubcopilot", "vscopilot",
+            "kiroide", "antigravity", "cody", "tabnine", "claude1", "claude_cowork"));
+
+    private static final Pattern WORD_SPLIT_PATTERN = Pattern.compile("[-_.\\s]+");
+
+    // Whole-word match only, unlike findClientInfo's substring fallback ("devstral" isn't "vs").
+    // Takes an agent group key ("claude2", "cursor") or an LLM domain ("chatgpt.com").
+    private static String knownClientKey(String value) {
+        if (value == null || value.isEmpty()) return null;
+        String lower = value.toLowerCase(Locale.ROOT);
+        String resolved = resolveClientKey(lower);
+        if (KNOWN_CLIENTS.containsKey(resolved)) return resolved;
+        for (String part : WORD_SPLIT_PATTERN.split(lower)) {
+            if (KNOWN_CLIENTS.containsKey(part)) return part;
+        }
+        return null;
+    }
+
+    public static boolean isIdeAssistant(String value) {
+        return IDE_ASSISTANT_KEYS.contains(knownClientKey(value));
     }
 
     /** Canonical KNOWN_CLIENTS key for a raw wire-level tag value (identity if not an aliased variant). */

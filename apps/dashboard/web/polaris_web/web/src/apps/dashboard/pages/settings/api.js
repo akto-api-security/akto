@@ -42,13 +42,14 @@ const settingRequests = {
         })
     },
 
-    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+    updateUserScopeRoleMapping(email, scopeRoleMapping, accessExpiresAt) {
         return request({
             url: '/api/updateUserScopeRoleMapping',
             method: 'post',
             data: {
                 email: email,
-                scopeRoleMapping: scopeRoleMapping
+                scopeRoleMapping: scopeRoleMapping,
+                accessExpiresAt: accessExpiresAt
             }
         })
     },
@@ -197,21 +198,21 @@ const settingRequests = {
         })
     },
 
-    addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly) {
+    addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly, sensitiveDataAlertRules) {
         return request({
             url: '/api/addCustomWebhook',
             method: 'post',
             data: {
-                webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly
+                webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly, sensitiveDataAlertRules
             }
         })
     },
-    updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, sendInstantly) {
+    updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, sendInstantly, sensitiveDataAlertRules) {
         return request({
             url: '/api/updateCustomWebhook',
             method: 'post',
             data: {
-                id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, sendInstantly
+                id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, sendInstantly, sensitiveDataAlertRules
             }
         })
     },
@@ -410,6 +411,9 @@ const settingRequests = {
             oktaGroupToAktoUserRoleMap,
             syncGroupsToUserTags: opts.syncGroupsToUserTags === true,
         }
+        if (Object.prototype.hasOwnProperty.call(opts, 'removeAccessWithoutGroup')) {
+            data.removeAccessWithoutGroup = opts.removeAccessWithoutGroup === true
+        }
         if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
             const t = opts.managementApiToken
             // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
@@ -427,6 +431,14 @@ const settingRequests = {
             url: '/api/fetchSAMLSso',
             method: 'post',
             data: {configType}
+        })
+    },
+
+    saveSamlGroupRoleMapping(groupRoleMapping, configType, removeAccessWithoutGroup) {
+        return request({
+            url: '/api/saveSamlGroupRoleMapping',
+            method: 'post',
+            data: {groupRoleMapping, configType, removeAccessWithoutGroup}
         })
     },
 
@@ -593,6 +605,13 @@ const settingRequests = {
             }
         });
     },
+    fetchAssignableRoles(){
+        return request({
+            url: '/api/fetchAssignableRoles',
+            method: 'post',
+            data: {}
+        });
+    },
     getRoleHierarchy(){
         return request({
             url: '/api/getRoleHierarchy',
@@ -658,18 +677,19 @@ const settingRequests = {
             data: {}
         })
     },
-    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
+    // opts: permissionOverrides, collectionRules, assignableRoles (and threatProtectionEnabled) when copying a role
+    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, opts = {}) {
         return request({
             url: '/api/createCustomRole',
             method: 'post',
-            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled }
+            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, ...opts }
         })
     },
-    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides, collectionRules, assignableRoles) {
         return request({
             url: '/api/updateCustomRole',
             method: 'post',
-            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled}
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides, collectionRules, assignableRoles}
         })
     },
     deleteCustomRole(roleName) {
@@ -679,11 +699,11 @@ const settingRequests = {
             data: {roleName}
         })
     },
-    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies) {
+    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, severityLevels, threatPolicies) {
         return request({
             url: '/api/addAwsWafIntegration',
             method: 'post',
-            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies}
+            data: {awsAccessKey, awsSecretKey, region, severityLevels, threatPolicies}
         })
     },
     fetchAwsWafIntegration() {
@@ -849,6 +869,102 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchLinearIntegration() {
+        return request({
+            url: '/api/fetchLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchLinearTeams(apiToken) {
+        return request({
+            url: '/api/fetchLinearTeams',
+            method: 'post',
+            data: { apiToken }
+        })
+    },
+
+    createLinearTeam(apiToken, teamName, teamKey) {
+        return request({
+            url: '/api/createLinearTeam',
+            method: 'post',
+            data: { apiToken, teamName, teamKey }
+        })
+    },
+
+    addLinearIntegration(apiToken) {
+        return request({
+            url: '/api/addLinearIntegration',
+            method: 'post',
+            data: { apiToken }
+        })
+    },
+
+    saveLinearTeams(teamMappings) {
+        return request({
+            url: '/api/saveLinearTeams',
+            method: 'post',
+            data: { teamMappings }
+        })
+    },
+
+    saveLinearBiDirectionalSync(biDirectionalSyncEnabled) {
+        return request({
+            url: '/api/saveLinearBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled }
+        })
+    },
+
+    removeLinearIntegration() {
+        return request({
+            url: '/api/removeLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchPortIOIntegration() {
+        return request({
+            url: '/api/fetchPortIOIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addPortIOIntegration(clientId, clientSecret, workflowId) {
+        return request({
+            url: '/api/addPortIOIntegration',
+            method: 'post',
+            data: { clientId, clientSecret, workflowId }
+        })
+    },
+
+    savePortIOSeverityMapping(severityToPriority) {
+        return request({
+            url: '/api/savePortIOSeverityMapping',
+            method: 'post',
+            data: { severityToPriority }
+        })
+    },
+
+    savePortIOBiDirectionalSync(biDirectionalSyncEnabled, updateWorkflowId) {
+        return request({
+            url: '/api/savePortIOBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled, updateWorkflowId }
+        })
+    },
+
+    removePortIOIntegration() {
+        return request({
+            url: '/api/removePortIOIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     removeInvitation(email) {
         return request({
             url: '/api/removeInvitation',
@@ -878,11 +994,53 @@ const settingRequests = {
         })
     },
     // ATLAS: server-side paginated Endpoint Shield agents (replaces the load-all fetchModuleInfo on that page)
-    async fetchEndpointShieldAgents({ skip = 0, limit = 20, sortKey = "lastHeartbeat", sortOrder = -1, hostnames = [], usernames = [], deviceIds = [], oses = [], queryValue = "", startTimestamp = 0, endTimestamp = 0 } = {}) {
+    async fetchEndpointShieldAgents({ skip = 0, limit = 20, sortKey = "lastHeartbeat", sortOrder = -1, hostnames = [], usernames = [], deviceIds = [], oses = [], browserNames = [], agentVersions = [], statuses = [], providers = [], queryValue = "", startTimestamp = 0, endTimestamp = 0 } = {}) {
         return await request({
             url: '/api/fetchEndpointShieldAgents',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, queryValue, startTimestamp, endTimestamp }
+            data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, browserNames, agentVersions, statuses, providers, queryValue, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchEndpointShieldStats({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchEndpointShieldStats',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchAtlasOverview({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchAtlasOverview',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchAtlasTrend({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchAtlasTrend',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchAtlasEmployees(params = {}) {
+        return await request({
+            url: '/api/fetchAtlasEmployees',
+            method: 'post',
+            data: params
+        })
+    },
+    async fetchAtlasPersonDetail({ deviceScope = "all", atlasKind, atlasId }) {
+        return await request({
+            url: '/api/fetchAtlasPersonDetail',
+            method: 'post',
+            data: { deviceScope, atlasKind, atlasId }
+        })
+    },
+    async fetchAtlasDevices(params = {}) {
+        return await request({
+            url: '/api/fetchAtlasDevices',
+            method: 'post',
+            data: params
         })
     },
     async fetchEndpointShieldFilterOptions() {
@@ -899,6 +1057,14 @@ const settingRequests = {
             url: '/api/fetchEndpointShieldUserMetadata',
             method: 'post',
             data: {}
+        })
+    },
+    // installedAppsToCheck: [{ name, version }, ...] — returns installedAppVulnerabilities keyed by "name#version"
+    async checkInstalledAppVulnerabilities(installedAppsToCheck) {
+        return await request({
+            url: '/api/checkInstalledAppVulnerabilities',
+            method: 'post',
+            data: { installedAppsToCheck }
         })
     },
     async deleteModuleInfo(moduleIds) {
@@ -937,11 +1103,11 @@ const settingRequests = {
             data: {}
         })
     },
-    async deleteCloudflareWafIntegration() {
+    async deleteCloudflareWafIntegration(wafType) {
         return await request({
             url: '/api/deleteCloudflareWafIntegration',
             method: 'post',
-            data: {}
+            data: {wafType}
         })
     },
     async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies) {
@@ -986,6 +1152,15 @@ const settingRequests = {
             data: {}
         })
     },
+    async backfillActivityGroupKeys() {
+        return await request({
+            url: '/api/backfillActivityGroupKeys',
+            method: 'post',
+            // Reads every existing activity once; can outlast the 60s default on large accounts.
+            timeout: 300000,
+            data: {}
+        })
+    },
     async deleteDuplicateEntries() {
         return await request({
             url: '/api/deleteDuplicateEntries',
@@ -1012,7 +1187,44 @@ const settingRequests = {
             }
         })
     },
-    getAgentLogs(agentId, startTime, endTime, logKey = null, afterId = null, pageSize = 500) {
+    // level: optional, "error" = error and critical rows only.
+    // Endpoint Shield diagnostics: a device's report history (summaries) and one report.
+    fetchEndpointShieldDiagnostics(deviceId, limit = 20) {
+        return request({
+            url: '/api/fetchEndpointShieldDiagnostics',
+            method: 'post',
+            data: { deviceId, limit }
+        })
+    },
+    runEndpointShieldDiagnostic(deviceId, profile = 'full') {
+        return request({
+            url: '/api/runEndpointShieldDiagnostic',
+            method: 'post',
+            data: { deviceId, profile }
+        })
+    },
+    fetchEndpointShieldDiagnosticRuns(deviceId) {
+        return request({
+            url: '/api/fetchEndpointShieldDiagnosticRuns',
+            method: 'post',
+            data: { deviceId }
+        })
+    },
+    cancelEndpointShieldDiagnosticRun(commandId) {
+        return request({
+            url: '/api/cancelEndpointShieldDiagnosticRun',
+            method: 'post',
+            data: { commandId }
+        })
+    },
+    fetchEndpointShieldDiagnostic(id) {
+        return request({
+            url: '/api/fetchEndpointShieldDiagnostic',
+            method: 'post',
+            data: { id }
+        })
+    },
+    getAgentLogs(agentId, startTime, endTime, logKey = null, afterId = null, pageSize = 500, level = null) {
         return request({
             url: '/api/getAgentLogs',
             method: 'post',
@@ -1022,11 +1234,12 @@ const settingRequests = {
                 endTime,
                 pageSize,
                 ...(logKey ? { logKey } : {}),
-                ...(afterId ? { afterId } : {})
+                ...(afterId ? { afterId } : {}),
+                ...(level ? { level } : {})
             }
         })
     },
-    exportAgentLogs(agentId, startTime, endTime, logKey = null) {
+    exportAgentLogs(agentId, startTime, endTime, logKey = null, level = null) {
         return request({
             url: '/api/exportAgentLogs',
             method: 'post',
@@ -1034,7 +1247,8 @@ const settingRequests = {
                 agentId,
                 startTime,
                 endTime,
-                ...(logKey ? { logKey } : {})
+                ...(logKey ? { logKey } : {}),
+                ...(level ? { level } : {})
             }
         })
     },
@@ -1117,6 +1331,27 @@ const settingRequests = {
             data: {moduleIds, deleteTopicAndReboot}
         })
     },
+    fetchAuthTokens() {
+        return request({
+            url: '/api/fetchAuthTokens',
+            method: 'post',
+            data: {}
+        })
+    },
+    revokeAuthToken(tokenId, reason) {
+        return request({
+            url: '/api/revokeAuthToken',
+            method: 'post',
+            data: {tokenId, reason}
+        })
+    },
+    revokeAllAuthTokens(reason) {
+        return request({
+            url: '/api/revokeAllAuthTokens',
+            method: 'post',
+            data: {reason}
+        })
+    },
     updateModuleEnvAndReboot(moduleId, moduleName, envData) {
         return request({
             url: '/api/updateModuleEnvAndReboot',
@@ -1124,9 +1359,61 @@ const settingRequests = {
             data: {moduleId, moduleName, envData}
         })
     },
+    // Bulk counterpart for the Endpoint Shield table's multi-select (e.g. enabling/disabling
+    // system proxy for several agents at once) — same envData shape as updateModuleEnvAndReboot.
+    bulkUpdateModuleEnvAndReboot(moduleIds, envData) {
+        return request({
+            url: '/api/bulkUpdateModuleEnvAndReboot',
+            method: 'post',
+            data: {moduleIds, envData}
+        })
+    },
+    // Akto users only: validates the agents' stored skills again in a dashboard job
+    triggerSkillRevalidation(agentIds) {
+        return request({
+            url: '/api/triggerSkillRevalidation',
+            method: 'post',
+            data: {agentIds}
+        })
+    },
+    fetchSkillRevalidationJob() {
+        return request({
+            url: '/api/fetchSkillRevalidationJob',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchFilterYamlTemplate() {
         return request({
             url: '/api/fetchFilterYamlTemplate',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchImpervaIntegration() {
+        return request({
+            url: '/api/fetchImpervaIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addImpervaIntegration(apiId, apiKey) {
+        return request({
+            url: '/api/addImpervaIntegration',
+            method: 'post',
+            data: {apiId, apiKey}
+        })
+    },
+    triggerImpervaImport() {
+        return request({
+            url: '/api/triggerImpervaImport',
+            method: 'post',
+            data: {}
+        })
+    },
+    stopImpervaImport() {
+        return request({
+            url: '/api/stopImpervaImport',
             method: 'post',
             data: {}
         })
@@ -1177,18 +1464,28 @@ const settingRequests = {
     fetchFileInspectionRules() {
         return request({ url: '/api/fetchFileInspectionRules', method: 'post', data: {} })
     },
-    addFileInspectionRule(path, existenceOnly, maxDepth) {
+    addFileInspectionRule(path, existenceOnly, maxDepth, agent, os, role) {
         return request({
             url: '/api/addFileInspectionRule',
             method: 'post',
-            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0 }
+            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent, os, role }
         })
     },
-    deleteFileInspectionRule(path) {
+    updateFileInspectionRule(ruleId, path, existenceOnly, maxDepth, agent, os, role) {
+        return request({
+            url: '/api/updateFileInspectionRule',
+            method: 'post',
+            data: { ruleId, path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent, os, role }
+        })
+    },
+    restoreFileInspectionDefaults() {
+        return request({ url: '/api/restoreFileInspectionDefaults', method: 'post', data: {} })
+    },
+    deleteFileInspectionRule(ruleId) {
         return request({
             url: '/api/deleteFileInspectionRule',
             method: 'post',
-            data: { path }
+            data: { ruleId }
         })
     },
     fetchFileInspectionResults(ruleId) {
@@ -1305,6 +1602,27 @@ const settingRequests = {
             url: '/api/cancelEndpointRemoteCommand',
             method: 'post',
             data: { commandId }
+        })
+    },
+    updateMcpKnownClientsOnly(mcpKnownClientsOnly) {
+        return request({
+            url: '/api/updateMcpKnownClientsOnly',
+            method: 'post',
+            data: { mcpKnownClientsOnly }
+        })
+    },
+    addMcpAllowedRedirectUri(mcpRedirectUri) {
+        return request({
+            url: '/api/addMcpAllowedRedirectUri',
+            method: 'post',
+            data: { mcpRedirectUri }
+        })
+    },
+    deleteMcpAllowedRedirectUri(mcpRedirectUri) {
+        return request({
+            url: '/api/deleteMcpAllowedRedirectUri',
+            method: 'post',
+            data: { mcpRedirectUri }
         })
     }
 }

@@ -1,6 +1,7 @@
 package com.akto.action.testing_issues;
 
 import com.akto.action.UserAction;
+import com.akto.action.testing.AiVerificationAction;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dao.RBACDao;
 import com.akto.action.testing.StartTestAction;
@@ -19,7 +20,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.HistoricalData;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
-import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -41,7 +41,6 @@ import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.util.ComplianceResolutionUtils;
 import com.akto.testing_utils.TestingUtils;
-import com.akto.utils.ApiInfoKeyResult;
 import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -89,6 +88,8 @@ public class IssuesAction extends UserAction {
     private List<Severity> filterSeverity;
     private List<String> filterCompliance;
     private List<String> filterSubCategory;
+    @Setter
+    private List<String> filterAiVerdict;
     private List<TestingRunIssues> similarlyAffectedIssues;
     private boolean activeCollections;
 
@@ -109,25 +110,10 @@ public class IssuesAction extends UserAction {
 
     private Map<String, String> issuesDescriptionMap;
 
-    @Getter
-    int buaCategoryCount;
-
-    int URL_METHOD_PAIR_THRESHOLD = 1;
-    
-    @Setter
-    private boolean showTestSubCategories;
-    @Setter
-    private boolean showApiInfo;
-    @Getter
-    private List<ApiInfo> buaCategoryApiInfo = new ArrayList<>();
     @Setter
     String categoryType;
     @Getter
     int endpointsCount;
-
-    public boolean isShowApiInfo() {
-        return showApiInfo;
-    }
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -146,6 +132,9 @@ public class IssuesAction extends UserAction {
         if (filterSubCategory != null && !filterSubCategory.isEmpty()) {
             filters = Filters.and(filters, Filters.in(ID + "."
                     + TestingIssuesId.TEST_SUB_CATEGORY, filterSubCategory));
+        }
+        if (filterAiVerdict != null && !filterAiVerdict.isEmpty()) {
+            filters = Filters.and(filters, AiVerificationAction.aiVerdictFilter(filterAiVerdict));
         }
 
         if (startEpoch != 0) {
@@ -196,6 +185,22 @@ public class IssuesAction extends UserAction {
     long ignoredIssuesCount;
     String sortKey;
     int sortOrder;
+
+    static final String AI_CONFIDENCE_SORT = "aiConfidence";
+
+    /**
+     * Sorts by Verify with AI's confidence in its verdict. Combine with the AI verdict filter to rank
+     * false positives (or true positives) by how sure the AI is. Unverified issues come last either way.
+     */
+    private static List<Bson> aiConfidenceSortStages(int sortOrder) {
+        Bson addVerified = Aggregates.addFields(new Field<>("aiVerified", new BasicDBObject("$cond",
+                Arrays.asList(new BasicDBObject("$ifNull", Arrays.asList("$" + TestingRunIssues.AI_CONFIDENCE, false)), 1, 0))));
+        Bson sort = Aggregates.sort(Sorts.orderBy(Sorts.descending("aiVerified"), sortOrder == 1
+                ? Sorts.ascending(TestingRunIssues.AI_CONFIDENCE, TestingRunIssues.CREATION_TIME)
+                : Sorts.descending(TestingRunIssues.AI_CONFIDENCE, TestingRunIssues.CREATION_TIME)));
+        return Arrays.asList(addVerified, sort);
+    }
+
     public String fetchAllIssues() {
         Bson filters = createFilters(true);
         
@@ -227,6 +232,8 @@ public class IssuesAction extends UserAction {
                     Aggregates.sort(Sorts.ascending(TestingRunIssues.CREATION_TIME)) :
                     Aggregates.sort(Sorts.descending(TestingRunIssues.CREATION_TIME));
             pipeline.add(sortStage);
+        } else if (AI_CONFIDENCE_SORT.equals(sortKey)) {
+            pipeline.addAll(aiConfidenceSortStages(sortOrder));
         }
 
         pipeline.add(Aggregates.skip(skip));
@@ -300,6 +307,8 @@ public class IssuesAction extends UserAction {
                 pipeline.add(Aggregates.sort(sortOrder == 1
                         ? Sorts.ascending(TestingRunIssues.CREATION_TIME)
                         : Sorts.descending(TestingRunIssues.CREATION_TIME)));
+            } else if (AI_CONFIDENCE_SORT.equals(sortKey)) {
+                pipeline.addAll(aiConfidenceSortStages(sortOrder));
             }
             pipeline.add(Aggregates.skip(skip));
             pipeline.add(Aggregates.limit(limit));
@@ -821,6 +830,20 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    /**
+     * An issue that leaves Ignored is no longer a false positive, so the verdict and the reason Verify
+     * with AI wrote are removed. Descriptions written by users are left as they are.
+     */
+    private static void clearAiVerifiedDescription(Bson issuesFilter) {
+        String prefix = AiVerificationAction.DESCRIPTION_PREFIX.replace("[", "\\[").replace("]", "\\]");
+        TestingRunIssuesDao.instance.getMCollection().updateMany(
+            Filters.and(issuesFilter, Filters.regex(TestingRunIssues.DESCRIPTION, "^" + prefix)),
+            Updates.unset(TestingRunIssues.DESCRIPTION));
+        TestingRunIssuesDao.instance.getMCollection().updateMany(
+            Filters.and(issuesFilter, Filters.exists(TestingRunIssues.AI_VERDICT)),
+            Updates.combine(Updates.unset(TestingRunIssues.AI_VERDICT), Updates.unset(TestingRunIssues.AI_CONFIDENCE)));
+    }
+
     public String updateIssueStatus () {
         if (issueId == null || statusToBeUpdated == null || ignoreReason == null) {
             throw new IllegalStateException();
@@ -839,6 +862,9 @@ public class IssuesAction extends UserAction {
         }
         // Verify issue exists and user has access (via dashboard filtering) before updating
         Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.eq(ID, issueId));
+        if (statusToBeUpdated != TestRunIssueStatus.IGNORED) {
+            clearAiVerifiedDescription(accessFilter);
+        }
         TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.getMCollection()
             .findOneAndUpdate(accessFilter, update, new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
         if (updatedIssue != null) {
@@ -879,6 +905,9 @@ public class IssuesAction extends UserAction {
         // Apply dashboard filtering to ensure user has access to all issues before updating
         Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.in(ID, issueIdArray));
         TestingRunIssuesDao.instance.getMCollection().updateMany(accessFilter, update);
+        if (statusToBeUpdated != TestRunIssueStatus.IGNORED && StringUtils.isEmpty(this.description)) {
+            clearAiVerifiedDescription(accessFilter);
+        }
 
         int accountId = Context.accountId.get();
         executorService.schedule( new Runnable() {
@@ -1476,101 +1505,6 @@ public class IssuesAction extends UserAction {
         Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.eq(Constants.ID, issueId));
         TestingRunIssuesDao.instance.getMCollection().updateOne(accessFilter, Updates.set(TestingRunIssues.DESCRIPTION, description));
         return SUCCESS.toUpperCase();
-    }
-
-    public String fetchBUACategoryCount() {
-        ApiInfoKeyResult result = com.akto.utils.Utils.fetchUniqueApiInfoKeys(
-                TestingRunIssuesDao.instance.getRawCollection(),
-                createFilters(true),
-                "_id.apiInfoKey",
-                this.showApiInfo
-        );
-        this.buaCategoryCount = result.count;
-        if (this.showApiInfo) {
-            this.buaCategoryApiInfo = result.apiInfoList;
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    public String fetchUrlsByIssues() {
-        List<Bson> pipeline = new ArrayList<>();
-
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
-        pipeline.add(
-                Aggregates.match(Filters.and(
-                        Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-                        filterQ
-                ))
-        );
-
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
-            }
-        } catch(Exception e){
-        }
-
-        // Group by testSubCategory and collect unique URL+Method combinations
-        BasicDBObject groupId = new BasicDBObject("testSubCategory", "$_id." + TestingIssuesId.TEST_SUB_CATEGORY);
-        pipeline.add(Aggregates.group(groupId,
-                Accumulators.addToSet("apiInfoKeySet", new BasicDBObject("url", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.URL)
-                        .append("method", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.METHOD)
-                        .append("apiCollectionId", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID))
-        ));
-
-        // Filter to only include groups with more than the threshold of unique URL+Method combinations
-        pipeline.add(Aggregates.match(Filters.expr(
-                new BasicDBObject("$gt", Arrays.asList(
-                        new BasicDBObject("$size", "$apiInfoKeySet"),
-                        URL_METHOD_PAIR_THRESHOLD
-                ))
-        )));
-
-        if (!showTestSubCategories) {
-            try {
-                long totalCount = TestingRunIssuesDao.instance.getMCollection()
-                        .aggregate(pipeline, BasicDBObject.class)
-                        .into(new ArrayList<>())
-                        .size();
-
-                this.response = new BasicDBObject();
-                this.response.put("totalCount", (int) totalCount);
-                return SUCCESS.toUpperCase();
-            } catch (Exception e) {
-                addActionError("Error counting URLs by test subcategory");
-                return ERROR.toUpperCase();
-            }
-        }
-
-        pipeline.add(Aggregates.project(Projections.fields(
-                Projections.include("testSubCategory", "apiInfoKeySet"),
-                Projections.computed("apiInfoKeySetCount", new BasicDBObject("$size", "$apiInfoKeySet"))
-        )));
-
-        // Sort by testSubCategory
-        pipeline.add(Aggregates.sort(Sorts.ascending("testSubCategory")));
-
-        try {
-            MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection()
-                    .aggregate(pipeline, BasicDBObject.class)
-                    .cursor();
-
-            List<BasicDBObject> result = new ArrayList<>();
-            while (cursor.hasNext()) {
-                BasicDBObject doc = cursor.next();
-                result.add(doc);
-            }
-
-            this.response = new BasicDBObject();
-            this.response.put("testSubCategories", result);
-            this.response.put("totalCount", result.size());
-
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            addActionError("Error fetching URLs by test subcategory");
-            return ERROR.toUpperCase();
-        }
     }
 
     public List<TestingRunIssues> getIssues() {

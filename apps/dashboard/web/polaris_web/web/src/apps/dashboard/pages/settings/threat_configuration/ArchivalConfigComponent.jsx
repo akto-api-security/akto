@@ -3,8 +3,10 @@ import func from "@/util/func"
 import { LegacyCard, VerticalStack, Divider, Text, Button, Box, Checkbox } from "@shopify/polaris";
 import api from "../../../pages/threat_detection/api.js";
 import Dropdown from "../../../components/layouts/Dropdown.jsx";
+import { usePermissions, whenAllowed, NO_PERMISSION_REASON } from "@/util/permissions";
 
 const ArchivalConfigComponent = ({ title, description }) => {
+    const { canCall } = usePermissions();
     const [deletionDays, setDeletionDays] = useState(60);
     const [deletionEnabled, setDeletionEnabled] = useState(false);
     const [isSaveDisabled, setIsSaveDisabled] = useState(true);
@@ -86,7 +88,8 @@ const ArchivalConfigComponent = ({ title, description }) => {
                 content: 'Save',
                 onAction: onSave,
                 loading: false,
-                disabled: isSaveDisabled
+                disabled: isSaveDisabled,
+                ...whenAllowed(canCall('api/modifyThreatConfiguration') || canCall('api/toggleArchivalEnabled'))
             }}
         >
             <Divider />
@@ -96,7 +99,8 @@ const ArchivalConfigComponent = ({ title, description }) => {
                         label="Enable deletion cron"
                         checked={deletionEnabled}
                         onChange={onToggleEnabled}
-                        helpText="When enabled, malicious events older than the configured retention time will be automatically deleted."
+                        helpText={!canCall('api/toggleArchivalEnabled') ? NO_PERMISSION_REASON : "When enabled, malicious events older than the configured retention time will be automatically deleted."}
+                        disabled={!canCall('api/toggleArchivalEnabled')}
                     />
                     <Box width="200px">
                         <Dropdown
@@ -104,6 +108,7 @@ const ArchivalConfigComponent = ({ title, description }) => {
                             selected={(val) => onChange(val)}
                             label="Retention Time"
                             initial={() => `${deletionDays} days`}
+                            disabled={!canCall('api/modifyThreatConfiguration')}
                         />
                     </Box>
                 </VerticalStack>

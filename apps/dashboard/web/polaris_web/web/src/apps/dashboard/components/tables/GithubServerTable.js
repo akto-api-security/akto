@@ -7,6 +7,7 @@ import {
   useIndexResourceState,
   Pagination,
   HorizontalStack,
+  HorizontalGrid,
   Key,
   ChoiceList,
   Tabs,
@@ -14,11 +15,16 @@ import {
   Text,
   Link,
   Button,
-  Tooltip} from '@shopify/polaris';
+  Tooltip,
+  Box,
+  Popover,
+  ActionList
+} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
 import { createPortal } from 'react-dom';
 import "./style.css"
+import { withPermissions } from "@/util/permissions";
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
 import PersistStore from '../../../main/PersistStore';
@@ -35,21 +41,27 @@ import DateRangePicker from '../layouts/DateRangePicker';
 import SpinnerCentered from '../progress/SpinnerCentered';
 import { ImportMinor } from '@shopify/polaris-icons';
 
+// Rows per CSV-export request — at or under every backend's per-request cap, so no single call is huge.
+const EXPORT_CHUNK_SIZE = 500;
+
 function GithubServerTable(props) {
 
   const navigate = useNavigate();
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   // {replace: true} — this only mirrors internal filter state into the URL (for shareability/
   // refresh-persistence), it isn't a user-initiated navigation. Without replace, every mount
   // (this runs even with an empty filter set, see the effect below) pushes a second, near-duplicate
   // history/location entry on top of whatever page just navigated here — PageWithMultipleCards'
   // own back-navigation stack (which tracks pathname+search) then sees that as a distinct entry,
   // so its back arrow has to be pressed twice to actually leave a page that mounted this table.
+  // Keep the hash: setSearchParams navigates to "?..." and drops it, which changes currentPageKey
+  // and re-runs the URL-filter sync below — after a page reload that sync ignores the URL and
+  // resets the filter the user just picked, so the first click on a filter option did nothing.
   const updateQueryParams = (key, value) => {
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set(key, value);
-    setSearchParams(newSearchParams, { replace: true });
+    navigate({ search: newSearchParams.toString(), hash: window.location.hash }, { replace: true });
   };
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
@@ -99,7 +111,22 @@ function GithubServerTable(props) {
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
   const [page, setPage] = useState(0);
-  const pageLimit = props?.pageLimit || 20;
+  // The page-size selector defaults every table to 50, regardless of whatever pageLimit a given
+  // page happens to pass in — a page only keeps its own smaller pageLimit (e.g. a compact 10-row
+  // flyout list) by also opting out of the selector via hidePageSizeSelector.
+  const [pageLimit, setPageLimit] = useState(props?.hidePageSizeSelector ? (props?.pageLimit || 50) : 50);
+  const [pageSizePopoverActive, setPageSizePopoverActive] = useState(false);
+  const handlePageLimitChange = (value) => {
+    setPage(0);
+    setPageLimit(Number(value));
+    setPageSizePopoverActive(false);
+  }
+  // Selector is on by default for every GithubServerTable/GithubSimpleTable — opt out per-table
+  // with hidePageSizeSelector, or override the choices with pageSizeOptions. The table's own
+  // configured pageLimit (e.g. a flyout using 10) is always included so the Select's value is
+  // never left pointing at an option that doesn't exist.
+  const pageSizeOptions = props?.hidePageSizeSelector ? null :
+    [...new Set([...(props?.pageSizeOptions || [20, 50, 100]), props?.pageLimit || 50])].sort((a, b) => a - b);
   const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
   const [fullDataIds, setFullDataIds] = useState([])
@@ -259,7 +286,7 @@ function GithubServerTable(props) {
   useEffect(() => {
     setActiveColumnSort(tableFunc.getColumnSort(sortSelected, props?.sortOptions))
     fetchData(queryValue);
-  }, [sortSelected, appliedFilters, page, pageFiltersMap])
+  }, [sortSelected, appliedFilters, page, pageLimit, pageFiltersMap])
 
   useEffect(()=> {
     setSortableColumns(tableFunc.getSortableChoices(props?.headers))
@@ -477,11 +504,21 @@ function GithubServerTable(props) {
                   </div>
                 </div>
               )}
-              {filter.choices.length < 10 ?
+              {filter.renderFilter ? filter.renderFilter({
+                selected: normalizedValue.values || [],
+                onChange: (value) => {
+                  const newValue = { ...normalizedValue, values: value };
+                  handleFilterStatusChange(filter.key, newValue);
+                },
+                onClose: () => {
+                  setHideFilter(true);
+                  setTimeout(() => setHideFilter(false), 10);
+                },
+              }) : (filter.choices || []).length < 10 ?
                 <ChoiceList
                   title={filter.title}
                   titleHidden
-                  choices={getSortedChoices(filter.choices)}
+                  choices={getSortedChoices(filter.choices || [])}
                   selected={normalizedValue.values || []}
                   onChange={(value) => {
                     const newValue = { ...normalizedValue, values: value };
@@ -492,7 +529,7 @@ function GithubServerTable(props) {
                 :
                 <DropdownSearch
                   placeHoder={"Apply filters"}
-                  optionsList={getSortedChoices(filter.choices)}
+                  optionsList={getSortedChoices(filter.choices || [])}
                   setSelected={(value) => {
                     const newValue = { ...normalizedValue, values: value };
                     handleFilterStatusChange(filter.key, newValue);
@@ -550,10 +587,14 @@ function GithubServerTable(props) {
   const {selectedResources: rawSelectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(fullDataIds!== undefined ? fullDataIds : data , {
       resourceIDResolver,
+      // Deep link from elsewhere (e.g. an Insight CTA's ?policyIds=a,b) — pre-checks those rows
+      // for the existing bulk-action bar instead of landing on an unfiltered, unselected table.
+      // Only an initial value (useIndexResourceState's own state, not reactive to prop changes).
+      selectedResources: props.initialSelectedResourceIds,
     });
 
   useEffect(() => {
-    if(!window.location.pathname.includes("testing")){
+    if(!window.location.pathname.includes("testing") && !props.selectAllAddsRowIds){
       return
     }
     if (!allResourcesSelected || (data && data.length >= total) || (fullDataIds && fullDataIds.length >= total) || (rawSelectedResources && rawSelectedResources.length >= total)) {
@@ -581,6 +622,16 @@ function GithubServerTable(props) {
   }, [allResourcesSelected])
 
   const selectedResources = allResourcesSelected && allDataIds.length > 0 ? allDataIds : rawSelectedResources;
+
+  useEffect(() => {
+    if (!props.clearSelectionKey) return;
+    handleSelectionChange("all", false);
+    selectItems([]);
+    setAllDataIds([]);
+    TableStore.getState().setSelectedItems([]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.clearSelectionKey]);
+
   const customSelectionChange = (selectionType,toggleType, selection) => {
     if(props?.treeView || props?.isMultipleItemsSelected === true){
       let tempItems = selection;
@@ -607,6 +658,8 @@ function GithubServerTable(props) {
               for (let row of data) {
                   if (row?.id instanceof Array) {
                     row?.id.forEach(item => allItemsSet.add(item));
+                  } else if (props?.selectAllAddsRowIds && row?.id !== undefined) {
+                    allItemsSet.add(row.id);
                   }
               }
               selectItems([...allItemsSet])
@@ -700,7 +753,10 @@ function GithubServerTable(props) {
 
   let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
   let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
-  const bulkActionResources = selectedItems.length > 0 ? selectedItems : selectedResources
+  // Grouped tables keep their selection in selectedItems; "Select all" across pages still means every row
+  const bulkActionResources = (props.selectAllAddsRowIds && allResourcesSelected && allDataIds.length > 0)
+    ? allDataIds
+    : (selectedItems.length > 0 ? selectedItems : selectedResources)
   
   // Move setState out of render to avoid "Cannot update a component while rendering" warning
   useEffect(() => {
@@ -711,10 +767,6 @@ function GithubServerTable(props) {
 
 
   const handleExportCsv = useCallback(async () => {
-    if (props.onExportCsv) return props.onExportCsv()
-    const fileName = props.csvFileName || props.resourceName?.plural || "export"
-
-    // Fetch all data (not just current page) for export
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
     appliedFilters.forEach((filter) => {
@@ -728,10 +780,34 @@ function GithubServerTable(props) {
       }
     });
 
+    // Pages that export on their own get the table's active sort, filters and query, in the same
+    // shape fetchData receives them
+    if (props.onExportCsv) return props.onExportCsv({ sortKey, sortOrder: sortOrder == 'asc' ? -1 : 1, filters, queryValue })
+    const fileName = props.csvFileName || props.resourceName?.plural || "export"
+
     func.setToast(true, false, "Exporting CSV, please wait...")
-    const exportLimit = Math.max(total || 0, 10000);
-    const allData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, 0, exportLimit, filters, filterOperators, queryValue);
-    func.exportTableAsCSV(props.headers, allData?.value || data, fileName)
+    // Page through in bounded chunks rather than one huge request. Backends also cap rows per
+    // request (50/200/500), so step by the size the first response actually came back with — the
+    // same skip/limit stepping the table's own pagination uses.
+    // Rows are de-duped by id and a page adding nothing new stops the loop, so a fetchData that
+    // ignores skip can't duplicate rows or spin. Filters are cloned since some pages mutate them.
+    const fetchChunk = (skip, limit) => props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, skip, limit, structuredClone(filters), structuredClone(filterOperators), queryValue)
+    const first = await fetchChunk(0, EXPORT_CHUNK_SIZE)
+    const rows = [...(first?.value || data)]
+    const chunkSize = rows.length
+    const expected = first?.total ?? total
+    if (chunkSize > 0 && chunkSize < expected) {
+      const seen = new Set(rows.map(r => r.id))
+      for (let skip = chunkSize; skip < expected; skip += chunkSize) {
+        const fresh = ((await fetchChunk(skip, chunkSize))?.value || []).filter(r => r.id == null || !seen.has(r.id))
+        if (fresh.length === 0) break
+        fresh.forEach(r => seen.add(r.id))
+        rows.push(...fresh)
+      }
+      // chunk fetches overwrite page state (loading, row caches) — restore the visible page
+      fetchDataRef.current(queryValue)
+    }
+    func.exportTableAsCSV(props.headers, rows, fileName)
   }, [props.onExportCsv, props.headers, props.csvFileName, data, sortSelected, appliedFilters, total, queryValue, props.fetchData])
 
   return (
@@ -771,10 +847,20 @@ function GithubServerTable(props) {
                   hideFilters={hideFilter}
                 />
               </span>
-              {exportPortalTarget && data.length > 0 && createPortal(
-                <Tooltip content="Export as CSV" dismissOnMouseOut>
-                  <Button size="slim" icon={ImportMinor} onClick={handleExportCsv} accessibilityLabel="Export as CSV" />
-                </Tooltip>,
+              {props.searchBelow ? (
+                <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">
+                  {props.searchBelow}
+                </Box>
+              ) : null}
+              {exportPortalTarget && (props.searchAccessory || data.length > 0) && createPortal(
+                <HorizontalStack gap="2" blockAlign="center">
+                  {props.searchAccessory}
+                  {data.length > 0 ? (
+                    <Tooltip content="Export as CSV" dismissOnMouseOut>
+                      <Button size="slim" icon={ImportMinor} onClick={handleExportCsv} accessibilityLabel="Export as CSV" />
+                    </Tooltip>
+                  ) : null}
+                </HorizontalStack>,
                 exportPortalTarget
               )}
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
@@ -793,7 +879,7 @@ function GithubServerTable(props) {
                 selectable={props.selectable || false}
                 onSelectionChange={customSelectionChange}
                 headings={processedHeadings}
-                promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(bulkActionResources) : []}
+                promotedBulkActions={props.selectable ? props.promotedBulkActions && withPermissions(props.promotedBulkActions(bulkActionResources)) : []}
                 hasZebraStriping={props.hasZebraStriping || false}
                 sortable={sortableColumns}
                 sortColumnIndex={activeColumnSort.columnIndex}
@@ -808,8 +894,8 @@ function GithubServerTable(props) {
             </div>
             </LegacyCard.Section>
             {(total !== 0 && !props?.hidePagination) && <LegacyCard.Section>
-              <HorizontalStack
-                align="center">
+              <HorizontalGrid columns="1fr auto 1fr" gap="4" alignItems="center">
+                <Box />
                 <Pagination
                   label={
                     total == 0 ? 'No data found' :
@@ -824,7 +910,36 @@ function GithubServerTable(props) {
                   nextKeys={[Key.RightArrow]}
                   onNext={onPageNext}
                 />
-              </HorizontalStack>
+                {pageSizeOptions && pageSizeOptions.length > 0 ? (
+                  <HorizontalStack align="end">
+                    <Popover
+                      active={pageSizePopoverActive}
+                      onClose={() => setPageSizePopoverActive(false)}
+                      preferredAlignment="right"
+                      fullWidth
+                      activator={
+                        <Box width="120px">
+                          <Button
+                            disclosure="select"
+                            fullWidth
+                            onClick={() => setPageSizePopoverActive((active) => !active)}
+                          >
+                            {`Show ${pageLimit}`}
+                          </Button>
+                        </Box>
+                      }
+                    >
+                      <ActionList
+                        items={pageSizeOptions.map((size) => ({
+                          content: String(size),
+                          active: size === pageLimit,
+                          onAction: () => handlePageLimitChange(size),
+                        }))}
+                      />
+                    </Popover>
+                  </HorizontalStack>
+                ) : <Box />}
+              </HorizontalGrid>
             </LegacyCard.Section>}
           </div>
         }

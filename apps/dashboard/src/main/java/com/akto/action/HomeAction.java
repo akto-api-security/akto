@@ -3,7 +3,6 @@ package com.akto.action;
 import static com.akto.action.SignupAction.BUSINESS_EMAIL_URI;
 import static com.akto.action.SignupAction.CHECK_INBOX_URI;
 import static com.akto.action.SignupAction.SSO_URL;
-import static com.akto.action.SignupAction.TEST_EDITOR_URL;
 import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 import com.akto.dao.SSOConfigsDao;
@@ -14,6 +13,7 @@ import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
+import com.akto.util.LoginRedirectUtils;
 import com.akto.utils.Auth0;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
@@ -57,6 +57,8 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
             String nodeEnv = System.getenv("NODE_ENV");
             servletRequest.setAttribute("nodeEnv", nodeEnv != null ? nodeEnv : "production");
             servletRequest.setAttribute("airgapped", String.valueOf("true".equalsIgnoreCase(System.getenv("AIRGAPPED"))));
+            String agGridLicenseKey = System.getenv("AG_GRID_LICENSE_KEY");
+            servletRequest.setAttribute("AG_GRID_LICENSE_KEY", agGridLicenseKey != null ? agGridLicenseKey : "");
         } catch(Exception e){
         }
 
@@ -101,7 +103,12 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
                     logger.debug("Access token expired, unable to set window vars", e);
                 }
             }
-            return redirectToAuth0(servletRequest, servletResponse, accessToken, new BasicDBObject());
+            BasicDBObject authState = new BasicDBObject();
+            String returnPath = LoginRedirectUtils.safeReturnPath(redirectUri);
+            if (returnPath != null) {
+                authState.put(LoginRedirectUtils.RETURN_PATH_STATE_KEY, returnPath);
+            }
+            return redirectToAuth0(servletRequest, servletResponse, accessToken, authState);
         }
 
         return "SUCCESS";
@@ -120,7 +127,6 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
 
         if(servletRequest.getRequestURI().equals(CHECK_INBOX_URI) ||
             servletRequest.getRequestURI().contains(BUSINESS_EMAIL_URI) ||
-            servletRequest.getRequestURI().contains(TEST_EDITOR_URL) || 
             servletRequest.getRequestURI().contains(SSO_URL)
             ) {
             return "SUCCESS";
@@ -170,8 +176,12 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     private String signupInvitationCode;
     private String signupEmailId;
 
-    // to prevent redirect_uri not found warning
-    public void setRedirect_uri(String redirect_uri) {
+    // Return path set by UserDetailsFilter, carried through the Auth0 state
+    private String redirectUri;
+
+    // Name is fixed by the redirect_uri request parameter
+    public void setRedirect_uri(String redirectUri) {
+        this.redirectUri = redirectUri;
     }
 
     public String getAccessToken() {

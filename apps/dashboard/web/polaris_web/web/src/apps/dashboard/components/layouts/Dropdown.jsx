@@ -148,6 +148,7 @@ function Dropdown(props) {
             autoComplete="off"
             {...props.label ? {label : props.label} : null}
             {...props.helpText ? {helpText : props.helpText} : null}
+            {...props.error ? {error : props.error} : null}
             {...props.placeHolder ? {placeholder : props.placeHolder} : null}
             suffix={
                 <span

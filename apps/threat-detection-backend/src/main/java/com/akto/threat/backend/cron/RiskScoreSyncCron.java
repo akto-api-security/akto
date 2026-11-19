@@ -162,17 +162,18 @@ public class RiskScoreSyncCron {
             int apiCollectionId = Integer.parseInt(parts[0]);
             String url = parts[1];
             String method = parts[2];
-            URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates, lfiTrie, osCommandInjectionTrie, ssrfTrie);
             List<String> severities = apiInfoKeyToSeverities.get(apiInfoKey);
             float threatScore = severityScorer.apply(severities);
-            if(urlTemplate != null || apiInfoKeyToApiInfo.containsKey(apiInfoKey)){
+            boolean exactMatch = apiInfoKeyToApiInfo.containsKey(apiInfoKey);
+            URLTemplate urlTemplate = exactMatch ? null : isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates, lfiTrie, osCommandInjectionTrie, ssrfTrie);
+            if(exactMatch || urlTemplate != null){
                 ApiInfoKey apiInfoKeyObj = null;
-                if(urlTemplate != null){
-                    apiInfoKeyObj = new ApiInfoKey(apiCollectionId, urlTemplate.getTemplateString(), urlTemplate.getMethod());
-                    loggerMaker.warnAndAddToDb("Updating risk score for " + urlTemplate.getTemplateString() + " " + urlTemplate.getMethod().name() + " " + apiCollectionId + " to " + threatScore);
-                }else{
+                if(exactMatch){
                     apiInfoKeyObj = apiInfoKeyToApiInfo.get(apiInfoKey);
                     loggerMaker.warnAndAddToDb("Updating risk score for from normal api info " + url + " " + method + " " + apiCollectionId + " to " + threatScore);
+                }else{
+                    apiInfoKeyObj = new ApiInfoKey(apiCollectionId, urlTemplate.getTemplateString(), urlTemplate.getMethod());
+                    loggerMaker.warnAndAddToDb("Updating risk score for " + urlTemplate.getTemplateString() + " " + urlTemplate.getMethod().name() + " " + apiCollectionId + " to " + threatScore);
                 }
                 apiInfoKeyToThreatScore.put(apiInfoKeyObj, Math.max(apiInfoKeyToThreatScore.getOrDefault(apiInfoKeyObj, 0.0f), threatScore));
             }

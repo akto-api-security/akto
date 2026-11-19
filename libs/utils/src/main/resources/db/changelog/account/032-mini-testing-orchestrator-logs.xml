@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collection + timestamp index for MiniTestingOrchestratorLogsDao.createIndicesIfAbsent
+        (collName: logs_mini_testing_orchestrator, index on Log.TIMESTAMP descending).
+        Written by the db-abstractor (api/insertMiniTestingOrchestratorLog), read by the
+        dashboard's "Mini Testing Orchestrator" log source.
+
+        Same shape as logs_smart_testing (007): uncapped createCollection + timestamp_-1,
+        index name matching MCollection.generateIndexName so the DAO's createIndexIfAbsent
+        treats it as present. Capping (maxDocuments=100_000, sizeInBytes=100_000_000 from
+        LogsDao) is left to the DAO when DbMode.allowCappedCollections() is true and the
+        collection does not yet exist; no convertToCapped here (MongoDB-only, see 006).
+    -->
+
+    <changeSet id="032-account-create-logs-mini-testing-orchestrator" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="logs_mini_testing_orchestrator"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="logs_mini_testing_orchestrator"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="logs_mini_testing_orchestrator"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="032-account-logs-mini-testing-orchestrator-timestamp-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="logs_mini_testing_orchestrator"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="logs_mini_testing_orchestrator">
+            <mongodb:keys>{ "timestamp": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "timestamp_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="logs_mini_testing_orchestrator">
+                <mongodb:keys>{ "timestamp": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

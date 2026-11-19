@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        endpoint_shield_diagnostics: one document per endpoint-shield diagnostic report
+        (installer, agent post-provision, on-demand). Written by the db-abstractor
+        (api/insertEndpointShieldDiagnostic), read by the dashboard's device panel.
+
+        {deviceId, createdAt desc} serves the per-device history list and the
+        keep-newest-20 trim. Name matches EndpointShieldDiagnosticDao in the
+        db-abstractor, so whichever side builds it first, the other is a no-op.
+
+        The collection is capped at 512 MB (EndpointShieldDiagnosticDao.CAPPED_SIZE_IN_BYTES),
+        like logs_endpoint_shield (006): once full, the oldest reports are evicted. The
+        convert runs as its own changeset after the create, on a collection that is still
+        empty when migrations run with the release; convertToCapped drops every non-_id
+        index, so the device index is recreated after it (same name, so the DAO and this
+        changelog agree). MongoDB only — convertToCapped is unsupported on DocumentDB/Cosmos,
+        where the DAO also leaves the collection uncapped (DbMode.allowCappedCollections).
+    -->
+
+    <changeSet id="031-account-endpoint-shield-diagnostics-collection" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="endpoint_shield_diagnostics"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="endpoint_shield_diagnostics"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="endpoint_shield_diagnostics"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="031-account-endpoint-shield-diagnostics-device-index" author="akto">
+        <mongodb:createIndex collectionName="endpoint_shield_diagnostics">
+            <mongodb:keys>{ "deviceId": 1, "createdAt": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "deviceId_createdAt" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="endpoint_shield_diagnostics">
+                <mongodb:keys>{ "deviceId": 1, "createdAt": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="031-account-endpoint-shield-diagnostics-convert-to-capped" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="endpoint_shield_diagnostics"/>
+        </preConditions>
+        <mongodb:runCommand>
+            <mongodb:command>{ "convertToCapped": "endpoint_shield_diagnostics", "size": 536870912 }</mongodb:command>
+        </mongodb:runCommand>
+        <!-- Reverting to uncapped needs a full clone too; no automatic inverse. -->
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="031-account-endpoint-shield-diagnostics-device-index-after-cap" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="endpoint_shield_diagnostics"/>
+        </preConditions>
+        <!-- Recreated after the convert above dropped it. -->
+        <mongodb:createIndex collectionName="endpoint_shield_diagnostics">
+            <mongodb:keys>{ "deviceId": 1, "createdAt": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "deviceId_createdAt" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="endpoint_shield_diagnostics">
+                <mongodb:keys>{ "deviceId": 1, "createdAt": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

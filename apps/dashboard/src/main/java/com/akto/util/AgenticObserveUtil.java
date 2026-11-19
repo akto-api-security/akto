@@ -1,9 +1,13 @@
 package com.akto.util;
 
+import com.akto.dao.ApiInfoDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.util.enums.GlobalEnums;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
@@ -84,6 +88,42 @@ public final class AgenticObserveUtil {
         return sb.length() > 0 ? sb.toString() : raw;
     }
 
+    public static void retainSkillsWithApiInfo(List<ApiCollection> collections) {
+        List<Integer> idsWithSkills = new ArrayList<>();
+        for (ApiCollection c : collections) {
+            if (c.getSkills() != null && !c.getSkills().isEmpty()) {
+                idsWithSkills.add(c.getId());
+            }
+        }
+        if (idsWithSkills.isEmpty()) {
+            return;
+        }
+
+        Set<String> existing = new HashSet<>();
+        List<ApiInfo> infos = ApiInfoDao.instance.findAll(
+            Filters.and(
+                Filters.in(ApiInfo.ID_API_COLLECTION_ID, idsWithSkills),
+                Filters.regex(ApiInfo.ID_URL, "^/skills/")),
+            Projections.include(Constants.ID));
+        for (ApiInfo info : infos) {
+            String url = info.getId().getUrl();
+            existing.add(info.getId().getApiCollectionId() + "|" + url.substring("/skills/".length()).toLowerCase(Locale.ROOT));
+        }
+
+        for (ApiCollection c : collections) {
+            if (c.getSkills() == null || c.getSkills().isEmpty()) {
+                continue;
+            }
+            List<String> kept = new ArrayList<>();
+            for (String s : c.getSkills()) {
+                if (StringUtils.isNotBlank(s) && existing.contains(c.getId() + "|" + s.toLowerCase(Locale.ROOT))) {
+                    kept.add(s);
+                }
+            }
+            c.setSkills(kept);
+        }
+    }
+
     public static Set<String> getSkillNames(ApiCollection collection) {
         Set<String> skills = new HashSet<>();
         if (collection == null) {
@@ -111,6 +151,10 @@ public final class AgenticObserveUtil {
 
     public static boolean hasSaasAgentTag(ApiCollection collection) {
         return collection != null && hasTagKey(collection.getEnvType(), Constants.AKTO_SAAS_AGENT_TAG);
+    }
+
+    public static String getSaasAgentTagValue(ApiCollection collection) {
+        return collection == null ? null : getTagValue(collection.getEnvType(), Constants.AKTO_SAAS_AGENT_TAG);
     }
 
     // The plugin's own name, from its plugin-name tag; falls back to the hostname's trailing segment.
@@ -221,6 +265,11 @@ public final class AgenticObserveUtil {
         // detection) must classify as "MCP Server", not get swallowed into gen-ai/agent grouping
         // just because gen-ai happened to be tagged first.
         CollectionTags fallback = null;
+        // ai-agent-caller only says the service was seen CALLING an AI asset, so it is weaker than
+        // a tag describing the collection itself. Held separately rather than folded into fallback:
+        // both are assigned in one pass, so sharing the variable would let whichever tag happened
+        // to come first win, and a gen-ai collection that also calls an LLM would type as a caller.
+        CollectionTags callerFallback = null;
         for (CollectionTags tag : envType) {
             if (tag == null || StringUtils.isBlank(tag.getKeyName())) {
                 continue;
@@ -232,8 +281,11 @@ public final class AgenticObserveUtil {
             if (fallback == null && (Constants.AKTO_GEN_AI_TAG.equals(key) || Constants.AKTO_BROWSER_LLM_TAG.equals(key))) {
                 fallback = tag;
             }
+            if (callerFallback == null && Constants.AKTO_AI_AGENT_CALLER_TAG.equals(key)) {
+                callerFallback = tag;
+            }
         }
-        return fallback;
+        return fallback != null ? fallback : callerFallback;
     }
 
     public static String getTypeFromCollection(ApiCollection collection) {
@@ -273,6 +325,10 @@ public final class AgenticObserveUtil {
         if (hasSkill && !hasAiAgent && !hasMcpServer) {
             return CLIENT_TYPE_SKILL;
         }
+        if(hasMcpServer && !hasAiAgent){
+            return CLIENT_TYPE_MCP_SERVER;
+        }
+        boolean hasAiAgentCaller = false;
         for (CollectionTags tag : envType) {
             if (tag == null) {
                 continue;
@@ -286,6 +342,16 @@ public final class AgenticObserveUtil {
             if (Constants.AKTO_BROWSER_LLM_TAG.equals(tag.getKeyName())) {
                 return CLIENT_TYPE_LLM;
             }
+            if (Constants.AKTO_AI_AGENT_CALLER_TAG.equals(tag.getKeyName())) {
+                hasAiAgentCaller = true;
+            }
+        }
+        // Resolved only after the loop: a service that merely CALLS an AI asset is typed by that
+        // just when it carries no stronger tag. Returning inside the loop would make it depend on
+        // tag order and let a caller tag beat a gen-ai or browser-llm tag listed after it. Without
+        // this it would reach the MCP Server default below and be mislabelled as one.
+        if (hasAiAgentCaller) {
+            return CLIENT_TYPE_AI_AGENT;
         }
         return CLIENT_TYPE_MCP_SERVER;
     }

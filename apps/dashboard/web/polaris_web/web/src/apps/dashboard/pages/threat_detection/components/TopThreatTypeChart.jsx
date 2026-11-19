@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import InfoCard from "../../dashboard/new_components/InfoCard";
 import BarGraph from "../../../components/charts/BarGraph";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
-const TopThreatTypeChart = ({ data, onBarClick }) => {
+const TopThreatTypeChart = ({ data, onBarClick, loading = false }) => {
   const [chartData, setChartData] = useState([]);
   useEffect(() => {
     const chartData = data
@@ -21,7 +22,7 @@ const TopThreatTypeChart = ({ data, onBarClick }) => {
       title={mapLabel("Top Threat Violation Types", getDashboardCategory())}
       titleToolTip={mapLabel("Number of detections for each threat category, from most to least common.", getDashboardCategory())}
       fillHeight
-      component={
+      component={loading ? <SpinnerCentered height="300px" /> :
         <BarGraph
           data={chartData}
           areaFillHex="true"

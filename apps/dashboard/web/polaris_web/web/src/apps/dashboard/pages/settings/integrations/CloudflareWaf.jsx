@@ -4,25 +4,26 @@ import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
 import func from '@/util/func'
+import { usePermissions, whenAllowed } from '@/util/permissions'
 import DropdownSearch from '../../../components/shared/DropdownSearch';
-import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
 import ThreatPoliciesDropdown from '../../../components/shared/ThreatPoliciesDropdown';
 
 function CloudflareWaf() {
+    const { canCall } = usePermissions()
     const [accountOrZoneId, setAccountOrZoneId] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [integrationType, setIntegrationType] = useState('zones');
     const [email, setEmail] = useState('');
     const [zoneId, setZoneId] = useState('');
-    const [severityLevels, setSeverityLevels] = useState(['CRITICAL']);
+    const [severityLevels, setSeverityLevels] = useState([]);
     const [threatPolicies, setThreatPolicies] = useState([]);
 
     const isZoneLevel = integrationType === "zones";
 
     const wafCard = (
         <LegacyCard
-            primaryFooterAction={{content: 'Save', onAction: () => addCloudflareWafIntegration()}}
-            secondaryFooterActions={[{content: 'Delete', onAction: () => deleteCloudflareWafIntegration()}]}
+            primaryFooterAction={{content: 'Save', onAction: () => addCloudflareWafIntegration(), ...whenAllowed(canCall('api/addCloudflareWafIntegration'))}}
+            secondaryFooterActions={[{content: 'Delete', onAction: () => deleteCloudflareWafIntegration(), ...whenAllowed(canCall('api/deleteCloudflareWafIntegration'))}]}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate Cloudflare-WAF</Text>
@@ -47,10 +48,6 @@ function CloudflareWaf() {
                 {isZoneLevel && (
                     <TextField value={zoneId} onChange={setZoneId} label="Cloudflare Zone ID" placeholder="Zone ID (required for WAF rule)"/>
                 )}
-                <SeverityLevelDropdown
-                  severityLevels={severityLevels}
-                  setSeverityLevels={setSeverityLevels}
-                />
                 <ThreatPoliciesDropdown
                   threatPolicies={threatPolicies}
                   setThreatPolicies={setThreatPolicies}
@@ -62,12 +59,14 @@ function CloudflareWaf() {
 
     async function addCloudflareWafIntegration(){
       await settingRequests.addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies)
+      window.IS_CLOUDFLARE_WAF_INTEGRATED = 'true'
       func.setToast(true, false, "Successfully added Cloudflare Waf Integration")
       fetchIntegration()
     }
 
     async function deleteCloudflareWafIntegration() {
-        await settingRequests.deleteCloudflareWafIntegration()
+        await settingRequests.deleteCloudflareWafIntegration('CLOUDFLARE_WAF')
+        window.IS_CLOUDFLARE_WAF_INTEGRATED = 'false'
         func.setToast(true, false, "Successfully deleted Cloudflare Waf Integration")
         fetchIntegration()
     }
@@ -83,7 +82,7 @@ function CloudflareWaf() {
       setAccountOrZoneId(resp?.cloudflareWafConfig?.accountOrZoneId || "")
       setIntegrationType(resp?.cloudflareWafConfig?.integrationType || "zones")
       setZoneId(resp?.cloudflareWafConfig?.zoneId || "")
-      setSeverityLevels(resp?.cloudflareWafConfig?.severityLevels || ['CRITICAL'])
+      setSeverityLevels(resp?.cloudflareWafConfig?.severityLevels || [])
       setThreatPolicies(resp?.cloudflareWafConfig?.threatPolicies || [])
     }
 
@@ -93,7 +92,7 @@ function CloudflareWaf() {
 
     let cardContent = "Seamlessly enhance your web application security with Cloudflare-WAF integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses. "
     return (
-        <IntegrationsLayout title= "Cloudflare WAF" cardContent={cardContent} component={wafCard} docsUrl=""/>
+        <IntegrationsLayout title= "Cloudflare WAF" cardContent={cardContent} component={wafCard} docsUrl="" readOnly={!canCall('api/addCloudflareWafIntegration')}/>
     )
 }
 

@@ -37,6 +37,7 @@ public class CloudflareWafAction extends UserAction {
     private List<String> threatPolicies;
 
     private Config.CloudflareWafConfig cloudflareWafConfig;
+    private String wafType;
 
     @Audit(description = "User added cloudflare waf integration", resource = Resource.CONFIGS, operation = Operation.CREATE)
     public String addCloudflareWafIntegration() {
@@ -124,19 +125,22 @@ public class CloudflareWafAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    @Audit(description = "User deleted cloudflare waf integration", resource = Resource.CONFIGS, operation = Operation.DELETE)
+    @Audit(description = "User deleted waf integration", resource = Resource.CONFIGS, operation = Operation.DELETE)
     public String deleteCloudflareWafIntegration() {
         int accId = Context.accountId.get();
+        boolean isAwsWaf = Config.ConfigType.AWS_WAF.name().equals(wafType);
         Bson filters = Filters.and(
                 Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accId),
-                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
+                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, isAwsWaf ? Config.ConfigType.AWS_WAF.name() : Config.ConfigType.CLOUDFLARE_WAF.name())
         );
-        Config.CloudflareWafConfig config = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(filters);
-        if (config != null) {
-            if (config.getRuleId() != null) {
-                deleteWafRule(config);
+        if (!isAwsWaf) {
+            Config.CloudflareWafConfig config = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(filters);
+            if (config != null) {
+                if (config.getRuleId() != null) {
+                    deleteWafRule(config);
+                }
+                deleteAllIpLists(config);
             }
-            deleteAllIpLists(config);
         }
         ConfigsDao.instance.getMCollection().deleteOne(filters);
         return SUCCESS.toUpperCase();
@@ -568,4 +572,6 @@ public class CloudflareWafAction extends UserAction {
     public void setThreatPolicies(List<String> threatPolicies) { this.threatPolicies = threatPolicies; }
     public String getZoneId() { return zoneId; }
     public void setZoneId(String zoneId) { this.zoneId = zoneId; }
+    public String getWafType() { return wafType; }
+    public void setWafType(String wafType) { this.wafType = wafType; }
 }

@@ -5,8 +5,11 @@ import PromptHardeningStore from "../promptHardeningStore"
 import Store from "../../../store";
 import api from "../api";
 import jsYaml from 'js-yaml';
+import { usePermissions, NO_PERMISSION_REASON } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 const PromptResponse = () => {
+    const { canCall, canCallAll } = usePermissions()
     const setToastConfig = Store(state => state.setToastConfig)
     const [agentResponse, setAgentResponse] = useState(null)
     const [systemPrompt, setSystemPrompt] = useState("You are a customer support agent for Acme Corp. Your role is to assist customers with their inquiries about orders, shipping, returns, and product information.\n\nGuidelines:\n- Always greet customers warmly and use their name when available\n- Be empathetic and understanding of customer concerns\n- Provide accurate information about order status, shipping times, and return policies\n- If you cannot resolve an issue, offer to escalate to a supervisor\n- Maintain a professional and friendly tone throughout the conversation\n- For refunds under 30 days, you may approve without escalation\n- Always thank the customer for their business\n\nRemember to protect customer privacy and never share personal information with unauthorized parties.")
@@ -307,6 +310,7 @@ const PromptResponse = () => {
 
                     {/* Action Buttons */}
                     <HorizontalStack gap="3" align="space-between">
+                        <AllowedAction allowed={canCall('api/generateMaliciousUserInput')}>
                         <Button
                             plain
                             size="slim"
@@ -366,15 +370,18 @@ const PromptResponse = () => {
                                 <Text variant="bodyMd" color="interactive">Auto-generate prompt</Text>
                             </HorizontalStack>
                         </Button>
-                        <Button
-                            primary
-                            size="slim"
-                            onClick={() => handleRunTest()}
-                            loading={isLoading}
-                            disabled={!systemPrompt || systemPrompt.trim() === '' || !userInput || userInput.trim() === ''}
-                        >
-                            Test system prompt
-                        </Button>
+                        </AllowedAction>
+                        <AllowedAction allowed={canCall('api/testSystemPrompt')}>
+                            <Button
+                                primary
+                                size="slim"
+                                onClick={() => handleRunTest()}
+                                loading={isLoading}
+                                disabled={!systemPrompt || systemPrompt.trim() === '' || !userInput || userInput.trim() === ''}
+                            >
+                                Test system prompt
+                            </Button>
+                        </AllowedAction>
                     </HorizontalStack>
 
                     {/* Safety Status - Show after test is run */}
@@ -408,12 +415,18 @@ const PromptResponse = () => {
                             </Text>
                             {!agentResponse.isSafe && (
                                 <Box paddingBlockStart="2">
+                                    {canCallAll('api/hardenSystemPrompt', 'api/testSystemPrompt') ? (
                                     <Link
                                         onClick={handleHardenAndRetry}
                                         monochrome
                                     >
                                         <Text variant="bodyMd" color="interactive">Harden prompt and retry</Text>
                                     </Link>
+                                    ) : (
+                                    <Tooltip content={NO_PERMISSION_REASON}>
+                                        <Text variant="bodyMd" color="subdued">Harden prompt and retry</Text>
+                                    </Tooltip>
+                                    )}
                                 </Box>
                             )}
                         </VerticalStack>

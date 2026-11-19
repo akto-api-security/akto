@@ -10,6 +10,8 @@ import { formatCompact, parsePromptText, parseResponseText, truncate, TOKEN_ESTI
 import api from "./api";
 import { GuardrailBanner, hasGuardrailVerdict, verdictStatus, verdictTone } from "./GuardrailVerdict";
 
+// Ask Akto chat is temporarily hidden here; flip to re-enable.
+const SHOW_ASK_AKTO_CHAT = false;
 
 function toSeconds(ts) {
     if (!ts) return 0;
@@ -141,12 +143,14 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
                 />
             }
             footer={
-                <AiChatSection
-                    placeholder="Ask anything about this trace..."
-                    resetKey={trace?.traceId}
-                    conversationType="AGENTIC_OBSERVE"
-                    chatMetadata={chatMetadata}
-                />
+                SHOW_ASK_AKTO_CHAT ? (
+                    <AiChatSection
+                        placeholder="Ask anything about this trace..."
+                        resetKey={trace?.traceId}
+                        conversationType="AGENTIC_OBSERVE"
+                        chatMetadata={chatMetadata}
+                    />
+                ) : null
             }
         >
             <Scrollable style={{ flex: 1 }}>

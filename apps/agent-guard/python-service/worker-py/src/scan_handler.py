@@ -1,5 +1,6 @@
 """Cloud-agnostic scan routing shared by the Cloudflare Worker and FastAPI app."""
 
+import json
 import logging
 import time
 from collections.abc import Callable, Coroutine
@@ -11,17 +12,21 @@ import metrics_push
 import scan_diag
 from constants import (
     CASCADE_SCANNERS,
-    FORCE_GEMMA_ONLY_SCANNERS,
     GEMMA_ONLY_SCANNERS,
     LOCAL_SCANNERS,
     REMOTE_SCANNERS,
+    SINGLE_MODEL_SCANNERS,
     SUPPORTED_SCANNERS,
+    apply_scanner_response_format,
     canonical_scanner,
-    force_gemma_only,
     get_default_config,
+    get_enrichment_config,
+    single_model_config,
     strip_qwen_tier,
 )
-from llm_scanner import scan_with_model_map
+from llm_scanner import _clean_json, scan_with_model_map
+from model_map import build_arbiter
+from prompts import build_reason_prompt
 from remote_scanner import scan_anonymize
 from scanners import scan_local
 from settings import settings
@@ -57,12 +62,46 @@ def scanners_metadata() -> dict:
     }
 
 
+async def _generate_reason(payload: dict) -> dict:
+    """Explain an already-decided block: one call to the FINAL_ARBITER entry, asking
+    only for the reason — not a fresh verdict. Every scanner shares this one prompt.
+    ENRICHMENT_MODEL_CONFIG_JSON, when set, wins over the policy's modelConfigs so the
+    core model is kept for verdicts; unset, the policy's (else the default) config is used."""
+    scanner_name = canonical_scanner(payload.get("scanner_name", ""))
+    text = payload.get("text", "")
+    model_configs = (get_enrichment_config() or {}).get("modelConfigs")
+    if not model_configs:
+        model_configs = (payload.get("config") or {}).get("modelConfigs")
+    if not model_configs:
+        model_configs = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)["modelConfigs"]
+    provider = build_arbiter(model_configs)
+    if provider is None:
+        return shape_response(scanner_name, True, 0.0, text, {"reason": ""})
+    reason = ""
+    try:
+        raw = await provider.complete(build_reason_prompt(scanner_name, text))
+        reason = json.loads(_clean_json(raw)).get("reason", "")
+    except Exception as exc:
+        logging.getLogger(__name__).warning(f"[_generate_reason] LLM call failed: {exc}")
+    return shape_response(scanner_name, True, 0.0, text, {"reason": reason})
+
+
+async def scan_enrichment(payload: dict, env=None) -> dict:
+    """Dispatch a post-verdict enrichment call. Extension point for future async needs."""
+    kind = payload.get("enrichment")
+    if kind == "reason":
+        return await _generate_reason(payload)
+    return {"error": f"unknown enrichment: {kind}"}
+
+
 async def scan_payload(
     payload: dict,
     env=None,
     schedule_fn: ScheduleFn | None = None,
 ) -> dict:
     """Run one scan and return the ScanResponse-shaped dict."""
+    if payload.get("enrichment"):
+        return await scan_enrichment(payload, env)
     started = time.perf_counter()
     schedule = schedule_fn or _noop_schedule
     scanner_name = canonical_scanner(payload.get("scanner_name", ""))
@@ -98,10 +137,11 @@ async def scan_payload(
         if not config.get("modelConfigs"):
             default_cfg = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
             config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
-        if scanner_name in FORCE_GEMMA_ONLY_SCANNERS:
-            config = {**config, "modelConfigs": force_gemma_only(config.get("modelConfigs"))}
+        if scanner_name in SINGLE_MODEL_SCANNERS:
+            config = {**config, "modelConfigs": single_model_config()}
         elif scanner_name in GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
+        config = {**config, "modelConfigs": apply_scanner_response_format(config.get("modelConfigs"))}
         store_fn = None
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
@@ -121,11 +161,21 @@ async def scan_payload(
             )
         scan_diag.log_backpressure_proceeding(scanner_name)
         try:
-            result = await scan_with_model_map(scanner_name, scanner_type, text, config, store_fn=store_fn)
+            result = await scan_with_model_map(
+                scanner_name,
+                scanner_type,
+                text,
+                config,
+                store_fn=store_fn,
+                schedule_fn=schedule_fn,
+                agent_host=payload.get("agent_host") or "",
+            )
             elapsed = result.get("execution_time_ms")
             if isinstance(elapsed, (int, float)) and elapsed > 0:
                 cascade_backpressure.record_cascade_latency(float(elapsed))
             schedule(alerts.post_slack(scanner_name, scanner_type, text, result))
+            if alerts.has_pending_fallback_alerts():
+                schedule(alerts.flush_fallback_alerts())
             scan_diag.log_scan_outcome(
                 "cascade_run",
                 scanner_name,
@@ -172,6 +222,8 @@ async def scan_payload(
             # (bad config, unexpected bug, not just "arbiter timed out") shows
             # up in the same channel people actually watch, not just logs.
             schedule(alerts.post_slack(scanner_name, scanner_type, text, error_result))
+            if alerts.has_pending_fallback_alerts():
+                schedule(alerts.flush_fallback_alerts())
             return error_result
 
     if scanner_name in LOCAL_SCANNERS:

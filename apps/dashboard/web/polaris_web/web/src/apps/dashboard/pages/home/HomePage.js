@@ -5,6 +5,7 @@ import Store from "../../store";
 import { Outlet } from "react-router-dom";
 import PersistStore from "../../../main/PersistStore";
 import { CATEGORY_AGENTIC_SECURITY } from "../../../main/labelHelper";
+import PageAccessGuard from "../../components/shared/PageAccessGuard";
 
 function HomePage() {
 
@@ -26,7 +27,7 @@ function HomePage() {
   return (
     <Frame navigation={leftNavCollapsed? undefined:<LeftNav />} topBar={<Header />} logo={logo} >
      <Box paddingBlockEnd={"20"}>
-      <Outlet />
+      <PageAccessGuard><Outlet /></PageAccessGuard>
      </Box>
     </Frame>
   );

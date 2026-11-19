@@ -13,7 +13,8 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true, simpleJson = false, redactHeaders = [], isWebSocket = false } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true, simpleJson = false, redactHeaders = [], isWebSocket = false, onAddAsSearchFilter } = props;
+    const searchSide = type === "request" || type === "response" ? type : "any";
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
@@ -38,9 +39,11 @@ function SampleDataComponent(props) {
         }
 
         if (isWebSocket || type === "events") {
-            const eventsMessage = func.formatWebSocketSampleDisplay(sampleData?.message, redactHeaders)
+            // the request or response part of the exchange; "events" shows all of it
+            const part = type === "events" ? undefined : type
+            const eventsMessage = func.formatWebSocketSampleDisplay(sampleData?.message, redactHeaders, part)
             const originalEventsMessage = sampleData?.originalMessage
-                ? func.formatWebSocketSampleDisplay(sampleData?.originalMessage, redactHeaders)
+                ? func.formatWebSocketSampleDisplay(sampleData?.originalMessage, redactHeaders, part)
                 : undefined
             setSampleJsonData((prev) => ({
                 ...prev,
@@ -61,9 +64,10 @@ function SampleDataComponent(props) {
         } catch {
           parsed = undefined
         }
-        if (parsed?.ip != null && parsed?.destIp != null) {
-            setIpObj({sourceIP: parsed?.ip, destIP: parsed?.destIp})
-        }
+        setIpObj({
+            sourceIP: func.isValidIpAddress(parsed?.ip) ? String(parsed.ip).trim() : "",
+            destIP: func.isValidIpAddress(parsed?.destIp) ? String(parsed.destIp).trim() : "",
+        })
         let responseJson = showResponse ? func.responseJson(parsed, sampleData?.highlightPaths || [], metadata) : {}
         let requestJson = func.requestJson(parsed, sampleData?.highlightPaths || [], metadata)
 
@@ -136,14 +140,14 @@ function SampleDataComponent(props) {
             const { requestData, responseData } = transform.buildDiffData(requestJson, responseJson, originalRequestJson, originalResponseJson)
 
             setSampleJsonData({
-                request: { ...requestData, vulnerabilitySegments: segmentsFromMetadata ? [] : llmRequestSegments },
-                response: { ...responseData, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : llmResponseSegments }
+                request: { ...requestData, vulnerabilitySegments: llmRequestSegments },
+                response: { ...responseData, vulnerabilitySegments: segmentsFromMetadata ? [...responseVulnerabilitySegments, ...llmResponseSegments] : llmResponseSegments }
             })
         }else{
             setSampleJsonData({ 
                 // Threat metadata segments highlight in request; LLM analysis segments are routed by their location field (REQUEST vs RESPONSE)
-                request: { message: transform.formatData(requestJson,"http", redactHeaders), original: transform.formatData(originalRequestJson,"http", redactHeaders), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? vulnerabilitySegments : llmRequestSegments },
-                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : llmResponseSegments } : {},
+                request: { message: transform.formatData(requestJson,"http", redactHeaders), original: transform.formatData(originalRequestJson,"http", redactHeaders), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? [...vulnerabilitySegments, ...llmRequestSegments] : llmRequestSegments },
+                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? [...responseVulnerabilitySegments, ...llmResponseSegments] : llmResponseSegments } : {},
             })
         }
     }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type, redactHeaders, isWebSocket])
@@ -338,7 +342,7 @@ function SampleDataComponent(props) {
                     <HorizontalStack padding="2" align='space-between'>
                         <Text variant="bodyMd" fontWeight="semibold">
                             {/* Hide the word 'response' if simpleJson is true */}
-                            {!simpleJson && (isWebSocket ? "Events" : func.toSentenceCase(type))}
+                            {!simpleJson && func.toSentenceCase(type)}
                             {!simpleJson && type==="response" && responseTime ? (` (${responseTime} ms)`) : ""}
                             {!simpleJson && type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ?
                                 (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`)
@@ -372,9 +376,10 @@ function SampleDataComponent(props) {
                             />
                             <Tooltip content={simpleJson ? "Copy" : `Copy ${type}`}>
                             <Popover
-                                zIndexOverride={"600"}
+                                zIndexOverride={"1051"}
+                                fixed
                                 active={popoverActive[type]}
-                                activator={<Button icon={ClipboardMinor} plain onClick={() => 
+                                activator={<Button icon={ClipboardMinor} plain onClick={() =>
                                     setPopoverActive({ [type]: !popoverActive[type] })} />}
                                 onClose={() => setPopoverActive(false)}
                             >
@@ -390,10 +395,10 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={handleEditorData}/> : null}
+                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={handleEditorData} onAddAsSearchFilter={onAddAsSearchFilter} searchSide={searchSide}/> : null}
             </LegacyCard.Section>
 
-            <Modal open={expanded} onClose={() => setExpanded(false)} title={simpleJson ? " " : (isWebSocket ? "Events" : func.toSentenceCase(type))} large>
+            <Modal open={expanded} onClose={() => setExpanded(false)} title={simpleJson ? " " : func.toSentenceCase(type)} large>
                 <Modal.Section>
                     {sampleJsonData[type] ? <SampleData
                         data={sampleJsonData[type]}
@@ -402,6 +407,8 @@ function SampleDataComponent(props) {
                         editorLanguage={simpleJson ? "json" : "custom_http"}
                         minHeight="600px"
                         getLineNumbers={getLineNumbers}
+                        onAddAsSearchFilter={onAddAsSearchFilter}
+                        searchSide={searchSide}
                     /> : null}
                 </Modal.Section>
             </Modal>

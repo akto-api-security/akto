@@ -1,10 +1,16 @@
 package com.akto.action.monitoring;
 
 import com.akto.action.UserAction;
+import com.akto.audit_logs_util.Audit;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.RBAC.Role;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
@@ -17,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Thin orchestrator over {@link SearchClient}: resolves request-level filters/context, calls the
@@ -35,13 +42,13 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private int          limit       = 20;
     @Setter private String       sortKey     = AgentQueryRecord.F_TIMESTAMP;
     @Setter private int          sortOrder   = 1;
-    @Setter private String       traceId;
+    @Getter @Setter private String       traceId;
     @Setter private String       searchAfterJson;
     @Setter private String       sessionsAfterKey;
     @Setter private int          sessionsLimit    = 20;
 
     // Single-value fields kept for backward-compat (session drill-down in SessionsView)
-    @Setter private String       sessionId;
+    @Getter @Setter private String       sessionId;
     @Setter private String       userName;
     @Setter private String       deviceId;
     @Setter private String       serviceId;
@@ -52,6 +59,8 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private List<String> sessionIds     = new ArrayList<>();
     @Setter private List<String> topicFilters    = new ArrayList<>();
     @Setter private List<String> subTopicFilters = new ArrayList<>();
+    @Setter private List<String> guardrailFilters = new ArrayList<>();
+    @Setter private List<String> guardrailPolicyFilters = new ArrayList<>();
 
     @Getter private String       nextAfterKey;
     @Getter private long         totalSessions    = 0;
@@ -97,7 +106,7 @@ public class LLMObservabilityAction extends UserAction {
             SearchClient.SessionsResult result = client.fetchSessions(
                 accountId, startMs(), endMs(), searchString,
                 buildMultiFilters(true), resolveContextAtlasFilter(),
-                sessionsLimit, sessionsAfterKey);
+                sessionsLimit, sessionsAfterKey, isUserRoleAdmin());
 
             sessions      = result.sessions;
             nextAfterKey  = result.nextAfterKey;
@@ -109,6 +118,10 @@ public class LLMObservabilityAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User viewed prompt content in Traces",
+           resource = Resource.TRACES_CONTENT,
+           operation = Operation.READ,
+           metadataGenerators = {"getSessionId"})
     public String fetchMessages() {
         try {
             SearchClient client = SearchClientFactory.instance();
@@ -158,12 +171,19 @@ public class LLMObservabilityAction extends UserAction {
         try {
             SearchClient client = SearchClientFactory.instance();
             if (!client.isConfigured()) return SUCCESS.toUpperCase();
+            // Users limited to specific collections only see stats of their own agents
+            Map<String, List<String>> ownAgentFilters = null;
+            if (ArgusCollectionScope.isLimited(getSUser())) {
+                ownAgentFilters = new HashMap<>();
+                List<String> services = buildMultiFilters(false).get(AgentQueryRecord.F_SERVICE_ID_KW);
+                ownAgentFilters.put(AgentQueryRecord.F_SERVICE_ID_KW, services);
+            }
             int accountId = Context.accountId.get();
 
             // Argus view always reports non-Atlas (agent) traffic so the total here matches
             // what the Argus paginated table reports; "false" also covers docs that predate
             // this field and were never Atlas-tagged.
-            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), Boolean.FALSE);
+            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), ownAgentFilters, Boolean.FALSE, isUserRoleAdmin());
 
             aggTotalSpans   = stats.totalSpans;
             aggInputTokens  = stats.inputTokens;
@@ -182,6 +202,10 @@ public class LLMObservabilityAction extends UserAction {
 
     // ── Spans for a single message/trace ──────────────────────────────────────
 
+    @Audit(description = "User viewed prompt content in Traces",
+           resource = Resource.TRACES_CONTENT,
+           operation = Operation.READ,
+           metadataGenerators = {"getTraceId"})
     public String fetchTraceDetail() {
         try {
             SearchClient client = SearchClientFactory.instance();
@@ -191,6 +215,15 @@ public class LLMObservabilityAction extends UserAction {
 
             Boolean atlasFilter = CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()) ? Boolean.TRUE : null;
             spans = client.fetchTraceDetail(accountId, traceId, atlasFilter);
+
+            // Users limited to specific collections only see traces of their own agents
+            Set<String> allowedHosts = ArgusCollectionScope.getRestrictedHosts(getSUser());
+            if (allowedHosts != null && spans != null) {
+                boolean ownTrace = spans.stream().anyMatch(span -> span.get(AgentQueryRecord.F_SERVICE_ID) != null)
+                    && spans.stream().allMatch(span -> span.get(AgentQueryRecord.F_SERVICE_ID) == null
+                        || allowedHosts.contains(span.get(AgentQueryRecord.F_SERVICE_ID).toString()));
+                if (!ownTrace) spans = new ArrayList<>();
+            }
         } catch (Exception e) {
             spans = new ArrayList<>();
         }
@@ -206,6 +239,17 @@ public class LLMObservabilityAction extends UserAction {
             int accountId = Context.accountId.get();
 
             filterChoices = client.fetchPromptFilters(accountId, startMs(), endMs());
+
+            // Users limited to specific collections only get filter values of their own agents.
+            // Users and devices cannot be narrowed by agent here, so they are not offered.
+            Set<String> allowedHosts = ArgusCollectionScope.getRestrictedHosts(getSUser());
+            if (allowedHosts != null && filterChoices != null) {
+                List<String> services = filterChoices.getOrDefault(AgentQueryRecord.F_SERVICE_ID, new ArrayList<>());
+                filterChoices.put(AgentQueryRecord.F_SERVICE_ID,
+                    services.stream().filter(allowedHosts::contains).collect(java.util.stream.Collectors.toList()));
+                filterChoices.put(AgentQueryRecord.F_USER_NAME, new ArrayList<>());
+                filterChoices.put(AgentQueryRecord.F_DEVICE_ID, new ArrayList<>());
+            }
         } catch (Exception e) {
             filterChoices = new HashMap<>();
         }
@@ -223,7 +267,7 @@ public class LLMObservabilityAction extends UserAction {
             SearchClient.SearchResult result = client.searchPrompts(
                 accountId, startMs(), endMs(), skip, Math.min(limit, 100),
                 sortKey, sortOrder == -1, searchAfterJson,
-                buildMultiFilters(true), resolveContextAtlasFilter(), searchString);
+                buildMultiFilters(true), resolveContextAtlasFilter(), searchString, isUserRoleAdmin());
 
             prompts = result.hits;
             total   = result.total;
@@ -234,6 +278,10 @@ public class LLMObservabilityAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private boolean isUserRoleAdmin() {
+        return RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get()) == Role.ADMIN;
+    }
+
     // ── Shared helpers ────────────────────────────────────────────────────────
 
     /** Atlas (endpoint) traffic in ENDPOINT context, agent traffic otherwise — never null. */
@@ -242,6 +290,8 @@ public class LLMObservabilityAction extends UserAction {
     }
 
     /** Merges single-value fields and multi-value lists into one Map for the SearchClient contract. */
+    private static final String NO_ACCESS_SERVICE_ID = "__akto_no_access__";
+
     private Map<String, List<String>> buildMultiFilters(boolean includeSession) {
         Map<String, List<String>> f = new HashMap<>();
         // Session filter: prefer multi-value list, fall back to single field
@@ -260,6 +310,13 @@ public class LLMObservabilityAction extends UserAction {
         List<String> services = nonEmpty(serviceIds);
         if (services.isEmpty() && serviceId != null && !serviceId.trim().isEmpty())
             services = Collections.singletonList(serviceId.trim());
+        // Users limited to specific collections only see traces of their own agents
+        Set<String> allowedHosts = ArgusCollectionScope.getRestrictedHosts(getSUser());
+        if (allowedHosts != null) {
+            services = ArgusCollectionScope.scopeValues(services, allowedHosts);
+            // nothing visible: filter on a value no trace has, so the query returns nothing
+            if (services.isEmpty()) services = Collections.singletonList(NO_ACCESS_SERVICE_ID);
+        }
         if (!services.isEmpty()) f.put(AgentQueryRecord.F_SERVICE_ID_KW, services);
         // deviceId (single-value only; no ag-grid filter for this field)
         if (deviceId != null && !deviceId.trim().isEmpty())
@@ -272,6 +329,12 @@ public class LLMObservabilityAction extends UserAction {
         if (!topics.isEmpty()) f.put(AgentQueryRecord.F_TOPIC_KW, topics);
         List<String> subTopics = nonEmpty(subTopicFilters);
         if (!subTopics.isEmpty()) f.put(AgentQueryRecord.F_SUB_TOPIC_KW, subTopics);
+        // hasActiveGuardrail: "true"/"false" values selected on the Guardrail column's set filter
+        List<String> guardrails = nonEmpty(guardrailFilters);
+        if (!guardrails.isEmpty()) f.put(AgentQueryRecord.F_GUARDRAIL_VIOLATED, guardrails);
+        // Guardrail Policy: which policy name(s) were triggered
+        List<String> guardrailPolicies = nonEmpty(guardrailPolicyFilters);
+        if (!guardrailPolicies.isEmpty()) f.put(AgentQueryRecord.F_GUARDRAIL_POLICY_KW, guardrailPolicies);
         return f;
     }
 

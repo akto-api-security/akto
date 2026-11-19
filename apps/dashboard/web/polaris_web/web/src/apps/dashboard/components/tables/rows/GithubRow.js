@@ -20,6 +20,7 @@ import './row.css'
 import GithubCell from '../cells/GithubCell';
 import func from "@/util/func"
 import TooltipText from '../../shared/TooltipText';
+import { withPermissions } from "@/util/permissions";
 
 const CellType = {
     TEXT: "TEXT",
@@ -131,7 +132,7 @@ function GithubRow(props) {
                             >
                                 <ActionList
                                     actionRole="menuitem"
-                                    sections={getActions(data)}
+                                    sections={withPermissions(getActions(data))}
                                 />
                             </Popover>
                         }
@@ -163,9 +164,11 @@ function GithubRow(props) {
     }
 
     function TextCell(header) {
+        const text = data[header.value];
+        const tooltip = header.tooltipKey ? data[header.tooltipKey] : text;
         return (
             <Box maxWidth={header.maxWidth ? header.maxWidth : ''} key={header.value}>
-                <TooltipText text={data[header.value]} tooltip={data[header.value]} />
+                <TooltipText text={text} tooltip={tooltip} />
             </Box>
         )
     }
@@ -181,7 +184,7 @@ function GithubRow(props) {
                 >
                     <ActionList
                         actionRole="menuitem"
-                        sections={getActions(data)}
+                        sections={withPermissions(getActions(data))}
                     />
                 </Popover>
             </HorizontalStack>

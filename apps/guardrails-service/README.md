@@ -138,7 +138,7 @@ POST /api/validate/response
 | `THREAT_BACKEND_TOKEN` | ✅ | Token for threat reporting |
 | `DATABASE_ABSTRACTOR_SERVICE_URL` | ✅ | Database abstractor URL |
 | `THREAT_BACKEND_URL` | ✅ | Threat backend URL |
-| `AGENT_GUARD_ENGINE_URL` | ✅ | Agent Guard Engine URL |
+| `SCANNER_API_URL` | ❌ | agent-guard base URL for text scans and image OCR (default: Akto SaaS) |
 | `SERVER_PORT` | ❌ | Port (default: 8080) |
 | `LOG_LEVEL` | ❌ | Log level (default: info) |
 

@@ -1,6 +1,7 @@
 package com.akto.threat.backend.service;
 
 import com.akto.dao.AgenticSessionContextDao;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.threat.backend.utils.ThreatUtils;
@@ -11,8 +12,11 @@ import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.OwaspCategory;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterRequest;
@@ -30,17 +34,24 @@ import com.akto.threat.backend.cache.DashboardFilterCache;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ParallelQueryExecutor;
 import com.akto.util.ThreatDetectionConstants;
+import com.mongodb.MongoExecutionTimeoutException;
+import com.mongodb.client.model.CountOptions;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.WriteModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.DistinctIterable;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Sorts;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -52,7 +63,8 @@ public class MaliciousEventService {
   private final MaliciousEventDao maliciousEventDao;
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
-  private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
+  // Read and written by concurrent (unordered) dashboard requests.
+  private static final Map<String, Boolean> shouldNotCreateIndexes = new ConcurrentHashMap<>();
   private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("SQLInjection", "SSRF");
 
   private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
@@ -126,17 +138,27 @@ public class MaliciousEventService {
   //   }
   // }
 
+  // Events for these filterIds are dropped at ingestion.
+  private static final Set<String> SKIPPED_FILTER_IDS = Collections.singleton("ApiLevelRateLimited");
+
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
     MaliciousEventMessage evt = request.getMaliciousEvent();
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
+
+    if (SKIPPED_FILTER_IDS.contains(filterId)) {
+      logger.debug("Skipping malicious event for filterId " + filterId);
+      return;
+    }
 
     MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder();
     String severity = evt.getSeverity();
     // Skip recording for specific policies on specific account.
     // TODO: Remove once policy is fixed.
 
-    String refId = UUID.randomUUID().toString();
+    String refId = (evt.hasRefId() && !evt.getRefId().isEmpty())
+        ? evt.getRefId()
+        : UUID.randomUUID().toString();
     logger.debug("received malicious event " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
 
     EventType eventType = evt.getEventType();
@@ -184,11 +206,16 @@ public class MaliciousEventService {
         .setSuccessfulExploit(evt.getSuccessfulExploit())
         .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
         .setLabel(label)
-        .setHost(evt.getHost() != null ? evt.getHost() : "");
+        .setHost(evt.getHost() != null ? evt.getHost() : "")
+        .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "");
 
     // Set contextSource if available
     if (contextSource != null && !contextSource.isEmpty()) {
         builder.setContextSource(contextSource);
+    }
+
+    if (ThreatUtils.groupsActivities(accountId)) {
+        builder.setGroupKey(ThreatUtils.activityGroupKey(evt.getLatestApiPayload()));
     }
 
     List<MaliciousEventDto.OwaspCategory> owaspCategories = evt.getOwaspCategoriesList()
@@ -200,12 +227,98 @@ public class MaliciousEventService {
         builder.setOwaspCategories(owaspCategories);
     }
 
+    if (ThreatDetectionConstants.HUMAN_APPROVAL.equalsIgnoreCase(status)) {
+        String humanResponse = evt.getHumanResponse();
+        builder.setHumanResponse(
+            humanResponse != null && !humanResponse.isEmpty()
+                ? humanResponse
+                : MaliciousEventDto.HumanResponse.PENDING.name());
+    }
+
     MaliciousEventDto maliciousEventModel = builder.build();
 
     this.kafka.send(
         KafkaUtils.generateMsg(
             maliciousEventModel, MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, accountId),
         KafkaTopic.ThreatDetection.INTERNAL_DB_MESSAGES);
+  }
+
+  // A negated regex can't be answered from index keys, so counting it fetches every doc in the range.
+  // Count the range once, then subtract the small excluded partitions, matched positively.
+  long countWithEvaluationModes(String accountId, Document scope, List<Document> evaluationModeConditions, long maxTimeMs) {
+    List<Document> included = new ArrayList<>();
+    List<Document> excluded = new ArrayList<>();
+    for (Document condition : evaluationModeConditions) {
+      Object endpoint = condition.get("latestApiEndpoint");
+      Object negated = endpoint instanceof Document ? ((Document) endpoint).get("$not") : null;
+      if (negated != null) {
+        excluded.add(new Document("latestApiEndpoint", negated));
+      } else {
+        included.add(condition);
+      }
+    }
+    Document rangeScope = new Document(scope);
+    included.forEach(condition -> andDocument(rangeScope, condition));
+    long total = maliciousEventDao.countDocuments(accountId, rangeScope, maxTimeMs);
+    if (excluded.isEmpty()) {
+      return total;
+    }
+    Document excludedScope = new Document(rangeScope);
+    andDocument(excludedScope, new Document("$or", excluded));
+    return total - maliciousEventDao.countDocuments(accountId, excludedScope, maxTimeMs);
+  }
+
+  public int updateRemediation(String accountId, String refId, String remediation) {
+    return updateEnrichment(accountId, refId, remediation, null);
+  }
+
+  /**
+   * Patches LLM-generated enrichment onto an already-recorded event, keyed on refId.
+   * Both fields are optional and independently gated on the gateway, so only the
+   * non-empty ones are written - otherwise a remediation-only call would wipe an
+   * evidence line already patched in by the same goroutine (and vice versa).
+   */
+  public int updateEnrichment(String accountId, String refId, String remediation, String evidenceLine) {
+    try {
+      if (refId == null || refId.isEmpty()) {
+        logger.error("refId is required to update enrichment");
+        return 0;
+      }
+
+      List<Bson> updates = new ArrayList<>();
+      if (remediation != null && !remediation.isEmpty()) {
+        updates.add(Updates.set("remediation", remediation));
+      }
+      if (evidenceLine != null && !evidenceLine.isEmpty()) {
+        updates.add(Updates.set("evidenceLine", evidenceLine));
+      }
+      if (updates.isEmpty()) {
+        return 0;
+      }
+      Bson update = Updates.combine(updates);
+
+      Bson filters = Filters.eq("refId", refId);
+
+      long modifiedCount = maliciousEventDao.getCollection(accountId)
+          .updateOne(filters, update)
+          .getModifiedCount();
+
+      return (int) modifiedCount;
+    } catch (Exception e) {
+      logger.error("Error updating enrichment for refId: " + refId, e);
+      return 0;
+    }
+  }
+
+  /** Looks up an event's human-approval decision by refId. Null (not found) is normal — the async write may not have landed yet. */
+  public MaliciousEventDto getApprovalStatus(String accountId, String refId) {
+    if (refId == null || refId.isEmpty()) {
+      logger.error("refId is required to fetch approval status");
+      return null;
+    }
+
+    Bson filters = Filters.eq("refId", refId);
+    return maliciousEventDao.getCollection(accountId).find(filters).first();
   }
 
   private <T> Set<T> findDistinctFields(
@@ -415,6 +528,21 @@ public class MaliciousEventService {
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
       String accountId, ListMaliciousRequestsRequest request, String contextSource, String skillEvalMode, String configEvalMode) {
+    return listMaliciousRequests(accountId, request, contextSource, skillEvalMode, configEvalMode, null);
+  }
+
+  public ListMaliciousRequestsResponse listMaliciousRequests(
+      String accountId, ListMaliciousRequestsRequest request, String contextSource, String skillEvalMode, String configEvalMode, String humanResponseFilter) {
+    try {
+      return fetchMaliciousRequests(accountId, request, contextSource, skillEvalMode, configEvalMode, humanResponseFilter);
+    } catch (MongoExecutionTimeoutException e) {
+      logger.error("list_malicious_requests exceeded " + ThreatUtils.REGEX_MAX_TIME_MS + "ms, returning an empty result: " + e.getMessage(), e);
+      return ListMaliciousRequestsResponse.newBuilder().build();
+    }
+  }
+
+  private ListMaliciousRequestsResponse fetchMaliciousRequests(
+      String accountId, ListMaliciousRequestsRequest request, String contextSource, String skillEvalMode, String configEvalMode, String humanResponseFilter) {
 
     if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
       createIndexIfAbsent(accountId);
@@ -424,181 +552,31 @@ public class MaliciousEventService {
     int skip = request.hasSkip() ? request.getSkip() : 0;
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
-
-    Document query = new Document();
-    if (!filter.getActorsList().isEmpty()) {
-      query.append("actor", new Document("$in", filter.getActorsList()));
+    boolean minimalFields = request.hasMinimalFields() && request.getMinimalFields();
+    List<String> excludedFields = new ArrayList<>();
+    if (minimalFields) {
+      excludedFields.addAll(Arrays.asList("latestApiOrig","payload","remediation", "evidenceLine", "humanResponse", "owaspCategories"));
     }
 
-    if (!filter.getUrlsList().isEmpty()) {
-      query.append("latestApiEndpoint", new Document("$in", filter.getUrlsList()));
-    }
+    Document query = buildListFilterQuery(accountId, filter, contextSource);
+    applyHumanResponseFilter(query, humanResponseFilter);
 
-    if (!filter.getApiCollectionIdList().isEmpty()) {
-      query.append("latestApiCollectionId", new Document("$in", filter.getApiCollectionIdList()));
-    }
-
-    if (!filter.getMethodList().isEmpty()) {
-      // Convert string methods to uppercase to match enum names stored in MongoDB
-      List<String> methodStrings = filter.getMethodList().stream()
-          .map(m -> m != null ? m.toUpperCase() : null)
-          .filter(m -> m != null)
-          .collect(Collectors.toList());
-      if (!methodStrings.isEmpty()) {
-        query.append("latestApiMethod", new Document("$in", methodStrings));
-      }
-    }
-
-    if (!filter.getIpsList().isEmpty()) {
-      query.append("latestApiIp", new Document("$in", filter.getIpsList()));
-    }
-
-    if (!filter.getTypesList().isEmpty()) {
-      query.append("type", new Document("$in", filter.getTypesList()));
-    }
-
-    if (!filter.getSubCategoryList().isEmpty()) {
-      query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
-    }
-
-    // Host attribution: exact match (hosts) OR loose device+service match (looseHostKeys, for
-    // 2-vs-3-segment hostname format mismatches) OR claude-config scanner events (no collection of
-    // their own, attributed by device id instead) — see the Filter.search_text/loose_host_keys/
-    // claude_device_ids/match_claude_config proto doc comments for the client-side derivation this
-    // mirrors (ViolationsTab.jsx's hostSet/looseHostSet/claudeDeviceIds).
-    List<Document> hostOrConditions = new ArrayList<>();
-    if (!filter.getHostsList().isEmpty()) {
-      hostOrConditions.add(new Document("host", new Document("$in", filter.getHostsList())));
-    }
-    if (!filter.getLooseHostKeysList().isEmpty()) {
-      Document looseKeyExpr = new Document("$concat", Arrays.asList(
-          new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), 0)),
-          " ",
-          new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), -1))
-      ));
-      hostOrConditions.add(new Document("$expr",
-          new Document("$in", Arrays.asList(looseKeyExpr, filter.getLooseHostKeysList()))));
-    }
-    Document claudeConfigHostMatch = new Document("host",
-        Pattern.compile("^[^.]+\\.(claude-settings|claude)$", Pattern.CASE_INSENSITIVE));
-    if (filter.hasMatchClaudeConfig() && filter.getMatchClaudeConfig()) {
-      hostOrConditions.add(claudeConfigHostMatch);
-    } else if (!filter.getClaudeDeviceIdsList().isEmpty()) {
-      Document deviceIdExpr = new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), 0));
-      hostOrConditions.add(new Document("$and", Arrays.asList(
-          claudeConfigHostMatch,
-          new Document("$expr", new Document("$in", Arrays.asList(deviceIdExpr, filter.getClaudeDeviceIdsList())))
-      )));
-    }
-    List<Document> extraAndClauses = new ArrayList<>();
-    if (!hostOrConditions.isEmpty()) {
-      extraAndClauses.add(hostOrConditions.size() == 1 ? hostOrConditions.get(0) : new Document("$or", hostOrConditions));
-    }
-    if (filter.hasSearchText() && !filter.getSearchText().isEmpty()) {
-      Pattern searchPattern = Pattern.compile(Pattern.quote(filter.getSearchText()), Pattern.CASE_INSENSITIVE);
-      extraAndClauses.add(new Document("$or", Arrays.asList(
-          new Document("filterId", searchPattern),
-          new Document("host", searchPattern),
-          new Document("actor", searchPattern)
-      )));
-    }
-    if (!extraAndClauses.isEmpty()) {
-      List<Document> allClauses = new ArrayList<>();
-      allClauses.add(new Document(query));
-      allClauses.addAll(extraAndClauses);
-      query.clear();
-      query.append("$and", allClauses);
-    }
-
-    if (filter.hasLatestApiOrigRegex() && !filter.getLatestApiOrigRegex().isEmpty()) {
-      query.append("latestApiOrig", new Document("$regex", filter.getLatestApiOrigRegex()));
-    }
-
-
-    if (!filter.getLatestAttackList().isEmpty()) {
-      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
-    }
-
-    if (!filter.getSeverityList().isEmpty()) {
-      query.append("severity", new Document("$in", filter.getSeverityList()));
-    }
-
-    // Handle status filter
-    if (filter.hasStatusFilter()) {
-      applyStatusFilter(query, filter.getStatusFilter());
-    }
-
-    if (filter.hasDetectedAtTimeRange()) {
-      TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
-      long start = timeRange.hasStart() ? timeRange.getStart() : 0;
-      long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
-
-      query.append("detectedAt", new Document("$gte", start).append("$lte", end));
-    }
-
-    if (filter.hasSuccessfulExploit()) {
-      boolean val = filter.getSuccessfulExploit();
-      if (val) {
-        query.append("successfulExploit", true);
-      } else {
-        List<Document> andConditions = new ArrayList<>();
-        andConditions.add(new Document(query));
-        andConditions.add(new Document("$or", Arrays.asList(
-            new Document("successfulExploit", false),
-            new Document("successfulExploit", new Document("$exists", false))
-        )));
-        query.clear();
-        query.append("$and", andConditions);
-      }
-    }
-
-    // if (filter.hasLabel()) {
-    //   String labelString = filter.getLabel();
-    //   MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(labelString);
-    //   applyLabelFilter(query, labelEnum);
-    // }
-
-    // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
-    if (!contextFilter.isEmpty()) {
-      query.putAll(contextFilter);
-    }
-
-    // Skills Evaluations / Misconfigured Settings partitions — Atlas (ENDPOINT) only. An event
-    // belongs to Skills Evaluations iff latestApiEndpoint starts with "/skills/"; it belongs to
-    // Misconfigured Settings iff latestApiEndpoint contains "/config/" (e.g.
-    // "/codex/config/mcp_servers.computer-use.command" — the agent name prefix varies, so this
-    // isn't anchored to the start like the skills pattern). Each mode independently narrows to
-    // just its own partition ("only") or excludes it ("exclude") — Active sets both to "exclude"
-    // so neither shows up there. Done server-side so the total count and pagination stay correct.
-    boolean hasSkillMode = skillEvalMode != null && !skillEvalMode.isEmpty();
-    boolean hasConfigMode = configEvalMode != null && !configEvalMode.isEmpty();
-    if ((hasSkillMode || hasConfigMode) && "ENDPOINT".equalsIgnoreCase(contextSource)) {
+    // Skills Evaluations / Misconfigured Settings partitions (see ThreatUtils.evaluationModeConditions).
+    // Done server-side so the total count and pagination stay correct.
+    List<Document> evaluationModeConditions = ThreatUtils.evaluationModeConditions(contextSource, skillEvalMode, configEvalMode);
+    Document countScope = new Document(query);
+    if (!evaluationModeConditions.isEmpty()) {
       List<Document> andConditions = new ArrayList<>();
       andConditions.add(new Document(query));
-
-      Pattern skillsEndpointPattern = Pattern.compile("^/skills/");
-      if ("only".equalsIgnoreCase(skillEvalMode)) {
-        andConditions.add(new Document("latestApiEndpoint", skillsEndpointPattern));
-      } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
-        andConditions.add(new Document("latestApiEndpoint", new Document("$not", skillsEndpointPattern)));
-      }
-
-      Pattern configEndpointPattern = Pattern.compile("/config/");
-      if ("only".equalsIgnoreCase(configEvalMode)) {
-        andConditions.add(new Document("latestApiEndpoint", configEndpointPattern));
-      } else if ("exclude".equalsIgnoreCase(configEvalMode)) {
-        andConditions.add(new Document("latestApiEndpoint", new Document("$not", configEndpointPattern)));
-      }
-
-      if (andConditions.size() > 1) {
-        query.clear();
-        query.append("$and", andConditions);
-      }
+      andConditions.addAll(evaluationModeConditions);
+      query.clear();
+      query.append("$and", andConditions);
     }
 
     // Check if sortBySeverity flag is set
     boolean sortBySeverity = filter.hasSortBySeverity() && filter.getSortBySeverity();
+    boolean sortByRiskScore = sort.containsKey("riskScore");
+    int riskScoreDir = sort.getOrDefault("riskScore", -1);
 
     long startTs = filter.hasDetectedAtTimeRange() && filter.getDetectedAtTimeRange().hasStart() ? filter.getDetectedAtTimeRange().getStart() : 0;
     long endTs   = filter.hasDetectedAtTimeRange() && filter.getDetectedAtTimeRange().hasEnd()   ? filter.getDetectedAtTimeRange().getEnd()   : 0;
@@ -617,56 +595,89 @@ public class MaliciousEventService {
     boolean dedupeLatestPerHostActorEndpoint = "only".equalsIgnoreCase(configEvalMode)
         && "ENDPOINT".equalsIgnoreCase(contextSource);
 
+    // Repeated Bedrock activities (same caller and prompt within the gap) are listed as one row.
+    boolean groupActivities = ThreatUtils.groupsActivities(accountId) && "AGENTIC".equalsIgnoreCase(contextSource)
+        && !dedupeLatestPerHostActorEndpoint && !(filter.hasUngroupActivities() && filter.getUngroupActivities());
+
     Document dedupeGroupKey = new Document("host", "$host")
         .append("actor", "$actor")
         .append("latestApiEndpoint", "$latestApiEndpoint");
 
+    boolean hasPayloadRegex = filter.hasLatestApiOrigRegex() && !filter.getLatestApiOrigRegex().isEmpty();
+    boolean regexQuery = hasPayloadRegex
+        || filter.hasSearchText() && !filter.getSearchText().isEmpty()
+        || !filter.getBehavioursList().isEmpty()
+        || !filter.getAgenticTypesList().isEmpty()
+        || !evaluationModeConditions.isEmpty()
+        || groupActivities
+        || dedupeLatestPerHostActorEndpoint;
+    long regexMaxTimeMs = regexQuery ? ThreatUtils.REGEX_MAX_TIME_MS : 0;
+
     long total;
     MongoCursor<MaliciousEventDto> cursor;
+    ActivityRows activityRows = groupActivities
+        ? listActivityRows(accountId, query, sort, sortBySeverity, sortByRiskScore, riskScoreDir, excludedFields, skip, limit, regexMaxTimeMs)
+        : null;
+    // $unset rejects an empty field list, so only add it when minimalFields populated excludedFields.
+    List<Document> matchStages = new ArrayList<>();
+    matchStages.add(new Document("$match", query));
+    if (!excludedFields.isEmpty()) {
+      matchStages.add(new Document("$unset", excludedFields));
+    }
     if (dedupeLatestPerHostActorEndpoint) {
       MongoCursor<Document> countCursor = maliciousEventDao.aggregateRaw(accountId, Arrays.asList(
           new Document("$match", query),
           new Document("$group", new Document("_id", dedupeGroupKey)),
           new Document("$count", "total")
-      )).cursor();
+      )).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
       total = countCursor.hasNext() ? ((Number) countCursor.next().get("total")).longValue() : 0;
       countCursor.close();
 
-      cursor = maliciousEventDao.getCollection(accountId).aggregate(Arrays.asList(
-          new Document("$match", query),
+      List<Document> pipeline = new ArrayList<>(matchStages);
+      pipeline.addAll(Arrays.asList(
           new Document("$sort", new Document("detectedAt", -1)),
           new Document("$group", new Document("_id", dedupeGroupKey).append("doc", new Document("$first", "$$ROOT"))),
-          new Document("$replaceRoot", new Document("newRoot", "$doc")),
-          new Document("$sort", new Document("detectedAt", sort.getOrDefault("detectedAt", -1))),
-          new Document("$skip", skip),
-          new Document("$limit", limit)
-      )).cursor();
+          new Document("$replaceRoot", new Document("newRoot", "$doc"))
+      ));
+      if (sortByRiskScore) {
+        pipeline.add(new Document("$addFields", riskScoreSortAddFields()));
+        pipeline.add(new Document("$sort", new Document("riskScoreNum", riskScoreDir).append("detectedAt", -1)));
+      } else {
+        pipeline.add(new Document("$sort", new Document("detectedAt", sort.getOrDefault("detectedAt", -1))));
+      }
+      pipeline.add(new Document("$skip", skip));
+      pipeline.add(new Document("$limit", limit));
+      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
+    } else if (activityRows != null) {
+      total = activityRows.total;
+      cursor = activityRows.cursor;
     } else if (sortBySeverity) {
-      total = maliciousEventDao.countDocuments(accountId, query);
+      total = countWithEvaluationModes(accountId, countScope, evaluationModeConditions, regexMaxTimeMs);
       // Use aggregation pipeline for custom severity sorting
-      cursor = maliciousEventDao.getCollection(accountId)
-          .aggregate(Arrays.asList(
-              new Document("$match", query),
-              new Document("$addFields", new Document("severityRank",
-                  new Document("$switch", new Document()
-                      .append("branches", Arrays.asList(
-                          new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 1),
-                          new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 2),
-                          new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 3),
-                          new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 4)
-                      ))
-                      .append("default", 5)
-                  )
-              )),
+      List<Document> pipeline = new ArrayList<>(matchStages);
+      pipeline.addAll(Arrays.asList(
+              new Document("$addFields", severityRankAddFields()),
               new Document("$sort", new Document("severityRank", sort.getOrDefault("severity", 1))),
               new Document("$skip", skip),
               new Document("$limit", limit)
-          ))
-          .cursor();
+          ));
+      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
+    } else if (sortByRiskScore) {
+      total = countWithEvaluationModes(accountId, countScope, evaluationModeConditions, regexMaxTimeMs);
+      List<Document> pipeline = new ArrayList<>(matchStages);
+      pipeline.addAll(Arrays.asList(
+              new Document("$addFields", riskScoreSortAddFields()),
+              new Document("$sort", new Document("riskScoreNum", riskScoreDir).append("detectedAt", -1)),
+              new Document("$skip", skip),
+              new Document("$limit", limit)
+          ));
+      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
     } else {
-      total = maliciousEventDao.countDocuments(accountId, query);
+      total = countWithEvaluationModes(accountId, countScope, evaluationModeConditions, regexMaxTimeMs);
       cursor = maliciousEventDao.getCollection(accountId)
           .find(query)
+          .maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS)
+          .projection(Projections.exclude(excludedFields))
           .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
           .skip(skip)
           .limit(limit)
@@ -679,29 +690,35 @@ public class MaliciousEventService {
         pageEvents.add(cursor.next());
       }
 
-      Set<String> sessionIdsOnPage = pageEvents.stream()
-          .map(MaliciousEventDto::getSessionId)
-          .filter(id -> id != null && !id.isEmpty())
-          .collect(Collectors.toSet());
-      Set<String> validSessionIds = AgenticSessionContextDao.instance
-          .findExistingSessionIdentifiers(accountId, sessionIdsOnPage);
+      // Session-id resolution is its own extra DB round trip (findExistingSessionIdentifiers) —
+      // skipped entirely under minimal_fields, same reasoning as the metadata/owasp/etc. fields
+      // below: a caller that only needs filterId/category/host has no use for it either.
+      Set<String> validSessionIds = Collections.emptySet();
+      if (!minimalFields) {
+        Set<String> sessionIdsOnPage = pageEvents.stream()
+            .map(MaliciousEventDto::getSessionId)
+            .filter(id -> id != null && !id.isEmpty())
+            .collect(Collectors.toSet());
+        validSessionIds = AgenticSessionContextDao.instance.findExistingSessionIdentifiers(accountId, sessionIdsOnPage);
+      }
 
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       for (MaliciousEventDto evt : pageEvents) {
-        String metadata = ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
-        String resolvedSessionId = (evt.getSessionId() != null && validSessionIds.contains(evt.getSessionId()))
+        Metadata parsedMetadata = ThreatUtils.parseMetadata(evt.getMetadata());
+        String metadata = minimalFields ? "" : ThreatUtils.metadataJson(parsedMetadata);
+        String behaviour = parsedMetadata != null ? parsedMetadata.getBehaviour() : "";
+        String resolvedSessionId = (!minimalFields && evt.getSessionId() != null && validSessionIds.contains(evt.getSessionId()))
             ? evt.getSessionId() : "";
 
-        maliciousEvents.add(
+        ListMaliciousRequestsResponse.MaliciousEvent.Builder builder =
             ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()
                 .setActor(evt.getActor())
-                .setFilterId(evt.getFilterId())
                 .setFilterId(evt.getFilterId())
                 .setId(evt.getId())
                 .setIp(evt.getLatestApiIp())
                 .setCountry(evt.getCountry())
                 .setDestCountry(evt.getDestCountry() != null ? evt.getDestCountry() : "")
-                .setPayload(evt.getLatestApiOrig())
+                .setPayload("")
                 .setEndpoint(evt.getLatestApiEndpoint())
                 .setMethod(evt.getLatestApiMethod().name())
                 .setDetectedAt(evt.getDetectedAt())
@@ -719,17 +736,37 @@ public class MaliciousEventService {
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
                 .setSessionId(resolvedSessionId)
-                .addAllOwaspCategories(evt.getOwaspCategories() != null
-                    ? evt.getOwaspCategories().stream()
-                        .map(o -> OwaspCategory.newBuilder()
-                            .setId(o.getId() != null ? o.getId() : "")
-                            .setName(o.getName() != null ? o.getName() : "")
-                            .setSeverity(o.getSeverity() != null ? o.getSeverity() : "")
-                            .setConfidence(o.getConfidence() != null ? o.getConfidence() : "")
-                            .build())
-                        .collect(Collectors.toList())
-                    : Collections.emptyList())
-                .build());
+                .setCaseOwner(evt.getCaseOwner() != null ? evt.getCaseOwner() : "")
+                .setBehaviour(behaviour)
+                .setFirstTriagedAt(evt.getFirstTriagedAt() != null ? evt.getFirstTriagedAt() : 0L);
+        if (evt.getGroupKey() != null && evt.getGroupCount() != null) {
+          builder.setGroupCount(evt.getGroupCount())
+              .setGroupFirstDetectedAt(evt.getGroupFirstDetectedAt() != null ? evt.getGroupFirstDetectedAt() : evt.getDetectedAt());
+          if (evt.getGroupEventIds() != null) {
+            builder.addAllGroupEventIds(evt.getGroupEventIds());
+          }
+          if (evt.getGroupFilterIds() != null) {
+            builder.addAllGroupFilterIds(evt.getGroupFilterIds());
+          }
+        }
+        if (!minimalFields) {
+          builder.setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
+              .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "")
+              .setHumanResponse(evt.getHumanResponse() != null ? evt.getHumanResponse() : "")
+              .setCaseNotes(evt.getCaseNotes() != null ? evt.getCaseNotes() : "")
+              .addAllCaseTimeline(ThreatUtils.caseActivities(evt))
+              .addAllOwaspCategories(evt.getOwaspCategories() != null
+                  ? evt.getOwaspCategories().stream()
+                      .map(o -> OwaspCategory.newBuilder()
+                          .setId(o.getId() != null ? o.getId() : "")
+                          .setName(o.getName() != null ? o.getName() : "")
+                          .setSeverity(o.getSeverity() != null ? o.getSeverity() : "")
+                          .setConfidence(o.getConfidence() != null ? o.getConfidence() : "")
+                          .build())
+                      .collect(Collectors.toList())
+                  : Collections.emptyList());
+        }
+        maliciousEvents.add(builder.build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
           .setTotal(total)
@@ -742,30 +779,477 @@ public class MaliciousEventService {
     }
   }
 
+  /** Fallback when the caller sends no limit (0/unset). */
+  private static final int GUARDRAIL_VIOLATION_PAYLOADS_DEFAULT_LIMIT = 50;
+  /** Hard cap regardless of what the caller asks for — an internal LLM scan job paging through
+   *  this endpoint should never be able to pull an unbounded page (and, by extension, an
+   *  unbounded amount of payload text) into memory in one call. */
+  private static final int GUARDRAIL_VIOLATION_PAYLOADS_MAX_LIMIT = 500;
+
+  // Batched, cursor-paginated fetch of the raw request/response payload (latestApiOrig) behind a
+  // set of guardrail-policy violations. listMaliciousRequests cannot serve this: its response
+  // hard-codes payload to "" for every row (see .setPayload("") below), and adding a payload field
+  // to that request risks an unrecognized-field parse failure on an un-redeployed caller (see the
+  // proto comment on ListGuardrailViolationPayloadsRequest). Sorted/paginated on the raw _id in
+  // either direction (request.newestFirst) — filterId does not appear in an existing _id-ordered
+  // index, but this endpoint is used by an internal LLM scan job, not an interactive list view, so
+  // a collection scan bounded by contextSource + filterId + detectedAt (existing
+  // contextSource_1_filterId_1_detectedAt_-1 index) followed by an in-memory _id sort over the
+  // matched page is an acceptable cost; add an {contextSource, filterId, _id} index if this needs
+  // to scale further.
+  /** Cursor encoding for listGuardrailViolationPayloads: "<detectedAt>|<_id>". Not an ObjectId —
+   *  see that method's own comment on why. "|" is safe as a separator: detectedAt is numeric and
+   *  _id is a UUID string (neither can contain it). */
+  private static final String GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR = "|";
+
+  public ListGuardrailViolationPayloadsResponse listGuardrailViolationPayloads(
+      String accountId, ListGuardrailViolationPayloadsRequest request, String contextSource) {
+
+    if (!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
+      createIndexIfAbsent(accountId);
+    }
+
+    int requestedLimit = request.getLimit() > 0
+        ? request.getLimit() : GUARDRAIL_VIOLATION_PAYLOADS_DEFAULT_LIMIT;
+    int limit = Math.min(requestedLimit, GUARDRAIL_VIOLATION_PAYLOADS_MAX_LIMIT);
+    List<String> filterIds = request.getFilterIdsList();
+
+    Document query = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
+    if (!filterIds.isEmpty()) {
+      query.append("filterId", new Document("$in", filterIds));
+    }
+    // Only rows that actually carry a payload are useful to the LLM attribution step.
+    query.append("latestApiOrig", new Document("$exists", true).append("$ne", ""));
+
+    if (request.hasDetectedAtTimeRange()) {
+      TimeRangeFilter timeRange = request.getDetectedAtTimeRange();
+      long start = timeRange.hasStart() ? timeRange.getStart() : 0;
+      long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
+      query.append("detectedAt", new Document("$gte", start).append("$lte", end));
+    }
+
+    // Oldest-first by default (what an exhaustive paging scan needs, so no row is skipped as new
+    // ones arrive between pages) — flip to newest-first on request.
+    //
+    // Cursor is on (detectedAt, _id), NOT _id alone: MaliciousEventDto#id is a
+    // UUID.randomUUID().toString() that the POJO codec auto-maps to _id (no @BsonId ObjectId
+    // override), so _id in this collection is a random string with no chronological meaning —
+    // sorting/range-filtering on it alone would produce an arbitrary, unstable page order, not the
+    // "walk forward without skipping a row" guarantee this endpoint exists for. detectedAt gives
+    // the real ordering; _id is only a tiebreaker for the (common) case of several events sharing a
+    // timestamp, using the standard keyset-pagination "$gt this OR ($eq this AND $gt that)" shape.
+    boolean newestFirst = request.hasNewestFirst() && request.getNewestFirst();
+    String cmp = newestFirst ? "$lt" : "$gt";
+
+    String cursorParam = request.hasCursor() ? request.getCursor() : null;
+    if (cursorParam != null && !cursorParam.isEmpty()) {
+      int sep = cursorParam.indexOf(GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR);
+      if (sep < 0) {
+        logger.error("Malformed cursor for listGuardrailViolationPayloads: " + cursorParam);
+        return ListGuardrailViolationPayloadsResponse.newBuilder().build();
+      }
+      try {
+        long cursorDetectedAt = Long.parseLong(cursorParam.substring(0, sep));
+        String cursorId = cursorParam.substring(sep + 1);
+        query.append("$or", Arrays.asList(
+            new Document("detectedAt", new Document(cmp, cursorDetectedAt)),
+            new Document("detectedAt", cursorDetectedAt)
+                .append("_id", new Document(cmp, cursorId))
+        ));
+      } catch (NumberFormatException e) {
+        logger.error("Malformed cursor for listGuardrailViolationPayloads: " + cursorParam);
+        return ListGuardrailViolationPayloadsResponse.newBuilder().build();
+      }
+    }
+
+    Bson sort = newestFirst
+        ? Sorts.orderBy(Sorts.descending("detectedAt"), Sorts.descending("_id"))
+        : Sorts.orderBy(Sorts.ascending("detectedAt"), Sorts.ascending("_id"));
+
+    List<ListGuardrailViolationPayloadsResponse.ViolationPayload> payloads = new ArrayList<>();
+    MongoCursor<Document> cursor = null;
+    try {
+      cursor = maliciousEventDao.getDocumentCollection(accountId)
+          .find(query)
+          .projection(Projections.include("_id", "refId", "filterId", "detectedAt", "latestApiOrig"))
+          .sort(sort)
+          .limit(limit)
+          .cursor();
+
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        String orig = HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"));
+        Object detectedAtRaw = doc.get("detectedAt");
+        long detectedAt = detectedAtRaw instanceof Number ? ((Number) detectedAtRaw).longValue() : 0L;
+        // _id may be legitimately typed as ObjectId or String depending on how a given row was
+        // inserted — read it generically rather than assuming one BSON type (see this method's own
+        // comment above on why it's a String in practice for this DTO).
+        Object idRaw = doc.get("_id");
+        String id = idRaw != null ? idRaw.toString() : "";
+        payloads.add(ListGuardrailViolationPayloadsResponse.ViolationPayload.newBuilder()
+            .setRefId(doc.getString("refId") != null ? doc.getString("refId") : "")
+            .setFilterId(doc.getString("filterId") != null ? doc.getString("filterId") : "")
+            .setDetectedAt(detectedAt)
+            .setOrig(orig != null ? orig : "")
+            .setCursor(detectedAt + GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR + id)
+            .build());
+      }
+    } finally {
+      if (cursor != null) {
+        cursor.close();
+      }
+    }
+
+    return ListGuardrailViolationPayloadsResponse.newBuilder()
+        .addAllPayloads(payloads)
+        .build();
+  }
+
+  // metadata is stored as proto-text (`risk_score: "0.95"`) or JSON (`"riskScore": "0.95"`).
+  private static final String RISK_SCORE_EXTRACT_REGEX = "(?:risk_score|riskScore)\\s*[:=]\\s*\"([0-9]*\\.?[0-9]+)\"";
+
+  private static final class ActivityRows {
+    final long total;
+    final MongoCursor<MaliciousEventDto> cursor;
+
+    ActivityRows(long total, MongoCursor<MaliciousEventDto> cursor) {
+      this.total = total;
+      this.cursor = cursor;
+    }
+  }
+
+  // Rows for an account that groups activities. Null if the grouped query fails, so the caller lists
+  // events one per row as it always has instead of showing nothing.
+  private ActivityRows listActivityRows(String accountId, Document query, Map<String, Integer> sort, boolean sortBySeverity,
+      boolean sortByRiskScore, int riskScoreDir, List<String> excludedFields, int skip, int limit, long maxTimeMs) {
+    try {
+      // Keyed events are folded into activity rows; the rest stay one row each and come straight off
+      // the indexes. Each side is cut to the page window before the two are merged and paged.
+      Document keyed = new Document("$and", Arrays.asList(query, new Document("groupKey", new Document("$type", "string"))));
+      Document unkeyed = new Document("$and", Arrays.asList(query, new Document("groupKey", new Document("$not", new Document("$type", "string")))));
+      List<Document> rowStages = ThreatUtils.activityGroupStages(keyed);
+      // The planner prefers the contextSource indexes and then reads every event; keyed events are a
+      // small slice of the collection, so their own partial index is far cheaper.
+      Bson keyedIndex = ThreatUtils.ACTIVITY_GROUP_INDEX_KEYS;
+      MongoCollection<MaliciousEventDto> events = maliciousEventDao.getCollection(accountId);
+
+      List<Document> countPipeline = new ArrayList<>(rowStages);
+      countPipeline.add(new Document("$count", "total"));
+      MongoCursor<Document> countCursor = events
+          .aggregate(countPipeline, Document.class).hint(keyedIndex).allowDiskUse(true).maxTime(maxTimeMs, TimeUnit.MILLISECONDS).cursor();
+      long keyedRows = countCursor.hasNext() ? ((Number) countCursor.next().get("total")).longValue() : 0;
+      countCursor.close();
+      // "No groupKey" can't use an index; all events minus keyed events can.
+      long keyedEvents = events.countDocuments(keyed, new CountOptions().hint(keyedIndex).maxTime(maxTimeMs, TimeUnit.MILLISECONDS));
+      long total = keyedRows + maliciousEventDao.countDocuments(accountId, query, maxTimeMs) - keyedEvents;
+
+      List<Document> sortStages = new ArrayList<>();
+      if (sortBySeverity) {
+        sortStages.add(new Document("$addFields", severityRankAddFields()));
+        sortStages.add(new Document("$sort", new Document("severityRank", sort.getOrDefault("severity", 1)).append("detectedAt", -1)));
+      } else if (sortByRiskScore) {
+        sortStages.add(new Document("$addFields", riskScoreSortAddFields()));
+        sortStages.add(new Document("$sort", new Document("riskScoreNum", riskScoreDir).append("detectedAt", -1)));
+      } else {
+        int dir = sort.getOrDefault("detectedAt", -1);
+        // _id breaks ties so pages stay stable when several rows share a detectedAt.
+        sortStages.add(new Document("$sort", new Document("detectedAt", dir).append("_id", dir)));
+      }
+      List<String> dropped = new ArrayList<>(excludedFields);
+      if (!dropped.contains("latestApiOrig")) {
+        dropped.add("latestApiOrig");
+      }
+      Document pageWindow = new Document("$limit", skip + limit);
+
+      List<Document> unkeyedPage = new ArrayList<>();
+      unkeyedPage.add(new Document("$match", unkeyed));
+      unkeyedPage.addAll(sortStages);
+      unkeyedPage.add(pageWindow);
+      unkeyedPage.add(new Document("$unset", dropped));
+
+      // Keyed rows are the outer pipeline so the index hint applies to them.
+      List<Document> pipeline = new ArrayList<>(rowStages);
+      pipeline.addAll(sortStages);
+      pipeline.add(pageWindow);
+      pipeline.add(new Document("$unset", dropped));
+      pipeline.add(new Document("$unionWith", new Document("coll", events.getNamespace().getCollectionName())
+          .append("pipeline", unkeyedPage)));
+      pipeline.addAll(sortStages);
+      pipeline.add(new Document("$skip", skip));
+      pipeline.add(new Document("$limit", limit));
+      MongoCursor<MaliciousEventDto> cursor = events.aggregate(pipeline).hint(keyedIndex).allowDiskUse(true).maxTime(maxTimeMs, TimeUnit.MILLISECONDS).cursor();
+      return new ActivityRows(total, cursor);
+    } catch (Exception e) {
+      logger.error("listActivityRows failed for accountId=" + accountId + ", listing ungrouped: " + e.getMessage());
+      return null;
+    }
+  }
+
+  // severityRank: CRITICAL=1 .. LOW=4, anything else 5, for the custom severity sort.
+  private static Document severityRankAddFields() {
+    return new Document("severityRank", new Document("$switch", new Document()
+        .append("branches", Arrays.asList(
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 1),
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 2),
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 3),
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 4)))
+        .append("default", 5)));
+  }
+
+  private static Document riskScoreSortAddFields() {
+    Document regexFind = new Document("$regexFind",
+        new Document("input", new Document("$ifNull", Arrays.asList("$metadata", "")))
+            .append("regex", RISK_SCORE_EXTRACT_REGEX));
+    Document parsedScore = new Document("$cond", Arrays.asList(
+        new Document("$eq", Arrays.asList("$$m", null)),
+        -1,
+        new Document("$convert", new Document("input",
+            new Document("$arrayElemAt", Arrays.asList("$$m.captures", 0)))
+            .append("to", "double")
+            .append("onError", -1)
+            .append("onNull", -1))
+    ));
+    Document letExpr = new Document("$let",
+        new Document("vars", new Document("m", regexFind)).append("in", parsedScore));
+    return new Document("riskScoreNum", letExpr);
+  }
+
+  // Order is precedence, mirroring deriveAgenticType in the dashboard's violationsData.js.
+  private static final String[][] AGENTIC_TYPE_RULES = {
+      {"Tool", "tool"}, {"Skill", "skill"}, {"Resource", "resource"}, {"Prompt", "prompt"},
+      {"Config", "config|setting"}, {"Tool", "mcp|server"}, {"Prompt", "message|completion|chat"}
+  };
+  private Document agenticTypeCondition(List<String> types) {
+    if (types == null || types.isEmpty()) {
+      return null;
+    }
+    Set<String> wanted = new HashSet<>(types);
+    List<Document> anyOf = new ArrayList<>();
+    StringBuilder earlier = new StringBuilder();
+    for (String[] rule : AGENTIC_TYPE_RULES) {
+      if (wanted.contains(rule[0])) {
+        List<Document> allOf = new ArrayList<>();
+        allOf.add(new Document("latestApiEndpoint", Pattern.compile(rule[1], Pattern.CASE_INSENSITIVE)));
+        if (earlier.length() > 0) {
+          allOf.add(new Document("latestApiEndpoint",
+              new Document("$not", Pattern.compile(earlier.toString(), Pattern.CASE_INSENSITIVE))));
+        }
+        anyOf.add(new Document("$and", allOf));
+      }
+      earlier.append(earlier.length() > 0 ? "|" : "").append("(?:").append(rule[1]).append(")");
+    }
+    if (wanted.contains("Prompt")) {
+      anyOf.add(new Document("latestApiEndpoint",
+          new Document("$not", Pattern.compile(earlier.toString(), Pattern.CASE_INSENSITIVE))));
+    }
+    return anyOf.isEmpty() ? null : new Document("$or", anyOf);
+  }
+
+  private Document behaviourCondition(List<String> behaviours) {
+    if (behaviours == null || behaviours.isEmpty()) {
+      return null;
+    }
+    List<Document> anyOf = new ArrayList<>();
+    for (String b : behaviours) {
+      if ("flag".equalsIgnoreCase(b)) {
+        // The UI shows a warn, or an event with no behaviour, as Flagged.
+        anyOf.add(new Document("metadata", Pattern.compile("behaviour\"?\\s*:\\s*\"(warn|flag)\"")));
+        anyOf.add(new Document("metadata", new Document("$not", Pattern.compile("behaviour"))));
+      } else {
+        anyOf.add(new Document("metadata", Pattern.compile("behaviour\"?\\s*:\\s*\"" + Pattern.quote(b.toLowerCase()) + "\"")));
+      }
+    }
+    return new Document("$or", anyOf);
+  }
+
+  // Owners to match; UNASSIGNED_OWNER stands for "no owner" (field missing, null or empty).
+  private Document caseOwnerCondition(List<String> owners) {
+    if (owners == null || owners.isEmpty()) {
+      return null;
+    }
+    List<Object> match = new ArrayList<>();
+    for (String owner : owners) {
+      if (UNASSIGNED_OWNER.equals(owner)) {
+        match.add(null);
+        match.add("");
+      } else if (owner != null && !owner.isEmpty()) {
+        match.add(owner);
+      }
+    }
+    return match.isEmpty() ? null : new Document(MaliciousEventDto.CASE_OWNER, new Document("$in", match));
+  }
+
+  // true: events with notes; false: events without (field missing, null or empty).
+  private Document caseNotesCondition(Boolean hasNotes) {
+    if (hasNotes == null) {
+      return null;
+    }
+    List<Object> none = Arrays.asList(null, "");
+    return new Document(MaliciousEventDto.CASE_NOTES, new Document(hasNotes ? "$nin" : "$in", none));
+  }
+
+  private void applyRiskScoreFilter(Document query, ListMaliciousRequestsRequest.Filter filter) {
+    if (!filter.hasRiskScoreFilterType() || filter.getRiskScoreFilterType().isEmpty()) {
+      return;
+    }
+    Document expr = buildRiskScoreExpr(filter);
+    if (expr == null) {
+      return;
+    }
+    List<Document> andConditions = new ArrayList<>();
+    andConditions.add(new Document(query));
+    andConditions.add(new Document("$expr", expr));
+    query.clear();
+    query.append("$and", andConditions);
+  }
+
+  private Document buildRiskScoreExpr(ListMaliciousRequestsRequest.Filter filter) {
+    String type = filter.getRiskScoreFilterType();
+    Document regexFind = new Document("$regexFind",
+        new Document("input", new Document("$ifNull", Arrays.asList("$metadata", "")))
+            .append("regex", RISK_SCORE_EXTRACT_REGEX));
+    Document parsedScore = new Document("$cond", Arrays.asList(
+        new Document("$eq", Arrays.asList("$$m", null)),
+        null,
+        new Document("$convert", new Document("input",
+            new Document("$arrayElemAt", Arrays.asList("$$m.captures", 0)))
+            .append("to", "double")
+            .append("onError", null)
+            .append("onNull", null))
+    ));
+
+    Document inExpr;
+    switch (type) {
+      case "blank":
+        inExpr = new Document("$eq", Arrays.asList("$$m", null));
+        break;
+      case "notBlank":
+        inExpr = new Document("$ne", Arrays.asList("$$m", null));
+        break;
+      case "equals":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$eq", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
+        break;
+      case "notEqual":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$and", Arrays.asList(
+            new Document("$ne", Arrays.asList(parsedScore, null)),
+            new Document("$ne", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()))
+        ));
+        break;
+      case "greaterThan":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$gt", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
+        break;
+      case "greaterThanOrEqual":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$gte", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
+        break;
+      case "lessThan":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$lt", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
+        break;
+      case "lessThanOrEqual":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$lte", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
+        break;
+      default:
+        return null;
+    }
+
+    return new Document("$let", new Document("vars", new Document("m", regexFind)).append("in", inExpr));
+  }
+
+  // Gives stored activities the current groupKey, so they group like new ones: events from before
+  // grouping existed, and events keyed by an earlier version of the key. Only events whose key changes
+  // are written, so running it again is safe; undo with $unset groupKey.
+  public int backfillActivityGroupKeys(String accountId) {
+    if (!ThreatUtils.groupsActivities(accountId)) {
+      return 0;
+    }
+    createIndexIfAbsent(accountId);
+    MongoCollection<Document> events = maliciousEventDao.getCollection(accountId).withDocumentClass(Document.class);
+    Document bedrockEvents = new Document("latestApiOrig", new Document("$regex", "bedrock-identity-arn"));
+    int updated = 0;
+    List<WriteModel<Document>> batch = new ArrayList<>();
+    try (MongoCursor<Document> cursor = events.find(bedrockEvents).projection(Projections.include("_id", "latestApiOrig", "groupKey")).batchSize(500).cursor()) {
+      while (cursor.hasNext()) {
+        Document event = cursor.next();
+        String groupKey = ThreatUtils.activityGroupKey(event.getString("latestApiOrig"));
+        if (groupKey == null || groupKey.equals(event.getString("groupKey"))) {
+          continue;
+        }
+        batch.add(new UpdateOneModel<>(Filters.eq("_id", event.get("_id")), Updates.set("groupKey", groupKey)));
+        if (batch.size() >= 500) {
+          updated += events.bulkWrite(batch).getModifiedCount();
+          batch.clear();
+        }
+      }
+    }
+    if (!batch.isEmpty()) {
+      updated += events.bulkWrite(batch).getModifiedCount();
+    }
+    logger.info("backfillActivityGroupKeys accountId=" + accountId + " updated=" + updated);
+    return updated;
+  }
+
   public void createIndexIfAbsent(String accountId) {
     ThreatUtils.createIndexIfAbsent(accountId, maliciousEventDao);
     shouldNotCreateIndexes.put(accountId, true);
   }
 
   public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource) {
+    return updateMaliciousEventStatus(accountId, eventIds, filterMap, status, jiraTicketUrl, contextSource, null);
+  }
+
+  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource, String humanResponse) {
+    return updateMaliciousEventStatus(accountId, eventIds, filterMap, status, jiraTicketUrl, contextSource, humanResponse, null, null, null);
+  }
+
+  /**
+   * caseOwner / caseNotes: null = leave as is, "" = clear. A change to status, owner or notes that actually
+   * takes effect on an event is added to its caseTimeline under updatedBy, so the history is complete whichever
+   * screen made the change. Jira and human-response updates are not part of the case history.
+   */
+  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource, String humanResponse, String caseOwner, String caseNotes, String updatedBy) {
     try {
-      Bson update = null;
+      boolean statusGiven = status != null && !status.isEmpty();
+      if (statusGiven || caseOwner != null || caseNotes != null) {
+        return updateWithCaseHistory(accountId, eventIds, filterMap, status, jiraTicketUrl, contextSource, humanResponse, caseOwner, caseNotes, updatedBy);
+      }
+
+      List<Bson> updateOps = new ArrayList<>();
 
       if(status != null && !status.isEmpty()) {
         MaliciousEventDto.Status eventStatus = MaliciousEventDto.Status.valueOf(status.toUpperCase());
-        update = Updates.set("status", eventStatus.toString());
+        updateOps.add(Updates.set("status", eventStatus.toString()));
       }
       if (jiraTicketUrl != null && !jiraTicketUrl.isEmpty()) {
-        update = Updates.set("jiraTicketUrl", jiraTicketUrl);
+        updateOps.add(Updates.set("jiraTicketUrl", jiraTicketUrl));
+        updateOps.add(Updates.min(MaliciousEventDto.FIRST_TRIAGED_AT, com.akto.dao.context.Context.now()));
       }
+      if (humanResponse != null && !humanResponse.isEmpty()) {
+        MaliciousEventDto.HumanResponse parsed = MaliciousEventDto.HumanResponse.valueOf(humanResponse.toUpperCase());
+        updateOps.add(Updates.set(MaliciousEventDto.HUMAN_RESPONSE, parsed.name()));
+      }
+      if (updateOps.isEmpty()) {
+        return 0;
+      }
+      Bson update = updateOps.size() == 1 ? updateOps.get(0) : Updates.combine(updateOps);
 
       Document query = buildQuery(eventIds, filterMap, "update", contextSource, accountId);
       if (query == null) {
         return 0;
       }
+      if (humanResponse != null && !humanResponse.isEmpty()) {
+        query.append("status", ThreatDetectionConstants.HUMAN_APPROVAL);
+        applyHumanResponseFilter(query, MaliciousEventDto.HumanResponse.PENDING.name());
+      }
 
-      String logMessage = String.format("Updating events %s to status: %s and jiraTicketUrl: %s",
-          getQueryDescription(eventIds, filterMap, accountId), status, jiraTicketUrl != null && !jiraTicketUrl.isEmpty() ? jiraTicketUrl : "null");
+      String logMessage = String.format("Updating events %s to status: %s jiraTicketUrl: %s humanResponse: %s",
+          getQueryDescription(eventIds, filterMap, accountId), status,
+          jiraTicketUrl != null && !jiraTicketUrl.isEmpty() ? jiraTicketUrl : "null",
+          humanResponse != null && !humanResponse.isEmpty() ? humanResponse : "null");
       logger.info(logMessage);
 
       long modifiedCount = maliciousEventDao.getCollection(accountId).updateMany(query, update).getModifiedCount();
@@ -774,6 +1258,101 @@ public class MaliciousEventService {
       logger.error("Error updating malicious event status", e);
       return 0;
     }
+  }
+
+  // The owner an event filter uses for "no owner".
+  public static final String UNASSIGNED_OWNER = "__unassigned__";
+  private static final int CASE_TIMELINE_MAX_ENTRIES = 10;
+  private static final int CASE_NOTES_MAX_LENGTH = 5000;
+
+  // Wraps a user-supplied value so a pipeline stage never reads it as an expression or field path ("$100 refund").
+  private static Document literal(Object value) {
+    return new Document("$literal", value);
+  }
+
+  // [entry] when `changed`, else [] — the term for one kind of change in the timeline concatenation.
+  private static Document timelineEntryIf(Document changed, long timestamp, String updatedBy, String activityType, String status, String owner, String notes) {
+    Document entry = new Document(MaliciousEventDto.CaseActivity.TIMESTAMP, timestamp)
+        .append(MaliciousEventDto.CaseActivity.UPDATED_BY, updatedBy)
+        .append(MaliciousEventDto.CaseActivity.ACTIVITY_TYPE, activityType)
+        .append(MaliciousEventDto.CaseActivity.STATUS, status)
+        .append(MaliciousEventDto.CaseActivity.OWNER, owner)
+        .append(MaliciousEventDto.CaseActivity.NOTES, notes);
+    return new Document("$cond", Arrays.asList(changed, Arrays.asList(literal(entry)), Collections.emptyList()));
+  }
+
+  private int updateWithCaseHistory(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource, String humanResponse, String caseOwner, String caseNotes, String updatedBy) {
+    Document query = buildQuery(eventIds, filterMap, "update", contextSource, accountId);
+    if (query == null) {
+      return 0;
+    }
+    if (humanResponse != null && !humanResponse.isEmpty()) {
+      query.append("status", ThreatDetectionConstants.HUMAN_APPROVAL);
+      applyHumanResponseFilter(query, MaliciousEventDto.HumanResponse.PENDING.name());
+    }
+
+    long now = com.akto.dao.context.Context.now();
+    String by = updatedBy == null ? "" : updatedBy.trim();   // who the entries are recorded under
+    Document set = new Document();
+    List<Object> changes = new ArrayList<>();
+    List<Object> triaged = new ArrayList<>();
+
+    if (status != null && !status.isEmpty()) {
+      String newStatus = MaliciousEventDto.Status.valueOf(status.toUpperCase()).toString();
+      set.append("status", literal(newStatus));
+      Document changed = new Document("$ne", Arrays.asList(new Document("$ifNull", Arrays.asList("$status", ThreatDetectionConstants.ACTIVE)), literal(newStatus)));
+      changes.add(timelineEntryIf(changed, now, by, MaliciousEventDto.CaseActivity.ACTIVITY_TYPE_STATUS, newStatus, "", ""));
+      triaged.add(changed);
+    }
+    if (caseOwner != null) {
+      String newOwner = caseOwner.trim();
+      set.append(MaliciousEventDto.CASE_OWNER, literal(newOwner));
+      Document changed = new Document("$ne", Arrays.asList(new Document("$ifNull", Arrays.asList("$" + MaliciousEventDto.CASE_OWNER, "")), literal(newOwner)));
+      changes.add(timelineEntryIf(changed, now, by, MaliciousEventDto.CaseActivity.ACTIVITY_TYPE_OWNER, "", newOwner, ""));
+      if (!newOwner.isEmpty()) {
+        triaged.add(changed);
+      }
+    }
+    if (caseNotes != null) {
+      String newNotes = caseNotes.length() > CASE_NOTES_MAX_LENGTH ? caseNotes.substring(0, CASE_NOTES_MAX_LENGTH) : caseNotes;
+      set.append(MaliciousEventDto.CASE_NOTES, literal(newNotes));
+      Document changed = new Document("$ne", Arrays.asList(new Document("$ifNull", Arrays.asList("$" + MaliciousEventDto.CASE_NOTES, "")), literal(newNotes)));
+      changes.add(timelineEntryIf(changed, now, by, MaliciousEventDto.CaseActivity.ACTIVITY_TYPE_NOTES, "", "", newNotes));
+    }
+    if (jiraTicketUrl != null && !jiraTicketUrl.isEmpty()) {
+      set.append("jiraTicketUrl", literal(jiraTicketUrl));
+      triaged.add(literal(true));
+    }
+    if (humanResponse != null && !humanResponse.isEmpty()) {
+      set.append(MaliciousEventDto.HUMAN_RESPONSE, literal(MaliciousEventDto.HumanResponse.valueOf(humanResponse.toUpperCase()).name()));
+    }
+
+    // Stage 1 reads the old values to decide which changes are real and appends them (keeping the newest
+    // entries); stage 2 writes the new values. The timeline is left alone, even absent, when nothing changed.
+    Document newEntries = new Document("$concatArrays", changes);
+    Document timeline = new Document("$cond", Arrays.asList(
+        new Document("$eq", Arrays.asList(new Document("$size", newEntries), 0)),
+        "$" + MaliciousEventDto.CASE_TIMELINE,
+        new Document("$slice", Arrays.asList(
+            new Document("$concatArrays", Arrays.asList(new Document("$ifNull", Arrays.asList("$" + MaliciousEventDto.CASE_TIMELINE, Collections.emptyList())), newEntries)),
+            -CASE_TIMELINE_MAX_ENTRIES))));
+    Document readOldValues = new Document(MaliciousEventDto.CASE_TIMELINE, timeline);
+    if (!triaged.isEmpty()) {
+      String firstTriagedAt = "$" + MaliciousEventDto.FIRST_TRIAGED_AT;
+      readOldValues.append(MaliciousEventDto.FIRST_TRIAGED_AT, new Document("$cond", Arrays.asList(
+          new Document("$or", triaged),
+          new Document("$ifNull", Arrays.asList(firstTriagedAt, now)),
+          firstTriagedAt)));
+    }
+    List<Document> pipeline = Arrays.asList(
+        new Document("$set", readOldValues),
+        new Document("$set", set));
+
+    logger.info(String.format("Updating events %s to status: %s caseOwner: %s caseNotes: %s by: %s",
+        getQueryDescription(eventIds, filterMap, accountId), status,
+        caseOwner == null ? "unchanged" : "'" + caseOwner + "'", caseNotes == null ? "unchanged" : "(" + caseNotes.length() + " chars)", by));
+
+    return (int) maliciousEventDao.getCollection(accountId).updateMany(query, pipeline).getModifiedCount();
   }
 
   public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap, String contextSource) {
@@ -831,9 +1410,163 @@ public class MaliciousEventService {
       query.append("status", ThreatDetectionConstants.IGNORED);
     } else if (ThreatDetectionConstants.TRAINING.equals(statusFilter)) {
       query.append("status", ThreatDetectionConstants.TRAINING);
+    } else if (ThreatDetectionConstants.HUMAN_APPROVAL.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.HUMAN_APPROVAL);
     } else if (ThreatDetectionConstants.ACTIVE.equals(statusFilter) || ThreatDetectionConstants.EVENTS_FILTER.equals(statusFilter)) {
       query.append("status", ThreatDetectionConstants.ACTIVE);
     }
+  }
+
+  private void applyHumanResponseFilter(Document query, String humanResponseFilter) {
+    if (humanResponseFilter == null || humanResponseFilter.isEmpty()) {
+      return;
+    }
+    query.append("humanResponse", humanResponseFilter.toUpperCase());
+  }
+
+  // Combine with $and so a clause that uses $or (legacy context, PENDING humanResponse)
+  // cannot overwrite another $or already on the query.
+  private void andDocument(Document query, Document clause) {
+    if (clause == null || clause.isEmpty()) {
+      return;
+    }
+    if (query.isEmpty()) {
+      query.putAll(clause);
+      return;
+    }
+    List<Document> clauses = new ArrayList<>();
+    clauses.add(new Document(query));
+    clauses.add(clause);
+    query.clear();
+    query.append("$and", clauses);
+  }
+
+  // Mongo query for a list filter in the given context. Shared by the violations list and the
+  // guardrail overview aggregations, so both count exactly the same events for the same filter.
+  public Document buildListFilterQuery(String accountId, ListMaliciousRequestsRequest.Filter filter, String contextSource) {
+    Document query = new Document();
+    if (!filter.getActorsList().isEmpty()) {
+      query.append("actor", new Document("$in", filter.getActorsList()));
+    }
+
+    if (!filter.getUrlsList().isEmpty()) {
+      query.append("latestApiEndpoint", new Document("$in", filter.getUrlsList()));
+    }
+
+    if (!filter.getApiCollectionIdList().isEmpty()) {
+      query.append("latestApiCollectionId", new Document("$in", filter.getApiCollectionIdList()));
+    }
+
+    if (!filter.getMethodList().isEmpty()) {
+      // Convert string methods to uppercase to match enum names stored in MongoDB
+      List<String> methodStrings = filter.getMethodList().stream()
+          .map(m -> m != null ? m.toUpperCase() : null)
+          .filter(m -> m != null)
+          .collect(Collectors.toList());
+      if (!methodStrings.isEmpty()) {
+        query.append("latestApiMethod", new Document("$in", methodStrings));
+      }
+    }
+
+    if (!filter.getIpsList().isEmpty()) {
+      query.append("latestApiIp", new Document("$in", filter.getIpsList()));
+    }
+
+    if (!filter.getTypesList().isEmpty()) {
+      query.append("type", new Document("$in", filter.getTypesList()));
+    }
+
+    if (!filter.getSubCategoryList().isEmpty()) {
+      query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
+    }
+
+    // Host attribution: exact match (hosts) OR loose device+service match (looseHostKeys, for
+    // 2-vs-3-segment hostname format mismatches) OR claude-config scanner events (no collection of
+    // their own, attributed by device id instead) — see the Filter.search_text/loose_host_keys/
+    // claude_device_ids/match_claude_config proto doc comments for the client-side derivation this
+    // mirrors (ViolationsTab.jsx's hostSet/looseHostSet/claudeDeviceIds).
+    Document hostMatch = ThreatUtils.hostAttributionMatch(filter.getHostsList(), filter.getLooseHostKeysList(),
+        filter.getClaudeDeviceIdsList(), filter.hasMatchClaudeConfig() && filter.getMatchClaudeConfig());
+    List<Document> extraAndClauses = new ArrayList<>();
+    if (hostMatch != null) {
+      extraAndClauses.add(hostMatch);
+    }
+    if (filter.hasSearchText() && !filter.getSearchText().isEmpty()) {
+      Pattern searchPattern = Pattern.compile(Pattern.quote(filter.getSearchText()), Pattern.CASE_INSENSITIVE);
+      extraAndClauses.add(new Document("$or", Arrays.asList(
+          new Document("filterId", searchPattern),
+          new Document("host", searchPattern),
+          new Document("actor", searchPattern)
+      )));
+    }
+    if (!extraAndClauses.isEmpty()) {
+      List<Document> allClauses = new ArrayList<>();
+      allClauses.add(new Document(query));
+      allClauses.addAll(extraAndClauses);
+      query.clear();
+      query.append("$and", allClauses);
+    }
+
+    if (filter.hasLatestApiOrigRegex() && !filter.getLatestApiOrigRegex().isEmpty()) {
+      query.append("latestApiOrig", new Document("$regex", ThreatUtils.anchorLookaheadRegex(filter.getLatestApiOrigRegex())));
+    }
+
+
+    if (!filter.getLatestAttackList().isEmpty()) {
+      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
+    }
+
+    if (!filter.getSeverityList().isEmpty()) {
+      query.append("severity", new Document("$in", filter.getSeverityList()));
+    }
+
+    if (filter.hasStatusFilter()) {
+      applyStatusFilter(query, filter.getStatusFilter());
+    }
+
+    if (filter.hasDetectedAtTimeRange()) {
+      TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
+      long start = timeRange.hasStart() ? timeRange.getStart() : 0;
+      long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
+
+      query.append("detectedAt", new Document("$gte", start).append("$lte", end));
+    }
+
+    if (filter.hasSuccessfulExploit()) {
+      boolean val = filter.getSuccessfulExploit();
+      if (val) {
+        query.append("successfulExploit", true);
+      } else {
+        List<Document> andConditions = new ArrayList<>();
+        andConditions.add(new Document(query));
+        andConditions.add(new Document("$or", Arrays.asList(
+            new Document("successfulExploit", false),
+            new Document("successfulExploit", new Document("$exists", false))
+        )));
+        query.clear();
+        query.append("$and", andConditions);
+      }
+    }
+
+    applyRiskScoreFilter(query, filter);
+    andDocument(query, agenticTypeCondition(filter.getAgenticTypesList()));
+    andDocument(query, behaviourCondition(filter.getBehavioursList()));
+    andDocument(query, caseOwnerCondition(filter.getCaseOwnersList()));
+    andDocument(query, caseNotesCondition(filter.hasHasCaseNotes() ? filter.getHasCaseNotes() : null));
+
+    // if (filter.hasLabel()) {
+    //   String labelString = filter.getLabel();
+    //   MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(labelString);
+    //   applyLabelFilter(query, labelEnum);
+    // }
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
+    if (!contextFilter.isEmpty()) {
+      andDocument(query, contextFilter);
+    }
+
+    return query;
   }
 
   private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource, String accountId) {
@@ -911,13 +1644,17 @@ public class MaliciousEventService {
 
     String latestApiOrigRegex = (String) filter.get("latestApiOrigRegex");
     if (latestApiOrigRegex != null && !latestApiOrigRegex.isEmpty()) {
-      query.append("latestApiOrig", new Document("$regex", latestApiOrigRegex));
+      query.append("latestApiOrig", new Document("$regex", ThreatUtils.anchorLookaheadRegex(latestApiOrigRegex)));
     }
+
+    // A bulk action on a filtered view must reach exactly the rows the view shows.
+    andDocument(query, caseOwnerCondition((List<String>) filter.get("caseOwners")));
+    andDocument(query, caseNotesCondition((Boolean) filter.get("hasCaseNotes")));
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
     Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
-      query.putAll(contextFilter);
+      andDocument(query, contextFilter);
     }
 
     return query;

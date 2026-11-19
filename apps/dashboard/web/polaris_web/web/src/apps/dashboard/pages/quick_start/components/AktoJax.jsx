@@ -7,7 +7,7 @@ import func from "@/util/func"
 import AktoDastOptions from './AktoDastOptions';
 import CustomHeadersInput from './CustomHeadersInput';
 import Dropdown from '../../../components/layouts/Dropdown';
-import testingApi from '../../testing/api'
+import TestRoleDropdown from '../../../components/shared/TestRoleDropdown';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import QuickStartStore from '../quickStartStore';
 
@@ -23,7 +23,6 @@ const AktoJax = () => {
     const [password, setPassword] = useState('')
     const [apiKey, setApiKey] = useState('')
 
-    const [testRolesArr, setTestRolesArr] = useState([])
     const [testRole, setTestRole] = useState("")
 
     const [outscopeUrls, setOutscopeUrls] = useState('');
@@ -115,19 +114,7 @@ const AktoJax = () => {
         })
     }
 
-    const fetchTestRoles = async () => {
-        const testRolesResponse = await testingApi.fetchTestRoles()
-            var testRoles = testRolesResponse.testRoles.map(testRole => {
-                return {
-                    "label": testRole.name,
-                    "value": testRole.hexId
-                }
-            })
-        setTestRolesArr(testRoles)
-    }
-
     useEffect(() => {
-        fetchTestRoles()
         fetchAvailableModules()
     }, [])
 
@@ -269,11 +256,10 @@ const AktoJax = () => {
                 {
                     authType === 'test-role' &&
                     <>
-                        <Dropdown
-                            menuItems={testRolesArr}
+                        <TestRoleDropdown
                             label={"Select " + mapLabel("Test", getDashboardCategory()) + " Role"}
-                            initial={testRole}
-                            selected={(role) => setTestRole(role)}
+                            selectedRole={testRole}
+                            setSelectedRole={setTestRole}
                         />
                     </>
                 }

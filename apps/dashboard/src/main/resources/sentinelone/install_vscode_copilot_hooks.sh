@@ -11,6 +11,7 @@
 # Controlled by flags in config.env (Jamf/enterprise only — all default off):
 #   ENABLE_PROMPT_HOOKS_VSCODE_COPILOT=true  — installs userPromptSubmitted hook
 #   ENABLE_MCP_HOOKS_VSCODE_COPILOT=true     — installs preToolUse/postToolUse MCP hooks
+#   AKTO_HEARTBEAT_ENABLED=true              — registers the device with the abstractor (default off)
 # Mirrors: mcp-endpoint-shield/misc/macos/install_vscode_copilot_hooks.sh (master branch)
 # ========================================================================================
 
@@ -280,6 +281,8 @@ export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="vscode"
 export CONTEXT_SOURCE="ENDPOINT"
+# Device registration with the abstractor — off unless enabled in config.env.
+export AKTO_HEARTBEAT_ENABLED="\${AKTO_HEARTBEAT_ENABLED:-false}"
 export DEVICE_ID="$device_id"
 export LOG_DIR="$HOME/.vscode/copilot/hooks/akto/logs"
 
@@ -319,6 +322,8 @@ export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="vscode"
 export CONTEXT_SOURCE="ENDPOINT"
+# Device registration with the abstractor — off unless enabled in config.env.
+export AKTO_HEARTBEAT_ENABLED="\${AKTO_HEARTBEAT_ENABLED:-false}"
 export DEVICE_ID="$device_id"
 export LOG_DIR="$HOME/.vscode/copilot/hooks/akto/logs"
 
