@@ -2,6 +2,8 @@ package com.akto.utils;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
@@ -87,14 +89,6 @@ public class TestRiskScoreExplainer {
                 score, now, now);
     }
 
-    private void assertNoCapWording(List<RiskScoreFactor> factors) {
-        for (RiskScoreFactor f : factors) {
-            String label = f.getLabel() == null ? "" : f.getLabel().toLowerCase();
-            assertFalse("explanation must not mention cap: " + f.getLabel(), label.contains("cap"));
-            assertFalse("explanation must not mention capped: " + f.getLabel(), label.contains("capped"));
-        }
-    }
-
     @Test
     public void newPublicSensitiveHighFinding() {
         int now = Context.now();
@@ -105,8 +99,8 @@ public class TestRiskScoreExplainer {
         List<RiskScoreFactor> factors = explain(apiInfo, true, severityScore,
                 Collections.singletonList("BOLA"), Arrays.asList("Email", "Phone"), emptyContext(), score);
 
+        assertNotNull(factors);
         assertFalse(factors.isEmpty());
-        assertNoCapWording(factors);
         assertTrue(RiskScoreExplainer.isAcceptable(factors, score, emptyContext(), apiInfo));
         assertEquals(2f, factors.stream().filter(f -> f.getLabel().equals("Open security findings"))
                 .findFirst().get().getPoints(), 0.001f);
@@ -122,6 +116,7 @@ public class TestRiskScoreExplainer {
         float score = computeScore(apiInfo, true, 0, emptyContext());
         List<RiskScoreFactor> factors = explain(apiInfo, true, 0, Collections.emptyList(),
                 Collections.singletonList("Email"), emptyContext(), score);
+        assertNotNull(factors);
         assertEquals(1, factors.size());
         assertEquals(1f, factors.get(0).getPoints(), 0.001f);
         assertEquals("Email", factors.get(0).getDetail());
@@ -135,7 +130,7 @@ public class TestRiskScoreExplainer {
         float score = computeScore(apiInfo, false, 0, emptyContext());
         List<RiskScoreFactor> factors = explain(apiInfo, false, 0, Collections.emptyList(),
                 Collections.emptyList(), emptyContext(), score);
-        assertNoCapWording(factors);
+        assertNotNull(factors);
         assertTrue(RiskScoreExplainer.isAcceptable(factors, score, emptyContext(), apiInfo));
         assertFalse(factors.stream().anyMatch(f -> f.getLabel().contains("Discovered")));
         assertTrue(factors.stream().anyMatch(f -> f.getLabel().contains("high severity")));
@@ -155,9 +150,11 @@ public class TestRiskScoreExplainer {
         assertEquals(5f, score, 0.001f);
         List<RiskScoreFactor> factors = explain(apiInfo, true, 0, Collections.emptyList(),
                 Collections.singletonList("Email"), ctx, score);
-        assertFalse(factors.isEmpty());
-        assertNoCapWording(factors);
-        assertTrue(RiskScoreExplainer.sumPoints(factors) > score);
+        assertNotNull(factors);
+        assertTrue(factors.stream().anyMatch(f -> RiskScoreExplainer.CAP_LABEL.equals(f.getLabel())));
+        assertEquals(-1f, factors.stream().filter(f -> RiskScoreExplainer.CAP_LABEL.equals(f.getLabel()))
+                .findFirst().get().getPoints(), 0.001f);
+        assertEquals(score, RiskScoreExplainer.sumPoints(factors), 0.05f);
         assertTrue(RiskScoreExplainer.isAcceptable(factors, score, ctx, apiInfo));
     }
 
@@ -172,24 +169,64 @@ public class TestRiskScoreExplainer {
         assertEquals(3f, score, 0.001f);
         List<RiskScoreFactor> factors = explain(apiInfo, false, 0, Collections.emptyList(),
                 Collections.emptyList(), ctx, score);
-        assertFalse(factors.isEmpty());
-        assertNoCapWording(factors);
-        assertTrue(RiskScoreExplainer.sumPoints(factors) < score);
+        assertNotNull(factors);
+        assertTrue(factors.stream().anyMatch(f -> RiskScoreExplainer.FLOOR_LABEL.equals(f.getLabel())));
+        assertEquals(2f, factors.stream().filter(f -> RiskScoreExplainer.FLOOR_LABEL.equals(f.getLabel()))
+                .findFirst().get().getPoints(), 0.001f);
+        assertEquals(score, RiskScoreExplainer.sumPoints(factors), 0.05f);
         assertTrue(RiskScoreExplainer.isAcceptable(factors, score, ctx, apiInfo));
     }
 
     @Test
-    public void agentBaseScoreUsesReason() {
+    public void maliciousServerFloorWithNoOtherFactors() {
+        int now = Context.now();
+        ApiInfo apiInfo = baseApi(21, "/tools/idle", now - 60 * 24 * 60 * 60, 0);
+        apiInfo.setParentMcpToolNames(Collections.singletonList("idle"));
+        McpRiskScoreContext ctx = contextWithMaliciousTool(21, "idle", false, false, true);
+        float score = computeScore(apiInfo, false, 0, ctx);
+        assertEquals(3f, score, 0.001f);
+        List<RiskScoreFactor> factors = explain(apiInfo, false, 0, Collections.emptyList(),
+                Collections.emptyList(), ctx, score);
+        assertNotNull(factors);
+        assertEquals(1, factors.size());
+        assertEquals(RiskScoreExplainer.FLOOR_LABEL, factors.get(0).getLabel());
+        assertEquals(3f, factors.get(0).getPoints(), 0.001f);
+    }
+
+    @Test
+    public void agentBaseScoreUsesFixedLabelAndDetail() {
         int now = Context.now();
         ApiInfo apiInfo = baseApi(30, "/agent", now - 60 * 24 * 60 * 60, 0);
-        McpRiskScoreContext ctx = contextWithAgent(30, 1.5, "Uses a tool that can change production data");
+        String reason = "Uses a tool that can change production data";
+        McpRiskScoreContext ctx = contextWithAgent(30, 1.5, reason);
         float score = computeScore(apiInfo, true, 10f, ctx);
         List<RiskScoreFactor> factors = explain(apiInfo, true, 10f, Collections.singletonList("Broken Authentication"),
                 Collections.singletonList("Email"), ctx, score);
-        assertNoCapWording(factors);
+        assertNotNull(factors);
         assertTrue(RiskScoreExplainer.isAcceptable(factors, score, ctx, apiInfo));
-        assertTrue(factors.stream().anyMatch(f ->
-                "Uses a tool that can change production data".equals(f.getLabel())));
+        RiskScoreFactor agent = factors.stream()
+                .filter(f -> RiskScoreExplainer.AGENT_RISK_LABEL.equals(f.getLabel()))
+                .findFirst().get();
+        assertEquals(reason, agent.getDetail());
+    }
+
+    @Test
+    public void agentReasonIsTruncatedInDetail() {
+        int now = Context.now();
+        ApiInfo apiInfo = baseApi(31, "/agent", now - 60 * 24 * 60 * 60, 0);
+        StringBuilder longReason = new StringBuilder();
+        for (int i = 0; i < 50; i++) {
+            longReason.append("abcdefghij");
+        }
+        McpRiskScoreContext ctx = contextWithAgent(31, 1.0, longReason.toString());
+        float score = computeScore(apiInfo, false, 0, ctx);
+        List<RiskScoreFactor> factors = explain(apiInfo, false, 0, Collections.emptyList(),
+                Collections.emptyList(), ctx, score);
+        assertNotNull(factors);
+        RiskScoreFactor agent = factors.stream()
+                .filter(f -> RiskScoreExplainer.AGENT_RISK_LABEL.equals(f.getLabel()))
+                .findFirst().get();
+        assertEquals(200, agent.getDetail().length());
     }
 
     @Test
@@ -199,41 +236,26 @@ public class TestRiskScoreExplainer {
         apiInfo.getApiAccessTypes().add(ApiAccessType.PUBLIC);
         float severityScore = 100f;
         float score = computeScore(apiInfo, true, severityScore, emptyContext());
-        // new suppressed by threat; public + sensitive + threat 1 + severity 2 = 5
         assertEquals(5f, score, 0.001f);
         List<RiskScoreFactor> factors = explain(apiInfo, true, severityScore, Collections.singletonList("BOLA"),
                 Collections.singletonList("Email"), emptyContext(), score);
+        assertNotNull(factors);
+        assertFalse(factors.stream().anyMatch(f -> RiskScoreExplainer.CAP_LABEL.equals(f.getLabel())));
         assertEquals(RiskScoreExplainer.sumPoints(factors), score, 0.05f);
         assertTrue(RiskScoreExplainer.isAcceptable(factors, score, emptyContext(), apiInfo));
     }
 
     @Test
-    public void emptyContextCanExceedFive() {
+    public void emptyContextExactMatchWithoutCapLine() {
         int now = Context.now();
         ApiInfo apiInfo = baseApi(1, "/users", now - 5 * 24 * 60 * 60, 0);
         apiInfo.getApiAccessTypes().add(ApiAccessType.PUBLIC);
         float severityScore = 100f;
         float score = computeScore(apiInfo, true, severityScore, emptyContext());
-        // new + public + sensitive + severity 2 = 5; with threat 0 and new: 5. Without threat for 6 need threat?
-        // new(1)+public(1)+sensitive(1)+severity(2)=5. To get 6 need threat without suppressing new - impossible.
-        // Use medium threat 0.5 with no "new" (threat>0) + public + sensitive + severity 2 = 4.5
-        // For uncapped 6: empty context, discovered old, public, sensitive, threat 1, severity 2 = 5
-        // Actually: discovered recent, no threat, public, sensitive, severity 2 = 5. Max without MCP empty is:
-        // new+public+sensitive+threat(when threat>0 new is off)+severity. Max = public+sensitive+1+2 = 5 if threat, or new+public+sensitive+2=5.
-        // Wait: threat adds raw threatScore. So public+sensitive+threat(1)+severity(2)=5. Or new+public+sensitive+severity=5.
-        // To get 6 with empty: need threatScore that doesn't suppress... it always suppresses new when threatScore==0 is required for new.
-        // So max base without MCP is 5. The quirk about 6 was: new+public+sensitive+threat binary + severity?
-        // On THIS branch threat is raw value. Master was +1 binary.
-        // Plan said: "A plain API can reach 6 (1+1+1+1+2)" - that's new+public+sensitive+threat(+1)+severity(2).
-        // On this branch threat is raw so critical threat is +1, same: but new is suppressed when threat>0.
-        // So: public+sensitive+threat1+severity2 = 5 when threat present.
-        // new+public+sensitive+severity2 = 5 when no threat.
-        // So empty context max is 5 on this branch, not 6. The plan's "6" assumed master's binary threat without mutual exclusion... 
-        // Actually: new requires threatScore==0. So you can't have both new and threat. Max = 5.
-        // I'll still assert empty context exact match for a 0.5 low severity case.
         assertTrue(score <= 5.01f);
         List<RiskScoreFactor> factors = explain(apiInfo, true, severityScore, Collections.singletonList("BOLA"),
                 Collections.singletonList("Email"), emptyContext(), score);
+        assertNotNull(factors);
         assertEquals(RiskScoreExplainer.sumPoints(factors), score, 0.05f);
     }
 
@@ -246,19 +268,35 @@ public class TestRiskScoreExplainer {
         assertEquals(0.5f, score, 0.001f);
         List<RiskScoreFactor> factors = explain(apiInfo, false, severityScore,
                 Collections.singletonList("SOME_LOW"), Collections.emptyList(), emptyContext(), score);
+        assertNotNull(factors);
         assertEquals(1, factors.size());
         assertEquals(0.5f, factors.get(0).getPoints(), 0.001f);
     }
 
     @Test
-    public void nullAccessTypes() {
+    public void nullAccessTypesDoesNotAddPublicPoint() {
         int now = Context.now();
         ApiInfo apiInfo = baseApi(1, "/users", now - 60 * 24 * 60 * 60, 0);
         apiInfo.setApiAccessTypes(null);
-        // getRiskScore would NPE on null access types - mirror what explainer does safely
         List<RiskScoreFactor> factors = RiskScoreExplainer.buildFactors(apiInfo, false, 0,
                 Collections.emptyList(), Collections.emptyList(), emptyContext(), now);
         assertTrue(factors.isEmpty());
+        assertFalse(factors.stream().anyMatch(f -> f.getLabel() != null && f.getLabel().contains("Public")));
+    }
+
+    @Test
+    public void ensureApiAccessTypesContractKeepsNullAccessNonPublic() {
+        int now = Context.now();
+        ApiInfo apiInfo = baseApi(1, "/users", now - 60 * 24 * 60 * 60, 0);
+        // Writer path normalizes null → empty set before getRiskScore; without that, getRiskScore NPEs.
+        // Explainer must treat null the same as empty: no public point.
+        apiInfo.setApiAccessTypes(new HashSet<>());
+        float expected = ApiInfoDao.getRiskScore(apiInfo, false, 0);
+        apiInfo.setApiAccessTypes(null);
+        List<RiskScoreFactor> factors = RiskScoreExplainer.buildFactors(apiInfo, false, 0,
+                Collections.emptyList(), Collections.emptyList(), emptyContext(), now);
+        assertEquals(expected, RiskScoreExplainer.sumPoints(factors), 0.05f);
+        assertFalse(factors.stream().anyMatch(f -> f.getLabel() != null && f.getLabel().contains("Public")));
     }
 
     @Test
@@ -266,7 +304,6 @@ public class TestRiskScoreExplainer {
         int now = Context.now();
         int discovered = now - Constants.ONE_MONTH_TIMESTAMP;
         ApiInfo apiInfo = baseApi(1, "/users", discovered, 0);
-        // At nowBefore (=now), still within 30 days. At nowAfter (=now+1), may be outside.
         float baseAtNow = 0;
         if ((now - discovered) <= Constants.ONE_MONTH_TIMESTAMP) {
             baseAtNow += 1;
@@ -274,8 +311,43 @@ public class TestRiskScoreExplainer {
         List<RiskScoreFactor> factors = RiskScoreExplainer.explain(apiInfo, false, 0,
                 Collections.emptyList(), Collections.emptyList(), emptyContext(),
                 baseAtNow, now, now + 1);
+        assertNotNull(factors);
         assertFalse(factors.isEmpty());
         assertTrue(factors.stream().anyMatch(f -> f.getLabel().contains("Discovered")));
+    }
+
+    @Test
+    public void mismatchReturnsNullNotEmptyList() {
+        int now = Context.now();
+        ApiInfo apiInfo = baseApi(1, "/users", now - 60 * 24 * 60 * 60, 0);
+        apiInfo.getApiAccessTypes().add(ApiAccessType.PUBLIC);
+        // Claim a score of 5 while factors only explain public=1
+        List<RiskScoreFactor> factors = RiskScoreExplainer.explain(apiInfo, false, 0,
+                Collections.emptyList(), Collections.emptyList(), emptyContext(),
+                5f, now, now);
+        assertNull(factors);
+    }
+
+    @Test
+    public void matchingZeroScoreReturnsEmptyListNotNull() {
+        int now = Context.now();
+        ApiInfo apiInfo = baseApi(1, "/users", now - 60 * 24 * 60 * 60, 0);
+        List<RiskScoreFactor> factors = explain(apiInfo, false, 0, Collections.emptyList(),
+                Collections.emptyList(), emptyContext(), 0f);
+        assertNotNull(factors);
+        assertTrue(factors.isEmpty());
+    }
+
+    @Test
+    public void removingMismatchGuardWouldStillNeedExactSum() {
+        // Documents that isAcceptable requires exact sum; cap/floor leniency is gone.
+        int now = Context.now();
+        ApiInfo apiInfo = baseApi(1, "/users", now - 60 * 24 * 60 * 60, 0);
+        apiInfo.getApiAccessTypes().add(ApiAccessType.PUBLIC);
+        List<RiskScoreFactor> factors = RiskScoreExplainer.buildFactors(apiInfo, false, 0,
+                Collections.emptyList(), Collections.emptyList(), emptyContext(), now);
+        assertEquals(1f, RiskScoreExplainer.sumPoints(factors), 0.001f);
+        assertFalse(RiskScoreExplainer.isAcceptable(factors, 5f, emptyContext(), apiInfo));
     }
 
     @Test
@@ -286,24 +358,19 @@ public class TestRiskScoreExplainer {
         apiInfo.getApiAccessTypes().add(ApiAccessType.PUBLIC);
         apiInfo.setParentMcpToolNames(Collections.singletonList(tool));
 
-        // Malicious + privileged
         McpRiskScoreContext both = contextWithMaliciousTool(collectionId, tool, true, true, false);
         float base = ApiInfoDao.getRiskScore(apiInfo, false, 0);
         float withHelper = McpApiRiskScoreUtils.getRiskScoreWithMcpAdjustments(apiInfo, base, both);
-        // Manual expected: base(1 public) +3 malicious +1 privileged = 5, capped at 5
         assertEquals(5f, withHelper, 0.001f);
 
-        // Agent base
         McpRiskScoreContext agent = contextWithAgent(collectionId, 2.0, "reason");
         float withAgent = McpApiRiskScoreUtils.getRiskScoreWithMcpAdjustments(apiInfo, base, agent);
         assertEquals(Math.min(5f, base + 2f), withAgent, 0.001f);
 
-        // Floor
         McpRiskScoreContext floor = contextWithMaliciousTool(collectionId, tool, false, false, true);
         float withFloor = McpApiRiskScoreUtils.getRiskScoreWithMcpAdjustments(apiInfo, base, floor);
         assertEquals(3f, withFloor, 0.001f);
 
-        // Empty context returns base unchanged
         assertEquals(base, McpApiRiskScoreUtils.getRiskScoreWithMcpAdjustments(apiInfo, base, emptyContext()), 0.001f);
     }
 }

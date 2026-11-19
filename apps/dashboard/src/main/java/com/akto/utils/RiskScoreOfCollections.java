@@ -54,6 +54,7 @@ public class RiskScoreOfCollections {
     private static final int QUERY_CHUNK_SIZE = 1000;
     // the sensitive cron looks back this far before its last run, so STIs written while it was running are not missed
     private static final int SENSITIVE_SYNC_BUFFER_SECONDS = 5 * 60;
+    private static final int MAX_ISSUE_NAMES_PER_API = 6;
     private static final String ISSUE_API_INFO_KEY = "_id.apiInfoKey";
     private static final List<String> ALL_ISSUE_STATUSES = Arrays.stream(TestRunIssueStatus.values())
             .map(Enum::name).collect(Collectors.toList());
@@ -68,6 +69,12 @@ public class RiskScoreOfCollections {
         }
     }
 
+    private static final class FactorWriteStats {
+        int factorsWritten;
+        int factorsEmpty;
+        int mismatches;
+    }
+
     private static void addSeverityScore(Map<ApiInfoKey, Float> severityScoreMap, ApiInfoKey apiInfoKey, String severity, int issueCount){
         if (apiInfoKey == null || severity == null) {
             return;
@@ -80,9 +87,30 @@ public class RiskScoreOfCollections {
             return;
         }
         List<String> names = issueNamesMap.computeIfAbsent(apiInfoKey, k -> new ArrayList<>());
-        if (!names.contains(name)) {
-            names.add(name);
+        if (names.size() >= MAX_ISSUE_NAMES_PER_API || names.contains(name)) {
+            return;
         }
+        names.add(name);
+    }
+
+    /** null factors = mismatch → unset; empty = explained with no lines; non-empty = set with the score they explain. */
+    private static Bson factorsUpdate(List<ApiInfo.RiskScoreFactor> factors, float riskScore, FactorWriteStats stats) {
+        if (factors == null) {
+            stats.mismatches++;
+            return Updates.combine(
+                Updates.unset(ApiInfo.RISK_SCORE_FACTORS),
+                Updates.unset(ApiInfo.RISK_SCORE_FACTORS_SCORE)
+            );
+        }
+        if (factors.isEmpty()) {
+            stats.factorsEmpty++;
+        } else {
+            stats.factorsWritten++;
+        }
+        return Updates.combine(
+            Updates.set(ApiInfo.RISK_SCORE_FACTORS, factors),
+            Updates.set(ApiInfo.RISK_SCORE_FACTORS_SCORE, riskScore)
+        );
     }
 
     private static Bson issueApiInfoKeysFilter(Collection<ApiInfoKey> apiInfoKeys){
@@ -132,7 +160,8 @@ public class RiskScoreOfCollections {
         return apiInfoKeys;
     }
 
-    // severity score of every api with open issues, summed inside mongo so no issue document reaches the JVM
+    // severity score of every api with open issues, summed inside mongo so no issue document reaches the JVM.
+    // Finding names are folded into the same group so a names-only failure cannot wipe severity scores.
     private SeverityBundle getSeverityBundleOfAllOpenIssues(){
         Map<ApiInfoKey, Float> severityScoreMap = new HashMap<>();
         Map<ApiInfoKey, List<String>> issueNamesMap = new HashMap<>();
@@ -141,7 +170,8 @@ public class RiskScoreOfCollections {
             Aggregates.match(openFilter),
             Aggregates.group(
                 new BasicDBObject("apiInfoKey", "$" + ISSUE_API_INFO_KEY).append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY),
-                Accumulators.sum("count", 1))
+                Accumulators.sum("count", 1),
+                Accumulators.addToSet("names", "$_id.testSubCategory"))
         );
 
         try (MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection()
@@ -150,26 +180,9 @@ public class RiskScoreOfCollections {
                 try {
                     BasicDBObject group = cursor.next();
                     BasicDBObject id = (BasicDBObject) group.get("_id");
-                    addSeverityScore(severityScoreMap, apiInfoKeyFromGroupId((BasicDBObject) id.get("apiInfoKey")),
+                    ApiInfoKey key = apiInfoKeyFromGroupId((BasicDBObject) id.get("apiInfoKey"));
+                    addSeverityScore(severityScoreMap, key,
                         id.getString(TestingRunIssues.KEY_SEVERITY), group.getInt("count"));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-
-        // second pass: finding names for the explanation only, does not feed the score
-        List<Bson> namesPipeline = Arrays.asList(
-            Aggregates.match(openFilter),
-            Aggregates.group("$" + ISSUE_API_INFO_KEY,
-                Accumulators.addToSet("names", "$_id.testSubCategory"))
-        );
-        try (MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection()
-                .aggregate(namesPipeline, BasicDBObject.class).allowDiskUse(true).cursor()) {
-            while (cursor.hasNext()) {
-                try {
-                    BasicDBObject group = cursor.next();
-                    ApiInfoKey key = apiInfoKeyFromGroupId((BasicDBObject) group.get("_id"));
                     @SuppressWarnings("unchecked")
                     List<String> names = (List<String>) group.get("names");
                     if (names != null) {
@@ -178,7 +191,7 @@ public class RiskScoreOfCollections {
                         }
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    loggerMaker.errorAndAddToDb(e, "Error processing severity bundle group row");
                 }
             }
         }
@@ -227,7 +240,7 @@ public class RiskScoreOfCollections {
             }
             return new SeverityBundle(severityScoreMap, issueNamesMap);
         } catch (Exception e) {
-            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error building updated severity bundle");
             return new SeverityBundle(new HashMap<>(), new HashMap<>());
         }
     }
@@ -238,22 +251,27 @@ public class RiskScoreOfCollections {
         if (apiInfoKeys == null || apiInfoKeys.isEmpty()) {
             return issueNamesMap;
         }
-        List<ApiInfoKey> keys = new ArrayList<>(apiInfoKeys);
-        for (int i = 0; i < keys.size(); i += QUERY_CHUNK_SIZE) {
-            List<ApiInfoKey> chunk = keys.subList(i, Math.min(i + QUERY_CHUNK_SIZE, keys.size()));
-            Bson filterQ = Filters.and(
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name()),
-                issueApiInfoKeysFilter(chunk)
-            );
-            try (MongoCursor<TestingRunIssues> cursor = TestingRunIssuesDao.instance.getMCollection().find(filterQ)
-                    .projection(Projections.include("_id")).cursor()) {
-                while (cursor.hasNext()) {
-                    TestingRunIssues issue = cursor.next();
-                    if (issue.getId() != null) {
-                        addIssueName(issueNamesMap, issue.getId().getApiInfoKey(), issue.getId().getTestSubCategory());
+        try {
+            List<ApiInfoKey> keys = new ArrayList<>(apiInfoKeys);
+            for (int i = 0; i < keys.size(); i += QUERY_CHUNK_SIZE) {
+                List<ApiInfoKey> chunk = keys.subList(i, Math.min(i + QUERY_CHUNK_SIZE, keys.size()));
+                Bson filterQ = Filters.and(
+                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name()),
+                    issueApiInfoKeysFilter(chunk)
+                );
+                try (MongoCursor<TestingRunIssues> cursor = TestingRunIssuesDao.instance.getMCollection().find(filterQ)
+                        .projection(Projections.include("_id")).cursor()) {
+                    while (cursor.hasNext()) {
+                        TestingRunIssues issue = cursor.next();
+                        if (issue.getId() != null) {
+                            addIssueName(issueNamesMap, issue.getId().getApiInfoKey(), issue.getId().getTestSubCategory());
+                        }
                     }
                 }
             }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Label-only issue names fetch failed; continuing without finding details");
+            return new HashMap<>();
         }
         return issueNamesMap;
     }
@@ -264,34 +282,39 @@ public class RiskScoreOfCollections {
         if (apiInfoKeys == null || apiInfoKeys.isEmpty()) {
             return result;
         }
-        List<String> sensitiveNames = sensitiveSubTypeNamesInResponse();
-        if (sensitiveNames.isEmpty()) {
-            return result;
-        }
-        List<ApiInfoKey> keys = new ArrayList<>(apiInfoKeys);
-        for (int i = 0; i < keys.size(); i += QUERY_CHUNK_SIZE) {
-            List<ApiInfoKey> chunk = keys.subList(i, Math.min(i + QUERY_CHUNK_SIZE, keys.size()));
-            Bson stiFilter = Filters.and(
-                stiApiInfoKeysFilter(chunk),
-                Filters.in(SingleTypeInfo.SUB_TYPE, sensitiveNames),
-                Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1)
-            );
-            List<Bson> pipeline = Arrays.asList(
-                Aggregates.match(stiFilter),
-                Aggregates.group(stiApiInfoKeyGroupId(), Accumulators.addToSet("subTypes", "$" + SingleTypeInfo.SUB_TYPE))
-            );
-            try (MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
-                    .aggregate(pipeline, BasicDBObject.class).allowDiskUse(true).cursor()) {
-                while (cursor.hasNext()) {
-                    BasicDBObject group = cursor.next();
-                    ApiInfoKey key = apiInfoKeyFromGroupId((BasicDBObject) group.get("_id"));
-                    @SuppressWarnings("unchecked")
-                    List<String> subTypes = (List<String>) group.get("subTypes");
-                    if (subTypes != null && !subTypes.isEmpty()) {
-                        result.put(key, new ArrayList<>(subTypes));
+        try {
+            List<String> sensitiveNames = sensitiveSubTypeNamesInResponse();
+            if (sensitiveNames.isEmpty()) {
+                return result;
+            }
+            List<ApiInfoKey> keys = new ArrayList<>(apiInfoKeys);
+            for (int i = 0; i < keys.size(); i += QUERY_CHUNK_SIZE) {
+                List<ApiInfoKey> chunk = keys.subList(i, Math.min(i + QUERY_CHUNK_SIZE, keys.size()));
+                Bson stiFilter = Filters.and(
+                    stiApiInfoKeysFilter(chunk),
+                    Filters.in(SingleTypeInfo.SUB_TYPE, sensitiveNames),
+                    Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1)
+                );
+                List<Bson> pipeline = Arrays.asList(
+                    Aggregates.match(stiFilter),
+                    Aggregates.group(stiApiInfoKeyGroupId(), Accumulators.addToSet("subTypes", "$" + SingleTypeInfo.SUB_TYPE))
+                );
+                try (MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
+                        .aggregate(pipeline, BasicDBObject.class).allowDiskUse(true).cursor()) {
+                    while (cursor.hasNext()) {
+                        BasicDBObject group = cursor.next();
+                        ApiInfoKey key = apiInfoKeyFromGroupId((BasicDBObject) group.get("_id"));
+                        @SuppressWarnings("unchecked")
+                        List<String> subTypes = (List<String>) group.get("subTypes");
+                        if (subTypes != null && !subTypes.isEmpty()) {
+                            result.put(key, new ArrayList<>(subTypes));
+                        }
                     }
                 }
             }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Label-only sensitive subtype fetch failed; continuing without subtype details");
+            return new HashMap<>();
         }
         return result;
     }
@@ -355,6 +378,7 @@ public class RiskScoreOfCollections {
         int apiInfoNotFoundCount = 0;
         int bulkUpdatesSize = 0;
         int bulkWriteModifiedCount = 0;
+        FactorWriteStats factorStats = new FactorWriteStats();
 
         final McpApiRiskScoreUtils.McpRiskScoreContext mcpRiskScoreContext =
                 (severityScoreMap != null && !severityScoreMap.isEmpty())
@@ -406,7 +430,7 @@ public class RiskScoreOfCollections {
                     Bson update = Updates.combine(
                         Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
                         Updates.set(ApiInfo.RISK_SCORE, riskScore),
-                        Updates.set(ApiInfo.RISK_SCORE_FACTORS, factors)
+                        factorsUpdate(factors, riskScore, factorStats)
                     );
                     bulkUpdatesForApiInfo.add(new UpdateManyModel<>(ApiInfoDao.getFilter(apiInfoKey), update, new UpdateOptions()));
                 }
@@ -423,7 +447,9 @@ public class RiskScoreOfCollections {
         loggerMaker.info("Severity score incremental update AccountId: " + Context.accountId.get() + " since: " + timeStampFilter
             + " apis with updated issues: " + severityScoreMapSize + " (fetched in " + issuesMs + " ms)"
             + " api infos not found: " + apiInfoNotFoundCount + " bulk updates: " + bulkUpdatesSize
-            + " riskScore group updates: " + riskScoreGroupUpdateCount + " total: " + (System.currentTimeMillis() - startMs) + " ms");
+            + " riskScore group updates: " + riskScoreGroupUpdateCount
+            + " factorsWritten: " + factorStats.factorsWritten + " factorsEmpty: " + factorStats.factorsEmpty
+            + " mismatches: " + factorStats.mismatches + " total: " + (System.currentTimeMillis() - startMs) + " ms");
 
         // Log activity for account 1763355072
         if (Context.accountId.get() == 1763355072) {
@@ -438,6 +464,7 @@ public class RiskScoreOfCollections {
     // builds the mcp risk score context (collection scans) only once, and only if there is something to write
     private static final class LazyMcpRiskScoreContext {
         private McpApiRiskScoreUtils.McpRiskScoreContext context;
+        final FactorWriteStats factorStats = new FactorWriteStats();
 
         McpApiRiskScoreUtils.McpRiskScoreContext get() {
             if (context == null) {
@@ -532,7 +559,7 @@ public class RiskScoreOfCollections {
             Bson update = Updates.combine(
                 Updates.set(ApiInfo.IS_SENSITIVE, isSensitive),
                 Updates.set(ApiInfo.RISK_SCORE, riskScore),
-                Updates.set(ApiInfo.RISK_SCORE_FACTORS, factors)
+                factorsUpdate(factors, riskScore, mcpRiskScoreContext.factorStats)
             );
             bulkUpdatesForApiInfo.add(new UpdateManyModel<>(ApiInfoDao.getFilter(apiInfoKey), update, new UpdateOptions()));
         }
@@ -643,9 +670,12 @@ public class RiskScoreOfCollections {
             Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_UPDATED_SENSITIVE_MAP), startTs),
             new UpdateOptions().upsert(true)
         );
+        FactorWriteStats factorStats = mcpRiskScoreContext.factorStats;
         loggerMaker.info("Sensitive info mapping AccountId: " + Context.accountId.get() + " mode: " + (lastSyncedTs == 0 ? "first run" : "incremental")
             + " since: " + stiTimeStampFilter + " new STIs: " + newStisMs + " ms"
-            + " modified data types re-evaluation: " + (totalMs - newStisMs) + " ms total: " + (System.currentTimeMillis() - startMs) + " ms");
+            + " modified data types re-evaluation: " + (totalMs - newStisMs) + " ms"
+            + " factorsWritten: " + factorStats.factorsWritten + " factorsEmpty: " + factorStats.factorsEmpty
+            + " mismatches: " + factorStats.mismatches + " total: " + (System.currentTimeMillis() - startMs) + " ms");
     }
 
     public void calculateRiskScoreForAllApis() {
@@ -674,6 +704,7 @@ public class RiskScoreOfCollections {
         int riskScoreGroupUpdates = 0;
         int totalBulkWrites = 0;
         int totalModifiedCount = 0;
+        FactorWriteStats factorStats = new FactorWriteStats();
 
         McpApiRiskScoreUtils.McpRiskScoreContext mcpRiskScoreContext = McpApiRiskScoreUtils.buildMcpRiskScoreContext();
         while(count < 100){
@@ -703,7 +734,7 @@ public class RiskScoreOfCollections {
                         riskScore, nowBefore, nowAfter);
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.RISK_SCORE, riskScore),
-                    Updates.set(ApiInfo.RISK_SCORE_FACTORS, factors),
+                    factorsUpdate(factors, riskScore, factorStats),
                     Updates.set(ApiInfo.LAST_CALCULATED_TIME, Context.now())
                 );
                 Bson filterQ = ApiInfoDao.getFilter(apiInfo.getId());
@@ -750,6 +781,8 @@ public class RiskScoreOfCollections {
 
         loggerMaker.info("Risk score full reset AccountId: " + Context.accountId.get() + " apis with open issues: " + initialSeverityScoreMapSize
             + " (aggregated in " + severityScoreMapMs + " ms) apis processed: " + totalApisProcessed + " in " + count + " batches"
-            + " riskScore group updates: " + riskScoreGroupUpdates + " total: " + (System.currentTimeMillis() - startMs) + " ms");
+            + " riskScore group updates: " + riskScoreGroupUpdates
+            + " factorsWritten: " + factorStats.factorsWritten + " factorsEmpty: " + factorStats.factorsEmpty
+            + " mismatches: " + factorStats.mismatches + " total: " + (System.currentTimeMillis() - startMs) + " ms");
     }
 }

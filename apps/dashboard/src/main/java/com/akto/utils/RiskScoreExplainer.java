@@ -1,14 +1,11 @@
 package com.akto.utils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo.RiskScoreFactor;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.utils.McpApiRiskScoreUtils.McpAuditFlags;
 import com.akto.utils.McpApiRiskScoreUtils.McpRiskScoreContext;
@@ -21,17 +18,20 @@ import static com.akto.jobs.utils.Utils.getRiskScoreValueFromSeverityScore;
  */
 public final class RiskScoreExplainer {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreExplainer.class, LogDb.DASHBOARD);
     private static final float MATCH_TOLERANCE = 0.05f;
     private static final int MAX_DETAIL_NAMES = 5;
+    private static final int MAX_AGENT_REASON_DETAIL_CHARS = 200;
+    static final String CAP_LABEL = "Capped at maximum risk score of 5";
+    static final String FLOOR_LABEL = "Malicious MCP server collection (minimum risk)";
+    static final String AGENT_RISK_LABEL = "AI agent risk";
 
     private RiskScoreExplainer() {}
 
     /**
      * Build reason lines for {@code computedScore}. Tries both clock readings around the score
-     * computation for the 30-day discovery check. Returns an empty list when the lines cannot
-     * be matched to the score (including after allowing for the existing cap of 5 and
-     * malicious-server floor of 3). Never invents reconciling lines.
+     * computation for the 30-day discovery check. Returns {@code null} when the lines cannot
+     * be matched to the score so writers can {@code $unset} factors instead of overwriting
+     * good data. An empty list means the score is explained with no contributing lines.
      */
     public static List<RiskScoreFactor> explain(ApiInfo apiInfo, boolean isSensitive, float severityScore,
             List<String> issueNames, List<String> sensitiveSubtypes, McpRiskScoreContext ctx,
@@ -47,12 +47,7 @@ public final class RiskScoreExplainer {
                 return factors;
             }
         }
-        String key = apiInfo != null && apiInfo.getId() != null ? apiInfo.getId().toString() : "unknown";
-        loggerMaker.warnAndAddToDb(
-                "Risk score explanation does not match computed score for " + key
-                        + " computedScore=" + computedScore + " factorSum=" + sumPoints(factors),
-                LogDb.DASHBOARD);
-        return Collections.emptyList();
+        return null;
     }
 
     static List<RiskScoreFactor> buildFactors(ApiInfo apiInfo, boolean isSensitive, float severityScore,
@@ -98,8 +93,20 @@ public final class RiskScoreExplainer {
             Double agentBase = ctx.agentBaseRiskScoreByCollectionId.get(cid);
             if (agentBase != null && agentBase > 0) {
                 String reason = ctx.agentBaseRiskScoreReasonByCollectionId.get(cid);
-                String label = (reason != null && !reason.isEmpty()) ? reason : "AI agent risk";
-                factors.add(new RiskScoreFactor(agentBase.floatValue(), label, null));
+                factors.add(new RiskScoreFactor(agentBase.floatValue(), AGENT_RISK_LABEL,
+                        truncateDetail(reason, MAX_AGENT_REASON_DETAIL_CHARS)));
+            }
+
+            // Same order as getRiskScoreWithMcpAdjustments: cap then floor.
+            float sum = sumPoints(factors);
+            float cap = McpApiRiskScoreUtils.getMcpRiskScoreCap();
+            if (sum > cap) {
+                factors.add(new RiskScoreFactor(cap - sum, CAP_LABEL, null));
+                sum = cap;
+            }
+            float floor = McpApiRiskScoreUtils.getMcpMaliciousServerFloor();
+            if (flags.maliciousServerTag && sum < floor) {
+                factors.add(new RiskScoreFactor(floor - sum, FLOOR_LABEL, null));
             }
         }
 
@@ -108,26 +115,7 @@ public final class RiskScoreExplainer {
 
     static boolean isAcceptable(List<RiskScoreFactor> factors, float computedScore, McpRiskScoreContext ctx,
             ApiInfo apiInfo) {
-        float sum = sumPoints(factors);
-        if (Math.abs(sum - computedScore) <= MATCH_TOLERANCE) {
-            return true;
-        }
-        // Existing cap of 5: lines may add up to more than the stored score.
-        if (Math.abs(computedScore - McpApiRiskScoreUtils.getMcpRiskScoreCap()) <= MATCH_TOLERANCE
-                && sum > computedScore + MATCH_TOLERANCE) {
-            return true;
-        }
-        // Existing malicious-server floor of 3: lines may add up to less than the stored score.
-        boolean maliciousServer = false;
-        if (ctx != null && apiInfo != null && apiInfo.getId() != null) {
-            maliciousServer = ctx.maliciousMcpServerCollectionIds.contains(apiInfo.getId().getApiCollectionId());
-        }
-        if (maliciousServer
-                && Math.abs(computedScore - McpApiRiskScoreUtils.getMcpMaliciousServerFloor()) <= MATCH_TOLERANCE
-                && sum < computedScore - MATCH_TOLERANCE) {
-            return true;
-        }
-        return false;
+        return Math.abs(sumPoints(factors) - computedScore) <= MATCH_TOLERANCE;
     }
 
     static float sumPoints(List<RiskScoreFactor> factors) {
@@ -157,6 +145,16 @@ public final class RiskScoreExplainer {
             return "Threat activity, low severity";
         }
         return "Threat activity";
+    }
+
+    static String truncateDetail(String value, int maxChars) {
+        if (value == null || value.isEmpty()) {
+            return null;
+        }
+        if (value.length() <= maxChars) {
+            return value;
+        }
+        return value.substring(0, maxChars);
     }
 
     static String joinNames(List<String> names) {

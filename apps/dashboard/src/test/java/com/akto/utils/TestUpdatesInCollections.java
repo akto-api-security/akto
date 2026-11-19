@@ -267,11 +267,9 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         assertNotNull("riskScoreFactors should be saved", apiInfo.getRiskScoreFactors());
         assertFalse("riskScoreFactors should not be empty for scored APIs with open issues",
                 apiInfo.getRiskScoreFactors().isEmpty());
+        assertEquals("riskScoreFactorsScore must match stored riskScore",
+                apiInfo.getRiskScore(), apiInfo.getRiskScoreFactorsScore(), 0.05f);
         assertTrue("saved factors must be acceptable for the stored riskScore",
                 RiskScoreExplainer.isAcceptable(apiInfo.getRiskScoreFactors(), apiInfo.getRiskScore(), null, apiInfo));
-        for (ApiInfo.RiskScoreFactor factor : apiInfo.getRiskScoreFactors()) {
-            String label = factor.getLabel() == null ? "" : factor.getLabel().toLowerCase();
-            assertFalse(label.contains("cap") || label.contains("capped"));
-        }
     }
 }

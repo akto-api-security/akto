@@ -49,6 +49,9 @@ public class ApiInfo {
     public static final String RISK_SCORE_FACTORS = "riskScoreFactors";
     private List<RiskScoreFactor> riskScoreFactors;
 
+    public static final String RISK_SCORE_FACTORS_SCORE = "riskScoreFactorsScore";
+    private float riskScoreFactorsScore;
+
     public static final String LAST_CALCULATED_TIME = "lastCalculatedTime";
     private int lastCalculatedTime;
 
@@ -308,6 +311,7 @@ public class ApiInfo {
         if (that.riskScore > this.riskScore) {
             this.riskScore = that.riskScore;
             this.riskScoreFactors = that.riskScoreFactors;
+            this.riskScoreFactorsScore = that.riskScoreFactorsScore;
         }
         this.threatScore = Math.max(this.threatScore, that.threatScore);
 
@@ -546,6 +550,14 @@ public class ApiInfo {
 
     public void setRiskScoreFactors(List<RiskScoreFactor> riskScoreFactors) {
         this.riskScoreFactors = riskScoreFactors;
+    }
+
+    public float getRiskScoreFactorsScore() {
+        return riskScoreFactorsScore;
+    }
+
+    public void setRiskScoreFactorsScore(float riskScoreFactorsScore) {
+        this.riskScoreFactorsScore = riskScoreFactorsScore;
     }
 
     public int getLastCalculatedTime() {
