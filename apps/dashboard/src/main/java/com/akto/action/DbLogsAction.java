@@ -7,15 +7,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.akto.dao.RBACDao;
-import com.akto.dao.context.Context;
 import com.akto.dto.Log;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.usage.UsageMetricCalculator;
-import com.akto.util.DashboardMode;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -80,21 +75,8 @@ public class DbLogsAction extends UserAction {
             && user.getLogin().toLowerCase().endsWith(INTERNAL_EMAIL_DOMAIN);
     }
 
-    /** Customers need the ADMIN role; roles are only enforced on metered dashboards with RBAC (same as roleAccessInterceptor). */
-    private boolean isAdminOrRbacNotEnforced() {
-        Integer accountId = Context.accountId.get();
-        if (accountId == null || getSUser() == null || !DashboardMode.isMetered()
-                || !UsageMetricCalculator.isRbacFeatureAvailable(accountId)) {
-            return true;
-        }
-        return RBACDao.getCurrentRoleForUser(getSUser().getId(), accountId) == Role.ADMIN;
-    }
-
     private List<LogDb> computeAllowedLogGroups() {
         boolean internal = isInternalUser();
-        if (!internal && !isAdminOrRbacNotEnforced()) {
-            return Collections.emptyList();
-        }
         return Arrays.stream(LogDb.values())
             .filter(db -> internal || CUSTOMER_VISIBLE_LOG_DBS.contains(db))
             .collect(Collectors.toList());
