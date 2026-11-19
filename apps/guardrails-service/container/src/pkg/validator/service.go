@@ -2626,6 +2626,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        processResult.Metadata,
 		Behaviour:       processResult.Behaviour,
+		// The allow failed open on a check that didn't run; /api/validate/file must not cache it.
+		Incomplete: processResult.Incomplete,
 	}
 
 	s.logger.Info("ValidateRequest - completed",
