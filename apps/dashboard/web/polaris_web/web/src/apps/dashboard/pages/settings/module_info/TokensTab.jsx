@@ -4,6 +4,7 @@ import settingRequests from "../api"
 import func from "@/util/func"
 import EmptyCard from "../../dashboard/new_components/EmptyCard"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
+import { CellType } from "../../../components/tables/rows/GithubRow"
 import RuntimeTokenField from "../../quick_start/components/RuntimeTokenField"
 import { usePermissions } from "@/util/permissions"
 import { maskedToken } from "./maskedToken"
@@ -94,6 +95,8 @@ const HEADERS = [
 ]
 
 const SORT_OPTIONS = buildSortOptions(HEADERS, DEFAULT_SORT_KEY)
+// with useNewRow the row menu only renders for a header of this type
+const ACTION_HEADER = { title: '', type: CellType.ACTION }
 
 function TokensTab() {
     const { canCall } = usePermissions()
@@ -128,6 +131,9 @@ function TokensTab() {
     const activeLegacyCount = activeTokens.filter(isLegacy).length
     const expiringSoon = activeTokens.filter(token => token.expiresAt > 0 && token.expiresAt - now <= EXPIRING_SOON_SECONDS)
     const idleTokens = activeTokens.filter(token => isIdle(token, now))
+    // only an active token has a row menu, so the column exists only while one does
+    const hasRowActions = activeTokens.length > 0
+    const tableHeaders = useMemo(() => (hasRowActions ? [...HEADERS, ACTION_HEADER] : HEADERS), [hasRowActions])
     // the rows carry "Expiring soon" / "Idle" badges; this is only the count
     const attentionSummary = [
         expiringSoon.length > 0 && `${expiringSoon.length} expiring within 14 days`,
@@ -162,7 +168,10 @@ function TokensTab() {
     }), [tokens])
 
     const getActions = (row) => {
-        if (!row?.token || tokenState(row.token, nowSeconds()) !== 'Active') return []
+        if (!row?.token) return []
+        const state = tokenState(row.token, nowSeconds())
+        // the menu button is on every row, so a token that cannot be revoked says why instead of opening empty
+        if (state !== 'Active') return [{ items: [{ content: `Token ${state.toLowerCase()}`, disabled: true }] }]
         return [{
             items: [{
                 content: 'Revoke',
@@ -260,12 +269,12 @@ function TokensTab() {
                         resourceName={resourceName}
                         sortOptions={SORT_OPTIONS}
                         filters={[]}
-                        headers={HEADERS}
-                        headings={HEADERS}
+                        headers={tableHeaders}
+                        headings={tableHeaders}
                         searchKeys={SEARCH_KEYS}
                         selectable={false}
                         getActions={getActions}
-                        hasRowActions={activeTokens.length > 0}
+                        hasRowActions={hasRowActions}
                         useNewRow={true}
                         condensedHeight={true}
                         mode={IndexFiltersMode.Filtering}
