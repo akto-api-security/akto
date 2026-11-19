@@ -10,7 +10,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
 import com.akto.utils.elasticsearch.ElasticSearchClient;
-import com.mongodb.BasicDBObject;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -26,6 +27,8 @@ import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider
 import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 
 import java.io.ByteArrayOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -33,9 +36,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,7 +44,7 @@ import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * ATLAS_S3_EXPORT recurring job: reads the account's Atlas traces from Elasticsearch since the last
+ * ATLAS_S3_EXPORT recurring job: reads the account's Atlas or Argus traces from Elasticsearch since the last
  * checkpoint and writes them to the customer's S3 bucket as gzipped OTLP/JSON
  * (ExportTraceServiceRequest), one object per page. Keys follow the OpenTelemetry Collector
  * awss3exporter layout and are deterministic per (window, page), so a retried window overwrites
@@ -55,7 +56,8 @@ public class AtlasS3ExportJobExecutor extends JobExecutor<AtlasS3ExportJobParams
     private static final LoggerMaker logger = new LoggerMaker(AtlasS3ExportJobExecutor.class, LogDb.DASHBOARD);
     public static final AtlasS3ExportJobExecutor INSTANCE = new AtlasS3ExportJobExecutor();
 
-    private static final int PAGE_SIZE = 500;
+    // Traces per ES read and per file; kept small because prompts/responses are stored untruncated.
+    private static final int PAGE_SIZE = 100;
     private static final long WINDOW_MS = 60 * 60 * 1000L;
     // Old history is sent a slice per run (the job recurs every 5 min) so a backfill never loads ES
     // or the jobs lane all at once. A started window is always finished, so every run advances at
@@ -70,7 +72,6 @@ public class AtlasS3ExportJobExecutor extends JobExecutor<AtlasS3ExportJobParams
     private static final String SCROLL_KEEP_ALIVE = "2m";
     private static final int SPAN_KIND_CLIENT = 3;
     private static final Pattern HEX = Pattern.compile("^[0-9a-f]+$");
-    private static final Map<String, List<String>> ATLAS_ONLY = Collections.singletonMap("isAtlasTraffic", Collections.singletonList("true"));
     private static final DateTimeFormatter KEY_TIME = DateTimeFormatter
         .ofPattern("'year='yyyy/'month='MM/'day='dd/'hour='HH/'minute='mm").withZone(ZoneOffset.UTC);
 
@@ -87,7 +88,8 @@ public class AtlasS3ExportJobExecutor extends JobExecutor<AtlasS3ExportJobParams
             logger.info("Atlas S3 export not enabled for account " + job.getAccountId() + ", skipping");
             return;
         }
-        AtlasS3ExportIntegration config = AtlasS3ExportIntegrationDao.instance.findOne(new BasicDBObject());
+        AtlasS3ExportIntegration config = AtlasS3ExportIntegrationDao.instance.findOne(
+            Filters.eq(AtlasS3ExportIntegration.SOURCE, params.getSource()));
         if (config == null || StringUtils.isBlank(config.getBucketName()) || StringUtils.isBlank(config.getRegion())) {
             logger.info("Atlas S3 export not configured for account " + job.getAccountId() + ", skipping");
             return;
@@ -100,20 +102,21 @@ public class AtlasS3ExportJobExecutor extends JobExecutor<AtlasS3ExportJobParams
         }
         ElasticSearchClient es = ElasticSearchClient.instance();
         if (!es.isConfigured()) {
-            throw new Exception("Elasticsearch is not configured, cannot read Atlas traces");
+            throw new Exception("Elasticsearch is not configured, cannot read traces");
         }
 
+        boolean atlas = CONTEXT_SOURCE.ENDPOINT.name().equals(params.getSource());
         long end = System.currentTimeMillis() - INGESTION_LAG_MS;
-        // 0 = never exported: start from the account's oldest Atlas trace so all history is sent.
+        // 0 = never exported: start from the account's oldest trace so all history is sent.
         long from = params.getLastExportedTs() > 0 ? params.getLastExportedTs()
-            : earliestAtlasTraceTs(es, job.getAccountId(), end);
+            : earliestTraceTs(es, job.getAccountId(), atlas, end);
         int exportedThisRun = 0;
         while (from < end && exportedThisRun < MAX_SPANS_PER_RUN) {
             long to = Math.min(from + WINDOW_MS, end);
-            int spans = exportWindow(es, job, config, from, to);
+            int spans = exportWindow(es, job, config, atlas, from, to);
             exportedThisRun += spans;
             if (spans > 0) {
-                logger.info("Atlas S3 export: account " + job.getAccountId() + " exported " + spans
+                logger.info("Atlas S3 export: account " + job.getAccountId() + " (" + params.getSource() + ") exported " + spans
                     + " spans for [" + from + ", " + to + ")");
             }
             params.setLastExportedTs(to);
@@ -123,14 +126,14 @@ public class AtlasS3ExportJobExecutor extends JobExecutor<AtlasS3ExportJobParams
         }
     }
 
-    /** Timestamp of the account's oldest Atlas trace, or {@code end} when there is none yet. */
-    private long earliestAtlasTraceTs(ElasticSearchClient es, int accountId, long end) throws Exception {
-        JSONObject query = es.buildBaseQueryMulti(accountId, 0, end, ATLAS_ONLY, null);
+    /** Timestamp of the account's oldest matching trace, or {@code end} when there is none yet. */
+    private long earliestTraceTs(ElasticSearchClient es, int accountId, boolean atlas, long end) throws Exception {
+        JSONObject query = tracesQuery(es, accountId, 0, end, atlas);
         JSONObject aggs = new JSONObject().put("earliest", new JSONObject()
             .put("min", new JSONObject().put("field", "timestamp")));
         JSONObject result = es.aggregate(query, aggs);
         if (result == null) {
-            throw new Exception("Elasticsearch read failed while finding the oldest Atlas trace");
+            throw new Exception("Elasticsearch read failed while finding the oldest trace");
         }
         JSONObject earliest = result.optJSONObject("earliest");
         if (earliest == null || earliest.isNull("value")) return end;
@@ -139,10 +142,10 @@ public class AtlasS3ExportJobExecutor extends JobExecutor<AtlasS3ExportJobParams
 
     // Pages are read in timestamp order and uploaded one after another, so files are written oldest first.
     private int exportWindow(ElasticSearchClient es, Job job, AtlasS3ExportIntegration config,
-                             long from, long to) throws Exception {
+                             boolean atlas, long from, long to) throws Exception {
         int accountId = job.getAccountId();
         String host = System.getenv("ES_HOST").replaceAll("/+$", "");
-        JSONObject query = es.buildBaseQueryMulti(accountId, from, to, ATLAS_ONLY, null);
+        JSONObject query = tracesQuery(es, accountId, from, to, atlas);
         JSONObject body = new JSONObject()
             .put("query", query)
             .put("size", PAGE_SIZE)
@@ -165,7 +168,7 @@ public class AtlasS3ExportJobExecutor extends JobExecutor<AtlasS3ExportJobParams
                 JSONObject source = hits.getJSONObject(i).optJSONObject("_source");
                 if (source != null) sources.put(source);
             }
-            byte[] gz = gzip(toOtlpJson(accountId, sources).toString().getBytes(StandardCharsets.UTF_8));
+            byte[] gz = gzip(toOtlpJson(accountId, sources));
             S3Uploader.put(accountId, config, buildKey(config.getPrefix(), from, page), gz);
             spans += sources.length();
             page++;
@@ -180,6 +183,18 @@ public class AtlasS3ExportJobExecutor extends JobExecutor<AtlasS3ExportJobParams
                 new JSONObject().put("scroll", SCROLL_KEEP_ALIVE).put("scroll_id", scrollId).toString());
         }
         return spans;
+    }
+
+    // Same split as the Traces pages: Atlas jobs export isAtlasTraffic=true, Argus jobs everything
+    // else, including older traces stored before the field existed.
+    private static JSONObject tracesQuery(ElasticSearchClient es, int accountId, long from, long to, boolean atlas)
+            throws JSONException {
+        JSONObject query = es.buildBaseQueryMulti(accountId, from, to, null, null);
+        JSONObject atlasTerm = new JSONObject().put("term", new JSONObject().put("isAtlasTraffic", true));
+        JSONObject bool = query.getJSONObject("bool");
+        if (atlas) bool.getJSONArray("must").put(atlasTerm);
+        else bool.put("must_not", new JSONArray().put(atlasTerm));
+        return query;
     }
 
     static String buildKey(String prefix, long windowStartMs, int page) {
@@ -291,10 +306,11 @@ public class AtlasS3ExportJobExecutor extends JobExecutor<AtlasS3ExportJobParams
         return new JSONObject().put("key", key).put("value", new JSONObject().put("intValue", String.valueOf(value)));
     }
 
-    private static byte[] gzip(byte[] data) throws Exception {
+    // Streams the JSON straight into gzip, so the uncompressed file is never held in memory.
+    private static byte[] gzip(JSONObject json) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try (GZIPOutputStream gz = new GZIPOutputStream(out)) {
-            gz.write(data);
+        try (Writer writer = new OutputStreamWriter(new GZIPOutputStream(out), StandardCharsets.UTF_8)) {
+            json.write(writer);
         }
         return out.toByteArray();
     }
