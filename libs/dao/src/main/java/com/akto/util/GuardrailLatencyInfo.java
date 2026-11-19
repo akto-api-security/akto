@@ -93,7 +93,7 @@ public class GuardrailLatencyInfo {
                     "1767812031",
                     GuardrailProbeType.VALIDATE),
             new GuardrailServiceTarget(
-                    "https://1767812031-proxy-guardrails.akto.io ",
+                    "https://1767812031-proxy-guardrails.akto.io",
                     "1767812031",
                     GuardrailProbeType.VALIDATE),
             new GuardrailServiceTarget(

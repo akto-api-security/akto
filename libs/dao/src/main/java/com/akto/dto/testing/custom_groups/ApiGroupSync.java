@@ -222,7 +222,8 @@ public abstract class ApiGroupSync {
         long startMs = System.currentTimeMillis();
         int syncStartedAt = Context.now();
 
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(),
+                Projections.include(AccountSettings.LAST_UPDATED_CRON_INFO));
         LastCronRunInfo lastRunInfo = accountSettings == null ? null : accountSettings.getLastUpdatedCronInfo();
         Integer lastSync = lastRunInfo == null || lastRunInfo.getGroupSyncTimes() == null
                 ? null : lastRunInfo.getGroupSyncTimes().get(String.valueOf(groupId()));
@@ -268,7 +269,7 @@ public abstract class ApiGroupSync {
         }
 
         long tookMs = System.currentTimeMillis() - startMs;
-        String message = String.format("AccountId: %d %s synced: since=%d (%s), newest data read=%d, saved=%d, slices=%d, scanned=%d, added=%d, removed=%d, write batches=%d, docs modified=%d, took=%d ms",
+        String message = String.format(Constants.CRON_STATS_LOG_TAG + " AccountId: %d %s synced: since=%d (%s), newest data read=%d, saved=%d, slices=%d, scanned=%d, added=%d, removed=%d, write batches=%d, docs modified=%d, took=%d ms",
                 accountId, groupName(), since,
                 hasMarker ? "last sync " + (syncStartedAt - lastSync) / 60 + " min ago" : "no last sync, fallback",
                 result.newestSeen, lastSaved, result.slices, result.scanned, result.added, result.removed, result.batches, result.docsModified, tookMs);

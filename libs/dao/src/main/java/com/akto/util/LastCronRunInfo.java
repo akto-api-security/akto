@@ -31,6 +31,10 @@ public class LastCronRunInfo {
     public static final String GROUP_SYNC_TIMES = "groupSyncTimes";
     private Map<String, Integer> groupSyncTimes;
 
+    // last time the status code and api type back fill finished for the account; it only looks at apis seen after this
+    public static final String LAST_STATUS_CODE_BACKFILL = "lastStatusCodeBackfill";
+    private int lastStatusCodeBackfill;
+
     public LastCronRunInfo() {
     }
 
@@ -103,6 +107,14 @@ public class LastCronRunInfo {
 
     public void setLastApiGroupsFullSync(int lastApiGroupsFullSync) {
         this.lastApiGroupsFullSync = lastApiGroupsFullSync;
+    }
+
+    public int getLastStatusCodeBackfill() {
+        return lastStatusCodeBackfill;
+    }
+
+    public void setLastStatusCodeBackfill(int lastStatusCodeBackfill) {
+        this.lastStatusCodeBackfill = lastStatusCodeBackfill;
     }
 
     public Map<String, Integer> getGroupSyncTimes() {

@@ -152,7 +152,7 @@ public class SyncCron {
                                 update,
                                 new UpdateOptions().upsert(true)
                             );
-                            loggerMaker.info("sync-cron-info AccountId: " + t.getId() + " window: [" + startTs + ", " + endTs + "]"
+                            loggerMaker.info(Constants.CRON_STATS_LOG_TAG + " sync-cron-info AccountId: " + t.getId() + " window: [" + startTs + ", " + endTs + "]"
                                 + " newParams: " + newParams + " (" + paramsCountMs + " ms)"
                                 + " newEndpoints: " + newEndpoints + " (" + endpointsCountMs + " ms)"
                                 + " riskScore(" + (fullReset ? "full reset" : "incremental from " + startTsSeverity) + "): " + riskScoreMs + " ms"
@@ -162,7 +162,7 @@ public class SyncCron {
                         }
                     }
                 }, "sync-cron-info");
-                loggerMaker.info("sync-cron-info run finished: accounts processed: " + processedAccounts.get()
+                loggerMaker.info(Constants.CRON_STATS_LOG_TAG + " sync-cron-info run finished: accounts processed: " + processedAccounts.get()
                     + ", skipped as dormant: " + dormantAccounts.get() + ", total: " + (System.currentTimeMillis() - runStartMs) + " ms");
             }
         }, 0, SYNC_CRON_INTERVAL_MINUTES, TimeUnit.MINUTES);
@@ -177,9 +177,12 @@ public class SyncCron {
 //                    loggerMaker.debugAndAddToDb("Cron for updating malicious MCP server tags dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
 //                    return;
 //                }
+                long runStartMs = System.currentTimeMillis();
+                AtomicInteger processedAccounts = new AtomicInteger();
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
+                        processedAccounts.incrementAndGet();
                         loggerMaker.debugAndAddToDb("Cron for updating malicious MCP server tags picked up for account " + t.getId(), LogDb.DASHBOARD);
                         try {
                             // Update malicious-mcp-server tags based on tool analysis (malicious names, descriptions, name-description mismatches)
@@ -189,6 +192,8 @@ public class SyncCron {
                         }
                     }
                 }, "mcp-maliciousness-cron-info");
+                loggerMaker.info(Constants.CRON_STATS_LOG_TAG + " mcp-maliciousness-cron-info run finished: accounts processed: " + processedAccounts.get()
+                    + ", total: " + (System.currentTimeMillis() - runStartMs) + " ms");
             }
         }, 0, 30, TimeUnit.MINUTES);
     }
