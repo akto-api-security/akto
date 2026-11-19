@@ -1,40 +1,105 @@
-import { Badge, Banner, Box, Button, DataTable, HorizontalStack, LegacyCard, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
-import { useEffect, useState } from "react"
+import { Badge, Banner, Box, Button, HorizontalStack, IndexFiltersMode, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { useEffect, useMemo, useState } from "react"
 import settingRequests from "../api"
 import func from "@/util/func"
 import EmptyCard from "../../dashboard/new_components/EmptyCard"
+import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
 import RuntimeTokenField from "../../quick_start/components/RuntimeTokenField"
 import { usePermissions } from "@/util/permissions"
 import { maskedToken } from "./maskedToken"
+import { buildSortOptions, disambiguateLabel } from "./tableConfig"
 
 const DAY = 24 * 60 * 60
 const EXPIRING_SOON_SECONDS = 14 * DAY
 const IDLE_SECONDS = 30 * DAY
 const MAX_USED_BY_CHIPS = 3
 const REVOKE_CONFIRM_TEXT = "REVOKE"
+const DEFAULT_SORT_KEY = 'createdTs'
+const SEARCH_KEYS = ['name', 'tokenMask', 'scopeCell', 'createdByEmail', 'status', 'source', 'usedByNames']
 // services re-sync their revoked list on this schedule, so a revoke can take this long to reach all of them
 const REVOKE_DELAY = "up to 15 minutes"
 const REVOKE_ALL_INFO = `Revoke all works after upgrading modules to the latest version. It revokes every active token, including the legacy tokens listed here; a legacy token that has not connected yet is not listed, so it is not included. Revoked tokens can take ${REVOKE_DELAY} to stop working everywhere.`
 
+const resourceName = { singular: 'token', plural: 'tokens' }
+
 const nowSeconds = () => Math.floor(Date.now() / 1000)
 
-const scopeLabel = (scope) => (scope && scope.length > 0)
-    ? scope.map(value => value.split('_').map(func.toSentenceCase).join(' ')).join(', ')
-    : 'Unscoped'
+const scopeNames = (scope) => (scope && scope.length > 0)
+    ? scope.map(value => value.split('_').map(func.toSentenceCase).join(' '))
+    : ['Unscoped']
 
 // REVOKED wins over EXPIRED; expiresAt 0 means the token never expires
 function tokenState(token, now) {
-    if (token.status === 'REVOKED') return 'REVOKED'
-    if (token.expiresAt > 0 && token.expiresAt <= now) return 'EXPIRED'
-    return 'ACTIVE'
+    if (token.status === 'REVOKED') return 'Revoked'
+    if (token.expiresAt > 0 && token.expiresAt <= now) return 'Expired'
+    return 'Active'
 }
 
 const isLegacy = (token) => token.source === 'DISCOVERED'
+const isIdle = (token, now) => now - (token.lastUsedAt || token.createdAt || 0) > IDLE_SECONDS
+
+const STATUS_BADGE = { Active: 'success', Expired: 'warning', Revoked: 'critical' }
+
+function usedByCell(token) {
+    const modules = token.modules || []
+    if (modules.length === 0) return '-'
+    const extra = (token.moduleCount ?? modules.length) - MAX_USED_BY_CHIPS
+    return (
+        <HorizontalStack gap="1" wrap={false}>
+            {modules.slice(0, MAX_USED_BY_CHIPS).map(module => (
+                <Tooltip
+                    key={module.id}
+                    content={`${module.moduleType || '-'} · last heartbeat ${func.epochToDateTime(module.lastHeartbeatReceived)}`}
+                >
+                    <Badge status={module.active ? 'success' : undefined}>{module.name || module.id}</Badge>
+                </Tooltip>
+            ))}
+            {extra > 0 && <Text variant="bodySm" color="subdued">+{extra} more</Text>}
+        </HorizontalStack>
+    )
+}
+
+function lastUsedCell(token, state, now) {
+    if (!token.lastUsedAt) return <Text color="subdued">Never</Text>
+    return (
+        <HorizontalStack gap="1" wrap={false}>
+            <span>{func.epochToDateTime(token.lastUsedAt)}</span>
+            {state === 'Active' && isIdle(token, now) && <Badge status="attention">Idle</Badge>}
+        </HorizontalStack>
+    )
+}
+
+function expiresCell(token, state, now) {
+    if (!token.expiresAt) return 'Never'
+    const soon = state === 'Active' && token.expiresAt - now <= EXPIRING_SOON_SECONDS
+    return (
+        <HorizontalStack gap="1" wrap={false}>
+            <span>{func.epochToDateTime(token.expiresAt)}</span>
+            {soon && <Badge status="warning">Expiring soon</Badge>}
+        </HorizontalStack>
+    )
+}
+
+const HEADERS = [
+    { title: 'Name', text: 'Name', value: 'name', sortKey: 'name', sortActive: true },
+    { title: 'Token', text: 'Token', value: 'tokenMask' },
+    { title: 'Scope', text: 'Scope', value: 'scopeCell', filterKey: 'scopeList', showFilter: true },
+    { title: 'Created by', text: 'Created by', value: 'createdByEmail', filterKey: 'createdByEmail', showFilter: true },
+    { title: 'Created', text: 'Created', value: 'createdLabel', sortKey: 'createdTs', sortActive: true },
+    { title: 'Expires', text: 'Expires', value: 'expiresLabel', sortKey: 'expiresTs', sortActive: true, sortLabels: ['Latest', 'Earliest'] },
+    { title: 'Status', text: 'Status', value: 'statusCell', filterKey: 'status', showFilter: true, sortKey: 'status', sortActive: true },
+    { title: 'Source', text: 'Source', value: 'source', filterKey: 'source', showFilter: true },
+    { title: 'Used by', text: 'Used by', value: 'usedByLabel' },
+    { title: 'Last used', text: 'Last used', value: 'lastUsedLabel', sortKey: 'lastUsedTs', sortActive: true },
+]
+
+const SORT_OPTIONS = buildSortOptions(HEADERS, DEFAULT_SORT_KEY)
 
 function TokensTab() {
     const { canCall } = usePermissions()
     const [tokens, setTokens] = useState([])
     const [loaded, setLoaded] = useState(false)
+    const [tableKey, setTableKey] = useState(0)
     const [busy, setBusy] = useState(false)
     const [createModal, setCreateModal] = useState({ open: false, key: 0 })
     const [revokeTarget, setRevokeTarget] = useState(null)
@@ -45,8 +110,8 @@ function TokensTab() {
     const fetchTokens = async () => {
         try {
             const resp = await settingRequests.fetchAuthTokens()
-            const list = resp?.authTokens || []
-            setTokens([...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)))
+            setTokens(resp?.authTokens || [])
+            setTableKey(key => key + 1)
         } catch (e) {
             // the request layer already toasts the error
         } finally {
@@ -59,11 +124,54 @@ function TokensTab() {
     }, [])
 
     const now = nowSeconds()
-    const activeTokens = tokens.filter(token => tokenState(token, now) === 'ACTIVE')
+    const activeTokens = tokens.filter(token => tokenState(token, now) === 'Active')
     const activeLegacyCount = activeTokens.filter(isLegacy).length
     const expiringSoon = activeTokens.filter(token => token.expiresAt > 0 && token.expiresAt - now <= EXPIRING_SOON_SECONDS)
-    const isIdle = (token) => now - (token.lastUsedAt || token.createdAt || 0) > IDLE_SECONDS
-    const idleTokens = activeTokens.filter(isIdle)
+    const idleTokens = activeTokens.filter(token => isIdle(token, now))
+    // the rows carry "Expiring soon" / "Idle" badges; this is only the count
+    const attentionSummary = [
+        expiringSoon.length > 0 && `${expiringSoon.length} expiring within 14 days`,
+        idleTokens.length > 0 && `${idleTokens.length} unused for 30+ days`,
+    ].filter(Boolean).join(' · ')
+
+    const rows = useMemo(() => tokens.map(token => {
+        const current = nowSeconds()
+        const state = tokenState(token, current)
+        const scopeList = scopeNames(token.scope)
+        const usedByNames = (token.modules || []).map(module => module.name || module.id)
+        return {
+            id: token.id,
+            name: token.name || '-',
+            tokenMask: maskedToken(token.hint),
+            scopeList,
+            scopeCell: scopeList.join(', '),
+            createdByEmail: token.createdByEmail || '-',
+            createdLabel: func.epochToDateTime(token.createdAt),
+            createdTs: token.createdAt || 0,
+            expiresLabel: expiresCell(token, state, current),
+            expiresTs: token.expiresAt > 0 ? token.expiresAt : Number.MAX_SAFE_INTEGER,
+            status: state,
+            statusCell: <Badge status={STATUS_BADGE[state]}>{state}</Badge>,
+            source: isLegacy(token) ? 'Legacy' : 'Generated',
+            usedByLabel: usedByCell(token),
+            usedByNames,
+            lastUsedLabel: lastUsedCell(token, state, current),
+            lastUsedTs: token.lastUsedAt || 0,
+            token,
+        }
+    }), [tokens])
+
+    const getActions = (row) => {
+        if (!row?.token || tokenState(row.token, nowSeconds()) !== 'Active') return []
+        return [{
+            items: [{
+                content: 'Revoke',
+                destructive: true,
+                requires: 'api/revokeAuthToken',
+                onAction: () => setRevokeTarget(row.token),
+            }],
+        }]
+    }
 
     const openCreateModal = () => setCreateModal(prev => ({ open: true, key: prev.key + 1 }))
     const closeCreateModal = () => setCreateModal(prev => ({ ...prev, open: false }))
@@ -108,79 +216,6 @@ function TokensTab() {
         }
     }
 
-    const statusBadge = (token) => {
-        const state = tokenState(token, now)
-        return (
-            <HorizontalStack gap="1" wrap={false}>
-                {state === 'ACTIVE' && <Badge status="success">Active</Badge>}
-                {state === 'EXPIRED' && <Badge status="warning">Expired</Badge>}
-                {state === 'REVOKED' && <Badge status="critical">Revoked</Badge>}
-                {isLegacy(token) && <Badge>Legacy</Badge>}
-            </HorizontalStack>
-        )
-    }
-
-    const usedBy = (token) => {
-        const modules = token.modules || []
-        if (modules.length === 0) return '-'
-        const extra = (token.moduleCount ?? modules.length) - MAX_USED_BY_CHIPS
-        return (
-            <HorizontalStack gap="1" wrap={false}>
-                {modules.slice(0, MAX_USED_BY_CHIPS).map(module => (
-                    <Tooltip
-                        key={module.id}
-                        content={`${module.moduleType || '-'} · last heartbeat ${func.epochToDateTime(module.lastHeartbeatReceived)}`}
-                    >
-                        <Badge status={module.active ? 'success' : undefined}>{module.name || module.id}</Badge>
-                    </Tooltip>
-                ))}
-                {extra > 0 && <Text variant="bodySm" color="subdued">+{extra} more</Text>}
-            </HorizontalStack>
-        )
-    }
-
-    const lastUsed = (token) => {
-        if (!token.lastUsedAt) return <Text color="subdued">Never</Text>
-        const label = func.epochToDateTime(token.lastUsedAt)
-        return (
-            <HorizontalStack gap="1" wrap={false}>
-                <span>{label}</span>
-                {tokenState(token, now) === 'ACTIVE' && isIdle(token) && <Badge status="attention">Idle</Badge>}
-            </HorizontalStack>
-        )
-    }
-
-    const expiresLabel = (token) => {
-        if (!token.expiresAt) return 'Never'
-        const soon = tokenState(token, now) === 'ACTIVE' && token.expiresAt - now <= EXPIRING_SOON_SECONDS
-        return (
-            <HorizontalStack gap="1" wrap={false}>
-                <span>{func.epochToDateTime(token.expiresAt)}</span>
-                {soon && <Badge status="warning">Expiring soon</Badge>}
-            </HorizontalStack>
-        )
-    }
-
-    const actions = (token) => {
-        if (tokenState(token, now) !== 'ACTIVE') return '-'
-        return (
-            <Button plain destructive disabled={!canCall('api/revokeAuthToken')} onClick={() => setRevokeTarget(token)}>Revoke</Button>
-        )
-    }
-
-    const rows = tokens.map(token => [
-        token.name || '-',
-        maskedToken(token.hint),
-        scopeLabel(token.scope),
-        token.createdByEmail || '-',
-        func.epochToDateTime(token.createdAt),
-        expiresLabel(token),
-        statusBadge(token),
-        usedBy(token),
-        lastUsed(token),
-        actions(token)
-    ])
-
     // the server sends at most a few modules per token plus the real total in moduleCount
     const affectedModules = (revokeTarget?.modules) || []
     const moreAffected = (revokeTarget?.moduleCount ?? affectedModules.length) - affectedModules.length
@@ -188,46 +223,9 @@ function TokensTab() {
 
     return (
         <VerticalStack gap="4">
-            <Banner status="info">
-                Revoking a token can take {REVOKE_DELAY} to take effect everywhere.
-            </Banner>
-            {expiringSoon.length > 0 && (
-                <Banner status="warning" title={`${expiringSoon.length} token(s) expire within 14 days`}>
-                    {expiringSoon.map(token => token.name).join(', ')}
-                </Banner>
-            )}
-            {idleTokens.length > 0 && (
-                <Banner status="info" title={`${idleTokens.length} active token(s) unused for 30+ days`}>
-                    Consider revoking tokens that are no longer needed: {idleTokens.map(token => token.name).join(', ')}
-                </Banner>
-            )}
-
-            {!loaded || tokens.length > 0 ? (
-                <LegacyCard>
-                    <LegacyCard.Section>
-                        <HorizontalStack align="space-between" blockAlign="center">
-                            <Text variant="headingMd" as="h2">Authentication tokens</Text>
-                            <HorizontalStack gap="2" blockAlign="center">
-                                <Button disabled={!canCall('api/createAuthToken')} onClick={openCreateModal}>Create token</Button>
-                                <Button
-                                    destructive
-                                    disabled={!canCall('api/revokeAllAuthTokens') || activeTokens.length === 0}
-                                    onClick={() => setRevokeAllOpen(true)}
-                                >
-                                    Revoke all
-                                </Button>
-                            </HorizontalStack>
-                        </HorizontalStack>
-                    </LegacyCard.Section>
-                    <DataTable
-                        columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text', 'text', 'text', 'text', 'text']}
-                        headings={['Name', 'Token', 'Scope', 'Created by', 'Created', 'Expires', 'Status', 'Used by', 'Last used', 'Actions']}
-                        rows={rows}
-                    />
-                </LegacyCard>
-            ) : (
+            {loaded && tokens.length === 0 ? (
                 <EmptyCard
-                    title="No tokens"
+                    title="No authentication tokens"
                     subTitleComponent={
                         <VerticalStack gap="3" inlineAlign="center">
                             <Text variant="bodyMd" alignment="center" color="subdued">
@@ -237,6 +235,46 @@ function TokensTab() {
                         </VerticalStack>
                     }
                 />
+            ) : (
+                <VerticalStack gap="2">
+                    <HorizontalStack align="space-between" blockAlign="center" gap="4">
+                        <VerticalStack gap="05">
+                            <Text variant="bodySm" color="subdued">Revoking a token can take {REVOKE_DELAY} to take effect everywhere.</Text>
+                            {attentionSummary && <Text variant="bodySm" color="subdued">{attentionSummary}</Text>}
+                        </VerticalStack>
+                        <HorizontalStack gap="2">
+                            <Button disabled={!canCall('api/createAuthToken')} onClick={openCreateModal}>Create token</Button>
+                            <Button
+                                destructive
+                                disabled={!canCall('api/revokeAllAuthTokens') || activeTokens.length === 0}
+                                onClick={() => setRevokeAllOpen(true)}
+                            >
+                                Revoke all
+                            </Button>
+                        </HorizontalStack>
+                    </HorizontalStack>
+                    <GithubSimpleTable
+                        key={`tokens-${tableKey}`}
+                        pageLimit={20}
+                        data={rows}
+                        resourceName={resourceName}
+                        sortOptions={SORT_OPTIONS}
+                        filters={[]}
+                        headers={HEADERS}
+                        headings={HEADERS}
+                        searchKeys={SEARCH_KEYS}
+                        selectable={false}
+                        getActions={getActions}
+                        hasRowActions={activeTokens.length > 0}
+                        useNewRow={true}
+                        condensedHeight={true}
+                        mode={IndexFiltersMode.Filtering}
+                        disambiguateLabel={disambiguateLabel}
+                        contentAwareFilterCache={true}
+                        skipUrlFilters={true}
+                        loading={!loaded}
+                    />
+                </VerticalStack>
             )}
 
             <Modal

@@ -1,30 +1,31 @@
-import { Page, Tabs } from "@shopify/polaris"
-import { useState } from "react"
+import { Box } from "@shopify/polaris"
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
+import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
+import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import ModuleInfo from "./ModuleInfo"
 import TokensTab from "./TokensTab"
 import { usePermissions } from "@/util/permissions"
 
-const TABS = [
-    { id: 'modules', content: 'Modules' },
-    { id: 'tokens', content: 'Tokens' }
-]
-
 const ModuleInfoPage = () => {
     const { canCall } = usePermissions()
-    const [selectedTab, setSelectedTab] = useState(0)
-    // only admins can list tokens; everyone else sees the Modules tab alone
+    // only admins can list tokens; everyone else sees the modules table alone, without tabs
     const canSeeTokens = canCall('api/fetchAuthTokens')
-    const tabs = canSeeTokens ? TABS : TABS.slice(0, 1)
-    const activeTab = canSeeTokens ? selectedTab : 0
+
+    const tabs = [
+        { id: 'modules', content: 'Modules', component: <ModuleInfo /> },
+        { id: 'authentication-tokens', content: 'Authentication tokens', component: <TokensTab /> },
+    ]
 
     return (
-        <Page
-            title="Module Information"
-            divider
-        >
-            {canSeeTokens && <Tabs tabs={tabs} selected={activeTab} onSelect={setSelectedTab} />}
-            {activeTab === 0 ? <ModuleInfo /> : <TokensTab />}
-        </Page>
+        <PageWithMultipleCards
+            title={<TitleWithInfo titleText="Module Information" />}
+            isFirstPage={true}
+            components={[
+                canSeeTokens
+                    ? <Box width="100%" key="module-info-tabs"><LayoutWithTabs tabs={tabs} currTab={() => {}} /></Box>
+                    : <ModuleInfo key="module-info" />
+            ]}
+        />
     )
 }
 
