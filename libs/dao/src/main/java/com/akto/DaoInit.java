@@ -348,6 +348,7 @@ public class DaoInit {
         ClassModel<PortIOAutoTicketParams> portIOAutoTicketParams = ClassModel.builder(PortIOAutoTicketParams.class).enableDiscriminator(true).build();
         ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
         ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
+        ClassModel<AuthToken> authTokenClassModel = ClassModel.builder(AuthToken.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
         ClassModel<DigestAuthParam> digestAuthParamClassModel = ClassModel.builder(DigestAuthParam.class).enableDiscriminator(true).build();
         ClassModel<CopilotOAuthAuthParam> copilotOAuthAuthParamClassModel = ClassModel.builder(CopilotOAuthAuthParam.class).enableDiscriminator(true).build();
@@ -430,7 +431,7 @@ public class DaoInit {
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
                 wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel, wizApiEndpointsImportJobParamsClassModel, impervaApiEndpointsImportJobParamsClassModel, skillRevalidationJobParamsClassModel, atlasS3ExportJobParamsClassModel,
                 mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel,
-                openTelemetryIntegrationClassModel, copilotStudioIntegrationClassModel, insightNarrativeCacheClassModel, insightClassificationCacheClassModel)
+                openTelemetryIntegrationClassModel, copilotStudioIntegrationClassModel, insightNarrativeCacheClassModel, insightClassificationCacheClassModel, authTokenClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -599,6 +600,7 @@ public class DaoInit {
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
         EndpointShieldDiagnosticDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
+        AuthTokensDao.instance.createIndicesIfAbsent();
         AgentConversationDao.instance.createIndexIfAbsent();
         AgentConversationResultDao.instance.createIndexIfAbsent();
         IpReputationScoreDao.instance.createIndicesIfAbsent();

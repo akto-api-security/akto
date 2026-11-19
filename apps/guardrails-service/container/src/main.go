@@ -155,6 +155,7 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 	acc := metrics.NewAccumulator()
 	dbClient := dbabstractor.NewClient(logger)
 	go metricsFlushLoop(dbClient, logger, acc)
+	dbClient.StartHeartbeat(context.Background(), dbabstractor.HeartbeatInterval)
 
 	if cfg.NhiEnabled {
 		// One Publisher is shared by every Source. Adding new sources later
