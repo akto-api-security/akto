@@ -682,4 +682,17 @@ public class TestAtlasDiscoveryService {
                 .filter(category -> "agents".equals(category.get("id"))).findFirst().get();
         assertEquals(1, agents.get("personalAccounts"));
     }
+
+    @Test
+    public void usernamesDifferingOnlyInCaseOrSpacesAreOneEmployee() {
+        Map<String, Map<String, String>> devices = new HashMap<>();
+        devices.put("d1", Collections.singletonMap("username", "User.One"));
+        devices.put("d2", Collections.singletonMap("username", " user.one "));
+        devices.put("d3", Collections.singletonMap("username", "user.two"));
+        AtlasPeople people = AtlasPeople.of(devices, users("USER.ONE", "Platform"));
+        assertEquals(1, people.usersOf(Arrays.asList("d1", "d2")).size());
+        assertEquals("Platform", people.teamOfDevice("d2"));
+        assertEquals(1, people.membersByTeam().get("Platform").size());
+        assertEquals(1, people.membersByTeam().get(AtlasPeople.UNTAGGED_TEAM).size());
+    }
 }

@@ -404,9 +404,10 @@ public class AtlasPeopleService {
             snapshot.devicesByLowerName.put(device.key, device);
         }
 
-        if (bundle != null && bundle.userTags != null) {
+        Map<String, List<DeviceTag>> tagsByUser = tagsByLowerUser(bundle);
+        if (!tagsByUser.isEmpty()) {
             for (DeviceRow device : snapshot.devicesByLowerName.values()) {
-                List<DeviceTag> tags = bundle.userTags.get(device.username);
+                List<DeviceTag> tags = tagsByUser.get(device.username.toLowerCase(Locale.ROOT));
                 if (tags == null) continue;
                 for (DeviceTag tag : tags) {
                     if (tag == null || tag.getKey() == null || tag.getValue() == null) continue;
@@ -565,7 +566,8 @@ public class AtlasPeopleService {
             boolean browser = InsightUtil.hasTag(c, Constants.AKTO_BROWSER_LLM_TAG);
             DeviceRow device = browser ? null : devicesByLowerName.get(hostDevice.toLowerCase(Locale.ROOT));
             if (!browser && device == null) continue;
-            if (ranged && !seenInWindow(bundle.collectionLastTrafficSeen.get(c.getId()), startTs, endTs)) continue;
+            // A tool found only by a config scan has no traffic, so its creation time counts, as in the AI inventory and the Overview.
+            if (ranged && !seenInWindow(bundle.collectionLastTrafficSeen.getOrDefault(c.getId(), c.getStartTs()), startTs, endTs)) continue;
 
             String[] parts = c.getHostName().split("\\.");
             ToolRow tool = new ToolRow();
@@ -786,6 +788,16 @@ public class AtlasPeopleService {
         target.merge("low", counts.getLow(), Integer::sum);
     }
 
+    // agent_users tags by lower-cased username, so they match a device's user whatever its case (as on the Overview).
+    private static Map<String, List<DeviceTag>> tagsByLowerUser(InsightDataBundle bundle) {
+        Map<String, List<DeviceTag>> tags = new HashMap<>();
+        if (bundle == null || bundle.userTags == null) return tags;
+        bundle.userTags.forEach((user, userTags) -> {
+            if (user != null && userTags != null) tags.putIfAbsent(user.trim().toLowerCase(Locale.ROOT), userTags);
+        });
+        return tags;
+    }
+
     // Groups devices by lowercase username into employees and attaches team tags from agent_users.
     private static List<EmployeeRow> buildEmployees(List<DeviceRow> devices, InsightDataBundle bundle) {
         Map<String, EmployeeRow> byUsername = new LinkedHashMap<>();
@@ -808,9 +820,10 @@ public class AtlasPeopleService {
                 employee.violationsBySeverity.merge(severity, device.violationsBySeverity.get(severity), Integer::sum);
             }
         }
-        if (bundle != null && bundle.userTags != null) {
+        Map<String, List<DeviceTag>> tagsByUser = tagsByLowerUser(bundle);
+        if (!tagsByUser.isEmpty()) {
             for (EmployeeRow employee : byUsername.values()) {
-                List<DeviceTag> tags = bundle.userTags.get(employee.username);
+                List<DeviceTag> tags = tagsByUser.get(employee.username.toLowerCase(Locale.ROOT));
                 if (tags == null) continue;
                 for (DeviceTag tag : tags) {
                     if (tag != null && tag.getKey() != null && tag.getValue() != null) {
