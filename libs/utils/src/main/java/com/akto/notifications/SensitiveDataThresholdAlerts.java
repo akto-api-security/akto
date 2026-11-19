@@ -54,34 +54,65 @@ public class SensitiveDataThresholdAlerts {
      */
     public static final int RESEND_AFTER_SECONDS = 86400;
 
-    /** Totals per collection for one type from an hour on, above a count. Abstracted for tests. */
-    public interface CountSource {
-        Map<Integer, Long> countsByCollectionAbove(String subType, int fromHour, long moreThan);
+    /** Per (caller, callee) totals for one type from an hour on. Abstracted for tests. */
+    public interface EdgeSource {
+        List<SensitiveDataCountDao.Edge> edgeCountsSince(String subType, int fromHour);
+    }
+
+    /** Which end of a call a breach is about. */
+    public enum Role {
+        /** The service that sent the data, summed across everyone it sent to. */
+        SENDER,
+        /** The service that received it, summed across everyone that sent to it. */
+        RECEIVER
     }
 
     public static class Breach {
         final String subType;
+        final Role role;
+        /** The breaching service: the sender for a SENDER breach, the receiver for a RECEIVER one. */
         final int apiCollectionId;
         final long count;
         final int threshold;
         final int windowDays;
+        /** The other end, broken down: where it sent to, or who sent to it. Largest first. */
+        final List<Peer> peers;
 
-        Breach(String subType, int apiCollectionId, long count, int threshold, int windowDays) {
+        Breach(String subType, Role role, int apiCollectionId, long count, int threshold, int windowDays,
+               List<Peer> peers) {
             this.subType = subType;
+            this.role = role;
             this.apiCollectionId = apiCollectionId;
             this.count = count;
             this.threshold = threshold;
             this.windowDays = windowDays;
+            this.peers = peers;
         }
 
         String alertKey() {
-            return keyFor(subType, apiCollectionId);
+            return keyFor(subType, role, apiCollectionId);
         }
     }
 
-    /** Used as a field name inside a document, so it must not contain '.' or '$'. */
-    static String keyFor(String subType, int apiCollectionId) {
-        return subType.replace('.', '_').replace('$', '_') + "|" + apiCollectionId;
+    /** One service at the other end of a breaching service's traffic. */
+    public static class Peer {
+        final int apiCollectionId;
+        final long count;
+
+        Peer(int apiCollectionId, long count) {
+            this.apiCollectionId = apiCollectionId;
+            this.count = count;
+        }
+    }
+
+    /**
+     * Used as a field name inside a document, so it must not contain '.' or '$'.
+     *
+     * The role is part of the key: one service can breach as a sender and as a receiver at once,
+     * and those are two different alerts that must not suppress each other.
+     */
+    static String keyFor(String subType, Role role, int apiCollectionId) {
+        return subType.replace('.', '_').replace('$', '_') + "|" + role.name() + "|" + apiCollectionId;
     }
 
     private SensitiveDataThresholdAlerts() {
@@ -128,17 +159,18 @@ public class SensitiveDataThresholdAlerts {
 
     static void evaluate(CustomWebhook webhook, int now) {
         List<Breach> breaches = findBreaches(webhook.getSensitiveDataAlertRules(),
-                webhook.getSensitiveDataAlertedAt(), now, SensitiveDataCountDao.instance::countsByCollectionAbove);
+                webhook.getSensitiveDataAlertedAt(), now, SensitiveDataCountDao.instance::edgeCountsSince);
         if (breaches.isEmpty()) return;
 
-        // Only collections with a service tag are alerted on.
+        // An alert names both ends of a call, so a breach on a collection that cannot be named
+        // would read as a bare hash. Those are dropped rather than sent half-legible.
         Map<Integer, String> names = collectionNames(breaches);
-        List<Breach> tagged = new ArrayList<>();
+        List<Breach> named = new ArrayList<>();
         for (Breach b : breaches) {
-            if (names.containsKey(b.apiCollectionId)) tagged.add(b);
+            if (names.containsKey(b.apiCollectionId)) named.add(b);
         }
-        if (tagged.isEmpty()) return;
-        breaches = tagged;
+        if (named.isEmpty()) return;
+        breaches = named;
 
         List<String> errors = new ArrayList<>();
         OriginalHttpResponse response = WebhookSender.sendCustomWebhook(webhook,
@@ -159,11 +191,19 @@ public class SensitiveDataThresholdAlerts {
     }
 
     /**
-     * The (type, collection) pairs above their rule's threshold that have not alerted in the last
+     * The breaches above their rule's threshold that have not alerted in the last
      * {@link #RESEND_AFTER_SECONDS}.
+     *
+     * One pass over the (caller, callee) totals yields both views: a service breaches as a SENDER
+     * on what it sent in total, and as a RECEIVER on what it received in total. Summing both from
+     * the same rows is what lets one alert name both ends - and means the two views cannot
+     * disagree about the traffic they describe.
+     *
+     * The same traffic appears in both views by design: a sender's total includes what each of its
+     * receivers counts. Alert totals therefore do not sum to distinct traffic.
      */
     static List<Breach> findBreaches(List<SensitiveDataAlertRule> rules, Map<String, Integer> alertedAt,
-                                     int now, CountSource counts) {
+                                     int now, EdgeSource edges) {
         if (rules == null || rules.isEmpty()) return Collections.emptyList();
         Map<String, Integer> lastAlerted = alertedAt == null ? Collections.<String, Integer>emptyMap() : alertedAt;
 
@@ -173,25 +213,63 @@ public class SensitiveDataThresholdAlerts {
 
             int windowSeconds = rule.getWindowDays() * 86400;
             int fromHour = SensitiveDataCount.hourOf(now - windowSeconds);
-            Map<Integer, Long> above = counts.countsByCollectionAbove(rule.getSubType(), fromHour, rule.getThreshold());
 
-            for (Map.Entry<Integer, Long> e : above.entrySet()) {
-                Integer last = lastAlerted.get(keyFor(rule.getSubType(), e.getKey()));
-                if (last != null && now - last < RESEND_AFTER_SECONDS) continue;
-                breaches.add(new Breach(rule.getSubType(), e.getKey(), e.getValue(), rule.getThreshold(), rule.getWindowDays()));
+            List<SensitiveDataCountDao.Edge> window = edges.edgeCountsSince(rule.getSubType(), fromHour);
+            if (window == null || window.isEmpty()) continue;
+
+            // sender -> (receiver -> count), and the mirror image of it
+            Map<Integer, Map<Integer, Long>> bySender = new LinkedHashMap<>();
+            Map<Integer, Map<Integer, Long>> byReceiver = new LinkedHashMap<>();
+            for (SensitiveDataCountDao.Edge edge : window) {
+                if (edge == null || edge.count <= 0) continue;
+                bySender.computeIfAbsent(edge.senderCollectionId, k -> new LinkedHashMap<>())
+                        .merge(edge.apiCollectionId, edge.count, Long::sum);
+                byReceiver.computeIfAbsent(edge.apiCollectionId, k -> new LinkedHashMap<>())
+                        .merge(edge.senderCollectionId, edge.count, Long::sum);
             }
+
+            collectBreaches(breaches, rule, Role.SENDER, bySender, lastAlerted, now);
+            collectBreaches(breaches, rule, Role.RECEIVER, byReceiver, lastAlerted, now);
         }
         return breaches;
     }
 
+    /** Every service in {@code grouped} whose total is above the threshold and is not suppressed. */
+    private static void collectBreaches(List<Breach> breaches, SensitiveDataAlertRule rule, Role role,
+                                        Map<Integer, Map<Integer, Long>> grouped,
+                                        Map<String, Integer> lastAlerted, int now) {
+        for (Map.Entry<Integer, Map<Integer, Long>> e : grouped.entrySet()) {
+            long total = 0;
+            for (Long v : e.getValue().values()) total += v;
+            if (total <= rule.getThreshold()) continue;
+
+            Integer last = lastAlerted.get(keyFor(rule.getSubType(), role, e.getKey()));
+            if (last != null && now - last < RESEND_AFTER_SECONDS) continue;
+
+            List<Peer> peers = new ArrayList<>();
+            for (Map.Entry<Integer, Long> p : e.getValue().entrySet()) {
+                peers.add(new Peer(p.getKey(), p.getValue()));
+            }
+            peers.sort((a, b) -> Long.compare(b.count, a.count));
+
+            breaches.add(new Breach(rule.getSubType(), role, e.getKey(), total, rule.getThreshold(),
+                    rule.getWindowDays(), peers));
+        }
+    }
+
     private static Map<Integer, String> collectionNames(List<Breach> breaches) {
         List<Integer> ids = new ArrayList<>();
-        for (Breach b : breaches) ids.add(b.apiCollectionId);
+        for (Breach b : breaches) {
+            ids.add(b.apiCollectionId);
+            // The other end is named too, so an alert reads as "caller -> callee" rather than
+            // naming one service and a bare id.
+            for (Peer p : b.peers) ids.add(p.apiCollectionId);
+        }
         Map<Integer, String> names = new HashMap<>();
         try {
             for (ApiCollection c : ApiCollectionsDao.instance.getMetaForIds(ids)) {
-                String tag = c.getServiceTag();
-                if (tag != null && !tag.trim().isEmpty()) names.put(c.getId(), tag.trim());
+                String label = label(c);
+                if (label != null) names.put(c.getId(), label);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "could not load collection names for sensitive data alert");
@@ -200,25 +278,70 @@ public class SensitiveDataThresholdAlerts {
     }
 
     /**
+     * What to call a collection in an alert.
+     *
+     * The service tag is preferred because it is the identity the counts are keyed by: one service
+     * is one id whichever end of a call it is on. Collections routed by Host carry no tag, so the
+     * host is used instead - for these it is the service's real address and reads as well as a tag
+     * would. Note that it does NOT pool: two hosts of one service stay two destinations, each
+     * measured against the threshold alone.
+     *
+     * Null when there is nothing readable, which is what keeps a bare hash out of an alert.
+     */
+    static String label(ApiCollection c) {
+        String[] candidates = { c.getServiceTag(), c.getHostName(), c.getName() };
+        for (String candidate : candidates) {
+            if (candidate != null && !candidate.trim().isEmpty()) return candidate.trim();
+        }
+        return null;
+    }
+
+    /** A service's name, falling back to its id when no collection exists for it yet. */
+    private static String nameOf(Map<Integer, String> names, int apiCollectionId) {
+        return names.getOrDefault(apiCollectionId, String.valueOf(apiCollectionId));
+    }
+
+    /**
      * JSON with a summary "text" field, so the same payload also reads as a message when the
      * webhook URL is a Slack incoming webhook, plus the breaches as structured data.
+     *
+     * Every alert names both ends: the breaching service, and the services at the other end of its
+     * traffic with what each of them accounts for.
      */
     static String buildPayload(List<Breach> breaches, Map<Integer, String> names) {
         StringBuilder text = new StringBuilder("Akto: sensitive data threshold crossed");
         List<Map<String, Object>> alerts = new ArrayList<>();
         for (Breach b : breaches) {
-            String name = names.getOrDefault(b.apiCollectionId, String.valueOf(b.apiCollectionId));
-            text.append("\n• ").append(b.subType).append(" in ").append(name).append(": ")
-                    .append(b.count).append(" events in the last ").append(b.windowDays)
+            String name = nameOf(names, b.apiCollectionId);
+            boolean sending = b.role == Role.SENDER;
+
+            text.append("\n• ").append(b.subType).append(": ").append(name)
+                    .append(sending ? " sent " : " received ").append(b.count)
+                    .append(" events in the last ").append(b.windowDays)
                     .append(" days (threshold ").append(b.threshold).append(")");
+
+            List<Map<String, Object>> peers = new ArrayList<>();
+            for (Peer p : b.peers) {
+                String peerName = nameOf(names, p.apiCollectionId);
+                text.append("\n    ").append(sending ? name + " -> " + peerName : peerName + " -> " + name)
+                        .append(": ").append(p.count);
+
+                Map<String, Object> peer = new LinkedHashMap<>();
+                peer.put("apiCollectionId", p.apiCollectionId);
+                peer.put("apiCollectionName", peerName);
+                peer.put("count", p.count);
+                peers.add(peer);
+            }
 
             Map<String, Object> alert = new LinkedHashMap<>();
             alert.put("dataType", b.subType);
+            alert.put("role", b.role.name());
             alert.put("apiCollectionId", b.apiCollectionId);
             alert.put("apiCollectionName", name);
             alert.put("count", b.count);
             alert.put("threshold", b.threshold);
             alert.put("windowDays", b.windowDays);
+            alert.put(sending ? "destinations" : "sources", peers);
             alerts.add(alert);
         }
 

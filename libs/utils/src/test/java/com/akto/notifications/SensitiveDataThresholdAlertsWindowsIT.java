@@ -43,6 +43,9 @@ public class SensitiveDataThresholdAlertsWindowsIT {
 
     private static final int ACCOUNT = 1000000;
     private static final int HOUR = 3600;
+
+    /** The caller these fixtures attribute every count to. */
+    private static final int UPSTREAM = 987001;
     private static final Gson gson = new Gson();
     private static String receiver;
     private static String receiverLog;
@@ -68,14 +71,28 @@ public class SensitiveDataThresholdAlertsWindowsIT {
     private static int now() { return Context.now(); }
 
     /** A bucket {@code hoursAgo} hours back. */
+    /**
+     * One caller's events into {@code collection}.
+     *
+     * The caller is part of the key now, and a count with no identifiable caller is not counted at
+     * all, so these fixtures name one. Which caller it is does not affect what these tests are
+     * about - window boundaries - so they all share {@link #UPSTREAM}.
+     */
     private static void counts(int collection, String type, int hoursAgo, long count) {
         int hour = SensitiveDataCount.hourOf(now() - hoursAgo * HOUR);
         SensitiveDataCountDao.instance.bulkInc(
-                Collections.singletonList(new SensitiveDataCount(collection, type, hour, count)));
+                Collections.singletonList(new SensitiveDataCount(collection, UPSTREAM, type, hour, count)));
     }
 
+    /**
+     * This branch alerts only on collections that carry a service tag and names them by it, so a
+     * fixture without one produces no alert at all and every expectation here would read as a
+     * silent pass of nothing.
+     */
     private static void collection(int id, String name) {
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(id, name, now(), new HashSet<>(), name, 0, false, true));
+        ApiCollection c = new ApiCollection(id, name, now(), new HashSet<>(), name, 0, false, true);
+        c.setServiceTag(name);
+        ApiCollectionsDao.instance.insertOne(c);
     }
 
     private static int webhook(int id, SensitiveDataAlertRule... rules) {
@@ -110,6 +127,8 @@ public class SensitiveDataThresholdAlertsWindowsIT {
     private static Set<String> alertedPairs(Map<String, Object> request) {
         Set<String> pairs = new HashSet<>();
         for (Map<String, Object> a : (List<Map<String, Object>>) ((Map<String, Object>) request.get("json")).get("alerts")) {
+            // Only the receiving end: UPSTREAM breaches as a sender on the same traffic.
+            if (!"RECEIVER".equals(a.get("role"))) continue;
             pairs.add(a.get("dataType") + "|" + ((Number) a.get("apiCollectionId")).intValue()
                     + "|" + ((Number) a.get("count")).longValue());
         }
@@ -251,7 +270,7 @@ public class SensitiveDataThresholdAlertsWindowsIT {
         SensitiveDataThresholdAlerts.run();                 // same day: quiet
         assertEquals(1, received().size());
 
-        markAlerted(id, "T|1", now() - 25 * HOUR);          // a day later, still breaching
+        markAlerted(id, "T|RECEIVER|1", now() - 25 * HOUR);          // a day later, still breaching
         SensitiveDataThresholdAlerts.run();
         assertEquals(2, received().size());
     }
@@ -263,11 +282,15 @@ public class SensitiveDataThresholdAlertsWindowsIT {
         counts(1, "T", 1, 500);
         int id = webhook(351, rule("T", 10, 30));
 
-        markAlerted(id, "T|1", now() - 23 * HOUR);
+        // This one asserts that nothing at all is sent, so both ends have to be quiet: the same
+        // traffic breaches for c1 as the receiver and for UPSTREAM as the sender.
+        markAlerted(id, "T|RECEIVER|1", now() - 23 * HOUR);
+        markAlerted(id, "T|SENDER|" + UPSTREAM, now() - 23 * HOUR);
         SensitiveDataThresholdAlerts.run();
         assertEquals("23h since the last alert: still quiet", 0, received().size());
 
-        markAlerted(id, "T|1", now() - 25 * HOUR);
+        markAlerted(id, "T|RECEIVER|1", now() - 25 * HOUR);
+        markAlerted(id, "T|SENDER|" + UPSTREAM, now() - 25 * HOUR);
         SensitiveDataThresholdAlerts.run();
         assertEquals("25h since the last alert: alerts again", 1, received().size());
     }
@@ -279,7 +302,7 @@ public class SensitiveDataThresholdAlertsWindowsIT {
         counts(1, "T", 1, 500);
         counts(2, "T", 1, 500);
         int id = webhook(352, rule("T", 10, 30));
-        markAlerted(id, "T|1", now() - HOUR);        // c1 alerted an hour ago
+        markAlerted(id, "T|RECEIVER|1", now() - HOUR);        // c1 alerted an hour ago
         SensitiveDataThresholdAlerts.run();
         assertEquals(1, received().size());
         assertEquals(Collections.singleton("T|2|500"), alertedPairs(received().get(0)));
@@ -296,7 +319,7 @@ public class SensitiveDataThresholdAlertsWindowsIT {
         collection(1, "c1");
         counts(1, "T", 5 * 24 + 2, 500);             // the spike has aged out of a 5 day window
         int id = webhook(353, rule("T", 100, 5));
-        markAlerted(id, "T|1", now() - 25 * HOUR);   // and a day has passed since the last alert
+        markAlerted(id, "T|RECEIVER|1", now() - 25 * HOUR);   // and a day has passed since the last alert
         SensitiveDataThresholdAlerts.run();
         assertEquals("a day passing does not alert on its own", 0, received().size());
 
@@ -312,7 +335,7 @@ public class SensitiveDataThresholdAlertsWindowsIT {
         collection(1, "c1");
         counts(1, "T", 2, 60);                       // inside the window but under 100
         int id = webhook(354, rule("T", 100, 5));
-        markAlerted(id, "T|1", now() - 25 * HOUR);
+        markAlerted(id, "T|RECEIVER|1", now() - 25 * HOUR);
         SensitiveDataThresholdAlerts.run();
         assertEquals(0, received().size());
     }
