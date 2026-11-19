@@ -7,13 +7,15 @@
 // policy change reaches a remembered file at once; the TTL only bounds how long an entry lives.
 // Only inspected allows are stored: a blocked file, or one let through without its content being
 // checked, is checked again. Every Redis failure reads as a miss, so the cache never lets a file
-// through on its own.
+// through on its own. An entry holds the text extracted from the file, so a caller that records the
+// file's content (a trace) still has it when the file is served from the cache.
 package filecache
 
 import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"time"
 
 	redis "github.com/redis/go-redis/v9"
@@ -21,15 +23,16 @@ import (
 )
 
 const (
-	keyPrefix = "guardrails:file-allowed:v1:"
+	keyPrefix = "guardrails:file-allowed:v2:"
 	// A slow Redis must not hold up a verdict: past this, the file is inspected as on a miss.
 	opTimeout = 200 * time.Millisecond
 )
 
-// Store remembers allowed files by key.
+// Store remembers allowed files by key, with the text extracted from each.
 type Store interface {
-	Allowed(ctx context.Context, key string) bool
-	Remember(ctx context.Context, key string)
+	// Lookup reports whether the file is remembered as allowed, and the text recorded for it.
+	Lookup(ctx context.Context, key string) (text string, ok bool)
+	Remember(ctx context.Context, key, text string)
 }
 
 // Key is the cache key for a file's bytes under a scope: whatever else the verdict depends on
@@ -59,21 +62,24 @@ func NewRedis(client *redis.Client, ttl time.Duration, logger *zap.Logger) Store
 	return &redisStore{client: redis.NewClient(&opts), ttl: ttl, logger: logger}
 }
 
-func (s *redisStore) Allowed(ctx context.Context, key string) bool {
+func (s *redisStore) Lookup(ctx context.Context, key string) (string, bool) {
 	ctx, cancel := context.WithTimeout(ctx, opTimeout)
 	defer cancel()
-	n, err := s.client.Exists(ctx, key).Result()
+	text, err := s.client.Get(ctx, key).Result()
+	if errors.Is(err, redis.Nil) {
+		return "", false
+	}
 	if err != nil {
 		s.logger.Warn("File cache lookup failed; inspecting the file", zap.Error(err))
-		return false
+		return "", false
 	}
-	return n == 1
+	return text, true
 }
 
-func (s *redisStore) Remember(ctx context.Context, key string) {
+func (s *redisStore) Remember(ctx context.Context, key, text string) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), opTimeout)
 	defer cancel()
-	if err := s.client.Set(ctx, key, "1", s.ttl).Err(); err != nil {
+	if err := s.client.Set(ctx, key, text, s.ttl).Err(); err != nil {
 		s.logger.Warn("File cache write failed; the file will be inspected again", zap.Error(err))
 	}
 }

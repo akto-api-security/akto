@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
@@ -25,6 +26,10 @@ import (
 )
 
 const chunkRetryDelay = 200 * time.Millisecond
+
+// maxFileContentBytes caps the extracted text kept per file for callers that record it (a
+// trace) and for the file cache that serves it back on a repeat.
+const maxFileContentBytes = 64 * 1024
 
 // Redirects disabled to prevent SSRF via open-redirect chains.
 var urlFetchClient = &http.Client{
@@ -59,6 +64,8 @@ type fileResult struct {
 	// NotCacheable: allowed, but the file cache must not vouch for it. An image whose OCR read
 	// no text - a misread there would otherwise be served as a clean pass for the cache TTL.
 	NotCacheable bool
+	// Content is the text extracted from the file, cut at maxFileContentBytes.
+	Content string
 }
 
 // ValidateFile handles POST /api/validate/file (multipart "file" uploads and/or "url" fields).
@@ -174,7 +181,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		zap.Int("fileCount", len(inputs)),
 		zap.Int("allowedCount", allowedCount),
 		zap.String("sessionID", sessionID))
-	h.writeMultiFileResponse(c, fileResults, dropped)
+	h.writeMultiFileResponse(c, fileResults, dropped, c.PostForm("return_content") == "true")
 }
 
 // fileCacheScope is everything besides a file's bytes that its verdict depends on: the account,
@@ -214,14 +221,14 @@ func (h *ValidationHandler) validateCachedFile(ctx context.Context, input *fileI
 		return h.validateSingleFile(ctx, input, meta, sessionID, requestID)
 	}
 	key := filecache.Key(scope, data)
-	if h.fileCache.Allowed(ctx, key) {
+	if text, ok := h.fileCache.Lookup(ctx, key); ok {
 		h.logger.Info("File allowed from cache; already inspected under the same policies",
 			zap.String("file", input.Filename), zap.String("sessionID", sessionID))
-		return &fileResult{Filename: input.Filename, Allowed: true}
+		return &fileResult{Filename: input.Filename, Allowed: true, Content: text}
 	}
 	fr := h.validateSingleFile(ctx, input, meta, sessionID, requestID)
 	if fr.Allowed && !fr.Uninspected && !fr.NotCacheable {
-		h.fileCache.Remember(ctx, key)
+		h.fileCache.Remember(ctx, key, fr.Content)
 	}
 	return fr
 }
@@ -261,6 +268,7 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 
 	text := fileprocessor.SanitizeText(rawText)
 	rawText = "" // allow GC to reclaim the unsanitized copy
+	fr.Content = truncateUTF8(text, maxFileContentBytes)
 	if strings.TrimSpace(text) == "" {
 		_, fr.NotCacheable = processor.(*fileprocessor.ImageProcessor)
 		h.logger.Warn("No text extracted; allowing file", zap.String("file", input.Filename), zap.Bool("ocr", fr.NotCacheable))
@@ -642,6 +650,16 @@ type fileValidationVerdict struct {
 	// content being checked (see fileResult.Uninspected, dropped inputs and allowFile). Such
 	// an allow says nothing about the content, so a caller must not remember it as safe.
 	Uninspected bool `json:"uninspected,omitempty"`
+	// Files is sent only when the caller asks for it (return_content=true): what was read from
+	// each inspected file, for callers that record it, as data-ingestion does for traces.
+	Files []fileContent `json:"files,omitempty"`
+}
+
+type fileContent struct {
+	Name        string `json:"name"`
+	Allowed     bool   `json:"allowed"`
+	Uninspected bool   `json:"uninspected,omitempty"`
+	Content     string `json:"content"`
 }
 
 func newFileValidationVerdict(r *mcp.ValidationResult) fileValidationVerdict {
@@ -658,13 +676,30 @@ func newFileValidationVerdict(r *mcp.ValidationResult) fileValidationVerdict {
 	}
 }
 
-// dropped reports inputs that were cut, uninspected, by the file-count limit.
-func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult, dropped bool) {
+// dropped reports inputs that were cut, uninspected, by the file-count limit; withContent adds
+// each file's extracted text.
+func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult, dropped, withContent bool) {
 	verdict := newFileValidationVerdict(fileVerdict(results))
 	if verdict.Allowed {
 		verdict.Uninspected = dropped || anyUninspected(results)
 	}
+	if withContent {
+		for _, fr := range results {
+			verdict.Files = append(verdict.Files, fileContent{Name: fr.Filename, Allowed: fr.Allowed, Uninspected: fr.Uninspected, Content: fr.Content})
+		}
+	}
 	c.JSON(http.StatusOK, verdict)
+}
+
+// truncateUTF8 cuts s to at most n bytes without splitting a character.
+func truncateUTF8(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
 }
 
 func anyUninspected(results []*fileResult) bool {

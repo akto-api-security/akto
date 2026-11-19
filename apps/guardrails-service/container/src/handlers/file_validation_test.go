@@ -95,7 +95,7 @@ func TestValidateFileInspectionFailures(t *testing.T) {
 			}, &models.ValidateRequestParams{}, "", "")
 			recorder := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(recorder)
-			h.writeMultiFileResponse(c, []*fileResult{fr}, false)
+			h.writeMultiFileResponse(c, []*fileResult{fr}, false, false)
 			assertFileAllowed(t, recorder, true)
 			assertUninspected(t, recorder, tc.uninspected)
 		})
@@ -141,7 +141,7 @@ func TestWriteMultiFileResponseVerdict(t *testing.T) {
 	t.Run("allow carries no reason or behaviour", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(recorder)
-		h.writeMultiFileResponse(c, []*fileResult{{Filename: "a.txt", Allowed: true}}, false)
+		h.writeMultiFileResponse(c, []*fileResult{{Filename: "a.txt", Allowed: true}}, false, false)
 
 		var resp mcp.ValidationResult
 		if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
@@ -164,7 +164,7 @@ func TestWriteMultiFileResponseVerdict(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(recorder)
-			h.writeMultiFileResponse(c, tc.results, tc.dropped)
+			h.writeMultiFileResponse(c, tc.results, tc.dropped, false)
 			assertFileAllowed(t, recorder, true)
 			assertUninspected(t, recorder, true)
 		})
@@ -180,7 +180,7 @@ func TestWriteMultiFileResponseVerdict(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(recorder)
 		// The first blocked file wins even when an allowed file precedes it.
-		h.writeMultiFileResponse(c, []*fileResult{{Allowed: true, Uninspected: true}, blocked}, true)
+		h.writeMultiFileResponse(c, []*fileResult{{Allowed: true, Uninspected: true}, blocked}, true, false)
 
 		var resp mcp.ValidationResult
 		if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
