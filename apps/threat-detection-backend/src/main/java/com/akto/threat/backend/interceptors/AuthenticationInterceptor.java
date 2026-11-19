@@ -60,6 +60,10 @@ public class AuthenticationInterceptor implements Handler<RoutingContext> {
       Jws<Claims> claims =
           Jwts.parserBuilder().setSigningKey(publicKey).build().parseClaimsJws(token);
       int accountId = (int) claims.getBody().get("accountId");
+      if (TokenRevocation.isRevoked(accountId, TokenRevocation.tokenIdOf(claims.getBody(), token))) {
+        context.response().setStatusCode(401).end("The access token has been revoked");
+        return;
+      }
       context.put("accountId", accountId + "");
       context.next();
     } catch (Exception e) {
