@@ -2833,7 +2833,6 @@ public class InitializerListener implements ServletContextListener {
                     ApiInfoBackfillJob.apiInfoBackfillScheduler();
                     DiscoveredTimestampBackfillJob.discoveredTimestampBackfillScheduler();
                     ModuleInfoCleanupJob.runOnce();
-                    // api_tokens is a single collection in the common DB, so once per start is enough
                     ApiTokensDao.instance.createIndicesIfAbsent();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
