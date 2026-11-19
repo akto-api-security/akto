@@ -29,6 +29,11 @@ public class BedrockAgentTraceParser implements TraceParser {
     private static final String FIELD_BEDROCK_POLICIES = "bedrock-role-policies";
     private static final String FIELD_HARNESS_POLICIES = "harness-role-policies";
 
+    // A node's position in the User -> ... -> leaf chain, carried in the edge metadata so
+    // ServiceGraphBuilder can tell whether an incoming record describes the call in more
+    // detail than the one that created the node. Not a HOVER_FIELDS key, so it never renders.
+    public static final String CHAIN_DEPTH = "chainDepth";
+
     // CloudWatch's trace data has no structured success/failure field for a tool
     // result — only free-text. These are the phrasings actually observed across real
     // tool failures (validation errors, missing-session lookups, etc.); this is a
@@ -103,23 +108,84 @@ public class BedrockAgentTraceParser implements TraceParser {
      */
     private List<String> extractRolePolicies(JsonNode awsMetadata) {
         for (String field : new String[]{FIELD_HARNESS_POLICIES, FIELD_BEDROCK_POLICIES}) {
-            String raw = awsMetadata.path(field).asText("").trim();
-            if (raw.isEmpty()) {
-                continue;
-            }
-
-            List<String> policies = new ArrayList<>();
-            for (String part : raw.split(",")) {
-                String policy = part.trim();
-                if (!policy.isEmpty()) {
-                    policies.add(policy);
-                }
-            }
+            List<String> policies = splitPolicies(awsMetadata.path(field).asText(""));
             if (!policies.isEmpty()) {
                 return policies;
             }
         }
         return Collections.emptyList();
+    }
+
+    /** One comma-separated string in, the non-empty names out. See {@link #extractRolePolicies}. */
+    private List<String> splitPolicies(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<String> policies = new ArrayList<>();
+        for (String part : raw.split(",")) {
+            String policy = part.trim();
+            if (!policy.isEmpty()) {
+                policies.add(policy);
+            }
+        }
+        return policies;
+    }
+
+    /** A trimmed tag value, or "" — so every caller can test emptiness without a null check. */
+    private static String tagValue(Map<String, String> tagsMap, String key) {
+        if (tagsMap == null) {
+            return "";
+        }
+        String value = tagsMap.get(key);
+        return value != null ? value.trim() : "";
+    }
+
+    /**
+     * The gateway's role, as a name. Prefers the ARN's last segment over the older
+     * "gateway-role-resources" tag, which is a list of everything the role can act on — useful
+     * detail, but an ARN blob where a reader expects a role.
+     */
+    private String gatewayRole(Map<String, String> tagsMap) {
+        String arn = tagValue(tagsMap, Constants.AI_AGENT_TAG_GATEWAY_EXECUTION_ROLE_ARN);
+        if (!arn.isEmpty()) {
+            String name = arn.substring(arn.lastIndexOf('/') + 1);
+            if (!name.isEmpty()) {
+                return name;
+            }
+        }
+        return tagValue(tagsMap, Constants.AI_AGENT_TAG_GATEWAY_ROLE);
+    }
+
+    /**
+     * The gateway's policy names, inline first (an AgentCore gateway service role keeps its
+     * grants inline and attaches nothing, so the attached list is empty exactly when the inline
+     * one matters). Falls back to whatever the caller decided is attributable to the gateway.
+     */
+    private List<String> gatewayPolicies(Map<String, String> tagsMap, List<String> fallback) {
+        for (String key : new String[]{Constants.AI_AGENT_TAG_GATEWAY_INLINE_POLICIES,
+                                       Constants.AI_AGENT_TAG_GATEWAY_POLICIES}) {
+            List<String> policies = splitPolicies(tagValue(tagsMap, key));
+            if (!policies.isEmpty()) {
+                return policies;
+            }
+        }
+        return fallback;
+    }
+
+    /** One chain hop's edge metadata. Empty role/policies/host are left out rather than blanked. */
+    private Map<String, Object> nodeMetadata(String type, String edgeParam, String role,
+            List<String> policies, String host) {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("type", type);
+        metadata.put("edgeParam", edgeParam);
+        metadata.put("role", role);
+        if (!policies.isEmpty()) {
+            metadata.put("policies", policies);
+        }
+        if (!host.isEmpty()) {
+            metadata.put("host", host);
+        }
+        return metadata;
     }
 
     @Override
@@ -223,18 +289,23 @@ public class BedrockAgentTraceParser implements TraceParser {
     }
 
     /**
+     * Builds the call chain as an ordered list of hops — User -> [Gateway] -> [AI Agent] ->
+     * [MCP Server] — emitting one edge per consecutive pair, with tools hanging off the last
+     * hop. Each hop is added only when the record actually identifies it, so a request that
+     * names fewer participants simply yields a shorter chain rather than a different shape.
+     *
      * @param botName see {@link #parse(Object, String)}.
      * @param tagsMap the HTTP-level tags map. Reads, all optional:
      *        <ul>
-     *        <li>"gateway-name" + "gateway-role-resources" — when both present, an extra Gateway
-     *        node is spliced into the chain between User and the agent node, showing the latter
-     *        as the Gateway node's role.</li>
-     *        <li>AKTO_MCP_SERVER_TAG ("mcp-server") — marks that a Gateway fronts an MCP server
-     *        routed straight to it rather than to a distinct orchestrating agent, so the node
-     *        after the gateway should read as an MCP Server, not an AI Agent.</li>
-     *        <li>"mcp-server-host" — the MCP server's real host, used as that node's identity/name
-     *        in place of the bot-name fallback, since a Gateway-fronted MCP target has no "bot" of
-     *        its own.</li>
+     *        <li>"gateway-name", plus a gateway role from "gateway-execution-role-arn" (or the
+     *        older "gateway-role-resources") — adds the Gateway hop. A gateway node with no
+     *        role to show isn't worth drawing, hence the second requirement.</li>
+     *        <li>"agent-name" — the agent that actually made this call. One gateway serves many
+     *        agents, so only the per-request principal separates them; this is the sole source
+     *        for the AI Agent hop once an MCP target has claimed "bot-name".</li>
+     *        <li>AKTO_MCP_SERVER_TAG ("mcp-server") + "mcp-server-host" — the MCP target the
+     *        call reached, added as the hop after the agent and named after its real host,
+     *        since a Gateway-fronted target has no "bot" of its own.</li>
      *        </ul>
      */
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input, String botName,
@@ -246,60 +317,89 @@ public class BedrockAgentTraceParser implements TraceParser {
                 throw new Exception("Invalid Bedrock Agent trace for service graph extraction");
             }
 
-            String gatewayName = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_GATEWAY_NAME) : null;
-            String gatewayRole = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_GATEWAY_ROLE) : null;
+            String gatewayName = tagValue(tagsMap, Constants.AI_AGENT_TAG_GATEWAY_NAME);
+            String agentName = tagValue(tagsMap, Constants.AI_AGENT_TAG_AGENT_NAME);
+            String mcpServerHost = tagValue(tagsMap, Constants.AKTO_MCP_SERVER_HOST_TAG);
             boolean isMcpServer = tagsMap != null && tagsMap.containsKey(Constants.AKTO_MCP_SERVER_TAG);
-            String mcpServerHost = tagsMap != null ? tagsMap.get(Constants.AKTO_MCP_SERVER_HOST_TAG) : null;
 
             String agentType = resolveAgentType(awsMetadata);
 
-            Map<String, ServiceGraphEdgeInfo> edges = new HashMap<>();
-
-            // Extract model edge
             String model = awsMetadata.path("model").asText("unknown");
             String executionRole = extractExecutionRoleValue(awsMetadata);
             List<String> rolePolicies = extractRolePolicies(awsMetadata);
 
-            // Node identity is the bot name alone; the role and its policies live in the edge
-            // metadata below. The map key IS the node id, so folding text that changes (a policy
-            // attached to the role, a reordered list) into the name forks a second node for the
-            // same agent, and the merge in ServiceGraphBuilder never removes the old one.
-            // A Gateway-fronted MCP target has no "bot" of its own, so it's named after its real
-            // host instead — falling back to the bot-name/"Bedrock Agent" default only when even
-            // that tag is missing.
-            String trimmedMcpServerHost = mcpServerHost != null ? mcpServerHost.trim() : "";
-            boolean hasMcpServerHost = !trimmedMcpServerHost.isEmpty();
-            String sourceService = (isMcpServer && hasMcpServerHost) ? trimmedMcpServerHost : extractBotName(botName);
+            boolean hasMcpServer = isMcpServer && !mcpServerHost.isEmpty();
 
-            // Keyed and targeted by the same name — the "User -> agent" edge is what gives the
-            // node its type; a node that is only ever a source has no type and the UI falls
-            // back to "Internal Service" (same pattern as buildServiceGraphFromSpans in
-            // HttpCallParser, used by Copilot/Snowflake).
-            Map<String, Object> agentMetadata = new HashMap<>();
-            agentMetadata.put("type", isMcpServer ? TracingConstants.SpanKind.MCP_SERVER : TracingConstants.SpanKind.AGENT);
-            agentMetadata.put("edgeParam", isMcpServer ? "MCP Server" : "AI Agent");
-            agentMetadata.put("role", executionRole);
-            if (!rolePolicies.isEmpty()) {
-                agentMetadata.put("policies", rolePolicies);
-            }
-            if (isMcpServer && hasMcpServerHost) {
-                agentMetadata.put("host", trimmedMcpServerHost);
-            }
+            // A gateway-fronted MCP record puts its target in bot-name (as "<server>.<gateway>"),
+            // so bot-name must not become an agent node there — only an explicit agent-name may.
+            // Everywhere else bot-name is still the agent's own identity, exactly as before.
+            String agentNode = !agentName.isEmpty() ? agentName
+                : (hasMcpServer ? "" : extractBotName(botName));
 
-            // Only known when both tags are present — a gateway node with no role to show
-            // isn't worth splicing in, so fall back to the plain User -> Agent edge.
-            boolean hasGateway = gatewayName != null && !gatewayName.isEmpty()
-                && gatewayRole != null && !gatewayRole.isEmpty();
+            String gatewayRole = gatewayRole(tagsMap);
+            boolean hasGateway = !gatewayName.isEmpty() && !gatewayRole.isEmpty();
+
+            // The gateway's policies are only separable from the agent's when no agent is in the
+            // chain. The interceptor aliases the gateway's role onto the harness- keys, and a
+            // resolved agent overwrites them, so with an agent present the record does not carry
+            // the gateway's policy names at all and the Gateway node shows a role with no list.
+            List<String> gatewayPolicies = gatewayPolicies(tagsMap,
+                agentNode.isEmpty() ? rolePolicies : Collections.emptyList());
+
+            // Node identity is the name alone; role and policies live in the edge metadata. The
+            // map key IS the node id, so folding text that changes (a policy attached to the
+            // role, a reordered list) into the name forks a second node for the same thing, and
+            // the merge in ServiceGraphBuilder never removes the old one.
+            List<String> chain = new ArrayList<>();
+            Map<String, Map<String, Object>> metadataByNode = new HashMap<>();
+            chain.add("User");
+
             if (hasGateway) {
-                Map<String, Object> gatewayMetadata = new HashMap<>();
-                gatewayMetadata.put("type", TracingConstants.SpanKind.GATEWAY);
-                gatewayMetadata.put("edgeParam", "Gateway");
-                gatewayMetadata.put("role", gatewayRole);
-                edges.put(gatewayName, new ServiceGraphEdgeInfo("User", gatewayName, gatewayMetadata));
-                edges.put(sourceService, new ServiceGraphEdgeInfo(gatewayName, sourceService, agentMetadata));
-            } else {
-                edges.put(sourceService, new ServiceGraphEdgeInfo("User", sourceService, agentMetadata));
+                chain.add(gatewayName);
+                metadataByNode.put(gatewayName, nodeMetadata(TracingConstants.SpanKind.GATEWAY,
+                    "Gateway", gatewayRole, gatewayPolicies, ""));
             }
+            if (!agentNode.isEmpty()) {
+                chain.add(agentNode);
+                metadataByNode.put(agentNode, nodeMetadata(TracingConstants.SpanKind.AGENT,
+                    "AI Agent", executionRole, rolePolicies, ""));
+            }
+            if (hasMcpServer) {
+                // The gateway's identity is what reaches the backend, so that is the role worth
+                // showing here. With no Gateway hop the harness- keys hold that same role by the
+                // aliasing above, which is what this node already showed before the chain existed.
+                chain.add(mcpServerHost);
+                metadataByNode.put(mcpServerHost, nodeMetadata(TracingConstants.SpanKind.MCP_SERVER,
+                    "MCP Server",
+                    hasGateway ? gatewayRole : executionRole,
+                    hasGateway ? gatewayPolicies : rolePolicies,
+                    mcpServerHost));
+            }
+            // Every hop above can decline, and a chain of just "User" has nothing to draw.
+            if (chain.size() == 1) {
+                String fallback = extractBotName(botName);
+                chain.add(fallback);
+                metadataByNode.put(fallback, nodeMetadata(TracingConstants.SpanKind.AGENT,
+                    "AI Agent", executionRole, rolePolicies, ""));
+            }
+
+            Map<String, ServiceGraphEdgeInfo> edges = new HashMap<>();
+            // Keyed and targeted by the same name — the incoming edge is what gives a node its
+            // type; a node that is only ever a source has no type and the UI falls back to
+            // "Internal Service" (same pattern as buildServiceGraphFromSpans in HttpCallParser,
+            // used by Copilot/Snowflake).
+            for (int depth = 1; depth < chain.size(); depth++) {
+                String node = chain.get(depth);
+                Map<String, Object> metadata = metadataByNode.get(node);
+                metadata.put(CHAIN_DEPTH, depth);
+                edges.put(node, new ServiceGraphEdgeInfo(chain.get(depth - 1), node, metadata));
+            }
+
+            String leaf = chain.get(chain.size() - 1);
+            int leafDepth = chain.size() - 1;
+            // A model is called by the agent; with no agent hop the leaf is the best stand-in.
+            String modelCaller = !agentNode.isEmpty() ? agentNode : leaf;
+            int modelDepth = chain.indexOf(modelCaller) + 1;
 
             // LLM Call edge. Skipped when the model is unknown: a gateway
             // interceptor sees MCP tool traffic and never a model call, so it sends
@@ -310,7 +410,8 @@ public class BedrockAgentTraceParser implements TraceParser {
                 Map<String, Object> llmMetadata = new HashMap<>();
                 llmMetadata.put("type", "llmCall");
                 llmMetadata.put("edgeParam", "Call to model");
-                edges.put(model, new ServiceGraphEdgeInfo(sourceService, model, llmMetadata));
+                llmMetadata.put(CHAIN_DEPTH, modelDepth);
+                edges.put(model, new ServiceGraphEdgeInfo(modelCaller, model, llmMetadata));
             }
 
             // Add tools edge for AgentCore
@@ -328,7 +429,8 @@ public class BedrockAgentTraceParser implements TraceParser {
                         toolsMetadata.put("type", isMcpServer ? TracingConstants.SpanKind.MCP_TOOL : TracingConstants.SpanKind.TOOL);
                         toolsMetadata.put("edgeParam", isMcpServer ? "MCP tool call" : "tool call");
                         toolsMetadata.put("totalToolCalls", totalToolCalls);
-                        edges.put(toolName, new ServiceGraphEdgeInfo(sourceService, toolName, toolsMetadata));
+                        toolsMetadata.put(CHAIN_DEPTH, leafDepth + 1);
+                        edges.put(toolName, new ServiceGraphEdgeInfo(leaf, toolName, toolsMetadata));
                     }
                 } else {
                     // No tool was actually called in this request — fall back to the
@@ -338,7 +440,8 @@ public class BedrockAgentTraceParser implements TraceParser {
                         Map<String, Object> toolsMetadata = new HashMap<>();
                         toolsMetadata.put("type", isMcpServer ? TracingConstants.SpanKind.MCP_TOOL : TracingConstants.SpanKind.TOOL);
                         toolsMetadata.put("edgeParam", isMcpServer ? "configured MCP tools" : "configured tools");
-                        edges.put(tools, new ServiceGraphEdgeInfo(sourceService, tools, toolsMetadata));
+                        toolsMetadata.put(CHAIN_DEPTH, leafDepth + 1);
+                        edges.put(tools, new ServiceGraphEdgeInfo(leaf, tools, toolsMetadata));
                     }
                 }
 
@@ -348,7 +451,8 @@ public class BedrockAgentTraceParser implements TraceParser {
                     Map<String, Object> skillsMetadata = new HashMap<>();
                     skillsMetadata.put("type", "skill");
                     skillsMetadata.put("edgeParam", "configured skills");
-                    edges.put(skills, new ServiceGraphEdgeInfo(sourceService, skills, skillsMetadata));
+                    skillsMetadata.put(CHAIN_DEPTH, leafDepth + 1);
+                    edges.put(skills, new ServiceGraphEdgeInfo(leaf, skills, skillsMetadata));
                 }
             }
 
