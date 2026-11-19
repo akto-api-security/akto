@@ -143,6 +143,19 @@ public class TokenRegistryMongoTest extends MongoBasedTest {
     }
 
     @Test
+    public void shortLivedInternalTokensAreNotMarkedUsedEither() {
+        int iat = now.get();
+        Claims claims = legacyClaims(iat, iat + 3 * 3600);
+        String raw = "header.payload.internal2";
+        String id = TokenRegistry.effectiveId(claims, raw);
+        AuthTokensDao.instance.insertOne(token(id, AuthToken.STATUS_ACTIVE, 0));
+
+        TokenRegistry.recordUse(claims, raw, id);
+
+        assertEquals(0, AuthTokensDao.instance.findOne(Filters.eq(AuthToken.ID, id)).getLastUsedAt());
+    }
+
+    @Test
     public void shortLivedInternalTokensAreNotRegistered() {
         int iat = now.get();
         Claims claims = legacyClaims(iat, iat + 3 * 3600);

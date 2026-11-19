@@ -119,6 +119,10 @@ public class TokenRegistry {
     // Never throws: usage tracking must not fail a request.
     public static void recordUse(Claims body, String rawToken, String tokenId) {
         try {
+            // short-lived raw tokens are internal and never registered, so there is nothing to mark as used
+            if (parentId(body) == null && !shouldDiscover(body)) {
+                return;
+            }
             if (shouldDiscover(body)) {
                 discover(body, rawToken, tokenId);
             }
