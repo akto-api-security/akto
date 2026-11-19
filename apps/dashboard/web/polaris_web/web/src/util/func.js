@@ -1500,6 +1500,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
                 return apiGroupsMap[x]
               }) : [],
               riskScore: riskScore,
+              riskScoreFactors: apiInfoMap[key]?.riskScoreFactors || [],
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
               responseCodes: responseCodesArr,
