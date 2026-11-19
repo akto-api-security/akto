@@ -165,7 +165,7 @@ public class InsightDataBundle {
     private static final int HOST_COUNTS_BUCKET_SECONDS = 300;
     // Rounded startTs -> account-wide events. Lives as long as this (60s-cached) bundle, so repeated drill/profile
     // opens share one threat-backend call per window instead of one per request or per agent.
-    private final Map<Integer, CompletableFuture<List<DashboardMaliciousEvent>>> hostCountsSince = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<List<DashboardMaliciousEvent>>> hostCountsSince = new ConcurrentHashMap<>();
     private volatile HostCollectionResolver hostResolver;
 
     // collectionId -> {severity -> count} since startTs in the request's context source, attributed by host, then actor
@@ -199,17 +199,22 @@ public class InsightDataBundle {
     }
 
     private List<DashboardMaliciousEvent> cachedEventsSince(int startTs) {
+        return cachedEvents(startTs, 0);
+    }
+
+    private List<DashboardMaliciousEvent> cachedEvents(int startTs, int endTs) {
         if (!threatBackendAvailable || threatAccess == null) return null;
         int since = startTs - Math.floorMod(startTs, HOST_COUNTS_BUCKET_SECONDS);
+        String key = since + "|" + endTs;
         CompletableFuture<List<DashboardMaliciousEvent>> created = new CompletableFuture<>();
-        CompletableFuture<List<DashboardMaliciousEvent>> inFlight = hostCountsSince.putIfAbsent(since, created);
+        CompletableFuture<List<DashboardMaliciousEvent>> inFlight = hostCountsSince.putIfAbsent(key, created);
         if (inFlight != null) return inFlight.join();
         try {
-            List<DashboardMaliciousEvent> events = threatAccess.violationEventsMinimal(since, Context.now(), 100_000, null);
+            List<DashboardMaliciousEvent> events = threatAccess.violationEventsMinimal(since, endTs > 0 ? endTs : Context.now(), 100_000, null);
             created.complete(events);
             return events;
         } catch (RuntimeException e) {
-            hostCountsSince.remove(since, created);
+            hostCountsSince.remove(key, created);
             created.completeExceptionally(e);
             throw e;
         }
@@ -222,7 +227,14 @@ public class InsightDataBundle {
     }
 
     public List<DashboardMaliciousEvent> eventsBetween(int startTs, int endTs) {
-        List<DashboardMaliciousEvent> events = cachedEventsSince(startTs);
+        return withinRange(cachedEventsSince(startTs), startTs, endTs);
+    }
+
+    public List<DashboardMaliciousEvent> eventsFetchedUntil(int startTs, int endTs) {
+        return withinRange(cachedEvents(startTs, endTs), startTs, endTs);
+    }
+
+    private static List<DashboardMaliciousEvent> withinRange(List<DashboardMaliciousEvent> events, int startTs, int endTs) {
         if (events == null) return null;
         long start = startTs;
         long end = endTs > 0 ? endTs : Long.MAX_VALUE;

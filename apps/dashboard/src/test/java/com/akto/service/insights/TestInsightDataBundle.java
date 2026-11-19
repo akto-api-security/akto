@@ -310,7 +310,25 @@ public class TestInsightDataBundle extends MongoBasedTest {
         assertEquals(2, access.calls.get());
     }
 
+    @Test
+    public void testEventsFetchedUntil_fetchesUpToTheGivenEndAndKeepsItsOwnCacheEntry() {
+        CountingThreatAccess access = new CountingThreatAccess();
+        InsightDataBundle bundle = buildBundle(ctx(ACCOUNT_ID), access);
+        int startTs = Context.now() - 30 * 86400;
+        int endTs = Context.now() + 3600;
+
+        bundle.eventsFetchedUntil(startTs, endTs);
+        assertEquals(endTs, access.lastEndTs);
+        bundle.eventsFetchedUntil(startTs, endTs);
+        assertEquals(1, access.calls.get());
+
+        bundle.eventsBetween(startTs, endTs);
+        assertEquals(2, access.calls.get());
+        assertTrue(access.lastEndTs <= Context.now());
+    }
+
     private static class CountingThreatAccess extends InsightsThreatBackendAccess {
+        private volatile int lastEndTs;
         private final AtomicInteger calls = new AtomicInteger();
         private final CountDownLatch started = new CountDownLatch(1);
         private CountDownLatch release;
@@ -318,6 +336,7 @@ public class TestInsightDataBundle extends MongoBasedTest {
 
         @Override
         public List<DashboardMaliciousEvent> violationEventsMinimal(int startTs, int endTs, int limit, Map<String, Object> filters) {
+            lastEndTs = endTs;
             int call = calls.incrementAndGet();
             started.countDown();
             if (release != null) {
