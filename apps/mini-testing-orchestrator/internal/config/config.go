@@ -1,9 +1,13 @@
 package config
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -19,13 +23,16 @@ type Config struct {
 	PodStatusPort    int
 	PodStatusTimeout time.Duration
 	ControlToken     string
-	LeaderElection   bool
-	LeaseName        string
-	PodName          string
-	HealthAddr       string
-	NotReadyGrace    time.Duration
-	StuckAfter       time.Duration
-	SummaryEvery     time.Duration
+	// ControlTokenSource is "explicit" (CONTROL_TOKEN), "derived" (from the
+	// database abstractor token) or "none".
+	ControlTokenSource string
+	LeaderElection     bool
+	LeaseName          string
+	PodName            string
+	HealthAddr         string
+	NotReadyGrace      time.Duration
+	StuckAfter         time.Duration
+	SummaryEvery       time.Duration
 
 	// Reporting to Akto's database abstractor; same env names as mini-testing.
 	ReportToAkto    bool
@@ -97,7 +104,29 @@ func Load() (Config, error) {
 	if c.HeartbeatEvery, err = durationEnv("HEARTBEAT_INTERVAL", 30*time.Second); err != nil {
 		return c, err
 	}
+	c.ControlToken, c.ControlTokenSource = resolveControlToken(c.ControlToken, c.CyborgToken)
 	return c, c.validate()
+}
+
+// derivedTokenLabel must match OrchestratorControl.DERIVED_TOKEN_LABEL in mini-testing.
+const derivedTokenLabel = "akto-mini-testing-orchestrator-control-token/v1"
+
+// resolveControlToken returns CONTROL_TOKEN when set, otherwise the token both
+// sides derive from the database abstractor token they already receive: an
+// HMAC-SHA256 of a fixed label keyed with the trimmed token, as hex. Deriving it
+// means the helm chart renders no random secret, so Argo CD sees a stable
+// manifest and pods always agree with the orchestrator.
+func resolveControlToken(explicit, databaseAbstractorToken string) (token, source string) {
+	if strings.TrimSpace(explicit) != "" {
+		return explicit, "explicit"
+	}
+	key := strings.TrimSpace(databaseAbstractorToken)
+	if key == "" {
+		return "", "none"
+	}
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(derivedTokenLabel))
+	return hex.EncodeToString(mac.Sum(nil)), "derived"
 }
 
 func (c Config) validate() error {
@@ -112,6 +141,9 @@ func (c Config) validate() error {
 		return fmt.Errorf("MAX_REPLICAS (%d) must be >= MIN_REPLICAS (%d)", c.MaxReplicas, c.MinReplicas)
 	case c.ScaleUpStep < 1:
 		return fmt.Errorf("SCALE_UP_STEP must be >= 1, got %d", c.ScaleUpStep)
+	case c.ControlToken == "":
+		// mini-testing pods refuse every caller without a token, so there is nothing to scale with
+		return fmt.Errorf("no control token: set DATABASE_ABSTRACTOR_SERVICE_TOKEN (the token is derived from it) or CONTROL_TOKEN")
 	case c.PollInterval <= 0:
 		return fmt.Errorf("POLL_INTERVAL must be positive")
 	case c.ScaleDownDelay < 0:
