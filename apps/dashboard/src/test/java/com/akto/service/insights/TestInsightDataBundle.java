@@ -1,6 +1,7 @@
 package com.akto.service.insights;
 
 import com.akto.MongoBasedTest;
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
@@ -20,17 +21,24 @@ import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Covers the InsightDataBundle surface added for the Ask Akto overlay: the memo() cache (a lazy
@@ -66,13 +74,7 @@ public class TestInsightDataBundle extends MongoBasedTest {
      *  value, matching the "every collection field is empty, never null" convention its own
      *  javadoc documents for InsightDataLoader-built bundles. */
     private InsightDataBundle buildBundle(InsightContext ctx) {
-        return new InsightDataBundle(ctx,
-                new java.util.ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-                new java.util.ArrayList<>(), new java.util.ArrayList<>(), new HashSet<>(), new HashMap<>(),
-                new java.util.ArrayList<>(), new java.util.ArrayList<>(),
-                new java.util.ArrayList<>(), new java.util.ArrayList<>(), new java.util.ArrayList<>(),
-                true, new java.util.ArrayList<>(), new HashMap<>(),
-                new InsightsThreatBackendAccess(), new InsightLazySources(ctx));
+        return buildBundle(ctx, new InsightsThreatBackendAccess());
     }
 
     /** RBAC collection-scoping trap (see this repo's CLAUDE.md): ApiInfoDao's 5-arg findAll and
@@ -228,6 +230,105 @@ public class TestInsightDataBundle extends MongoBasedTest {
                     null, Context.accountId.get());
         } finally {
             Context.accountId.set(ACCOUNT_ID);
+        }
+    }
+
+    private InsightDataBundle buildBundle(InsightContext ctx, InsightsThreatBackendAccess threatAccess) {
+        return new InsightDataBundle(ctx,
+                new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
+                new ArrayList<>(), new ArrayList<>(), new HashSet<>(), new HashMap<>(),
+                new ArrayList<>(), new ArrayList<>(),
+                new ArrayList<>(), new ArrayList<>(), new ArrayList<>(),
+                true, new ArrayList<>(), new HashMap<>(),
+                threatAccess, new InsightLazySources(ctx));
+    }
+
+    @Test
+    public void testEventsBetween_concurrentCallsShareOneFetch() throws Exception {
+        CountingThreatAccess access = new CountingThreatAccess();
+        access.release = new CountDownLatch(1);
+        InsightDataBundle bundle = buildBundle(ctx(ACCOUNT_ID), access);
+        int startTs = Context.now() - 30 * 86400;
+        int callers = 8;
+
+        ExecutorService pool = Executors.newFixedThreadPool(callers);
+        try {
+            List<Future<List<DashboardMaliciousEvent>>> results = new ArrayList<>();
+            for (int i = 0; i < callers; i++) {
+                results.add(pool.submit(() -> bundle.eventsBetween(startTs, 0)));
+            }
+            assertTrue(access.started.await(5, TimeUnit.SECONDS));
+            Thread.sleep(300);
+            access.release.countDown();
+            for (Future<List<DashboardMaliciousEvent>> result : results) {
+                assertNotNull(result.get(5, TimeUnit.SECONDS));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(1, access.calls.get());
+    }
+
+    @Test
+    public void testEventsBetween_completedFetchIsReusedWithoutAnotherCall() {
+        CountingThreatAccess access = new CountingThreatAccess();
+        InsightDataBundle bundle = buildBundle(ctx(ACCOUNT_ID), access);
+        int startTs = Context.now() - 30 * 86400;
+
+        assertNotNull(bundle.eventsBetween(startTs, 0));
+        assertNotNull(bundle.eventsBetween(startTs, 0));
+        assertEquals(1, access.calls.get());
+    }
+
+    @Test
+    public void testEventsBetween_startsInTheSameFiveMinuteBucketShareOneFetch() {
+        CountingThreatAccess access = new CountingThreatAccess();
+        InsightDataBundle bundle = buildBundle(ctx(ACCOUNT_ID), access);
+        int bucketStart = (Context.now() - 30 * 86400) / 300 * 300;
+
+        bundle.eventsBetween(bucketStart + 10, 0);
+        bundle.eventsBetween(bucketStart + 250, 0);
+        assertEquals(1, access.calls.get());
+
+        bundle.eventsBetween(bucketStart + 300, 0);
+        assertEquals(2, access.calls.get());
+    }
+
+    @Test
+    public void testEventsBetween_thrownFetchIsNotCachedAndIsRetried() {
+        CountingThreatAccess access = new CountingThreatAccess();
+        access.failFirst = true;
+        InsightDataBundle bundle = buildBundle(ctx(ACCOUNT_ID), access);
+        int startTs = Context.now() - 30 * 86400;
+
+        try {
+            bundle.eventsBetween(startTs, 0);
+            fail("the first fetch throws, so the caller must see the exception");
+        } catch (IllegalStateException expected) {
+        }
+        assertNotNull(bundle.eventsBetween(startTs, 0));
+        assertEquals(2, access.calls.get());
+    }
+
+    private static class CountingThreatAccess extends InsightsThreatBackendAccess {
+        private final AtomicInteger calls = new AtomicInteger();
+        private final CountDownLatch started = new CountDownLatch(1);
+        private CountDownLatch release;
+        private boolean failFirst;
+
+        @Override
+        public List<DashboardMaliciousEvent> violationEventsMinimal(int startTs, int endTs, int limit, Map<String, Object> filters) {
+            int call = calls.incrementAndGet();
+            started.countDown();
+            if (release != null) {
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            if (failFirst && call == 1) throw new IllegalStateException("threat backend failed");
+            return new ArrayList<>();
         }
     }
 }

@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -164,7 +165,7 @@ public class InsightDataBundle {
     private static final int HOST_COUNTS_BUCKET_SECONDS = 300;
     // Rounded startTs -> account-wide events. Lives as long as this (60s-cached) bundle, so repeated drill/profile
     // opens share one threat-backend call per window instead of one per request or per agent.
-    private final Map<Integer, List<DashboardMaliciousEvent>> hostCountsSince = new ConcurrentHashMap<>();
+    private final Map<Integer, CompletableFuture<List<DashboardMaliciousEvent>>> hostCountsSince = new ConcurrentHashMap<>();
     private volatile HostCollectionResolver hostResolver;
 
     // collectionId -> {severity -> count} since startTs in the request's context source, attributed by host, then actor
@@ -200,12 +201,18 @@ public class InsightDataBundle {
     private List<DashboardMaliciousEvent> cachedEventsSince(int startTs) {
         if (!threatBackendAvailable || threatAccess == null) return null;
         int since = startTs - Math.floorMod(startTs, HOST_COUNTS_BUCKET_SECONDS);
-        List<DashboardMaliciousEvent> events = hostCountsSince.get(since);
-        if (events == null) {
-            events = threatAccess.violationEventsMinimal(since, Context.now(), 100_000, null);
-            hostCountsSince.putIfAbsent(since, events);
+        CompletableFuture<List<DashboardMaliciousEvent>> created = new CompletableFuture<>();
+        CompletableFuture<List<DashboardMaliciousEvent>> inFlight = hostCountsSince.putIfAbsent(since, created);
+        if (inFlight != null) return inFlight.join();
+        try {
+            List<DashboardMaliciousEvent> events = threatAccess.violationEventsMinimal(since, Context.now(), 100_000, null);
+            created.complete(events);
+            return events;
+        } catch (RuntimeException e) {
+            hostCountsSince.remove(since, created);
+            created.completeExceptionally(e);
+            throw e;
         }
-        return events;
     }
 
     /** Events inside the page's date range (ctx start..end), from the same cache; null when the threat
