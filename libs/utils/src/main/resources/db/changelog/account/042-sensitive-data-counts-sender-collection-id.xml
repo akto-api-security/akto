@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        The caller is part of a bucket's key now.
+
+        An alert names both ends of a call, so sensitive_data_counts gained senderCollectionId and
+        bulkInc upserts on (subType, hour, apiCollectionId, senderCollectionId).
+
+        033 created subType_hour_apiCollectionId as UNIQUE. That constraint is wrong once a bucket
+        is per caller: two callers sending the same data type to the same collection in one hour
+        are one key under it, so the second caller's increment is a duplicate key and is lost. The
+        old index has to go, not merely be superseded - createIndexIfAbsent matches on name, so the
+        new index is created beside the old one and the old constraint stays in force.
+
+        Order matters. Dropping first means a window where neither unique index exists; creating
+        first would mean a window where the old constraint still rejects a second caller. The
+        second is the safer failure: a rejected increment is a lost count, an absent unique index
+        lets two documents exist for one bucket and the alert then sums both.
+    -->
+
+    <changeSet id="042-account-sensitive-data-counts-caller-unique-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="sensitive_data_counts"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="sensitive_data_counts">
+            <mongodb:keys>{ "subType": 1, "hour": 1, "apiCollectionId": 1, "senderCollectionId": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "subType_hour_apiCollectionId_senderCollectionId", "unique": true }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="sensitive_data_counts">
+                <mongodb:keys>{ "subType": 1, "hour": 1, "apiCollectionId": 1, "senderCollectionId": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="042-account-sensitive-data-counts-drop-bucket-unique-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="sensitive_data_counts"/>
+        </preConditions>
+        <mongodb:dropIndex collectionName="sensitive_data_counts">
+            <mongodb:keys>{ "subType": 1, "hour": 1, "apiCollectionId": 1 }</mongodb:keys>
+        </mongodb:dropIndex>
+        <rollback>
+            <mongodb:createIndex collectionName="sensitive_data_counts">
+                <mongodb:keys>{ "subType": 1, "hour": 1, "apiCollectionId": 1 }</mongodb:keys>
+                <mongodb:options>{ "name": "subType_hour_apiCollectionId", "unique": true }</mongodb:options>
+            </mongodb:createIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
