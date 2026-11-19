@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -19,13 +20,25 @@ public class AtlasPeople {
     private final Map<String, String> usernameByDevice;
     private final Map<String, String> teamByUser;
 
-    /** From ModuleInfoDao's device metadata map (device -> username, os, browserName). */
+    /** From ModuleInfoDao's device metadata map (device -> username, os, browserName). Usernames match ignoring case and spaces, like Devices & employees. */
     public static AtlasPeople of(Map<String, Map<String, String>> deviceMetadata, Map<String, String> teamByUser) {
+        Map<String, String> spellingByKey = new HashMap<>();
         Map<String, String> usernameByDevice = new HashMap<>();
         for (Map.Entry<String, Map<String, String>> e : deviceMetadata.entrySet()) {
-            usernameByDevice.put(e.getKey(), e.getValue().get(USERNAME_KEY));
+            String username = e.getValue().get(USERNAME_KEY);
+            if (AtlasPeopleService.isRealUsername(username)) {
+                String trimmed = username.trim();
+                username = spellingByKey.computeIfAbsent(identityKey(trimmed), k -> trimmed);
+            }
+            usernameByDevice.put(e.getKey(), username);
         }
-        return new AtlasPeople(usernameByDevice, teamByUser);
+        Map<String, String> teams = new HashMap<>();
+        teamByUser.forEach((user, team) -> teams.put(spellingByKey.getOrDefault(identityKey(user), user), team));
+        return new AtlasPeople(usernameByDevice, teams);
+    }
+
+    private static String identityKey(String username) {
+        return username.trim().toLowerCase(Locale.ROOT);
     }
 
     /** The distinct known users of these devices. */
