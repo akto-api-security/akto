@@ -63,8 +63,9 @@ public class WizIntegration {
     // Jobs
     private ObjectId wizSyncJobId;
 
-    // Wiz Findings
+    // Wiz Findings Status
     private boolean isBidirectionalSyncEnabled;
+    private long lastSyncedFindingStatusTs;
     
     // Wiz Import API Endpoints Job
     private ObjectId wizImportApiEndpointsJobId;
