@@ -983,22 +983,31 @@ prettifyEpoch(epoch) {
     // return `${direction}\n${payload}`
     return payload
   },
-  formatWebSocketEventsMessage(events) {
+  // asArray: several events as one JSON array of their payloads instead of a numbered list
+  formatWebSocketEventsMessage(events, keep = () => true, asArray = false) {
     const parsed = func.parseWebSocketEventsField(events)
     if (parsed == null) return ""
     if (Array.isArray(parsed)) {
-      return parsed.map((e, i) => {
+      const kept = parsed.filter(keep)
+      if (asArray && kept.length > 1) {
+        const payloads = kept.map((e) => func.parseWebSocketEventPayload(
+          e != null && typeof e === "object" && !Array.isArray(e) ? e.payload : e))
+        return JSON.stringify(payloads, null, 2)
+      }
+      return kept.map((e, i) => {
         const body = func.formatWebSocketEventForDisplay(e)
-        return parsed.length > 1 ? `--- Event ${i + 1} ---\n${body}` : body
+        return kept.length > 1 ? `--- Event ${i + 1} ---\n${body}` : body
       }).join("\n\n")
     }
-    return func.formatWebSocketEventForDisplay(parsed)
+    return keep(parsed) ? func.formatWebSocketEventForDisplay(parsed) : ""
   },
   isWebSocketUpgradeResponse(parsed) {
     const code = parsed?.statusCode ?? parsed?.response?.statusCode
     return code != null && String(code) === "101"
   },
-  formatWebSocketSampleDisplay(message, redactHeaders = []) {
+  // part "request": first line, request headers and the incoming events (sent to the server);
+  // part "response": status, response headers and the other events (from the server); none: everything
+  formatWebSocketSampleDisplay(message, redactHeaders = [], part) {
     try {
       const parsed = func.parseWebSocketSampleMessage(message)
       if (!parsed) return typeof message === "string" ? message : ""
@@ -1013,17 +1022,20 @@ prettifyEpoch(epoch) {
           queryParams[key] = value
         }
       }
-      const parts = [func.webSocketRequestFirstLine(parsed, queryParams)]
+      const parts = []
+      if (part !== "response") {
+        parts.push(func.webSocketRequestFirstLine(parsed, queryParams))
+      }
       const requestHeaders = func.parseWebSocketHeaders(parsed.requestHeaders || parsed.request?.headers)
       const requestHeaderLines = func.formatWebSocketHeaderLines(requestHeaders, redactSet)
-      if (requestHeaderLines.length > 0) {
+      if (part !== "response" && requestHeaderLines.length > 0) {
         parts.push("")
         parts.push(requestHeaderLines.join("\n"))
       }
       const isUpgrade = func.isWebSocketUpgradeResponse(parsed)
       const responseHeaders = func.parseWebSocketHeaders(parsed.responseHeaders || parsed.response?.headers)
       const responseHeaderLines = func.formatWebSocketHeaderLines(responseHeaders, redactSet)
-      if (responseHeaderLines.length > 0 || (!isUpgrade && (parsed.statusCode != null || parsed.status))) {
+      if (part !== "request" && (responseHeaderLines.length > 0 || part === "response" || (!isUpgrade && (parsed.statusCode != null || parsed.status)))) {
         parts.push("")
         if (isUpgrade) {
           const statusText = parsed.status || "Switching Protocols"
@@ -1037,11 +1049,17 @@ prettifyEpoch(epoch) {
         }
       }
       if (parsed.events != null && parsed.events !== "") {
-        parts.push("")
-        parts.push("Events:")
-        parts.push(func.formatWebSocketEventsMessage(parsed.events))
+        const isIncoming = (e) => String(e?.direction || "").toLowerCase() === "incoming"
+        const keep = part === "request" ? isIncoming : part === "response" ? (e) => !isIncoming(e) : undefined
+        // the server's frames (e.g. a streamed reply) read as one JSON array
+        const events = func.formatWebSocketEventsMessage(parsed.events, keep, part === "response")
+        if (events) {
+          parts.push("")
+          parts.push("Events:")
+          parts.push(events)
+        }
       }
-      return parts.join("\n")
+      return parts.join("\n").trim()
     } catch (e) {
       return typeof message === "string" ? message : ""
     }

@@ -178,7 +178,8 @@ function SampleDataList(props) {
     const currentSample = visibleSamples[Math.min(page, visibleSamples.length - 1)];
     const parsedSample = func.parseWebSocketSampleMessage(currentSample?.message)
     const isWebSocket = isWebSocketProp === true || func.isWebSocketApiType(parsedSample?.type)
-    const panelTypes = isWebSocket ? ['events'] : ['request', 'response'];
+    // WebSocket too: frames sent to the server under request, the server's frames under response
+    const panelTypes = ['request', 'response'];
 
     // Verification contract (keystone): only ever show evidence that can actually
     // be located in the SAME text the editor renders. We validate REQUEST segments
