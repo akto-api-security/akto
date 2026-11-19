@@ -38,11 +38,6 @@ func AccountIDFromContext(c *gin.Context) (int, bool) {
 var deploymentAccountID = AccountIDFromServiceToken
 
 func NewMiddleware(rsaPublicKey string, logger *zap.Logger) (gin.HandlerFunc, error) {
-	return NewMiddlewareWithRevocation(rsaPublicKey, logger, nil)
-}
-
-// NewMiddlewareWithRevocation also rejects tokens whose id is in revoked; a nil set revokes nothing.
-func NewMiddlewareWithRevocation(rsaPublicKey string, logger *zap.Logger, revoked *RevokedSet) (gin.HandlerFunc, error) {
 	publicKey, err := parseRSAPublicKey(rsaPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse RSA_PUBLIC_KEY: %w", err)
@@ -53,7 +48,7 @@ func NewMiddlewareWithRevocation(rsaPublicKey string, logger *zap.Logger, revoke
 	}
 
 	return func(c *gin.Context) {
-		accountID, tokenID, err := verifyTokenWithID(c.GetHeader("Authorization"), publicKey)
+		accountID, err := verifyToken(c.GetHeader("Authorization"), publicKey)
 		if err != nil {
 			logger.Warn("Authentication failed", zap.Error(err))
 			c.AbortWithStatus(http.StatusUnauthorized)
@@ -67,11 +62,6 @@ func NewMiddlewareWithRevocation(rsaPublicKey string, logger *zap.Logger, revoke
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		if revoked.Contains(tokenID) {
-			logger.Warn("Rejected a revoked token", zap.String("tokenId", tokenID))
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
 
 		c.Set(AccountIDKey, accountID)
 		c.Next()
@@ -79,14 +69,8 @@ func NewMiddlewareWithRevocation(rsaPublicKey string, logger *zap.Logger, revoke
 }
 
 func verifyToken(authHeader string, publicKey *rsa.PublicKey) (int, error) {
-	accountID, _, err := verifyTokenWithID(authHeader, publicKey)
-	return accountID, err
-}
-
-// verifyTokenWithID also returns the token id (tid, else the signature hash) used for revocation checks.
-func verifyTokenWithID(authHeader string, publicKey *rsa.PublicKey) (int, string, error) {
 	if authHeader == "" {
-		return 0, "", fmt.Errorf("missing Authorization header")
+		return 0, fmt.Errorf("missing Authorization header")
 	}
 
 	// Accept both a raw token and the "Bearer <token>" scheme (case-insensitive),
@@ -102,19 +86,15 @@ func verifyTokenWithID(authHeader string, publicKey *rsa.PublicKey) (int, string
 		return publicKey, nil
 	})
 	if err != nil {
-		return 0, "", err
+		return 0, err
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return 0, "", fmt.Errorf("unexpected claims type %T", token.Claims)
+		return 0, fmt.Errorf("unexpected claims type %T", token.Claims)
 	}
 
-	accountID, err := extractAccountID(claims)
-	if err != nil {
-		return 0, "", err
-	}
-	return accountID, TokenID(claims, authHeader), nil
+	return extractAccountID(claims)
 }
 
 func parseRSAPublicKey(raw string) (*rsa.PublicKey, error) {
