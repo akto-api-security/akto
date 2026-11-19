@@ -56,7 +56,7 @@ public class ProviderGuardrailAction extends ActionSupport {
     private static final String MCP_TOOL_PREFIX = "mcp__";
     private static final String MCP_SEPARATOR = "__";
     private static final String MCP_SERVER_TAG_VALUE = "MCP Server";
-    private static final String MCP_TOOLS_CALL_PATH = "/mcp/tools/call";
+    private static final String MCP_PATH = "/mcp";
     private static final String TOOL_CALL_SEGMENT = "/tool-call";
     private static final String THIRD_PARTY_TOOL = "third_party";
 
@@ -252,7 +252,7 @@ public class ProviderGuardrailAction extends ActionSupport {
 
         String path = "/" + provider.toLowerCase() + "/guardrail";
         if (mcp != null) {
-            path = MCP_TOOLS_CALL_PATH;
+            path = MCP_PATH;
         } else if (call != null) {
             path += TOOL_CALL_SEGMENT + "/" + toolPathSegment(call.name);
         } else if (TOOL_CALL_EVENT.equals(frame.eventType)) {
