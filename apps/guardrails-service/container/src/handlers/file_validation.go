@@ -53,8 +53,12 @@ type fileResult struct {
 	ChunkResults     []*chunkResult
 	FailedResult     *mcp.ValidationResult
 	// Uninspected marks a file allowed without its content being checked: unreadable, too
-	// large, an unsupported type, an extraction failure or a chunk with no verdict.
+	// large, an unsupported type, an extraction failure, a chunk with no verdict, or a chunk
+	// whose scan didn't run (a scanner failure or timeout the verdict failed open on).
 	Uninspected bool
+	// NotCacheable: allowed, but the file cache must not vouch for it. An image whose OCR read
+	// no text - a misread there would otherwise be served as a clean pass for the cache TTL.
+	NotCacheable bool
 }
 
 // ValidateFile handles POST /api/validate/file (multipart "file" uploads and/or "url" fields).
@@ -216,7 +220,7 @@ func (h *ValidationHandler) validateCachedFile(ctx context.Context, input *fileI
 		return &fileResult{Filename: input.Filename, Allowed: true}
 	}
 	fr := h.validateSingleFile(ctx, input, meta, sessionID, requestID)
-	if fr.Allowed && !fr.Uninspected {
+	if fr.Allowed && !fr.Uninspected && !fr.NotCacheable {
 		h.fileCache.Remember(ctx, key)
 	}
 	return fr
@@ -258,7 +262,8 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	text := fileprocessor.SanitizeText(rawText)
 	rawText = "" // allow GC to reclaim the unsanitized copy
 	if strings.TrimSpace(text) == "" {
-		h.logger.Warn("No text extracted; allowing file", zap.String("file", input.Filename))
+		_, fr.NotCacheable = processor.(*fileprocessor.ImageProcessor)
+		h.logger.Warn("No text extracted; allowing file", zap.String("file", input.Filename), zap.Bool("ocr", fr.NotCacheable))
 		return fr
 	}
 
@@ -316,6 +321,10 @@ func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chu
 			fr.FailedChunkIndex = i + 1
 			fr.FailedResult = r.Result
 			return fr
+		}
+		if r.Result != nil && r.Result.Incomplete {
+			h.logger.Warn("Chunk allowed without every check running; allowing uninspected", zap.String("file", fr.Filename), zap.Int("chunk", i+1))
+			fr.Uninspected = true
 		}
 	}
 	return fr
