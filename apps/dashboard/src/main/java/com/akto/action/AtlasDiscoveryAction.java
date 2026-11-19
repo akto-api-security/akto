@@ -1,7 +1,9 @@
 package com.akto.action;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -10,11 +12,15 @@ import com.akto.service.atlas.AtlasAssetStatusService;
 import com.akto.service.atlas.AtlasDeviceScope;
 import com.akto.service.atlas.AtlasDiscoveryService;
 import com.akto.service.atlas.AtlasPeople;
+import com.akto.service.atlas.AtlasPeopleService;
 import com.akto.service.atlas.AtlasPeopleSource;
 import com.akto.service.atlas.AtlasToolRow;
+import com.akto.service.insights.InsightUtil;
 import com.akto.utils.ArgusCollectionScope;
 import com.akto.utils.TtlCache;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -40,6 +46,7 @@ public class AtlasDiscoveryAction extends UserAction {
     private static final String TOOL_NOT_FOUND = "Tool not found";
     private static final List<Integer> DEMO_ACCOUNT_IDS = Arrays.asList(1669322524);
     private static final TtlCache<Integer, Map<String, Map<String, String>>> DEVICE_CACHE = new TtlCache<>(DEVICE_CACHE_TTL_MS, DEVICE_CACHE_MAX_ENTRIES);
+    private static final TtlCache<Integer, Map<String, String>> HOOK_USER_CACHE = new TtlCache<>(DEVICE_CACHE_TTL_MS, DEVICE_CACHE_MAX_ENTRIES);
 
     private final AtlasPeopleSource peopleSource = new AtlasPeopleSource();
     private final AtlasAssetStatusService statusService = new AtlasAssetStatusService();
@@ -154,7 +161,25 @@ public class AtlasDiscoveryAction extends UserAction {
         Map<String, AtlasAssetStatus> decisions = new HashMap<>(statusService.loadDecisions());
         decisions.putAll(statusService.loadSkillDecisions(allRows));
         return new AtlasDiscoveryService(rows, decisions, account.getAllowlistNamesLower(),
-                AtlasPeople.of(devices, account.getTeamByUser()), now, DEMO_ACCOUNT_IDS.contains(Context.accountId.get()));
+                AtlasPeople.of(devices, loadHookUsers(), account.getTeamByUser()), now, DEMO_ACCOUNT_IDS.contains(Context.accountId.get()));
+    }
+
+    // Inference-hooks device -> its user, read as Devices & employees reads them, so people seen only through hooks are counted too.
+    private static Map<String, String> loadHookUsers() {
+        Integer account = Context.accountId.get();
+        Map<String, String> cached = HOOK_USER_CACHE.get(account);
+        if (cached != null) return cached;
+        Map<String, String> hookUsers = new HashMap<>();
+        List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
+                Filters.eq(ApiCollection.TAGS_STRING + ".keyName", AtlasPeopleService.INFERENCE_HOOKS_TAG_KEY),
+                Projections.include(ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING));
+        for (ApiCollection c : collections) {
+            String deviceId = InsightUtil.deviceIdOf(c);
+            String username = AtlasPeopleService.hookUsername(c);
+            if (deviceId != null && username != null) hookUsers.putIfAbsent(deviceId, username);
+        }
+        HOOK_USER_CACHE.put(account, hookUsers);
+        return hookUsers;
     }
 
     // Every endpoint-shield module is read, so share one read per account across the requests of a page load.

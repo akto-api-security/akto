@@ -165,13 +165,18 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
             Map<String, Object> ad = m.getAdditionalData();
             Map<String, String> meta = new HashMap<>();
             // JS uses `||` here, which keeps a literal "-" — deliberately NOT resolveModuleUsername's "-" rejection.
-            String username = firstNonEmpty(ad, "username", "userName", "user", "email");
+            String username = deviceUsername(ad);
             meta.put("username", username != null ? username : "-");
             meta.put("os", firstNonEmpty(ad, "os"));
             meta.put("browserName", firstNonEmpty(ad, "browserName"));
             result.put(name, meta);
         }
         return result;
+    }
+
+    // A device's owner as the device metadata map reads it: the first non-empty username field; may be "-".
+    public static String deviceUsername(Map<String, Object> additionalData) {
+        return firstNonEmpty(additionalData, "username", "userName", "user", "email");
     }
 
     // Mirrors the JS `a || b || c` chain: first field holding a non-empty string.

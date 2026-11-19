@@ -403,7 +403,8 @@ public class ModuleInfoAction extends UserAction {
         return new Document("deviceName", module.getName())
                 .append("moduleId", module.getId())
                 .append("status", additional.get("currentStatus"))
-                .append("username", additional.get("username"))
+                // Same owner field as the Atlas Overview's device map, so both count the same employees.
+                .append("username", ModuleInfoDao.deviceUsername(additional))
                 .append("os", additional.get("os"))
                 .append("platform", additional.get("platform"))
                 .append("browserName", additional.get("browserName"))
