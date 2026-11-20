@@ -1,0 +1,7 @@
+{
+  "x-akto-installer-akto_message_id": "msg-abc",
+  "x-akto-installer-akto_session_id": "sess-123",
+  "x-akto-installer-current_message_id": "msg-abc",
+  "x-akto-installer-cwd": "/tmp/work",
+  "x-akto-installer-session_id": "sess-123"
+}
