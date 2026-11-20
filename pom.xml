@@ -164,6 +164,17 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <!-- Pin explicitly: surefire's auto-selected junit-vintage-engine (matching the
+                 junit-jupiter-api 5.4.2 pinned elsewhere) can't parse junit:junit's 3-part
+                 version "4.13.1" - its JUnit4VersionCheck regex (^(\d+\.\d+)(?:-.+)?) only
+                 accepts 2-part versions, predating junit:junit's patch releases. Fails test
+                 discovery entirely ("Failed to parse version of junit:junit: 4.13.1"). -->
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+            <version>5.9.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>2.18.9</version>
