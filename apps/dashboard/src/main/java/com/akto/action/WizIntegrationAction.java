@@ -145,7 +145,7 @@ public class WizIntegrationAction extends UserAction {
             WizIntegrationDao.instance.getMCollection().updateOne(
                 new BasicDBObject(),
                 Updates.combine(
-                    Updates.set(WizIntegration.IS_BIDIRECTIONAL_SYNC_ENABLED, bidirectionalSyncEnabled),
+                    Updates.set(WizIntegration.BIDIRECTIONAL_SYNC_ENABLED, bidirectionalSyncEnabled),
                     Updates.set(WizIntegration.UPDATED_TS, Context.now())
                 )
             );

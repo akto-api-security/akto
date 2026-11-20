@@ -31,9 +31,12 @@ public class WizSyncJobExecutor extends JobExecutor<WizSyncJobParams> {
                 return;
             }
 
-            // Fetch issue status changes from Wiz.
-            WizIntegrationUtils.syncTestingRunIssuesStatusFromWiz(wizIntegration);
-
+            // Fetch issue status changes from Wiz, only if bidirectional sync is enabled.
+            if (wizIntegration.isBidirectionalSyncEnabled()) {
+                WizIntegrationUtils.syncTestingRunIssuesStatusFromWiz(wizIntegration);
+            } else {
+                logger.info("Wiz bidirectional sync is disabled. Skipping status sync from Wiz.");
+            }
             long secondsSinceLastUpload = (System.currentTimeMillis() / 1000L) - wizIntegration.getLastUploadedScanTs();
             boolean pastTwentyFourHours = secondsSinceLastUpload > 24 * 60 * 60;
 
