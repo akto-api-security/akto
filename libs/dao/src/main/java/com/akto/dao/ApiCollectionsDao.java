@@ -52,6 +52,9 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.START_TS }, false);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.NAME }, true);
+
+        // host upserts (createCollectionForHost*) filter on hostName
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.HOST_NAME }, true);
     }
 
     public ApiCollection getMeta(int apiCollectionId) {
