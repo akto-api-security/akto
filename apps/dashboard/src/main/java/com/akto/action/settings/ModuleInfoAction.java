@@ -399,15 +399,14 @@ public class ModuleInfoAction extends UserAction {
 
     // Flattens a grouped ModuleInfo into the plain row AtlasPeopleService.build expects.
     private static Document toAtlasModuleRow(ModuleInfo module) {
-        Map<String, Object> additional = module.getAdditionalData() == null ? new HashMap<>() : module.getAdditionalData();
+        Map<String, Object> additionalData = module.getAdditionalData() == null ? new HashMap<>() : module.getAdditionalData();
         return new Document("deviceName", module.getName())
                 .append("moduleId", module.getId())
-                .append("status", additional.get("currentStatus"))
-                // Same owner field as the Atlas Overview's device map, so both count the same employees.
-                .append("username", ModuleInfoDao.deviceUsername(additional))
-                .append("os", additional.get("os"))
-                .append("platform", additional.get("platform"))
-                .append("browserName", additional.get("browserName"))
+                .append("status", additionalData.get("currentStatus"))
+                .append("username", ModuleInfo.ownerUsernameOf(additionalData))
+                .append("os", additionalData.get("os"))
+                .append("platform", additionalData.get("platform"))
+                .append("browserName", additionalData.get("browserName"))
                 .append(ModuleInfo.LAST_HEARTBEAT_RECEIVED, module.getLastHeartbeatReceived())
                 .append(ModuleInfo.CURRENT_VERSION, module.getCurrentVersion());
     }
