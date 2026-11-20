@@ -89,6 +89,7 @@ const PAGE_REQUIRES = {
     '/dashboard/observe/endpoint-shield': 'api/fetchEndpointShieldAgents',
     '/dashboard/observe/agentic-discovery': 'api/fetchAtlasDiscoveryOverview',
     '/dashboard/observe/agent-discovery': 'api/fetchArgusDiscoveryOverview',
+    '/dashboard/observe/agent-inventory': 'api/fetchArgusInventory',
     '/dashboard/nhi/identities': 'api/fetchAllNhiIdentities',
     '/dashboard/nhi/violations': 'api/fetchAllNhiViolations',
     '/dashboard/nhi/policies': 'api/fetchNhiPolicies',

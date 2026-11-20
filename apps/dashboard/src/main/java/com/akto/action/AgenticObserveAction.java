@@ -3156,6 +3156,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Integer> traffic, Map<String, Double> risk, Map<String, List<String>> sensitive,
             Map<String, String> usernames,
             Map<String, Map<String, String>> deviceMeta, Map<String, Map<String, Integer>> violationsByCollectionId,
+            boolean excludeConnectorIngested) {
+        return classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames,
+                deviceMeta, violationsByCollectionId, excludeConnectorIngested, Collections.emptyMap());
+    }
+
+    private Map<String, HostGroupSummary> classifyHostGroupedRows(List<ApiCollection> collections, String groupBy,
+            Map<String, Integer> traffic, Map<String, Double> risk, Map<String, List<String>> sensitive,
+            Map<String, String> usernames,
+            Map<String, Map<String, String>> deviceMeta, Map<String, Map<String, Integer>> violationsByCollectionId,
             boolean excludeConnectorIngested, Map<String, List<Map<String, String>>> tagsByUser) {
         boolean isUserGroup = "user".equals(groupBy);
         Map<String, List<Map<String, String>>> tags = tagsByUser != null ? tagsByUser : Collections.emptyMap();

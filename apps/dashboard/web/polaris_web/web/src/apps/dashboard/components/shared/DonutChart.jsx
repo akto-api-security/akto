@@ -7,7 +7,12 @@ import PersistStore from '../../../main/PersistStore';
 import observeFunc from "../../pages/observe/transform"
 
 
-function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle, navUrlBuilder, invertTextSizes, onSegmentClick, titleColor, titleFontWeight, sliceBorderWidth}) {
+// With `centered`, the title (and the line under it, if any) sit as one block on the middle of the ring.
+const CAP_HEIGHT = 0.72
+const SUBTITLE_SIZE = 12
+const LINE_GAP = 8
+
+function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle, navUrlBuilder, invertTextSizes, onSegmentClick, titleColor, titleFontWeight, sliceBorderWidth, centered, titleFontSize}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -28,7 +33,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
             width: size,
             className: 'pie-chart',
             margin: '10',
-            events: subtitle ? {
+            events: (subtitle || centered) ? {
                 render: function() {
                     const chart = this;
                     const centerX = chart.plotLeft + (chart.plotWidth / 2);
@@ -42,14 +47,24 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
                         chart.subtitleLabel.destroy();
                     }
                     
+                    let titleY = centerY - (invertTextSizes ? 10 : 5)
+                    let subtitleY = centerY + 15
+                    if (centered) {
+                        const titleCap = (titleFontSize || 20) * CAP_HEIGHT
+                        const subtitleCap = subtitle ? SUBTITLE_SIZE * CAP_HEIGHT : 0
+                        const half = (titleCap + (subtitle ? LINE_GAP : 0) + subtitleCap) / 2
+                        titleY = centerY - half + titleCap
+                        subtitleY = centerY + half
+                    }
+
                     // Add title
                     chart.titleLabel = chart.renderer.text(
                         title,
                         centerX,
-                        centerY - (invertTextSizes ? 10 : 5)
+                        titleY
                     )
                     .css({
-                        fontSize: invertTextSizes ? '12px' : '20px',
+                        fontSize: titleFontSize ? titleFontSize + 'px' : (invertTextSizes ? '12px' : '20px'),
                         fontWeight: titleFontWeight || (invertTextSizes ? 'normal' : '400'),
                         color: titleColor || (invertTextSizes ? '#666' : undefined),
                         textAlign: 'center'
@@ -60,10 +75,11 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
                     .add();
                     
                     // Add subtitle
+                    if (!subtitle) return
                     chart.subtitleLabel = chart.renderer.text(
                         subtitle,
                         centerX,
-                        centerY + 15
+                        subtitleY
                     )
                     .css({
                         fontSize: invertTextSizes ? '20px' : '12px',
@@ -85,7 +101,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
         legend: {
             enabled: false,
         },
-        title: subtitle ? { text: null } : {
+        title: (subtitle || centered) ? { text: null } : {
             text: title,
             y: size*0.4,
         },

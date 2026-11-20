@@ -51,7 +51,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents as expandRowsToEvents } from "@/apps/dashboard/pages/threat_detection/utils/activityGroups";
-import { fetchEndpointViolationCounts } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
+import { dateRangeFromSearchParams, fetchEndpointViolationCounts } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
 import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "./ViolationFlyoutSections";
@@ -1053,9 +1053,11 @@ function Violations() {
     }, []);
 
     // values.ranges has no 30-day preset (it jumps 7 days -> 2 months), so pass the range inline.
+    // A link can carry its own range (?since=&until=, epoch seconds).
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        func.getAllTimeRangeForAccounts() || func.getLast30DaysRange(),
+        location.search,
+        (search) => dateRangeFromSearchParams(new URLSearchParams(search)) || func.getAllTimeRangeForAccounts() || func.getLast30DaysRange(),
     );
 
     const getTimeEpoch = useCallback((key) => {
@@ -1161,6 +1163,18 @@ function Violations() {
             });
             applyGridFilter("user", userNames);
         }
+        // ?severity=CRITICAL,HIGH is seeded the same way as user above.
+        const severities = (params.get("severity") || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (severities.length > 0) {
+            setActiveSeverityFilter(new Set(severities));
+            const key = gridFilterKey.current;
+            const { filtersMap, setFiltersMap } = PersistStore.getState();
+            setFiltersMap({
+                ...filtersMap,
+                [key]: { ...(filtersMap[key] || {}), filters: { ...(filtersMap[key]?.filters || {}), severity: severities } },
+            });
+            applyGridFilter("severity", severities);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.search]);
 
@@ -1203,6 +1217,15 @@ function Violations() {
         setActiveAssetFilter(new Set());
         triggerTableRefresh();
     }, [triggerTableRefresh]);
+
+    // Deep link from the Guardrail overview (?host=a,b): the agent hosts go into the filter the Agents card drives.
+    useEffect(() => {
+        const hosts = (new URLSearchParams(location.search).get("host") || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (hosts.length === 0) return;
+        setActiveAssetFilter(new Set(hosts));
+        triggerTableRefresh();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.search]);
 
     const handleOpenCardClick = useCallback(() => {
         if (currentTab === "active") return;
