@@ -102,7 +102,7 @@ function McpSecurityPage() {
     <PageWithMultipleCards
       title={
         <HorizontalStack gap="2">
-          <Text as="h1" variant="headingLg">MCP Security</Text>
+          <Text as="h1" variant="headingLg">MCP Protection</Text>
           <Badge>Beta</Badge>
         </HorizontalStack>
       }
@@ -123,8 +123,8 @@ function McpSecurityPage() {
             <Box width="100%" key="beta-card">
               <EmptyScreensLayout
                 iconSrc={"/public/mcp.svg"}
-                headingText={"MCP Security is in beta"}
-                description={"MCP Security is currently in beta. Contact our sales team to learn more about this feature and get access."}
+                headingText={"MCP Protection is in beta"}
+                description={"MCP Protection is currently in beta. Contact our sales team to learn more about this feature and get access."}
                 bodyComponent={<Button url="https://www.akto.io/api-security-demo" target="_blank" primary>Contact sales</Button>}
               />
             </Box>
