@@ -1,0 +1,16 @@
+# Builds the log-pipeline consumer image from the repo root:
+#   docker build --platform linux/arm64 -f log-pipeline-prod/Dockerfile.consumer -t log-consumer:local .
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /src
+COPY . .
+RUN mvn -B -q package -pl apps/database-abstractor -am -DskipTests
+
+FROM eclipse-temurin:17-jre
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends procps && rm -rf /var/lib/apt/lists/* \
+ && groupadd -r app && useradd -r -g app -M -s /usr/sbin/nologin app
+WORKDIR /app
+COPY --from=build /src/apps/database-abstractor/target/database-abstractor/WEB-INF/classes /app/classes
+COPY --from=build /src/apps/database-abstractor/target/database-abstractor/WEB-INF/lib /app/lib
+USER app
+ENV LOG_CONSUMER_MAIN=com.akto.logpipeline.LogPipelineConsumerMain
+ENTRYPOINT ["/bin/sh", "-c", "exec java $JAVA_OPTS -cp \"/app/classes:/app/lib/*\" $LOG_CONSUMER_MAIN"]
