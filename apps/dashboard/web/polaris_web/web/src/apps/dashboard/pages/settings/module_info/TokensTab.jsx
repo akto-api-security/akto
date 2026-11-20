@@ -1,5 +1,5 @@
-import { Badge, Banner, Box, Button, HorizontalStack, IndexFiltersMode, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
-import { useEffect, useMemo, useState } from "react"
+import { Badge, Banner, Box, Button, HorizontalStack, IndexFiltersMode, Link, Modal, Popover, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { useEffect, useMemo, useRef, useState } from "react"
 import settingRequests from "../api"
 import func from "@/util/func"
 import EmptyCard from "../../dashboard/new_components/EmptyCard"
@@ -11,9 +11,15 @@ import { maskedToken } from "./maskedToken"
 import { buildSortOptions, disambiguateLabel } from "./tableConfig"
 
 const DAY = 24 * 60 * 60
-const EXPIRING_SOON_SECONDS = 14 * DAY
+const EXPIRING_SOON_DAYS = 15
+const EXPIRING_SOON_SECONDS = EXPIRING_SOON_DAYS * DAY
 const IDLE_SECONDS = 30 * DAY
-const MAX_USED_BY_CHIPS = 3
+// one name keeps the column narrow; the hover list holds the rest
+const MAX_USED_BY_CHIPS = 1
+const USED_BY_NAME_MAX_WIDTH = '180px'
+// the server only lists modules that heartbeated within this window (AuthTokenAction.ACTIVE_HEARTBEAT_SECONDS)
+const ACTIVE_WINDOW = "5 minutes"
+const MODULE_LIST_MAX_HEIGHT = '260px'
 const REVOKE_CONFIRM_TEXT = "REVOKE"
 const DEFAULT_SORT_KEY = 'createdTs'
 const SEARCH_KEYS = ['name', 'tokenMask', 'scopeCell', 'createdByEmail', 'status', 'source', 'usedByNames']
@@ -41,21 +47,70 @@ const isIdle = (token, now) => now - (token.lastUsedAt || token.createdAt || 0) 
 
 const STATUS_BADGE = { Active: 'success', Expired: 'warning', Revoked: 'critical' }
 
+// Hover list of every module under a token; it scrolls instead of truncating (same hover popover as the guardrail CountPopover).
+function ModuleListPopover({ modules, extra }) {
+    const [active, setActive] = useState(false)
+    const closeTimer = useRef(null)
+
+    const open = () => { clearTimeout(closeTimer.current); setActive(true) }
+    const scheduleClose = () => { closeTimer.current = setTimeout(() => setActive(false), 200) }
+    useEffect(() => () => clearTimeout(closeTimer.current), [])
+
+    return (
+        <Popover
+            active={active}
+            activator={
+                <span onMouseEnter={open} onMouseLeave={scheduleClose} style={{ cursor: 'pointer' }}>
+                    <Link>+{extra} more</Link>
+                </span>
+            }
+            onClose={() => setActive(false)}
+            preferredPosition="below"
+            autofocusTarget="none"
+        >
+            <div onMouseEnter={open} onMouseLeave={scheduleClose}>
+                <Popover.Pane fixed>
+                    <Box padding="3" minWidth="280px" maxWidth="420px">
+                        <VerticalStack gap="2">
+                            <Text variant="bodySm" color="subdued">{modules.length} modules active in the last {ACTIVE_WINDOW}</Text>
+                            <div style={{ maxHeight: MODULE_LIST_MAX_HEIGHT, overflowY: 'auto' }}>
+                                <VerticalStack gap="1">
+                                    {modules.map(module => (
+                                        <HorizontalStack key={module.id} gap="3" align="space-between" blockAlign="start" wrap={false}>
+                                            <Text variant="bodyMd" breakWord>{module.name || module.id}</Text>
+                                            <Text variant="bodySm" color="subdued">{module.moduleType || '-'}</Text>
+                                        </HorizontalStack>
+                                    ))}
+                                </VerticalStack>
+                            </div>
+                        </VerticalStack>
+                    </Box>
+                </Popover.Pane>
+            </div>
+        </Popover>
+    )
+}
+
 function usedByCell(token) {
     const modules = token.modules || []
     if (modules.length === 0) return '-'
-    const extra = (token.moduleCount ?? modules.length) - MAX_USED_BY_CHIPS
+    const extra = modules.length - MAX_USED_BY_CHIPS
     return (
-        <HorizontalStack gap="1" wrap={false}>
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
             {modules.slice(0, MAX_USED_BY_CHIPS).map(module => (
                 <Tooltip
                     key={module.id}
-                    content={`${module.moduleType || '-'} · last heartbeat ${func.epochToDateTime(module.lastHeartbeatReceived)}`}
+                    content={`${module.name || module.id} · ${module.moduleType || '-'} · last heartbeat ${func.epochToDateTime(module.lastHeartbeatReceived)}`}
                 >
-                    <Badge status={module.active ? 'success' : undefined}>{module.name || module.id}</Badge>
+                    <Badge status="success">
+                        {/* a long hostname is cut with an ellipsis here; the tooltip above has the full name */}
+                        <span style={{ display: 'block', maxWidth: USED_BY_NAME_MAX_WIDTH, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {module.name || module.id}
+                        </span>
+                    </Badge>
                 </Tooltip>
             ))}
-            {extra > 0 && <Text variant="bodySm" color="subdued">+{extra} more</Text>}
+            {extra > 0 && <ModuleListPopover modules={modules} extra={extra} />}
         </HorizontalStack>
     )
 }
@@ -70,13 +125,22 @@ function lastUsedCell(token, state, now) {
     )
 }
 
+// a token that never expires (expiresAt 0) or has already expired is not "expiring soon"
+const isExpiringSoon = (token, now) => token.expiresAt > now && token.expiresAt - now < EXPIRING_SOON_SECONDS
+
+// rounded up, so a token with 3 hours left reads "1 day left" rather than "0 days left"
+function daysLeftLabel(token, now) {
+    const days = Math.ceil((token.expiresAt - now) / DAY)
+    return `${days} ${days === 1 ? 'day' : 'days'} left`
+}
+
 function expiresCell(token, state, now) {
     if (!token.expiresAt) return 'Never'
-    const soon = state === 'Active' && token.expiresAt - now <= EXPIRING_SOON_SECONDS
+    const soon = state === 'Active' && isExpiringSoon(token, now)
     return (
         <HorizontalStack gap="1" wrap={false}>
             <span>{func.epochToDateTime(token.expiresAt)}</span>
-            {soon && <Badge status="warning">Expiring soon</Badge>}
+            {soon && <Badge status="warning">{daysLeftLabel(token, now)}</Badge>}
         </HorizontalStack>
     )
 }
@@ -129,14 +193,14 @@ function TokensTab() {
     const now = nowSeconds()
     const activeTokens = tokens.filter(token => tokenState(token, now) === 'Active')
     const activeLegacyCount = activeTokens.filter(isLegacy).length
-    const expiringSoon = activeTokens.filter(token => token.expiresAt > 0 && token.expiresAt - now <= EXPIRING_SOON_SECONDS)
+    const expiringSoon = activeTokens.filter(token => isExpiringSoon(token, now))
     const idleTokens = activeTokens.filter(token => isIdle(token, now))
     // only an active token has a row menu, so the column exists only while one does
     const hasRowActions = activeTokens.length > 0
     const tableHeaders = useMemo(() => (hasRowActions ? [...HEADERS, ACTION_HEADER] : HEADERS), [hasRowActions])
-    // the rows carry "Expiring soon" / "Idle" badges; this is only the count
+    // the rows carry the "N days left" / "Idle" badges; this is only the count
     const attentionSummary = [
-        expiringSoon.length > 0 && `${expiringSoon.length} expiring within 14 days`,
+        expiringSoon.length > 0 && `${expiringSoon.length} expiring within ${EXPIRING_SOON_DAYS} days`,
         idleTokens.length > 0 && `${idleTokens.length} unused for 30+ days`,
     ].filter(Boolean).join(' · ')
 
@@ -225,10 +289,8 @@ function TokensTab() {
         }
     }
 
-    // the server sends at most a few modules per token plus the real total in moduleCount
     const affectedModules = (revokeTarget?.modules) || []
-    const moreAffected = (revokeTarget?.moduleCount ?? affectedModules.length) - affectedModules.length
-    const revokeAllModuleCount = activeTokens.reduce((count, token) => count + (token.moduleCount ?? (token.modules || []).length), 0)
+    const revokeAllModuleCount = activeTokens.reduce((count, token) => count + (token.modules || []).length, 0)
 
     return (
         <VerticalStack gap="4">
@@ -315,16 +377,19 @@ function TokensTab() {
                         </Text>
                         {affectedModules.length > 0 ? (
                             <VerticalStack gap="1">
-                                <Text variant="bodyMd" fontWeight="semibold">These modules will lose access:</Text>
-                                {affectedModules.map(module => (
-                                    <Text key={module.id} variant="bodyMd">
-                                        {module.name || module.id} ({module.moduleType || '-'}), last heartbeat {func.epochToDateTime(module.lastHeartbeatReceived)}
-                                    </Text>
-                                ))}
-                                {moreAffected > 0 && <Text variant="bodyMd" color="subdued">and {moreAffected} more</Text>}
+                                <Text variant="bodyMd" fontWeight="semibold">These {affectedModules.length} module(s) are using it and will lose access:</Text>
+                                <div style={{ maxHeight: MODULE_LIST_MAX_HEIGHT, overflowY: 'auto' }}>
+                                    <VerticalStack gap="1">
+                                        {affectedModules.map(module => (
+                                            <Text key={module.id} variant="bodyMd" breakWord>
+                                                {module.name || module.id} ({module.moduleType || '-'}), last heartbeat {func.epochToDateTime(module.lastHeartbeatReceived)}
+                                            </Text>
+                                        ))}
+                                    </VerticalStack>
+                                </div>
                             </VerticalStack>
                         ) : (
-                            <Text variant="bodyMd" color="subdued">No modules are currently using this token.</Text>
+                            <Text variant="bodyMd" color="subdued">No module has sent a heartbeat with this token in the last {ACTIVE_WINDOW}.</Text>
                         )}
                         <TextField
                             label="Reason (optional)"
@@ -353,7 +418,7 @@ function TokensTab() {
                 <Modal.Section>
                     <VerticalStack gap="3">
                         <Banner status="critical">
-                            This revokes {activeTokens.length} active token(s){activeLegacyCount > 0 ? `, including ${activeLegacyCount} legacy token(s),` : ''} affecting {revokeAllModuleCount} module(s).
+                            This revokes {activeTokens.length} active token(s){activeLegacyCount > 0 ? `, including ${activeLegacyCount} legacy token(s),` : ''} affecting {revokeAllModuleCount} active module(s).
                         </Banner>
                         <Text variant="bodyMd" color="subdued">{REVOKE_ALL_INFO}</Text>
                         <TextField
