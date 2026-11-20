@@ -39,22 +39,22 @@ const headers = [
         value: 'riskScoreComp',
         sortActive: true
     },
-    {   
+    {
         title: 'Test coverage',
-        text: 'Test coverage', 
+        text: 'Test coverage',
         value: 'coverage',
         isText: CellType.TEXT,
         tooltipContent: (<Text variant="bodySm">Percentage of endpoints tested successfully in the collection</Text>)
     },
     {
-        title: 'Issues', 
-        text: 'Issues', 
+        title: 'Issues',
+        text: 'Issues',
         value: 'issuesArr',
         tooltipContent: (<Text variant="bodySm">Severity and count of issues present in the collection</Text>)
     },
     {   
-        title: 'Sensitive data' , 
-        text: 'Sensitive data' , 
+        title: 'Sensitive data' ,
+        text: 'Sensitive data' ,
         value: 'sensitiveSubTypes',
         tooltipContent: (<Text variant="bodySm">Types of data type present in response of endpoint inside the collection</Text>)
     },
@@ -93,7 +93,7 @@ const sortOptions = [
     { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' , columnIndex: 2},
     { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detected', columnIndex: 8 },
     { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detected' , columnIndex: 8},
-  ];        
+  ];
 
 
 const resourceName = {
@@ -108,7 +108,7 @@ function convertToCollectionData(c) {
         detected: func.prettifyEpoch(c.startTs),
         icon: CircleTickMajor,
         nextUrl: "/dashboard/observe/inventory/"+ c.id
-    }    
+    }
 }
 
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
@@ -202,7 +202,7 @@ function ApiCollections() {
             api.getLastTrafficSeen(),
             api.getUserEndpoints(),
         ];
-        
+
         let results = await Promise.allSettled(apiPromises);
 
         apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
@@ -235,7 +235,7 @@ function ApiCollections() {
         setCollectionsMap(func.mapCollectionIdToName(tmp))
         const allHostNameMap = func.mapCollectionIdToHostName(tmp)
         setHostNameMap(allHostNameMap)
-        
+
         tmp = {}
         tmp.all = dataObj.prettify
         tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
@@ -251,7 +251,7 @@ function ApiCollections() {
 
     useEffect(() => {
         fetchData()
-        resetFunc()    
+        resetFunc()
     }, [])
     const createCollectionModalActivatorRef = useRef();
 
@@ -332,15 +332,53 @@ function ApiCollections() {
         setRefreshData(!refreshData)
     }
 
-    const updateEnvType = (apiCollectionIds,type) => {
-        let copyObj = JSON.parse(JSON.stringify(envTypeMap))
-        apiCollectionIds.forEach(id => copyObj[id] = type)
-        api.updateEnvTypeOfCollection(type,apiCollectionIds).then((resp) => {
-            func.setToast(true, false, "ENV type updated successfully")
+    const updateTags = async (apiCollectionIds, tagObj) => {
+        let copyObj = await JSON.parse(JSON.stringify(envTypeMap))
+        apiCollectionIds.forEach(id => {
+            if(!copyObj[id]) {
+                copyObj[id] = []
+            }
+
+            if(tagObj === null) {
+                copyObj[id] = []
+            } else {
+                if(tagObj?.keyName?.toLowerCase() === 'envtype') {
+                    // Replace any existing envType tag (staging, production, QA, DEV, INTEG, UAT, PREPROD, INTERNAL, etc.)
+                    const currentEnvIndex = copyObj[id].findIndex(tag =>
+                        tag.keyName?.toLowerCase() === 'envtype' || tag.keyName?.toLowerCase() === 'usersetenvtype'
+                    )
+
+                    if (currentEnvIndex === -1) {
+                        copyObj[id].push(tagObj)
+                    } else {
+                        const currentValue = copyObj[id][currentEnvIndex].value?.toLowerCase()
+                        if (tagObj.value?.toLowerCase() !== currentValue) {
+                            copyObj[id][currentEnvIndex] = tagObj
+                        } else {
+                            copyObj[id].splice(currentEnvIndex, 1)
+                        }
+                    }
+                } else {
+                    const index = copyObj[id].findIndex(tag => 
+                        tag.keyName === tagObj.keyName && tag.value === tagObj.value
+                    )
+
+                    if (index === -1) {
+                        copyObj[id].push(tagObj)
+                    } else {
+                        copyObj[id].splice(index, 1)
+                    }
+                }
+            }
+        })
+
+
+        await api.updateEnvTypeOfCollection(tagObj === null ? tagObj : [tagObj], apiCollectionIds, tagObj === null).then(() => {
+            func.setToast(true, false, "Tags updated successfully")
             setEnvTypeMap(copyObj)
             updateData(copyObj)
         })
-        
+
     }
 
     const modalComponent = <CreateNewCollectionModal
@@ -388,11 +426,11 @@ function ApiCollections() {
         <GithubSimpleTable
             key={refreshData}
             pageLimit={100}
-            data={data[selectedTab]} 
-            sortOptions={sortOptions} 
-            resourceName={resourceName} 
+            data={data[selectedTab]}
+            sortOptions={sortOptions}
+            resourceName={resourceName}
             filters={[]}
-            disambiguateLabel={disambiguateLabel} 
+            disambiguateLabel={disambiguateLabel}
             headers={headers}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
@@ -411,9 +449,9 @@ function ApiCollections() {
     return(
         <PageWithMultipleCards
             title={
-                <TitleWithInfo 
+                <TitleWithInfo
                     tooltipContent={"Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
-                    titleText={"API collections"} 
+                    titleText={"API collections"}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
