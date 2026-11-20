@@ -50,11 +50,9 @@ public class MaliciousEventDto {
   public static final String EVAL_TYPE_SKILL = "SKILL";
   public static final String DEDUPE_KEY = "dedupeKey";
   public static final String FIRST_DETECTED_AT = "firstDetectedAt";
-  public static final String OCCURRENCE_COUNT = "occurrenceCount";
   private String evalType;
   private String dedupeKey;
   private Long firstDetectedAt;
-  private Integer occurrenceCount;
   // Set only by the grouped activity list (never stored): how many events are behind this row, the first
   // one's time, their ids, and the policies they tripped.
   private Integer groupCount;
@@ -666,14 +664,6 @@ public class MaliciousEventDto {
 
   public void setFirstDetectedAt(Long firstDetectedAt) {
     this.firstDetectedAt = firstDetectedAt;
-  }
-
-  public Integer getOccurrenceCount() {
-    return occurrenceCount;
-  }
-
-  public void setOccurrenceCount(Integer occurrenceCount) {
-    this.occurrenceCount = occurrenceCount;
   }
 
   public String getGroupKey() {

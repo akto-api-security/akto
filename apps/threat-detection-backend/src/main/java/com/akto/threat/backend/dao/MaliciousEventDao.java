@@ -50,7 +50,7 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
 
     private static final Set<String> INSERT_ONLY_FIELDS = new HashSet<>(Arrays.asList(
         "_id", "status", "caseOwner", "caseNotes", "caseTimeline", "jiraTicketUrl",
-        MaliciousEventDto.DEDUPE_KEY, MaliciousEventDto.FIRST_DETECTED_AT, MaliciousEventDto.OCCURRENCE_COUNT));
+        MaliciousEventDto.DEDUPE_KEY, MaliciousEventDto.FIRST_DETECTED_AT));
     private static final int UPSERT_ATTEMPTS = 2;
 
     public void upsertByDedupeKey(String accountId, MaliciousEventDto event) {
@@ -70,7 +70,6 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
             }
         }
         updates.add(Updates.setOnInsert(MaliciousEventDto.FIRST_DETECTED_AT, new BsonInt64(event.getDetectedAt())));
-        updates.add(Updates.inc(MaliciousEventDto.OCCURRENCE_COUNT, 1));
 
         Bson filter = Filters.and(
             Filters.eq(MaliciousEventDto.DEDUPE_KEY, event.getDedupeKey()),
