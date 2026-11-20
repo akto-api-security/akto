@@ -160,6 +160,17 @@ public class Constants {
      * under this name so the Traces UI groups their traffic like everyone else's.
      */
     public static final String AI_AGENT_HEADER_INSTALLER_SESSION_ID = "x-akto-installer-akto_session_id";
+    /**
+     * The per-turn identifier, read by AgentQueryRecord as traceId. It is what folds the spans
+     * of one exchange into a single trace, and what every per-trace lookup is keyed on, so a
+     * record without it cannot be expanded or re-fetched.
+     */
+    public static final String AI_AGENT_HEADER_INSTALLER_MESSAGE_ID = "x-akto-installer-akto_message_id";
+    /**
+     * Bedrock's own per-invocation id, which the log processor already puts on every record.
+     * Lower case because header names are normalised on ingest (OriginalHttpRequest.buildHeadersMap).
+     */
+    public static final String AI_AGENT_HEADER_BEDROCK_REQUEST_ID = "x-request-id";
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";

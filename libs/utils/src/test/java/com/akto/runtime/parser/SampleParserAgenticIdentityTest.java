@@ -11,11 +11,12 @@ import com.akto.util.Constants;
 import com.google.gson.Gson;
 
 /**
- * A pipeline that builds records from logs has no request to hang a header on, so it delivers
- * the conversation id as a tag. AgentQueryRecord only ever reads the header, so without this
- * bridge every such record arrives with a null session and Traces cannot group it.
+ * A pipeline that builds records from logs has no request to hang headers on, so it delivers
+ * the conversation as a tag and the turn as a response id. AgentQueryRecord only ever reads the
+ * x-akto-installer-* headers, so without these bridges every such record arrives with a null
+ * session and an empty traceId - ungroupable, uncountable and not expandable.
  */
-public class SampleParserSessionHeaderTest {
+public class SampleParserAgenticIdentityTest {
 
     private static final Gson gson = new Gson();
     private static final String SESSION = "8ef2a7f2-4e53-42ec-b368-6c051c763a5d";
@@ -35,11 +36,21 @@ public class SampleParserSessionHeaderTest {
             + "}";
     }
 
-    private String sessionHeaderOf(HttpResponseParams p) {
-        List<String> values = p.getRequestParams().getHeaders()
-            .get(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID);
+    private String headerOf(HttpResponseParams p, String name) {
+        List<String> values = p.getRequestParams().getHeaders().get(name);
         return values == null || values.isEmpty() ? null : values.get(0);
     }
+
+    private String sessionHeaderOf(HttpResponseParams p) {
+        return headerOf(p, Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID);
+    }
+
+    private String messageIdHeaderOf(HttpResponseParams p) {
+        return headerOf(p, Constants.AI_AGENT_HEADER_INSTALLER_MESSAGE_ID);
+    }
+
+    private static final String REQUEST_ID_HEADER =
+        "\\\"x-request-id\\\":\\\"a299d3ed-b7d6-4d84-b8d4-35cca20d6e04\\\"";
 
     @Test
     public void testSessionTagBecomesTheHeaderTracesReads() throws Exception {
@@ -107,6 +118,61 @@ public class SampleParserSessionHeaderTest {
 
         assertNull(sessionHeaderOf(p));
         assertNotNull(p.getRequestParams().getHeaders().get("host"));
+    }
+
+    // ---------------- turn identifier (traceId) ----------------
+
+    /**
+     * Without this, every Bedrock record lands with an empty traceId: per-session message counts
+     * are a cardinality over it, and every per-trace lookup is keyed on it, so the turns of a
+     * conversation can neither be counted nor expanded.
+     */
+    @Test
+    public void testRequestIdBecomesTheTurnIdentifier() throws Exception {
+        HttpResponseParams p = SampleParser.parseSampleMessage(message(
+            "{\"source\":\"AWS_BEDROCK\",\"bot-name\":\"a\"}", REQUEST_ID_HEADER));
+
+        assertEquals("a299d3ed-b7d6-4d84-b8d4-35cca20d6e04", messageIdHeaderOf(p));
+    }
+
+    /** Two turns of one conversation share a session but must stay distinct traces. */
+    @Test
+    public void testTurnsInOneConversationGetDistinctIds() throws Exception {
+        String tags = "{\"source\":\"AWS_BEDROCK\",\"session-id\":\"" + SESSION + "\"}";
+        HttpResponseParams first  = SampleParser.parseSampleMessage(
+            message(tags, "\\\"x-request-id\\\":\\\"req-one\\\""));
+        HttpResponseParams second = SampleParser.parseSampleMessage(
+            message(tags, "\\\"x-request-id\\\":\\\"req-two\\\""));
+
+        assertEquals(sessionHeaderOf(first), sessionHeaderOf(second), "same conversation");
+        assertNotEquals(messageIdHeaderOf(first), messageIdHeaderOf(second), "different turns");
+    }
+
+    @Test
+    public void testNoRequestIdInventsNoTurnIdentifier() throws Exception {
+        HttpResponseParams p = SampleParser.parseSampleMessage(message(
+            "{\"source\":\"AWS_BEDROCK\",\"session-id\":\"" + SESSION + "\"}", null));
+
+        assertNull(messageIdHeaderOf(p));
+        assertEquals(SESSION, sessionHeaderOf(p), "the session still bridges on its own");
+    }
+
+    @Test
+    public void testExistingTurnIdentifierIsNeverOverwritten() throws Exception {
+        HttpResponseParams p = SampleParser.parseSampleMessage(message(
+            "{\"source\":\"AWS_BEDROCK\"}",
+            "\\\"x-request-id\\\":\\\"from-bedrock\\\","
+            + "\\\"x-akto-installer-akto_message_id\\\":\\\"from-header\\\""));
+
+        assertEquals("from-header", messageIdHeaderOf(p));
+    }
+
+    @Test
+    public void testOtherSourcesGetNoTurnIdentifier() throws Exception {
+        HttpResponseParams p = SampleParser.parseSampleMessage(message(
+            "{\"source\":\"ENDPOINT\",\"bot-name\":\"some-bot\"}", REQUEST_ID_HEADER));
+
+        assertNull(messageIdHeaderOf(p), "only AWS_BEDROCK opts into the bridge");
     }
 
     /**
