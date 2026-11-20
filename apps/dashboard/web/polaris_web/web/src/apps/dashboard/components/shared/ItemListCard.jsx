@@ -1,6 +1,7 @@
 import { Box, Button, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import ShowListInBadge from "./ShowListInBadge";
 import Pressable from "../../pages/dashboard/ask/components/Pressable";
+import TooltipText from "./TooltipText";
 
 /*
  * Bordered list of rows (title, optional description, optional right-side tag), e.g. the tools an
@@ -15,7 +16,7 @@ import Pressable from "../../pages/dashboard/ask/components/Pressable";
  *     onViewAll={openComponents}
  * />
  */
-function ItemListCard({ items = [], emptyText, limit, onViewAll, onViewLess }) {
+function ItemListCard({ items = [], emptyText, limit, onViewAll, onViewLess, truncateTitles = false }) {
     if (!items.length) {
         return <Text variant="bodySm" color="subdued">{emptyText}</Text>;
     }
@@ -26,14 +27,17 @@ function ItemListCard({ items = [], emptyText, limit, onViewAll, onViewLess }) {
             {shown.map((item, i) => {
                 const text = (
                     <VerticalStack gap="05">
-                        <Text variant="bodyMd">{item.title}</Text>
+                        {truncateTitles
+                            ? <TooltipText text={item.title} tooltip={item.title} textProps={{ variant: "bodyMd" }} />
+                            : <Text variant="bodyMd">{item.title}</Text>}
                         {item.description && <Text variant="bodySm" color="subdued">{item.description}</Text>}
                     </VerticalStack>
                 );
+                const shrinkable = (node) => (truncateTitles ? <Box minWidth="0">{node}</Box> : node);
                 const row = (
                     <HorizontalStack align="space-between" blockAlign="center" wrap={false} gap="3">
-                        {item.media ? <HorizontalStack gap="3" blockAlign="center" wrap={false}>{item.media}{text}</HorizontalStack> : text}
-                        {item.tag}
+                        {shrinkable(item.media ? <HorizontalStack gap="3" blockAlign="center" wrap={false}>{item.media}{shrinkable(text)}</HorizontalStack> : text)}
+                        {truncateTitles ? <div style={{ flexShrink: 0 }}>{item.tag}</div> : item.tag}
                     </HorizontalStack>
                 );
                 const key = item.id ?? item.title;

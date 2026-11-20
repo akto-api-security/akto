@@ -114,7 +114,7 @@ provider is a config entry plus its key; no code change.
 
 | Variable | Notes |
 |----------|-------|
-| `OCR_MODEL_CONFIG_JSON` | JSON list of preset names and entries, e.g. `["gemma", "azure_vision"]`. Unset → `["gemma"]`. Malformed → OCR is off (503), not a silent default. |
+| `OCR_MODEL_CONFIG_JSON` | JSON list of preset names and entries, e.g. `["gemma", "azure_vision"]`. Unset → `["gemma"]` when `OCR_GEMMA_URL` is set, else `["arbiter"]`. Malformed → OCR is off (503), not a silent default. |
 | `OCR_GEMMA_URL` / `OCR_GEMMA_KEY` / `OCR_GEMMA_MODEL` | `gemma` preset: an OpenAI-compatible chat endpoint (e.g. `http://<vllm>/v1`, without `/chat/completions`) that accepts image input, its Bearer key, and the served model name |
 | `OCR_AZURE_URL` / `OCR_AZURE_KEY` | `azure_vision` preset: the Azure Computer Vision resource endpoint and key (OCR v3.2, the same call guardrails-service makes today) |
 | any other `OCR_*` | whatever your own entries name, e.g. `OCR_GOOGLE_KEY` below |
@@ -122,6 +122,24 @@ provider is a config entry plus its key; no code change.
 Presets: `gemma` (OCR through a Gemma chat model; the endpoint must allow
 image input, e.g. vLLM's `--limit-mm-per-prompt '{"image": 1}'`) and
 `azure_vision`. Both are ordinary entries kept in `ocr.py`'s `PRESETS`.
+
+**`arbiter`: no OCR settings at all.** With nothing set, `/ocr` reads the
+image with the `FINAL_ARBITER` model of the scan config
+(`DEFAULT_MODEL_CONFIG_JSON`, else the built-in default), and falls back to
+its `FINAL_ARBITER_BACKUP` the same way scans do. It uses that model's own
+provider settings and auth, e.g. Bedrock's API key, IAM keys or pod role, so
+there is no second key to manage. List it explicitly as `"arbiter"` or
+`{"provider": "arbiter", "timeoutMs": 60000}`, e.g. `["gemma", "arbiter"]`.
+
+- The arbiter's provider must take image input: `openai_compatible` / vLLM,
+  `gemma_fast_arbiter`, the Foundry providers, or `bedrock` with a Gemma 4
+  model (Mantle). Qwen3Guard, Vertex, Anthropic, Bedrock Converse and
+  reach-back don't; the entry is then skipped with a warning, and with
+  nothing else listed `/ocr` answers 503.
+- The model itself must read images; on vLLM that means image input enabled.
+- OCR calls share the arbiter's capacity with scans (about 1–2 s per image on
+  Gemma 4 26B). To keep them apart, point `OCR_MODEL_CONFIG_JSON` at another
+  model.
 
 An `"http"` entry:
 
@@ -161,7 +179,7 @@ the 4 MB image plus JSON framing gets a 413 before its body is read.
 # Piped, not inline: an inline base64 image over ~96 KB exceeds the shell's per-argument limit.
 { printf '{"image_b64":"'; base64 -w0 screenshot.png; printf '"}'; } |
   curl -s localhost:8090/ocr -H 'Content-Type: application/json' -d @-
-# 200 {"text": "line one\nline two", "provider": "gemma"}
+# 200 {"text": "line one\nline two", "provider": "gemma"}   ("arbiter:<provider>" when the arbiter read it)
 # 400 body not a JSON object, or image_b64 missing/invalid · 413 image (or body) too large · 503 no provider configured
 # 502 {"error": "every OCR provider failed", "failures": [{"provider": "gemma", "reason": "HTTP 400"}]}
 ```

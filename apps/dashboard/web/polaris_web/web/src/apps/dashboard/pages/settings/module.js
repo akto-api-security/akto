@@ -417,6 +417,13 @@ const settingFunctions = {
       })
       return trafficData
     },
+    saveLinearBiDirectionalSync: async function(biDirectionalSyncEnabled) {
+      let trafficData = {}
+      await settingRequests.saveLinearBiDirectionalSync(biDirectionalSyncEnabled).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     removeLinearIntegration: async function() {
       let trafficData = {}
       await settingRequests.removeLinearIntegration().then((resp)=>{
@@ -441,6 +448,13 @@ const settingFunctions = {
     savePortIOSeverityMapping: async function(severityToPriority) {
       let portInteg = {}
       await settingRequests.savePortIOSeverityMapping(severityToPriority).then((resp)=>{
+        portInteg = resp.portIOIntegration
+      })
+      return portInteg
+    },
+    savePortIOBiDirectionalSync: async function(biDirectionalSyncEnabled, updateWorkflowId) {
+      let portInteg = {}
+      await settingRequests.savePortIOBiDirectionalSync(biDirectionalSyncEnabled, updateWorkflowId).then((resp)=>{
         portInteg = resp.portIOIntegration
       })
       return portInteg

@@ -2,6 +2,7 @@ package com.akto.utils;
 
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
@@ -29,14 +30,8 @@ public class TestRoleAuthUtils {
      * replaces headers that already exist, and this request is built from scratch).
      */
     public static void applyTestRoleAuth(OriginalHttpRequest request, String roleId) throws Exception {
-        TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(roleId)));
-        if (testRole == null) {
-            throw new Exception("Test role not found: " + roleId);
-        }
-        AuthMechanism authMechanism = testRole.findDefaultAuthMechanism();
-        if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().isEmpty()) {
-            throw new Exception("No default auth mechanism configured for test role: " + testRole.getName());
-        }
+        TestRoles testRole = findTestRole(roleId);
+        AuthMechanism authMechanism = defaultAuthMechanism(testRole);
 
         // LOGIN_REQUEST (incl. recorded flows) params are templates like ${x1.response.body...};
         // they only hold real values after the login flow has run and filled the cached params.
@@ -64,6 +59,40 @@ public class TestRoleAuthUtils {
         if (!Boolean.TRUE.equals(result.getSuccess())) {
             throw new Exception("Auth was not applied for test role " + testRole.getName() + ": " + result.getErrMsg());
         }
+    }
+
+    /**
+     * For a request whose role mini-testing applies: adds the header names of the role's auth with empty values,
+     * without resolving them (no login flow runs here), so a sample saved from the request has the auth headers a
+     * test with the role replaces. Mini-testing matches the role's auth to the request the same way.
+     */
+    public static void addTestRoleHeaderNames(OriginalHttpRequest request, String roleId) throws Exception {
+        TestRoles testRole = findTestRole(roleId);
+        AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(new RawApi(request, null, ""));
+        if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().isEmpty()) {
+            throw new Exception("No auth mechanism configured for test role: " + testRole.getName());
+        }
+        for (AuthParam authParam : authMechanism.getAuthParams()) {
+            if (authParam.getKey() != null && authParam.getWhere() == AuthParam.Location.HEADER) {
+                request.getHeaders().putIfAbsent(authParam.getKey().toLowerCase().trim(), new ArrayList<>(Arrays.asList("")));
+            }
+        }
+    }
+
+    private static TestRoles findTestRole(String roleId) throws Exception {
+        TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(roleId)));
+        if (testRole == null) {
+            throw new Exception("Test role not found: " + roleId);
+        }
+        return testRole;
+    }
+
+    private static AuthMechanism defaultAuthMechanism(TestRoles testRole) throws Exception {
+        AuthMechanism authMechanism = testRole.findDefaultAuthMechanism();
+        if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().isEmpty()) {
+            throw new Exception("No default auth mechanism configured for test role: " + testRole.getName());
+        }
+        return authMechanism;
     }
 
     /**

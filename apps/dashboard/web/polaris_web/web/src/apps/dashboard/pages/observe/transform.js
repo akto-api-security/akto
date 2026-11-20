@@ -1,6 +1,7 @@
 import func from "@/util/func";
 import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
+import RiskScoreTooltipContent from "./RiskScoreTooltipContent";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import CopyEndpoint from "./api_collections/component/CopyEndpoint"
@@ -422,10 +423,23 @@ const transform = {
         }
     },
 
-    // Suppressed when either score is 0/falsy — a "0" risk-score badge showing a non-zero base
-    // score (or vice versa) in its tooltip reads as contradictory, so both have to be meaningfully
-    // non-zero before the extra context is worth surfacing.
-    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason){
+    // Prefer riskScoreFactors saved with the score when present. Fall back to the older
+    // baseRiskScoreReason string used on inventory / collection pages.
+    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason, riskScoreFactors, scope = "asset"){
+        if (riskScore && Array.isArray(riskScoreFactors) && riskScoreFactors.length > 0) {
+            return (
+                <Tooltip dismissOnMouseOut content={
+                    <RiskScoreTooltipContent
+                        riskScore={Number(riskScore)}
+                        status={transform.getStatus(Number(riskScore))}
+                        factors={riskScoreFactors}
+                        scope={scope}
+                    />
+                }>
+                    {badge}
+                </Tooltip>
+            );
+        }
         if(!baseRiskScoreReason || !riskScore || !baseRiskScore) return badge;
         return (
             <Tooltip dismissOnMouseOut content={
@@ -610,7 +624,7 @@ const transform = {
             const riskScoreBadge = <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>;
             const riskScoreComp = isUntrackedTab
                 ? <Text></Text>
-                : (isLoading ? loadingComp : this.wrapRiskScoreTooltip(riskScoreBadge, c.riskScore, c.baseRiskScore, c.baseRiskScoreReason));
+                : (isLoading ? loadingComp : this.wrapRiskScoreTooltip(riskScoreBadge, c.riskScore, c.baseRiskScore, c.baseRiskScoreReason, c.riskScoreFactors));
 
             // Create iconComp for collections if not already present
             const showIcon = isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || ((isApiSecurityCategory() || isDastCategory()) && c.hostName);
@@ -790,7 +804,14 @@ const transform = {
                 methodComp: <MethodBox method={url.method} url={url.endpoint} apiType={url.apiType} methodBoxWidth="48px" />,
                 endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} apiType={url.apiType} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} isMalicious={url.isMalicious || false} isMisconfigured={url.isMisconfigured || false} skillTags={url.skillTags || []} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
-                riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
+                riskScoreComp: this.wrapRiskScoreTooltip(
+                    <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
+                    url.riskScore,
+                    null,
+                    null,
+                    url.riskScoreFactors,
+                    "row",
+                ),
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,

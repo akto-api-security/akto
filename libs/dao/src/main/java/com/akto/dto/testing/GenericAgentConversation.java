@@ -20,7 +20,9 @@ public class GenericAgentConversation {
         ANALYZE_DASHBOARD_DATA,
         AGENTIC_OBSERVE,
         INSIGHTS,
-        COMMAND_PALETTE
+        COMMAND_PALETTE,
+        /** Ask Akto writing pre/post-request scripts; see service/scripts/validation/CLAUDE.md. */
+        TEST_SCRIPT
     }
 
     private String title;

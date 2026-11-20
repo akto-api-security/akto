@@ -277,6 +277,9 @@ function DetectedCellRenderer({ value, data }) {
 const TYPE_FILTER_ACCOUNT_ID = 1791484402;
 const typeFilterEnabled = () => isEndpointSecurityCategory() && Number(window.ACTIVE_ACCOUNT) === TYPE_FILTER_ACCOUNT_ID;
 
+// Content access is audited only for Argus and Atlas, not API Security.
+const revealRequired = () => isEndpointSecurityCategory() || isAgenticSecurityCategory();
+
 const AGENTIC_TYPE_FILTER_VALUES = ["Prompt", "Tool", "Resource"];
 const ACTION_FILTER_LABELS = { block: "Blocked", alert: "Alert", flag: "Flagged" };
 
@@ -1590,7 +1593,8 @@ function Violations() {
             if (pendingDeepLinkRefId.current) {
                 const deepLinkMatch = value.find(r => r.refId === pendingDeepLinkRefId.current);
                 if (deepLinkMatch) {
-                    setPendingReveal(deepLinkMatch);
+                    if (revealRequired()) setPendingReveal(deepLinkMatch);
+                    else setSelectedViolation(deepLinkMatch);
                     pendingDeepLinkRefId.current = null;
                 }
             }
@@ -1725,7 +1729,9 @@ function Violations() {
     }, [isHumanApprovalTab, bulkPendingCount, handleBulkStatusUpdate, handleBulkHumanApproval]);
 
     const handleRowClick = (e) => {
-        if (e?.data) setPendingReveal(e.data);
+        if (!e?.data) return;
+        if (revealRequired()) setPendingReveal(e.data);
+        else setSelectedViolation(e.data);
     };
 
     // Opens the content only after the view is audited.

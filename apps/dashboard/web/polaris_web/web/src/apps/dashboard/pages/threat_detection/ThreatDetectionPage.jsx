@@ -365,6 +365,8 @@ function ThreatDetectionPage() {
     const [pendingRowContext, setPendingRowContext] = useState(null);
     const [revealedRefId, setRevealedRefId] = useState(null);
     const [revealing, setRevealing] = useState(false);
+    // Content access is audited only for Argus and Atlas, not API Security.
+    const revealRequired = isEndpointSecurityCategory() || isAgenticSecurityCategory();
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
     const showNewLayoutToggle = isEndpointSecurityCategory() || isAgenticSecurityCategory();
@@ -749,7 +751,7 @@ function ThreatDetectionPage() {
           urlParams.get("filterId")
         );
         
-        if (!hasParams || !queryParams.hasQueryEvent || revealedRefId !== queryParams.refId) {
+        if (!hasParams || !queryParams.hasQueryEvent || (revealRequired && revealedRefId !== queryParams.refId)) {
             return;
         }
         
@@ -758,9 +760,9 @@ function ThreatDetectionPage() {
         return () => {
             isMountedRef.current = false;
         };
-      }, [queryParams.hasQueryEvent, queryParams.refId, fetchEventDetails, location.search, revealedRefId]);
+      }, [queryParams.hasQueryEvent, queryParams.refId, fetchEventDetails, location.search, revealedRefId, revealRequired]);
 
-      const revealPending = queryParams.hasQueryEvent && revealedRefId !== queryParams.refId;
+      const revealPending = revealRequired && queryParams.hasQueryEvent && revealedRefId !== queryParams.refId;
 
       const confirmReveal = async () => {
         if (revealing) return;

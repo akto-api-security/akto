@@ -167,11 +167,11 @@ public class AtlasGuardrailUtils {
     }
 
     static List<DashboardMaliciousEvent> periodEvents(InsightDataBundle bundle) {
-        if (!hasPreviousPeriod(bundle))
-            return bundle.windowEvents();
         int startTs = bundle.ctx.getStartTs();
         int endTs = bundle.ctx.getEndTs();
-        return bundle.eventsBetween(startTs - (endTs - startTs), endTs);
+        if (!hasPreviousPeriod(bundle))
+            return bundle.eventsFetchedUntil(startTs, endTs);
+        return bundle.eventsFetchedUntil(startTs - (endTs - startTs), endTs);
     }
 
     public static Pair<List<DashboardMaliciousEvent>, List<DashboardMaliciousEvent>> splitByPeriod(InsightDataBundle bundle) {

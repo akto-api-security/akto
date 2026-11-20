@@ -343,6 +343,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     const trafficInfoMap = transformMaps?.trafficInfoMap || {};
     const coverageMap = transformMaps?.coverageMap || {};
     const riskScoreMap = transformMaps?.riskScoreMap || {};
+    const riskScoreFactorsMap = transformMaps?.riskScoreFactorsMap || {};
     const severityInfoMap = transformMaps?.severityInfoMap || {};
     const sensitiveInfoMap = transformMaps?.sensitiveInfoMap || {};
     const usernameMap = transformMaps?.usernameMap || {};
@@ -350,6 +351,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     const detected = func.prettifyEpoch(trafficInfoMap[rawCollection.id] || 0);
     const discovered = func.prettifyEpoch(rawCollection.startTs || 0);
     const riskScore = rawCollection.urlsCount === 0 ? 0 : (riskScoreMap[rawCollection.id] || 0);
+    const riskScoreFactors = riskScoreFactorsMap[rawCollection.id] || [];
     const rawEnvType = rawCollection?.envType || null;
 
     const envType = Array.isArray(rawCollection?.envType) ? rawCollection.envType.map(func.formatCollectionType) : [];
@@ -420,6 +422,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         sensitiveInRespCount: sensitiveTypes.length,
         detectedTimestamp: trafficInfoMap[rawCollection.id] || 0,
         riskScore,
+        riskScoreFactors,
         baseRiskScore: rawCollection.baseRiskScore,
         baseRiskScoreReason: rawCollection.baseRiskScoreReason,
         detected,
@@ -682,6 +685,7 @@ function ApiCollections(props) {
             // coverage arrives separately (loadDetails), after the rows are shown
             coverageMap: {},
             riskScoreMap: resp.riskScoreMap || {},
+            riskScoreFactorsMap: resp.riskScoreFactorsUnavailable ? {} : (resp.riskScoreFactorsMap || {}),
             severityInfoMap: resp.severityInfoMap || {},
             sensitiveInfoMap: resp.sensitiveInfoMap || {},
             usernameMap,
@@ -689,6 +693,7 @@ function ApiCollections(props) {
         return (resp.apiCollections || []).map(c => ({
             ...transformRawCollectionData(c, transformMaps),
             issuesUnavailable: !!resp.issuesUnavailable,
+            riskScoreFactorsUnavailable: !!resp.riskScoreFactorsUnavailable,
         }))
     }
 

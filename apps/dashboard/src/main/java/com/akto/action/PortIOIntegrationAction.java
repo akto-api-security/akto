@@ -25,6 +25,8 @@ public class PortIOIntegrationAction extends UserAction {
     private String clientSecret;
     private String workflowId;
     private Map<String, String> severityToPriority;
+    private boolean biDirectionalSyncEnabled;
+    private String updateWorkflowId;
     private PortIOIntegration portIOIntegration;
     private List<TestingIssuesId> testingIssuesIdList;
     private String errorMessage;
@@ -49,6 +51,20 @@ public class PortIOIntegrationAction extends UserAction {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error saving Port severity mapping: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    @Audit(description = "User changed Port.io bi-directional sync", resource = Resource.PORT_IO_INTEGRATION, operation = Operation.UPDATE)
+    public String savePortIOBiDirectionalSync() {
+        try {
+            portIOIntegration = new PortIOIntegrationService().saveBiDirectionalSync(biDirectionalSyncEnabled,
+                updateWorkflowId);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error saving Port.io bi-directional sync: " + e.getMessage(),
+                LoggerMaker.LogDb.DASHBOARD);
             addActionError(e.getMessage());
             return Action.ERROR.toUpperCase();
         }

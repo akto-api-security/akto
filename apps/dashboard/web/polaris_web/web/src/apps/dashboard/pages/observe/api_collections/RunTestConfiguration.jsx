@@ -88,6 +88,10 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
         return { projectId: firstProject, issueType: firstIssueType }
     }
 
+    // DropdownSearch shows `value` as the field text and highlights `preSelected`, so single-selects need both
+    const labelOf = (items, val) => items.find((item) => item.value === val)?.label ?? ""
+    const selectedOf = (val) => (val ? [val] : [])
+
     const severitiesArr = func.getAktoSeverities()
     const allSeverity = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
 
@@ -221,18 +225,18 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             testRunTimeLabel: testRunTimeOption.label
                         }));
                     }} />
-                    <Dropdown
-                        menuItems={testRolesArr}
+                    <DropdownSearch
+                        optionsList={testRolesArr}
                         label={"Select " + mapLabel("Test", getDashboardCategory()) + " Role"}
-                        initial={testRun.testRoleLabel}
-                        selected={(requests) => {
-                            let testRole;
-                            if (!(requests === "No test role selected")) { testRole = requests; }
+                        placeholder="Select role"
+                        value={labelOf(testRolesArr, testRun.testRoleId) || testRun.testRoleLabel}
+                        preSelected={selectedOf(testRun.testRoleId)}
+                        setSelected={(requests) => {
                             const testRoleOption = getLabel(testRolesArr, requests);
 
                             setTestRun(prev => ({
                                 ...prev,
-                                testRoleId: testRole,
+                                testRoleId: requests,
                                 testRoleLabel: testRoleOption.label
                             }));
                         }} />
@@ -346,42 +350,46 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 {testRun.autoTicketingDetails.shouldCreateTickets &&
                     <>
                         {ticketToolOptions.length > 1 &&
-                            <Dropdown
-                                menuItems={ticketToolOptions}
-                                selected={changeTicketTool}
-                                placeHolder={"Select Ticket Tool"}
-                                initial={ticketSource}
+                            <DropdownSearch
+                                optionsList={ticketToolOptions}
+                                setSelected={changeTicketTool}
+                                placeholder={"Select Ticket Tool"}
+                                value={labelOf(ticketToolOptions, ticketSource)}
+                                preSelected={selectedOf(ticketSource)}
                             />
                         }
                         {isPortIOTicketing ? null : isLinearTicketing ?
-                            <Dropdown
+                            <DropdownSearch
                                 key="linear-team"
-                                menuItems={linearTeams}
-                                selected={(val) => {
+                                optionsList={linearTeams}
+                                setSelected={(val) => {
                                     setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
                                 }}
-                                placeHolder={"Select Team"}
-                                initial={testRun.autoTicketingDetails.projectId}
+                                placeholder={"Select Team"}
+                                value={labelOf(linearTeams, testRun.autoTicketingDetails.projectId)}
+                                preSelected={selectedOf(testRun.autoTicketingDetails.projectId)}
                             />
                             :
                             <>
-                                <Dropdown
+                                <DropdownSearch
                                     key="jira-project"
-                                    menuItems={allProjects}
-                                    selected={(val) => {
+                                    optionsList={allProjects}
+                                    setSelected={(val) => {
                                         setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
                                     }}
                                     disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
-                                    placeHolder={"Select Project"}
-                                    initial={testRun.autoTicketingDetails.projectId}
+                                    placeholder={"Select Project"}
+                                    value={labelOf(allProjects, testRun.autoTicketingDetails.projectId)}
+                                    preSelected={selectedOf(testRun.autoTicketingDetails.projectId)}
                                 />
-                                <Dropdown
+                                <DropdownSearch
                                     key="jira-issue-type"
                                     disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
-                                    menuItems={allIssuesType}
-                                    selected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
-                                    placeHolder={"Select Issue Type"}
-                                    initial={testRun.autoTicketingDetails.issueType}
+                                    optionsList={allIssuesType}
+                                    setSelected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
+                                    placeholder={"Select Issue Type"}
+                                    value={labelOf(allIssuesType, testRun.autoTicketingDetails.issueType)}
+                                    preSelected={selectedOf(testRun.autoTicketingDetails.issueType)}
                                 />
                             </>
                         }

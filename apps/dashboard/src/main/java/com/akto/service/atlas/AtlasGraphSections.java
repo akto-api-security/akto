@@ -49,7 +49,9 @@ final class AtlasGraphSections {
         List<AtlasTool> agents = tools.stream()
                 .filter(t -> AtlasAssetStatusService.ROW_TYPE_AGENT.equals(t.getRow().getRowType()) && !t.getRow().getMcpDevices().isEmpty())
                 .sorted(busiestFirst())
+                .limit(MATRIX_AGENTS)
                 .collect(Collectors.toList());
+        // Servers are ranked over the shown agents only, so every column has at least one filled cell.
         List<String> servers = busiest(devicesByServer(agents), MATRIX_SERVERS);
 
         List<Map<String, Object>> serverCols = new ArrayList<>();
@@ -62,7 +64,7 @@ final class AtlasGraphSections {
             serverCols.add(col);
         }
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (AtlasTool agent : agents.subList(0, Math.min(MATRIX_AGENTS, agents.size()))) {
+        for (AtlasTool agent : agents) {
             Map<String, Integer> byServer = new HashMap<>();
             for (Map.Entry<String, Set<String>> e : agent.getRow().getMcpDevices().entrySet()) {
                 byServer.merge(AtlasDiscoveryService.lower(e.getKey()), e.getValue().size(), Integer::sum);
@@ -80,19 +82,18 @@ final class AtlasGraphSections {
         return out;
     }
 
-    /** Share of each tagged team's employees who used each category recently; empty when no user carries a team tag. */
+    /** Share of each team's employees who used each category recently; employees with no team tag form the Untagged row, listed last. */
     Map<String, Object> teamCategoryMatrix() {
         Map<String, Set<String>> members = people.membersByTeam();
         Map<String, Map<String, Set<String>>> adopters = new HashMap<>();
         for (AtlasTool tool : tools) {
             for (String user : tool.getRecentUsers()) {
-                String team = people.teamOfUser(user);
-                if (team == null) continue;
+                String team = people.teamOrUntagged(user);
                 adopters.computeIfAbsent(team, k -> new HashMap<>()).computeIfAbsent(tool.getCategory(), k -> new HashSet<>()).add(user);
             }
         }
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (String team : busiest(members, MATRIX_TEAMS)) {
+        for (String team : untaggedLast(members, MATRIX_TEAMS)) {
             int size = members.get(team).size();
             List<Long> percents = new ArrayList<>();
             for (String category : TEAM_MATRIX_CATEGORIES) {
@@ -111,7 +112,7 @@ final class AtlasGraphSections {
         return out;
     }
 
-    /** Teams -> AI tools -> MCP servers; edge weight is devices. Each column keeps its busiest connected nodes; a node with no incoming link is left out. */
+    /** Teams -> AI tools -> MCP servers; edge weight is devices; devices with no team tag form the Untagged team, listed last. Each column keeps its busiest connected nodes; a node with no incoming link is left out. */
     Map<String, Object> supplyChain() {
         // Distinct devices per team: a device that runs several of these tools is counted once.
         Map<String, Set<String>> devicesByTeam = new HashMap<>();
@@ -128,7 +129,6 @@ final class AtlasGraphSections {
             Map<String, Set<String>> toolTeamDevices = new HashMap<>();
             for (String deviceId : tool.getRow().getDeviceIds()) {
                 String team = people.teamOfDevice(deviceId);
-                if (team == null) continue;
                 byTeam.merge(team, 1, Integer::sum);
                 toolTeamDevices.computeIfAbsent(team, k -> new HashSet<>()).add(deviceId);
             }
@@ -137,7 +137,7 @@ final class AtlasGraphSections {
             teamToolDevices.put(tool.key(), byTeam);
             chainTools.add(tool);
         }
-        List<String> teams = busiest(devicesByTeam, CHAIN_COLUMN_LIMIT);
+        List<String> teams = untaggedLast(devicesByTeam, CHAIN_COLUMN_LIMIT);
         List<String> servers = busiest(devicesByServer(chainTools), CHAIN_COLUMN_LIMIT);
 
         List<Map<String, Object>> edges = new ArrayList<>();
@@ -212,6 +212,16 @@ final class AtlasGraphSections {
         return membersByKey.keySet().stream()
                 .sorted(Comparator.comparingInt((String key) -> membersByKey.get(key).size()).reversed().thenComparing(key -> key))
                 .limit(limit).collect(Collectors.toList());
+    }
+
+    // The busiest teams, with Untagged kept in the limit and moved to the end.
+    private static List<String> untaggedLast(Map<String, Set<String>> membersByTeam, int limit) {
+        boolean untagged = membersByTeam.containsKey(AtlasPeople.UNTAGGED_TEAM);
+        List<String> teams = busiest(membersByTeam, Integer.MAX_VALUE).stream()
+                .filter(team -> !AtlasPeople.UNTAGGED_TEAM.equals(team))
+                .limit(untagged ? limit - 1 : limit).collect(Collectors.toList());
+        if (untagged) teams.add(AtlasPeople.UNTAGGED_TEAM);
+        return teams;
     }
 
     private static Map<String, Object> node(String id, String label, String category, int devices, AtlasAssetStatus status) {
