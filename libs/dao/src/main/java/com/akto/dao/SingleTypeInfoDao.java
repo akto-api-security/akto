@@ -336,7 +336,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
         Bson filter = null;
         if (apiCollectionId != -1) {
-            filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
+            filter = Filters.and(filterForHostHeader(apiCollectionId, false), Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
         }
         List<Bson> pipeline = getPipelineForEndpoints(filter);
         return processPipelineForEndpoint(pipeline);
