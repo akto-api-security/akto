@@ -42,24 +42,22 @@ public class TestJwtAuthenticator {
                 .compact();
     }
 
-    private JwtAuthenticator.PublicKeyLoader originalLoader;
+    private PublicKeyCache originalCache;
 
     @BeforeEach
     public void setUp() throws Exception {
         current = newKeyPair();
-        originalLoader = JwtAuthenticator.publicKeyLoader;
-        JwtAuthenticator.resetPublicKeyCacheForTest();
-        JwtAuthenticator.publicKeyLoader = () -> {
+        originalCache = JwtAuthenticator.publicKeyCache;
+        JwtAuthenticator.publicKeyCache = new PublicKeyCache(() -> {
             loads.incrementAndGet();
             if (dbDown) throw new IllegalStateException("db down");
             return current.getPublic();
-        };
+        });
     }
 
     @AfterEach
     public void tearDown() {
-        JwtAuthenticator.publicKeyLoader = originalLoader;
-        JwtAuthenticator.resetPublicKeyCacheForTest();
+        JwtAuthenticator.publicKeyCache = originalCache;
     }
 
     @Test
