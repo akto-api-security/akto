@@ -1,0 +1,367 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh SessionStart",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh SessionEnd",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Setup": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh Setup",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh InstructionsLoaded",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-prompt-wrapper.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh UserPromptExpansion",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-mcp-request-wrapper.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PermissionRequest",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PermissionDenied",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-mcp-response-wrapper.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PostToolUseFailure",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PostToolBatch",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-response-wrapper.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh StopFailure",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh SubagentStart",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh SubagentStop",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "TaskCreated": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh TaskCreated",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh TaskCompleted",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh TeammateIdle",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh Notification",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "MessageDisplay": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh MessageDisplay",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "ConfigChange": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh ConfigChange",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "CwdChanged": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh CwdChanged",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "DirectoryAdded": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh DirectoryAdded",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh FileChanged",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PreCompact",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PostCompact",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PreModelSwitch",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PostModelSwitch",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Elicitation": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh Elicitation",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "ElicitationResult": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh ElicitationResult",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh WorktreeCreate",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh WorktreeRemove",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
