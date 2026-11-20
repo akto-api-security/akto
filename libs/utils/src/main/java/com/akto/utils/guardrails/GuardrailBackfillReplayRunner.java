@@ -95,9 +95,11 @@ public final class GuardrailBackfillReplayRunner {
             if (StringUtils.isBlank(prompt)) {
                 continue;
             }
-            String id = asText(row.get(AgentQueryRecord.F_TRACE_ID));
+            // ES document's own _id, not traceId: searchPrompts returns one row per prompt, so
+            // several rows share a traceId and would collide in rowById and in refId.
+            String id = asText(row.get("id"));
             if (StringUtils.isBlank(id)) {
-                id = asText(row.get("id")); // ES document's own _id: always present, always unique
+                id = asText(row.get(AgentQueryRecord.F_TRACE_ID));
             }
             String envelope = GuardrailsServiceClient.traceEnvelope(
                 prompt, asText(row.get(AgentQueryRecord.F_RESPONSE_PAYLOAD)));
