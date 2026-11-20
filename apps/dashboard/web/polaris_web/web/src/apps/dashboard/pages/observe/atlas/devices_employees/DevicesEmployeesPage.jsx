@@ -19,7 +19,7 @@ import ViolationsBySeverityCard from "./ViolationsBySeverityCard";
 import PeopleFlyout from "./PeopleFlyout";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS, ATLAS_CHAT_SCOPE } from "./constants";
 import {
-    CATEGORY_ORDER, DEVICE_SCOPES, EMPTY_PEOPLE_FILTERS, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT, HIGH_RISK_THRESHOLD, MIN_SEARCH_LENGTH,
+    CATEGORY_ORDER, DAY_SECONDS, DEVICE_SCOPES, EMPTY_PEOPLE_FILTERS, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT, HIGH_RISK_THRESHOLD, MIN_SEARCH_LENGTH,
 } from "./peopleConstants";
 import transform from "./transform";
 
@@ -147,7 +147,7 @@ function DevicesEmployeesPage() {
         else if (employee) openPerson("employee", employee);
     }, [openPerson]);
 
-    // ?team=<name>[&category=agents|mcp|browser] opens the Employees tab filtered to that team and tool type (the Atlas Overview links here).
+    // ?team=<name>[&category=agents|mcp|browser&days=<n>] opens the Employees tab filtered to that team and tool type, counting tools used in the last n days (the Atlas Overview links here).
     // The filters only know their values once the overview has loaded, and the grid drops a selection it does not know, so this waits for it.
     const teamLinkHandled = useRef(false);
     useEffect(() => {
@@ -156,8 +156,13 @@ function DevicesEmployeesPage() {
         const params = new URLSearchParams(window.location.search);
         const team = params.get("team");
         const category = params.get("category");
+        const days = parseInt(params.get("days"), 10);
         if (team && !params.get("device") && !params.get("employee") && !params.get("user")) {
-            showTable("employees", { teams: [team], categories: CATEGORY_ORDER.includes(category) ? [category] : [] });
+            showTable("employees", {
+                teams: [team],
+                categories: CATEGORY_ORDER.includes(category) ? [category] : [],
+                usedSince: days > 0 ? func.timeNow() - days * DAY_SECONDS : 0,
+            });
         }
     }, [overviewStatus, showTable]);
 

@@ -142,7 +142,7 @@ const initialState = {
     collectionsRegistryStatusMap: {},// Keep in memory (not persisted)
     tagCollectionsMap: {},// Keep in memory (not persisted)
     hostNameMap: {}, // Keep in memory (not persisted)
-    skillRiskScoreCache: { data: {}, ts: 0 }, // skillName -> maxRiskScore, in-memory only
+    skillRiskScoreCache: { data: {}, skillRiskScoreFactors: {}, ts: 0 }, // skillName -> riskScore (+ factors map), in-memory only
     agenticCollectionsCache: { data: null, ts: 0 }, // {collections, trafficMap, riskScoreMap}, in-memory only
     agenticTrafficRiskCache: { data: null, ts: 0 }, // {trafficMap, riskScoreMap} only (no collections), in-memory only
     agenticSensitiveInfoCache: { data: null, ts: 0 }, // sensitiveMap, in-memory only

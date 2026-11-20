@@ -1331,6 +1331,27 @@ const settingRequests = {
             data: {moduleIds, deleteTopicAndReboot}
         })
     },
+    fetchAuthTokens() {
+        return request({
+            url: '/api/fetchAuthTokens',
+            method: 'post',
+            data: {}
+        })
+    },
+    revokeAuthToken(tokenId, reason) {
+        return request({
+            url: '/api/revokeAuthToken',
+            method: 'post',
+            data: {tokenId, reason}
+        })
+    },
+    revokeAllAuthTokens(reason) {
+        return request({
+            url: '/api/revokeAllAuthTokens',
+            method: 'post',
+            data: {reason}
+        })
+    },
     updateModuleEnvAndReboot(moduleId, moduleName, envData) {
         return request({
             url: '/api/updateModuleEnvAndReboot',

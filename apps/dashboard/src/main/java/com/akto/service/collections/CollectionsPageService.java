@@ -9,6 +9,7 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionStats;
 import com.akto.dto.ApiCollectionStatsMeta;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.CollectionTags;
@@ -26,6 +27,7 @@ import com.akto.service.collections.CollectionsPageResponse.UntrackedRow;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.IconUtils;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.RiskScoreExplainer;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -104,19 +106,52 @@ public class CollectionsPageService extends TimedService {
         List<Integer> ids = rows.stream().map(ApiCollectionStats::getId).collect(Collectors.toList());
         Map<Integer, Integer> endpointCounts = rows.stream()
                 .collect(Collectors.toMap(ApiCollectionStats::getId, ApiCollectionStats::getEndpointsCount));
-        page.setRiskScoreMap(rows.stream().collect(Collectors.toMap(ApiCollectionStats::getId, ApiCollectionStats::getRiskScore)));
+        Map<Integer, Double> riskScoreMap = rows.stream()
+                .collect(Collectors.toMap(ApiCollectionStats::getId, ApiCollectionStats::getRiskScore));
+        page.setRiskScoreMap(riskScoreMap);
         page.setLastSeenMap(rows.stream().collect(Collectors.toMap(ApiCollectionStats::getId, ApiCollectionStats::getLastSeen)));
         page.setSensitiveInfoMap(rows.stream().collect(Collectors.toMap(ApiCollectionStats::getId,
                 row -> row.getSensitiveSubTypes() == null ? new ArrayList<String>() : row.getSensitiveSubTypes())));
 
-        // open issues are queried while the collections' documents load, and given a time limit of their own
+        // open issues and riskScoreFactors run while collections load, each with their own time limit
         Future<Map<Integer, Map<String, Integer>>> issues = submitLimited(
                 "issues of the page's collections", () -> loadSeverityInfo(ids), Map::size);
+        Future<RiskScoreExplainer.LoadResult> factorsFuture = submitLimited(
+                "riskScoreFactors of the page's collections",
+                () -> RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(ids),
+                r -> r == null || r.byCollection == null ? 0 : r.byCollection.size());
         page.setApiCollections(timed("load the page's collections", () -> loadCollectionsInOrder(ids, endpointCounts), List::size));
         Map<Integer, Map<String, Integer>> severityInfo = awaitOrNull(issues, "issues");
         page.setIssuesUnavailable(severityInfo == null);
         if (severityInfo != null) page.setSeverityInfoMap(severityInfo);
+        RiskScoreExplainer.LoadResult factorsLoad = awaitOrNull(factorsFuture, "riskScoreFactors");
+        if (factorsLoad == null || factorsLoad.unavailable) {
+            page.setRiskScoreFactorsUnavailable(true);
+            page.setRiskScoreFactorsMap(java.util.Collections.emptyMap());
+        } else {
+            page.setRiskScoreFactorsUnavailable(false);
+            page.setRiskScoreFactorsMap(toRiskScoreFactorsMap(ids, riskScoreMap, factorsLoad.byCollection));
+        }
         return page;
+    }
+
+    /**
+     * Per-collection riskScoreFactors for the page: only when the highest-risk api_info's rounded
+     * score matches the collection's stats riskScore (avoids a drifted precomputed score).
+     */
+    private static Map<Integer, List<BasicDBObject>> toRiskScoreFactorsMap(
+            List<Integer> ids, Map<Integer, Double> riskScoreMap, Map<Integer, ApiInfo> winning) {
+        Map<Integer, List<BasicDBObject>> out = new HashMap<>();
+        if (ids == null || ids.isEmpty() || riskScoreMap == null || winning == null) return out;
+        for (Integer id : ids) {
+            if (id == null) continue;
+            ApiInfo info = winning.get(id);
+            Double collectionScore = riskScoreMap.get(id);
+            if (collectionScore == null) continue;
+            List<BasicDBObject> factors = RiskScoreExplainer.factorsIfMatches(info, collectionScore);
+            if (!factors.isEmpty()) out.put(id, factors);
+        }
+        return out;
     }
 
     /**

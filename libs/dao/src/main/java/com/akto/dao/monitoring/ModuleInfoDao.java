@@ -5,6 +5,8 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 
 import java.util.HashMap;
@@ -36,6 +38,10 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         // moduleType + lastHeartbeatReceived — used in heartbeat threshold queries
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo.LAST_HEARTBEAT_RECEIVED }, false);
+
+        // the admin token list finds the modules of a token by tokenId; sparse since most rows have none
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending(ModuleInfo.TOKEN_ID),
+            new IndexOptions().name("tokenId_1").sparse(true));
     }
 
     // Computed fresh on every call from module_info (updated every heartbeat) rather than
@@ -162,13 +168,13 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         for (ModuleInfo m : modules) {
             String name = m.getName();
             if (name == null || name.isEmpty()) continue;
-            Map<String, Object> ad = m.getAdditionalData();
+            Map<String, Object> additionalData = m.getAdditionalData();
             Map<String, String> meta = new HashMap<>();
             // JS uses `||` here, which keeps a literal "-" — deliberately NOT resolveModuleUsername's "-" rejection.
-            String username = firstNonEmpty(ad, "username", "userName", "user", "email");
-            meta.put("username", username != null ? username : "-");
-            meta.put("os", firstNonEmpty(ad, "os"));
-            meta.put("browserName", firstNonEmpty(ad, "browserName"));
+            String ownerUsername = ModuleInfo.ownerUsernameOf(additionalData);
+            meta.put("username", ownerUsername != null ? ownerUsername : "-");
+            meta.put("os", firstNonEmpty(additionalData, "os"));
+            meta.put("browserName", firstNonEmpty(additionalData, "browserName"));
             result.put(name, meta);
         }
         return result;

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -53,8 +54,12 @@ type fileResult struct {
 	ChunkResults     []*chunkResult
 	FailedResult     *mcp.ValidationResult
 	// Uninspected marks a file allowed without its content being checked: unreadable, too
-	// large, an unsupported type, an extraction failure or a chunk with no verdict.
+	// large, an unsupported type, an extraction failure, a chunk with no verdict, or a chunk
+	// whose scan didn't run (a scanner failure or timeout the verdict failed open on).
 	Uninspected bool
+	// NotCacheable: allowed, but the file cache must not vouch for it. An image whose OCR read
+	// no text - a misread there would otherwise be served as a clean pass for the cache TTL.
+	NotCacheable bool
 }
 
 // ValidateFile handles POST /api/validate/file (multipart "file" uploads and/or "url" fields).
@@ -216,7 +221,7 @@ func (h *ValidationHandler) validateCachedFile(ctx context.Context, input *fileI
 		return &fileResult{Filename: input.Filename, Allowed: true}
 	}
 	fr := h.validateSingleFile(ctx, input, meta, sessionID, requestID)
-	if fr.Allowed && !fr.Uninspected {
+	if fr.Allowed && !fr.Uninspected && !fr.NotCacheable {
 		h.fileCache.Remember(ctx, key)
 	}
 	return fr
@@ -248,7 +253,12 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	}
 
 	rawText, err := processor.ExtractContent(ctx, input.Reader, ext)
-	if err != nil {
+	if errors.Is(err, fileprocessor.ErrIncomplete) {
+		// Part of the file (an embedded image) could not be read: validate what was, and an allow
+		// still leaves the file uninspected.
+		h.logger.Warn("File content only partly extracted; an allow leaves it uninspected", zap.Error(err), zap.String("file", input.Filename))
+		fr.Uninspected = true
+	} else if err != nil {
 		// Fail open when parsing fails; there is no extracted content to validate.
 		h.logger.Warn("Content extraction failed; allowing file", zap.Error(err), zap.String("file", input.Filename))
 		fr.Uninspected = true
@@ -258,7 +268,12 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	text := fileprocessor.SanitizeText(rawText)
 	rawText = "" // allow GC to reclaim the unsanitized copy
 	if strings.TrimSpace(text) == "" {
-		h.logger.Warn("No text extracted; allowing file", zap.String("file", input.Filename))
+		// OCR may have misread text as nothing; a cached pass would hide that for the whole TTL.
+		switch processor.(type) {
+		case *fileprocessor.ImageProcessor, *fileprocessor.DocumentProcessor:
+			fr.NotCacheable = true
+		}
+		h.logger.Warn("No text extracted; allowing file", zap.String("file", input.Filename), zap.Bool("ocr", fr.NotCacheable))
 		return fr
 	}
 
@@ -316,6 +331,10 @@ func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chu
 			fr.FailedChunkIndex = i + 1
 			fr.FailedResult = r.Result
 			return fr
+		}
+		if r.Result != nil && r.Result.Incomplete {
+			h.logger.Warn("Chunk allowed without every check running; allowing uninspected", zap.String("file", fr.Filename), zap.Int("chunk", i+1))
+			fr.Uninspected = true
 		}
 	}
 	return fr

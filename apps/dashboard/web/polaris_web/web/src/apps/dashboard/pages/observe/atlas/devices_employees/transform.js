@@ -382,6 +382,7 @@ const transform = {
         guardrailModes: filters.guardrailModes,
         riskMin: filters.riskMin,
         riskMax: filters.riskMax,
+        startTimestamp: filters.usedSince,
     }),
     toCsvLines: (tab, rows) => {
         const columns = CSV_COLUMNS[tab];

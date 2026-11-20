@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.dao.context.Context;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
 import com.akto.dto.nhi_governance.NhiIdentity;
 import com.akto.log.LoggerMaker;
@@ -62,14 +63,14 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
     @Getter private long statDisabled;
     @Getter private long statWithViolations;
 
-    // Unlike NhiGovernanceViolationsAction.buildBaseMatchConditions, this does NOT add a
-    // contextSource filter: NhiIdentityDao extends the plain AccountsContextDao (not
-    // AccountsContextDaoWithContextSource like NhiViolationDao), which never auto-scopes by
-    // contextSource for any of its queries — including the existing, unpaginated
-    // fetchNhiIdentities() below, which has never filtered by it either. Matches the date-range
-    // filter that method already applies.
+    // NhiIdentityDao extends the plain AccountsContextDao (not AccountsContextDaoWithContextSource
+    // like NhiViolationDao), so contextSource is applied explicitly here, mirroring
+    // NhiGovernanceViolationsAction.buildBaseMatchConditions.
     private List<Bson> buildIdentityMatchConditions() {
         List<Bson> matchConditions = new ArrayList<>();
+        if (Context.contextSource.get() != null) {
+            matchConditions.add(Filters.eq(NhiIdentity.CONTEXT_SOURCE, Context.contextSource.get().name()));
+        }
         if (startTimestamp > 0 && endTimestamp > 0) {
             matchConditions.add(Filters.gte(NhiIdentity.CREATED_AT, startTimestamp));
             matchConditions.add(Filters.lte(NhiIdentity.CREATED_AT, endTimestamp));
@@ -98,11 +99,7 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
     // fetchDeviceChildren keeping a separate full-fetch alongside its own paginated grid.
     public String fetchNhiIdentities() {
         try {
-            Bson filter = (startTimestamp > 0 && endTimestamp > 0)
-                    ? Filters.and(
-                            Filters.gte(NhiIdentity.CREATED_AT, startTimestamp),
-                            Filters.lte(NhiIdentity.CREATED_AT, endTimestamp))
-                    : Filters.empty();
+            Bson filter = combineIdentityMatch(buildIdentityMatchConditions());
             identities = NhiIdentityDao.instance.findAll(filter);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {

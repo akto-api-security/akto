@@ -6,6 +6,7 @@ import com.akto.dao.ApiInfoDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.EndpointShieldSettings;
 import com.akto.dto.GuardrailPolicies;
@@ -20,6 +21,7 @@ import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
 import com.akto.util.McpClientRegistry;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.RiskScoreExplainer;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import org.bson.Document;
@@ -86,9 +88,10 @@ public class AtlasPeopleService {
     private static final String UNTAGGED_TEAM = AtlasPeople.UNTAGGED_TEAM.toLowerCase(Locale.ROOT);
     private static final String MISCONFIGURED_TAG_KEY = "misconfigured-config";
     private static final String UNKNOWN_USERNAME_PLACEHOLDER = "not-available";
+    private static final String NO_OWNER_PLACEHOLDER = "-";
     private static final String BROWSER_HOST_MARKER = "chrome";
     private static final String BROWSER_USER_EMAIL_TAG = "browser-user-email";
-    private static final String INFERENCE_HOOKS_TAG_KEY = "inference-hooks";
+    public static final String INFERENCE_HOOKS_TAG_KEY = "inference-hooks";
     private static final String USERNAME_TAG_KEY = "username";
     private static final Pattern ACCOUNT_SLOT_SUFFIX = Pattern.compile("-u\\d+$");
     private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^a-z0-9]");
@@ -223,6 +226,8 @@ public class AtlasPeopleService {
         public boolean misconfigured;
         public final List<Map<String, String>> tags = new ArrayList<>();
         public double riskScore;
+        /** Collection id of the tool that produced {@link #riskScore}; used to load riskScoreFactors. */
+        public int riskCollectionId;
 
         public DeviceRow() {
             for (String category : CATEGORIES) toolsByCategory.put(category, 0);
@@ -287,6 +292,8 @@ public class AtlasPeopleService {
         public int personalAccounts;
         public int lastActive;
         public double riskScore;
+        /** Collection id of the device that produced {@link #riskScore}; used to load riskScoreFactors. */
+        public int riskCollectionId;
         public boolean inferenceHooksOnly;
 
         public Map<String, Object> toMap() {
@@ -404,9 +411,10 @@ public class AtlasPeopleService {
             snapshot.devicesByLowerName.put(device.key, device);
         }
 
-        if (bundle != null && bundle.userTags != null) {
+        Map<String, List<DeviceTag>> tagsByUser = tagsByLowerUser(bundle);
+        if (!tagsByUser.isEmpty()) {
             for (DeviceRow device : snapshot.devicesByLowerName.values()) {
-                List<DeviceTag> tags = bundle.userTags.get(device.username);
+                List<DeviceTag> tags = tagsByUser.get(device.username.toLowerCase(Locale.ROOT));
                 if (tags == null) continue;
                 for (DeviceTag tag : tags) {
                     if (tag == null || tag.getKey() == null || tag.getValue() == null) continue;
@@ -459,15 +467,14 @@ public class AtlasPeopleService {
     private static Map<String, DeviceRow> hookDevices(InsightDataBundle bundle) {
         Map<String, DeviceRow> hookDevices = new LinkedHashMap<>();
         for (ApiCollection c : bundle.collections) {
-            if (!InsightUtil.hasTagValue(c, Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_ENDPOINT_SOURCE_VALUE) || !InsightUtil.hasTag(c, INFERENCE_HOOKS_TAG_KEY)) continue;
             String deviceId = InsightUtil.deviceIdOf(c);
-            List<String> usernames = InsightUtil.tagValues(c, USERNAME_TAG_KEY);
-            if (deviceId == null || usernames.isEmpty() || !isRealUsername(usernames.get(0))) continue;
+            String username = hookUsername(c);
+            if (deviceId == null || username == null) continue;
             hookDevices.computeIfAbsent(deviceId.toLowerCase(Locale.ROOT), key -> {
                 DeviceRow device = new DeviceRow();
                 device.name = deviceId;
                 device.key = key;
-                device.username = usernames.get(0).trim();
+                device.username = username;
                 device.hook = true;
                 return device;
             });
@@ -475,10 +482,22 @@ public class AtlasPeopleService {
         return hookDevices;
     }
 
+    /** The user an inference-hooks collection names (its first "username" tag); null when it is not one or names no one. Shared with the Overview. */
+    public static String hookUsername(ApiCollection c) {
+        if (!InsightUtil.hasTagValue(c, Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_ENDPOINT_SOURCE_VALUE) || !InsightUtil.hasTag(c, INFERENCE_HOOKS_TAG_KEY)) return null;
+        List<String> usernames = InsightUtil.tagValues(c, USERNAME_TAG_KEY);
+        return usernames.isEmpty() || !isRealUsername(usernames.get(0)) ? null : usernames.get(0).trim();
+    }
+
+    // One person however their username is written: the part before "@", letters and digits only.
+    static String personKey(String username) {
+        return identityKey(localPart(username));
+    }
+
     // Adds hook-only people as employees; anyone whose normalised username already matches a managed employee keeps only the managed row.
     private static void addInferenceHookEmployees(Snapshot snapshot, Map<String, DeviceRow> hookDevices, InsightDataBundle bundle) {
         Set<String> managed = new HashSet<>();
-        for (EmployeeRow employee : snapshot.employees) managed.add(identityKey(localPart(employee.username)));
+        for (EmployeeRow employee : snapshot.employees) managed.add(personKey(employee.username));
         List<DeviceRow> withTools = new ArrayList<>();
         for (DeviceRow device : hookDevices.values()) {
             if (device.tools.isEmpty()) continue;
@@ -489,7 +508,7 @@ public class AtlasPeopleService {
             withTools.add(device);
         }
         for (EmployeeRow employee : buildEmployees(withTools, bundle)) {
-            if (managed.contains(identityKey(localPart(employee.username)))) continue;
+            if (managed.contains(personKey(employee.username))) continue;
             employee.inferenceHooksOnly = true;
             employee.deviceNames.clear();
             snapshot.employees.add(employee);
@@ -511,6 +530,7 @@ public class AtlasPeopleService {
             device.personalAccounts = primary.personalAccounts;
             device.misconfigured = primary.misconfigured;
             device.riskScore = primary.riskScore;
+            device.riskCollectionId = primary.riskCollectionId;
         }
     }
 
@@ -565,7 +585,8 @@ public class AtlasPeopleService {
             boolean browser = InsightUtil.hasTag(c, Constants.AKTO_BROWSER_LLM_TAG);
             DeviceRow device = browser ? null : devicesByLowerName.get(hostDevice.toLowerCase(Locale.ROOT));
             if (!browser && device == null) continue;
-            if (ranged && !seenInWindow(bundle.collectionLastTrafficSeen.get(c.getId()), startTs, endTs)) continue;
+            // A tool found only by a config scan has no traffic, so its creation time counts, as in the AI inventory and the Overview.
+            if (ranged && !seenInWindow(bundle.collectionLastTrafficSeen.getOrDefault(c.getId(), c.getStartTs()), startTs, endTs)) continue;
 
             String[] parts = c.getHostName().split("\\.");
             ToolRow tool = new ToolRow();
@@ -582,7 +603,7 @@ public class AtlasPeopleService {
             tool.plugin = AgenticObserveUtil.getPluginName(c);
             tool.orphan = c.getHostName().contains(AgenticObserveUtil.NOT_ATTACHED_VALUE);
             if (browser) {
-                String identity = identityKey(ACCOUNT_SLOT_SUFFIX.matcher(parts[0].toLowerCase(Locale.ROOT)).replaceAll(""));
+                String identity = browserIdentity(parts[0]);
                 device = browserRowByName.get(identity);
                 String email = browserEmailOf(c);
                 if (device == null && email != null) device = browserRowByEmail.get(identityKey(localPart(email)));
@@ -604,7 +625,10 @@ public class AtlasPeopleService {
             device.tools.add(tool);
             if (tool.misconfigured) device.misconfigured = true;
             devicesByHost.put(c.getHostName().toLowerCase(Locale.ROOT), device);
-            if (tool.plugin != null) {
+            // A plugin's bundled MCP server is an MCP server, as in the AI inventory and the Overview; any other plugin is not a tool category.
+            if (tool.plugin != null && InsightUtil.hasTag(c, Constants.AKTO_MCP_SERVER_TAG)) {
+                tool.category = CAT_MCP;
+            } else if (tool.plugin != null) {
                 tool.category = CAT_PLUGIN;
                 continue;
             }
@@ -652,6 +676,11 @@ public class AtlasPeopleService {
     // Lowercases and strips non-alphanumerics so browser collection prefixes can match extension names and emails.
     static String identityKey(String value) {
         return value == null ? "" : NON_ALPHANUMERIC.matcher(value.toLowerCase(Locale.ROOT)).replaceAll("");
+    }
+
+    // A browser host's identity: its prefix without the account slot ("-u1"), letters and digits only.
+    static String browserIdentity(String hostDevice) {
+        return identityKey(ACCOUNT_SLOT_SUFFIX.matcher(hostDevice.toLowerCase(Locale.ROOT)).replaceAll(""));
     }
 
     private static String browserEmailOf(ApiCollection c) {
@@ -736,7 +765,10 @@ public class AtlasPeopleService {
         for (DeviceRow device : devices) {
             for (ToolRow tool : device.tools) {
                 tool.riskScore = AgenticObserveUtil.roundRiskScore(riskByCollection.getOrDefault(tool.collectionId, 0.0));
-                device.riskScore = Math.max(device.riskScore, tool.riskScore);
+                if (tool.riskScore > device.riskScore) {
+                    device.riskScore = tool.riskScore;
+                    device.riskCollectionId = tool.collectionId;
+                }
             }
         }
     }
@@ -786,6 +818,16 @@ public class AtlasPeopleService {
         target.merge("low", counts.getLow(), Integer::sum);
     }
 
+    // agent_users tags by lower-cased username, so they match a device's user whatever its case (as on the Overview).
+    private static Map<String, List<DeviceTag>> tagsByLowerUser(InsightDataBundle bundle) {
+        Map<String, List<DeviceTag>> tags = new HashMap<>();
+        if (bundle == null || bundle.userTags == null) return tags;
+        bundle.userTags.forEach((user, userTags) -> {
+            if (user != null && userTags != null) tags.putIfAbsent(user.trim().toLowerCase(Locale.ROOT), userTags);
+        });
+        return tags;
+    }
+
     // Groups devices by lowercase username into employees and attaches team tags from agent_users.
     private static List<EmployeeRow> buildEmployees(List<DeviceRow> devices, InsightDataBundle bundle) {
         Map<String, EmployeeRow> byUsername = new LinkedHashMap<>();
@@ -803,14 +845,18 @@ public class AtlasPeopleService {
             employee.unapprovedTools += device.unapprovedTools;
             employee.personalAccounts += device.personalAccounts;
             employee.lastActive = Math.max(employee.lastActive, device.lastHeartbeat);
-            employee.riskScore = Math.max(employee.riskScore, device.riskScore);
+            if (device.riskScore > employee.riskScore) {
+                employee.riskScore = device.riskScore;
+                employee.riskCollectionId = device.riskCollectionId;
+            }
             for (String severity : SEVERITIES) {
                 employee.violationsBySeverity.merge(severity, device.violationsBySeverity.get(severity), Integer::sum);
             }
         }
-        if (bundle != null && bundle.userTags != null) {
+        Map<String, List<DeviceTag>> tagsByUser = tagsByLowerUser(bundle);
+        if (!tagsByUser.isEmpty()) {
             for (EmployeeRow employee : byUsername.values()) {
-                List<DeviceTag> tags = bundle.userTags.get(employee.username);
+                List<DeviceTag> tags = tagsByUser.get(employee.username.toLowerCase(Locale.ROOT));
                 if (tags == null) continue;
                 for (DeviceTag tag : tags) {
                     if (tag != null && tag.getKey() != null && tag.getValue() != null) {
@@ -1077,8 +1123,14 @@ public class AtlasPeopleService {
         }
         matching.sort(deviceComparator(query).thenComparing(device -> device.key));
         totalOut[0] = matching.size();
+        List<DeviceRow> sliced = slice(matching, query);
         List<Map<String, Object>> page = new ArrayList<>();
-        for (DeviceRow device : slice(matching, query)) page.add(deviceRow(device, query));
+        List<Integer> riskCollectionIds = new ArrayList<>();
+        for (DeviceRow device : sliced) {
+            page.add(deviceRow(device, query));
+            riskCollectionIds.add(device.riskCollectionId);
+        }
+        attachRiskScoreFactors(page, riskCollectionIds);
         return page;
     }
 
@@ -1119,9 +1171,38 @@ public class AtlasPeopleService {
         }
         matching.sort(employeeComparator(query));
         totalOut[0] = matching.size();
+        List<EmployeeRow> sliced = slice(matching, query);
         List<Map<String, Object>> page = new ArrayList<>();
-        for (EmployeeRow employee : slice(matching, query)) page.add(employee.toMap());
+        List<Integer> riskCollectionIds = new ArrayList<>();
+        for (EmployeeRow employee : sliced) {
+            page.add(employee.toMap());
+            riskCollectionIds.add(employee.riskCollectionId);
+        }
+        attachRiskScoreFactors(page, riskCollectionIds);
         return page;
+    }
+
+    /**
+     * One aggregation for this page's winning collections; puts {@code riskScoreFactors} on each
+     * row whose winning ApiInfo has a non-empty saved breakdown.
+     */
+    private static void attachRiskScoreFactors(List<Map<String, Object>> rows, List<Integer> riskCollectionIds) {
+        if (rows == null || riskCollectionIds == null || rows.isEmpty()) return;
+        Set<Integer> ids = new HashSet<>();
+        for (Integer id : riskCollectionIds) {
+            if (RiskScoreExplainer.isSetCollectionId(id)) ids.add(id);
+        }
+        if (ids.isEmpty()) return;
+        RiskScoreExplainer.LoadResult loaded = RiskScoreExplainer.loadHighestRiskApiInfoByCollectionResult(ids);
+        if (loaded.unavailable) return;
+        for (int i = 0; i < rows.size() && i < riskCollectionIds.size(); i++) {
+            Integer collectionId = riskCollectionIds.get(i);
+            if (!RiskScoreExplainer.isSetCollectionId(collectionId)) continue;
+            ApiInfo winning = loaded.byCollection.get(collectionId);
+            Object displayed = rows.get(i).get("riskScore");
+            double displayedScore = displayed instanceof Number ? ((Number) displayed).doubleValue() : 0;
+            RiskScoreExplainer.putExplanationIfMatches(rows.get(i), winning, displayedScore);
+        }
     }
 
     private static List<DeviceRow> devicesOf(Snapshot snapshot, EmployeeRow employee) {
@@ -1250,6 +1331,8 @@ public class AtlasPeopleService {
     private static boolean usesAgentClient(DeviceRow device, String category) {
         if (!CAT_AGENTS.equals(category) && !CAT_IDE.equals(category)) return false;
         for (ToolRow tool : device.tools) {
+            // A plugin's MCP server does not count toward the agent it is installed on, as on the Overview.
+            if (tool.plugin != null) continue;
             if (!CAT_AGENTS.equals(tool.category) && !CAT_IDE.equals(tool.category) && !CAT_MCP.equals(tool.category)) continue;
             String client = Constants.AKTO_AI_AGENT_TAG.equals(tool.client) ? tool.agent : tool.client;
             if (client == null || !AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(McpClientRegistry.getAgentTypeFromValue(client))) continue;
@@ -1336,9 +1419,9 @@ public class AtlasPeopleService {
         return total;
     }
 
-    // Filters out empty and placeholder usernames so they don't become employees.
+    // Filters out empty and placeholder usernames ("-" is the device map's "no owner") so they don't become employees.
     public static boolean isRealUsername(String username) {
-        return username != null && !username.trim().isEmpty()
+        return username != null && !username.trim().isEmpty() && !NO_OWNER_PLACEHOLDER.equals(username.trim())
                 && !UNKNOWN_USERNAME_PLACEHOLDER.equalsIgnoreCase(username.trim());
     }
 

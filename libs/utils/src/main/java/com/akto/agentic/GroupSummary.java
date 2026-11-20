@@ -75,6 +75,10 @@ public class GroupSummary {
     public final Set<Integer> capabilityCollectionIds = new LinkedHashSet<>();
     public final Set<String> personalEndpointIds = new HashSet<>();
     public double maxRiskScore = 0;
+    // Collection whose collRisk last raised maxRiskScore — used to load the winning endpoint's
+    // factor breakdown for the risk-score tooltip (see fetchAgenticAssetsSummary page loop).
+    // 0 means none; hashed collection ids may be negative.
+    public int winningCollectionId;
     public Double baseRiskScore;
     public String baseRiskScoreReason;
     public int maxTrafficTimestamp = 0;
@@ -164,6 +168,7 @@ public class GroupSummary {
         }
         if (collRisk > maxRiskScore) {
             maxRiskScore = collRisk;
+            winningCollectionId = c.getId();
             baseRiskScore = c.getBaseRiskScore();
             baseRiskScoreReason = c.getBaseRiskScoreReason();
         }
