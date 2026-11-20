@@ -6,6 +6,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
@@ -128,6 +129,43 @@ public class UsersCollectionsList {
         return collectionList;
     }
 
+    /**
+     * Agentic collections as master's AGENTIC context defines them: MCP, GenAI and ai-agent-caller
+     * collections (a service seen calling an AI asset is an agentic asset too), excluding
+     * endpoint-source collections, plus the unauthenticated MCP tools group.
+     * Used by usage metering (AI_ASSET_COUNT, ACTIVE_ENDPOINTS) so billing matches master. This
+     * branch's AGENTIC context still uses the older MCP + GenAI filter.
+     */
+    public static Bson agenticCollectionsFilter() {
+        Bson filter = Filters.and(
+            Filters.exists(ApiCollection.TAGS_STRING),
+            Filters.or(
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_AI_AGENT_CALLER_TAG))
+            ),
+            Filters.nor(getEndpointSourceFilter())
+        );
+        return Filters.or(filter, Filters.eq(Constants.ID, UnauthenticatedEndpoint.UNAUTHENTICATED_MCP_TOOLS_GROUP_ID));
+    }
+
+    /** Collections ingested from endpoint (device) sources: tag source=ENDPOINT. */
+    public static Bson endpointSourceCollectionsFilter() {
+        return Filters.and(
+            Filters.exists(ApiCollection.TAGS_STRING),
+            getEndpointSourceFilter()
+        );
+    }
+
+    private static Bson getEndpointSourceFilter() {
+        return Filters.elemMatch(ApiCollection.TAGS_STRING,
+            Filters.and(
+                Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENDPOINT_SOURCE_TAG),
+                Filters.eq(CollectionTags.VALUE, Constants.AKTO_ENDPOINT_SOURCE_VALUE)
+            )
+        );
+    }
+
     public static Set<Integer> getContextCollections(CONTEXT_SOURCE source) {
         Set<Integer> collectionIds = new HashSet<>();
         Bson finalFilter = Filters.or(
@@ -135,7 +173,9 @@ public class UsersCollectionsList {
             Filters.nor(
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG))
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_AI_AGENT_CALLER_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG)),
+                getEndpointSourceFilter()
             )
         );
         switch (source) {
