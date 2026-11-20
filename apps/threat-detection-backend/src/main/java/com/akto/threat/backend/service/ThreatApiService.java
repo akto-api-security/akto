@@ -71,8 +71,8 @@ public class ThreatApiService {
       base.add(new Document("$match", match));
     }
     ThreatUtils.addHostScope(base, request.hasHostScope() ? ThreatUtils.hostScopeMatch(request.getHostScope()) : null);
+    Document hint = request.hasHostScope() ? null : ThreatUtils.coverIndexHint(accountId, match);
 
-    base.add(new Document("$sort", new Document("detectedAt", -1))); // sort
     base.add(
         new Document(
             "$group",
@@ -81,7 +81,7 @@ public class ThreatApiService {
                     new Document("endpoint", "$latestApiEndpoint")
                         .append("method", "$latestApiMethod")
                         .append("host", "$host"))
-                .append("discoveredAt", new Document("$last", "$detectedAt"))
+                .append("discoveredAt", new Document("$min", "$detectedAt"))
                 .append("distinctActors", new Document("$addToSet", "$actor"))
                 .append("requestsCount", new Document("$sum", 1))));
     base.add(
@@ -91,7 +91,7 @@ public class ThreatApiService {
     List<Document> countPipeline = new ArrayList<>(base);
     countPipeline.add(new Document("$count", "total"));
 
-    Document result = maliciousEventDao.aggregateRaw(accountId, countPipeline).first();
+    Document result = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, countPipeline), hint).first();
     long total = result != null ? result.getInteger("total", 0) : 0;
 
     List<Document> pipeline = new ArrayList<>(base);
@@ -108,7 +108,7 @@ public class ThreatApiService {
                 .append("actorsCount", sort.getOrDefault("actorsCount", -1))));
 
     List<ListThreatApiResponse.ThreatApi> apis = new ArrayList<>();
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         Document agg = (Document) doc.get("_id");
