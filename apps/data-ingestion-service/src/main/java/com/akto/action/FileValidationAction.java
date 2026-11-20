@@ -30,7 +30,7 @@ import java.util.Map;
  * When guardrails-service is unreachable or errors, GuardrailsClient fails open with
  * {@code allowed=true, failOpen=true}.
  *
- * Every call is also ingested like an http-proxy call, so it shows in Traces: the request carries
+ * With {@code ingest_data=true} (as on http-proxy) the call is also ingested, so it shows in Traces: the request carries
  * each file's metadata (name, content type, size, sha256; the URL for a fetched file), never its
  * content, and the response the verdict, which is recorded as the trace's guardrail result.
  */
@@ -60,9 +60,10 @@ public class FileValidationAction extends ActionSupport implements UploadedFiles
     private String metadata;
     private String akto_account_id;
     private String akto_vxlan_id;
+    private String ingest_data;
 
     private final List<GuardrailsClient.FilePart> files = new ArrayList<>();
-    private final List<Map<String, Object>> fileMetadata = new ArrayList<>();
+    private final List<UploadedFile> uploads = new ArrayList<>();
     private Map<String, Object> data;
 
     @Override
@@ -71,7 +72,7 @@ public class FileValidationAction extends ActionSupport implements UploadedFiles
             if ("file".equals(uploaded.getInputName()) && uploaded.getContent() instanceof File) {
                 File file = (File) uploaded.getContent();
                 files.add(new GuardrailsClient.FilePart(file, uploaded.getOriginalName(), uploaded.getContentType()));
-                fileMetadata.add(metadataOf(file, uploaded.getOriginalName(), uploaded.getContentType()));
+                uploads.add(uploaded);
             }
         }
     }
@@ -80,7 +81,9 @@ public class FileValidationAction extends ActionSupport implements UploadedFiles
         long start = System.currentTimeMillis();
         List<String> urls = url != null ? url : new ArrayList<>();
         data = guardrailsClient.callValidateFile(buildFields(), files, urls);
-        ingest(data, urls);
+        if ("true".equalsIgnoreCase(ingest_data)) {
+            ingest(data, urls);
+        }
         loggerMaker.infoAndAddToDb("[validate-file] completed - path: {}, files: {}, urls: {}, account: {}, latencyMs: {}",
                 path, files.size(), urls.size(), akto_account_id, System.currentTimeMillis() - start);
         return Action.SUCCESS.toUpperCase();
@@ -95,7 +98,10 @@ public class FileValidationAction extends ActionSupport implements UploadedFiles
             requestData.put("method", method);
             requestData.put("requestHeaders", HttpProxyAction.normalizeHostInRequestHeaders(requestHeaders));
             requestData.put("responseHeaders", "{}");
-            List<Map<String, Object>> described = new ArrayList<>(fileMetadata);
+            List<Map<String, Object>> described = new ArrayList<>();
+            for (UploadedFile u : uploads) {
+                described.add(metadataOf((File) u.getContent(), u.getOriginalName(), u.getContentType()));
+            }
             for (String u : urls) {
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("url", u);
