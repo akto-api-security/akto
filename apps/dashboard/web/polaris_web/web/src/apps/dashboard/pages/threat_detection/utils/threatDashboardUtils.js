@@ -1,6 +1,7 @@
 import { flags } from "../components/flags/index.mjs";
 import SessionStore from "../../../../main/SessionStore";
 import PersistStore from "../../../../main/PersistStore";
+import LocalStore from "../../../../main/LocalStorageStore";
 import { getDashboardCategory, categoryToShortName, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import values from "@/util/values";
 import GUARDRAIL_RULE_DEFINITIONS from "../constants/guardrailRuleDefinitions";
@@ -242,6 +243,30 @@ export const goToGuardrailActivity = (navigate, filters = {}) => {
         setFiltersMap({ ...filtersMap, [`${GUARDRAIL_ACTIVITY_PATH}/`]: { filters: saved, sort: [] } });
     }
     navigate(link);
+};
+
+// A date range from ?since= and ?until= (epoch seconds), or null when the link has none.
+export const dateRangeFromSearchParams = (searchParams) => {
+    const sinceTs = parseInt(searchParams.get("since"), 10);
+    const untilTs = parseInt(searchParams.get("until"), 10);
+    if (Number.isNaN(sinceTs) || Number.isNaN(untilTs)) return null;
+    return { title: "Custom", alias: "custom", period: { since: new Date(sinceTs * 1000), until: new Date(untilTs * 1000) } };
+};
+
+// Same-tab link into Guardrail Violations: policies and agent hosts as comma lists, a severity, and the date range.
+export const goToGuardrailViolations = (navigate, filters = {}) => {
+    // The page sends people back to the activity page unless the new layout is on.
+    LocalStore.getState().setGuardrailViolationsNewLayout(true);
+    const params = new URLSearchParams();
+    if (filters.latestAttack) params.set("policy", filters.latestAttack.split(",").map(subCategoryToFilterId).join(","));
+    if (filters.host) params.set("host", filters.host);
+    if (filters.severity) params.set("severity", filters.severity);
+    if (filters.startTimestamp && filters.endTimestamp) {
+        params.set("since", String(filters.startTimestamp));
+        params.set("until", String(filters.endTimestamp));
+    }
+    const query = params.toString();
+    navigate(`/dashboard/guardrails/violations${query ? `?${query}` : ""}`);
 };
 
 // The Agentic Guardrail Activity page (charts and table); its saved filters live under this path.

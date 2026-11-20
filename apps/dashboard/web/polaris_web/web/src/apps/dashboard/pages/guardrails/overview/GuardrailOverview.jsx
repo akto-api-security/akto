@@ -10,7 +10,7 @@ import PersistStore from '../../../../main/PersistStore'
 import func from '@/util/func'
 import values from '@/util/values'
 import threatApi from '../../threat_detection/api'
-import { goToGuardrailActivity } from '../../threat_detection/utils/threatDashboardUtils'
+import { dateRangeFromSearchParams, goToGuardrailViolations } from '../../threat_detection/utils/threatDashboardUtils'
 import { downloadMaliciousEventsAsCsv } from '../../threat_detection/utils/exportEvents'
 import InsightsFlyout from '../../observe/agentic/insights/InsightsFlyout'
 import InsightsEntryButton from '../../observe/agentic/insights/InsightsEntryButton'
@@ -31,17 +31,6 @@ export const policyLink = (name) => `/dashboard/guardrails/policies${name ? `?po
 
 // "Last 1 year". Found by alias, so reordering the picker's ranges cannot change the default.
 const DEFAULT_DATE_RANGE = values.ranges.find((range) => range.alias === 'lastYear')
-
-// A shared link only reproduces the page if the date filter comes back with it.
-function dateRangeFromSearchParams(searchParams) {
-    const sinceParam = searchParams.get('since')
-    const untilParam = searchParams.get('until')
-    if (sinceParam == null || untilParam == null) return null
-    const sinceTs = parseInt(sinceParam, 10)
-    const untilTs = parseInt(untilParam, 10)
-    if (Number.isNaN(sinceTs) || Number.isNaN(untilTs)) return null
-    return { title: 'Custom', alias: 'custom', period: { since: new Date(sinceTs * 1000), until: new Date(untilTs * 1000) } }
-}
 
 function GuardrailOverview() {
     const navigate = useNavigate()
@@ -95,10 +84,8 @@ function GuardrailOverview() {
         }
     }
 
-    // The activity page opens in this window with the same date range and these filters applied, and Back returns
-    // here with the same range. It lands on its Active tab, the closest match to the design's Open and All tabs;
-    // the page does not read a tab from the link yet.
-    const openActivity = (filters = {}) => goToGuardrailActivity(navigate, { startTimestamp, endTimestamp, ...filters })
+    // The Violations page opens in this window with the same date range and these filters applied; Back returns here.
+    const openViolations = (filters = {}) => goToGuardrailViolations(navigate, { startTimestamp, endTimestamp, ...filters })
 
     const exportCsv = async () => {
         try {
@@ -141,22 +128,22 @@ function GuardrailOverview() {
                     <Banner
                         status="warning"
                         title={`${critUnassigned.toLocaleString()} critical issue${critUnassigned === 1 ? ' has' : 's have'} no owner.`}
-                        action={{ content: 'Review critical issues', onAction: () => openActivity({ severity: 'CRITICAL' }) }}
+                        action={{ content: 'Review critical issues', onAction: () => openViolations({ severity: 'CRITICAL' }) }}
                     >
                         Assign an owner so they get triaged.
                     </Banner>
                 )}
                 <OverviewKpiRow
                     kpis={kpis}
-                    onOpenIssues={() => openActivity()}
+                    onOpenIssues={() => openViolations()}
                     onOpenPolicies={() => navigate('/dashboard/guardrails/policies')}
                 />
                 <HorizontalGrid columns={{ xs: 1, lg: ['twoThirds', 'oneThird'] }} gap="4">
-                    <ViolationsTrendCard points={trend} onOpenRange={(start, end) => openActivity({ startTimestamp: start, endTimestamp: end })} />
+                    <ViolationsTrendCard points={trend} onOpenRange={(start, end) => openViolations({ startTimestamp: start, endTimestamp: end })} />
                     <TopPoliciesCard
                         policies={topPolicies.rows}
                         total={topPolicies.total}
-                        onOpen={(policy) => openActivity({ latestAttack: policy })}
+                        onOpen={(policy) => openViolations({ latestAttack: policy })}
                         onLoadMore={() => loadMore('topPolicies')}
                         loadingMore={loadingMore === 'topPolicies'}
                     />
@@ -164,7 +151,7 @@ function GuardrailOverview() {
                 <ViolationHeatmap
                     heatmap={heatmap}
                     policySeverity={policySeverity}
-                    onOpen={(hosts, policies) => openActivity({ host: hosts.join(','), latestAttack: policies.join(',') })}
+                    onOpen={(hosts, policies) => openViolations({ host: hosts.join(','), latestAttack: policies.join(',') })}
                     onLoadMore={() => loadMore('heatmap')}
                     loadingMore={loadingMore === 'heatmap'}
                 />
@@ -174,8 +161,8 @@ function GuardrailOverview() {
                     onLoadMore={() => loadMore('attention')}
                     loadingMore={loadingMore === 'attention'}
                     collectionsMap={collectionsMap}
-                    onViewAll={() => openActivity()}
-                    onReview={(row) => openActivity({ latestAttack: row.policy, host: row.host })}
+                    onViewAll={() => openViolations()}
+                    onReview={(row) => openViolations({ latestAttack: row.policy, host: row.host })}
                     onOpenPolicy={(row) => navigate(policyLink(row.policy))}
                     onAssign={(row, agent) => setAssigning({ row, agent })}
                 />

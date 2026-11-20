@@ -29,6 +29,51 @@
     color: var(--zone-text);
 }
 
+/* Optional quadrants: tinted top zones, dashed split lines and a name in each corner. */
+.bubble-plot__quad {
+    position: absolute;
+    top: 0;
+    height: var(--quad-y);
+}
+
+.bubble-plot__quad--left {
+    left: 0;
+    width: var(--quad-x);
+    background: color-mix(in srgb, var(--p-color-bg-critical-subdued) 60%, transparent);
+}
+
+.bubble-plot__quad--right {
+    left: var(--quad-x);
+    right: 0;
+    background: color-mix(in srgb, var(--p-color-bg-caution-subdued) 60%, transparent);
+}
+
+.bubble-plot__split-x {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--quad-x);
+    border-left: 1px dashed var(--p-color-border);
+}
+
+.bubble-plot__split-y {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: var(--quad-y);
+    border-top: 1px dashed var(--p-color-border);
+}
+
+.bubble-plot__corner {
+    position: absolute;
+    pointer-events: none;
+}
+
+.bubble-plot__corner--top-left { left: 8px; top: 6px; }
+.bubble-plot__corner--top-right { right: 8px; top: 6px; }
+.bubble-plot__corner--bottom-left { left: 8px; bottom: 6px; }
+.bubble-plot__corner--bottom-right { right: 8px; bottom: 6px; }
+
 .bubble-plot__circle {
     position: absolute;
     left: clamp(calc(var(--d) / 2), var(--x), calc(100% - var(--d) / 2));
