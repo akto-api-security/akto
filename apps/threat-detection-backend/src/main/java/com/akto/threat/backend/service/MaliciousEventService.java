@@ -266,7 +266,7 @@ public class MaliciousEventService {
     }
     Document rangeScope = new Document(scope);
     included.forEach(condition -> andDocument(rangeScope, condition));
-    long total = maliciousEventDao.countDocuments(accountId, rangeScope, maxTimeMs);
+    long total = maliciousEventDao.countDocuments(accountId, rangeScope, maxTimeMs, ThreatUtils.coverIndexHint(accountId, rangeScope));
     if (excluded.isEmpty()) {
       return total;
     }

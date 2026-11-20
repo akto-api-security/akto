@@ -1,5 +1,6 @@
 package com.akto.threat.backend.utils;
 
+import org.bson.Document;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -54,18 +55,26 @@ public class ThreatUtilsEvalTypeTest {
   }
 
   @Test
-  void evalTypeReadsNeedTheFlagEndpointContextAndNoSkillOnlyMode() {
-    assertTrue(ThreatUtils.readsByEvalType("ENDPOINT", null, true));
-    assertFalse(ThreatUtils.readsByEvalType("ENDPOINT", null, false));
-    assertFalse(ThreatUtils.readsByEvalType("AGENTIC", null, true));
-    assertFalse(ThreatUtils.readsByEvalType("ENDPOINT", "only", true));
-    assertTrue(ThreatUtils.readsByEvalType("ENDPOINT", "exclude", true));
+  void evalTypeConditionsMatchByFieldAndNeverByRegex() {
+    assertEquals(Collections.singletonList(new Document("evalType", "SKILL")), ThreatUtils.evalTypeConditions("only", null));
+    assertEquals(Collections.singletonList(new Document("evalType", "CONFIG")), ThreatUtils.evalTypeConditions(null, "only"));
+    assertEquals(
+        Collections.singletonList(new Document("evalType", new Document("$nin", Arrays.asList("SKILL", "CONFIG")))),
+        ThreatUtils.evalTypeConditions("exclude", "exclude"));
+    assertEquals(
+        Collections.singletonList(new Document("evalType", new Document("$nin", Collections.singletonList("SKILL")))),
+        ThreatUtils.evalTypeConditions("exclude", null));
+    assertTrue(ThreatUtils.evalTypeConditions(null, null).isEmpty());
   }
 
   @Test
-  void skillsAreAlwaysSubtractedAndConfigOnlyWhenExcluded() {
-    assertEquals(Collections.singletonList("SKILL"), ThreatUtils.evalTypesExcludedFromCounts(null));
-    assertEquals(Collections.singletonList("SKILL"), ThreatUtils.evalTypesExcludedFromCounts("only"));
-    assertEquals(Arrays.asList("SKILL", "CONFIG"), ThreatUtils.evalTypesExcludedFromCounts("exclude"));
+  void coverIndexIsHintedOnlyWhenEveryFilteredFieldIsInIt() {
+    Document plain = new Document("contextSource", "ENDPOINT").append("status", "ACTIVE")
+        .append("detectedAt", new Document("$gte", 1).append("$lte", 2))
+        .append("evalType", new Document("$ne", "SKILL"));
+    assertTrue(ThreatUtils.filtersOnlyCoverFields(plain));
+    assertTrue(ThreatUtils.filtersOnlyCoverFields(new Document("$and", Arrays.asList(plain, new Document("evalType", "CONFIG")))));
+    assertFalse(ThreatUtils.filtersOnlyCoverFields(new Document(plain).append("filterId", new Document("$in", Arrays.asList("a")))));
+    assertFalse(ThreatUtils.filtersOnlyCoverFields(new Document("$and", Arrays.asList(plain, new Document("$or", Arrays.asList(new Document("host", "h")))))));
   }
 }

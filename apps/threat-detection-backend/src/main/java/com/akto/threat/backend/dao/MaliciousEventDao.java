@@ -99,6 +99,11 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
             .aggregate(pipeline);
     }
 
+    public AggregateIterable<Document> aggregateRaw(String accountId, List<Document> pipeline, Bson hint) {
+        AggregateIterable<Document> iterable = aggregateRaw(accountId, pipeline);
+        return hint == null ? iterable : iterable.hint(hint);
+    }
+
     public MongoCollection<Document> getDocumentCollection(String accountId) {
         return getDatabase(accountId)
             .getCollection(getCollectionName(), Document.class);
@@ -109,7 +114,15 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
     }
 
     public long countDocuments(String accountId, Bson filter, long maxTimeMs) {
-        return getCollection(accountId).countDocuments(filter, new CountOptions().maxTime(maxTimeMs, TimeUnit.MILLISECONDS));
+        return countDocuments(accountId, filter, maxTimeMs, null);
+    }
+
+    public long countDocuments(String accountId, Bson filter, long maxTimeMs, Bson hint) {
+        CountOptions options = new CountOptions().maxTime(maxTimeMs, TimeUnit.MILLISECONDS);
+        if (hint != null) {
+            options.hint(hint);
+        }
+        return getCollection(accountId).countDocuments(filter, options);
     }
 
     public void createIndexIfAbsent(String accountId) {

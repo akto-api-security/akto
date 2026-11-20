@@ -22,6 +22,7 @@ import org.bson.conversions.Bson;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -173,6 +174,9 @@ public class ThreatUtils {
         if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
             return new Document();
         }
+        if (USE_EVAL_TYPE_READS) {
+            return new Document(MaliciousEventDto.EVAL_TYPE, new Document("$ne", MaliciousEventDto.EVAL_TYPE_SKILL));
+        }
         return new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN));
     }
 
@@ -195,14 +199,37 @@ public class ThreatUtils {
         return null;
     }
 
-    public static boolean readsByEvalType(String contextSource, String skillEvalMode, boolean enabled) {
-        return enabled && "ENDPOINT".equalsIgnoreCase(contextSource) && !"only".equalsIgnoreCase(skillEvalMode);
+    public static final String EVAL_TYPE_COVER_INDEX = "idx_ctx_status_detectedAt_evalType_cover";
+    private static final List<String> EVAL_TYPE_COVER_FIELDS = Arrays.asList(
+        "contextSource", "status", "detectedAt", MaliciousEventDto.EVAL_TYPE, "severity", "host", "category", "subCategory",
+        "actor", "successfulExploit", "latestApiEndpoint", "latestApiMethod");
+    private static final Set<String> EVAL_TYPE_COVER_ACCOUNTS = ConcurrentHashMap.newKeySet();
+
+    // Hint only when the cover index exists for the account and every filtered field is in it; the planner
+    // otherwise picks another index and fetches every full document.
+    public static Document coverIndexHint(String accountId, Document match) {
+        if (!USE_EVAL_TYPE_READS || !EVAL_TYPE_COVER_ACCOUNTS.contains(accountId)
+            || !"ENDPOINT".equals(match.get("contextSource")) || !filtersOnlyCoverFields(match)) {
+            return null;
+        }
+        Document keys = new Document();
+        EVAL_TYPE_COVER_FIELDS.forEach(field -> keys.append(field, "detectedAt".equals(field) ? -1 : 1));
+        return keys;
     }
 
-    public static List<String> evalTypesExcludedFromCounts(String configEvalMode) {
-        return "exclude".equalsIgnoreCase(configEvalMode)
-            ? Arrays.asList(MaliciousEventDto.EVAL_TYPE_SKILL, MaliciousEventDto.EVAL_TYPE_CONFIG)
-            : Collections.singletonList(MaliciousEventDto.EVAL_TYPE_SKILL);
+    static boolean filtersOnlyCoverFields(Document match) {
+        for (Map.Entry<String, Object> condition : match.entrySet()) {
+            if ("$and".equals(condition.getKey())) {
+                for (Object clause : (List<?>) condition.getValue()) {
+                    if (!(clause instanceof Document) || !filtersOnlyCoverFields((Document) clause)) {
+                        return false;
+                    }
+                }
+            } else if (!EVAL_TYPE_COVER_FIELDS.contains(condition.getKey())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public static String configDedupeKey(String host, String actor, String category, String latestApiEndpoint) {
@@ -223,19 +250,37 @@ public class ThreatUtils {
         if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
             return conditions;
         }
+        if (USE_EVAL_TYPE_READS) {
+            return evalTypeConditions(skillEvalMode, configEvalMode);
+        }
         if ("only".equalsIgnoreCase(skillEvalMode)) {
-            conditions.add(USE_EVAL_TYPE_READS
-                ? new Document(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_SKILL)
-                : new Document("latestApiEndpoint", SKILLS_ENDPOINT_PATTERN));
+            conditions.add(new Document("latestApiEndpoint", SKILLS_ENDPOINT_PATTERN));
         } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
             conditions.add(new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN)));
         }
         if ("only".equalsIgnoreCase(configEvalMode)) {
-            conditions.add(USE_EVAL_TYPE_READS
-                ? new Document(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_CONFIG)
-                : new Document("latestApiEndpoint", CONFIG_ENDPOINT_PATTERN));
+            conditions.add(new Document("latestApiEndpoint", CONFIG_ENDPOINT_PATTERN));
         } else if ("exclude".equalsIgnoreCase(configEvalMode)) {
             conditions.add(new Document("latestApiEndpoint", new Document("$not", CONFIG_ENDPOINT_PATTERN)));
+        }
+        return conditions;
+    }
+
+    static List<Document> evalTypeConditions(String skillEvalMode, String configEvalMode) {
+        List<Document> conditions = new ArrayList<>();
+        List<String> excluded = new ArrayList<>();
+        if ("only".equalsIgnoreCase(skillEvalMode)) {
+            conditions.add(new Document(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_SKILL));
+        } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
+            excluded.add(MaliciousEventDto.EVAL_TYPE_SKILL);
+        }
+        if ("only".equalsIgnoreCase(configEvalMode)) {
+            conditions.add(new Document(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_CONFIG));
+        } else if ("exclude".equalsIgnoreCase(configEvalMode)) {
+            excluded.add(MaliciousEventDto.EVAL_TYPE_CONFIG);
+        }
+        if (!excluded.isEmpty()) {
+            conditions.add(new Document(MaliciousEventDto.EVAL_TYPE, new Document("$nin", excluded)));
         }
         return conditions;
     }
@@ -605,12 +650,17 @@ public class ThreatUtils {
         requiredIndexes.put("idx_context_detectedAt_category_subCategory", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("category"), Indexes.ascending("subCategory")));
         // Lets the Active tab count and its skills/config exclusion count be answered from index keys alone.
         requiredIndexes.put("idx_ctx_status_detected_endpoint", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending("status"), Indexes.descending("detectedAt"), Indexes.ascending("latestApiEndpoint")));
+        // Holds every field the Atlas counts and charts read, so they are answered from index keys alone.
+        requiredIndexes.put(EVAL_TYPE_COVER_INDEX, Indexes.compoundIndex(
+            Indexes.ascending("contextSource", "status"), Indexes.descending("detectedAt"),
+            Indexes.ascending(EVAL_TYPE_COVER_FIELDS.subList(3, EVAL_TYPE_COVER_FIELDS.size()))));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {
                 collection.createIndex(entry.getValue(), new IndexOptions().name(entry.getKey()));
             }
         }
+        EVAL_TYPE_COVER_ACCOUNTS.add(accountId);
 
         // Only accounts that group activities have keyed events; partial so it stays small.
         if (groupsActivities(accountId) && !existingIndexes.contains(ACTIVITY_GROUP_INDEX)) {
