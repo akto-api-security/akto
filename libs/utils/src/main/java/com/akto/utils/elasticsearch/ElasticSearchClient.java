@@ -1290,6 +1290,27 @@ public class ElasticSearchClient extends SearchClient {
         }
     }
 
+    // ── Retention (used by ArchiveOldAgentQueryRecordsCron) ───────────────────
+
+    /**
+     * Deletes up to {@code maxDocs} records (across all accounts — the index is shared) whose
+     * timestamp is older than {@code cutoffMs}. Returns the number deleted, or -1 on failure.
+     */
+    public long deleteOlderThan(long cutoffMs, int maxDocs) {
+        if (!isConfigured()) return -1;
+        try {
+            JSONObject body = new JSONObject().put("query", new JSONObject().put("range", new JSONObject()
+                .put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("lt", cutoffMs))));
+            String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX
+                + "/_delete_by_query?conflicts=proceed&refresh=true&max_docs=" + maxDocs;
+            JSONObject response = httpPost(url, body.toString());
+            return response != null ? response.optLong("deleted", 0) : -1;
+        } catch (JSONException e) {
+            logger.error("deleteOlderThan error: " + e.getMessage());
+            return -1;
+        }
+    }
+
     // ── Scroll API (used by crons) ────────────────────────────────────────────
 
     @Override
