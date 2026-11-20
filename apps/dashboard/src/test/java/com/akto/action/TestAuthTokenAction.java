@@ -216,7 +216,7 @@ public class TestAuthTokenAction extends MongoBasedTest {
     }
 
     @Test
-    public void testFetchAuthTokensJoinsModulesNewestFirst() {
+    public void testFetchAuthTokensJoinsOnlyModulesThatHeartbeatedInTheLastFiveMinutes() {
         insertToken("old", AuthToken.STATUS_ACTIVE, AuthToken.SOURCE_GENERATED, 100);
         insertToken("new", AuthToken.STATUS_ACTIVE, AuthToken.SOURCE_GENERATED, 200);
         int now = Context.now();
@@ -240,32 +240,39 @@ public class TestAuthTokenAction extends MongoBasedTest {
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> modules = (List<Map<String, Object>>) rows.get(0).get("modules");
-        assertEquals(2, modules.size());
-        for (Map<String, Object> module : modules) {
-            boolean live = "m-live".equals(module.get("id"));
-            assertEquals(live, module.get("active"));
-            assertEquals(live ? "runtime-1" : "runtime-2", module.get("name"));
-        }
+        assertEquals(1, modules.size());
+        assertEquals("m-live", modules.get(0).get("id"));
+        assertEquals("runtime-1", modules.get(0).get("name"));
     }
 
     @Test
-    public void testFetchAuthTokensCapsModulesPerTokenNewestFirstAndReportsTheTotal() {
+    public void testFetchAuthTokensListsEveryActiveModuleNewestFirstAndSkipsStaleOnes() {
         insertToken("shared", AuthToken.STATUS_ACTIVE, AuthToken.SOURCE_GENERATED, 100);
-        for (int i = 0; i < 25; i++) {
+        int now = Context.now();
+        for (int i = 0; i < 250; i++) {
             ModuleInfoDao.instance.insertOne(ModuleInfo.builder().id("m-" + i).name("device-" + i)
-                    .moduleType(ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD).lastHeartbeatReceived(1000 + i).tokenId("shared").build());
+                    .moduleType(ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD).lastHeartbeatReceived(now - 250 + i).tokenId("shared").build());
+        }
+        // retired devices keep their module_info row and token id forever, so they must not be listed
+        for (int i = 0; i < 40; i++) {
+            ModuleInfoDao.instance.insertOne(ModuleInfo.builder().id("old-" + i).name("retired-" + i)
+                    .moduleType(ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD).lastHeartbeatReceived(now - 3600 - i).tokenId("shared").build());
         }
 
         AuthTokenAction action = action();
         assertEquals(Action.SUCCESS.toUpperCase(), action.fetchAuthTokens());
 
         Map<String, Object> row = action.getAuthTokens().get(0);
-        assertEquals(25, row.get("moduleCount"));
+        assertFalse(row.containsKey("moduleCount"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> modules = (List<Map<String, Object>>) row.get("modules");
-        assertEquals(20, modules.size());
-        assertEquals("m-24", modules.get(0).get("id"));
-        assertEquals("m-5", modules.get(19).get("id"));
+        assertEquals(250, modules.size());
+        assertEquals("m-249", modules.get(0).get("id"));
+        assertEquals("m-0", modules.get(249).get("id"));
+        for (Map<String, Object> module : modules) {
+            assertFalse(((String) module.get("id")).startsWith("old-"));
+            assertFalse(module.containsKey("active"));
+        }
     }
 
     @Test
@@ -285,9 +292,9 @@ public class TestAuthTokenAction extends MongoBasedTest {
         AuthTokenAction tokens = action();
         assertEquals(Action.SUCCESS.toUpperCase(), tokens.fetchAuthTokens());
         Map<String, Object> row = tokens.getAuthTokens().get(0);
-        assertEquals(2, row.get("moduleCount"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> modules = (List<Map<String, Object>>) row.get("modules");
+        assertEquals(2, modules.size());
         for (Map<String, Object> module : modules) {
             assertEquals("m-guardrail".equals(module.get("id")) ? "Akto-hosted guardrail" : "my-runtime", module.get("name"));
         }
