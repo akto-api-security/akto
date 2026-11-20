@@ -22,7 +22,7 @@ export const PollingProvider = ({ children }) => {
     const pollingStoppedRef = useRef(false);
 
     useEffect(() => {
-        // Poll fast only while tests are running or queued, and not at all while the tab is hidden
+        // Poll fast only while tests are running (recurring runs stay queued), and not at all while the tab is hidden
         let effectActive = true;
         const scheduleNextPoll = (delay) => {
             // A request still in flight at unmount must not start a new poll
@@ -61,8 +61,8 @@ export const PollingProvider = ({ children }) => {
                     }
                     return prevState;
                 });
-                const testsActive = (resp?.currentRunningTestsStatus?.length || 0) > 0 || (resp?.testRunsQueued || 0) > 0;
-                scheduleNextPoll(testsActive ? ACTIVE_POLL_MS : IDLE_POLL_MS);
+                const testsRunning = (resp?.currentRunningTestsStatus?.length || 0) > 0;
+                scheduleNextPoll(testsRunning ? ACTIVE_POLL_MS : IDLE_POLL_MS);
             }).catch(() => {
                 scheduleNextPoll(IDLE_POLL_MS);
             });
