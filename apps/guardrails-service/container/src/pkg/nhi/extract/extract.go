@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/claudecli"
 	"gopkg.in/yaml.v3"
 )
 
@@ -68,6 +69,16 @@ type Finding struct {
 	// Metadata is extractor-specific extra context (profile name, MCP server
 	// name, header name, registry URL, ...). Persisted on the NhiIdentity.
 	Metadata map[string]any
+}
+
+// LoginFunc reads the signed-in user's email from an agent's login file. The email becomes the
+// owner of that agent's identities found on the same device and home.
+type LoginFunc func(content []byte, log claudecli.Logger) (email string, ok bool)
+
+// ClaudeCodeLogin reads the Claude account from ~/.claude.json via the shared claudecli.ParseLogin.
+func ClaudeCodeLogin(content []byte, log claudecli.Logger) (string, bool) {
+	account, ok := claudecli.ParseLogin(content, log)
+	return account.EmailAddress, ok
 }
 
 // ExtractorFunc parses one piece of raw material and returns its findings.
@@ -734,20 +745,27 @@ func FlatYAMLCredentials(_ string, content []byte) []Finding {
 // Claude Code credentials.json (OAuth tokens)
 // ============================================================================
 
-// ClaudeCredentials extracts the OAuth access / refresh tokens that
-// Claude Code stores at ~/.claude/credentials.json after login.
+// ClaudeCredentials extracts the OAuth tokens Claude Code stores after login: the current store
+// ({claudeAiOauth, mcpOAuth}, parsed by the shield's shared claudecli.ParseCredentials) and the
+// legacy flat ~/.claude/credentials.json.
 func ClaudeCredentials(_ string, content []byte) []Finding {
+	var out []Finding
+	if creds, err := claudecli.ParseCredentials(content); err == nil {
+		for _, c := range creds {
+			if f, ok := claudeCredentialFinding(c); ok {
+				out = append(out, f)
+			}
+		}
+	}
 	var doc struct {
 		AccessToken  string `json:"accessToken"`
 		RefreshToken string `json:"refreshToken"`
-		ExpiresAt    any    `json:"expiresAt"`
 		OAuthToken   string `json:"oauth_token"`
 		Token        string `json:"token"`
 	}
-	if err := json.Unmarshal(content, &doc); err != nil {
-		return nil
+	if err := json.Unmarshal(bytes.TrimSpace(content), &doc); err != nil {
+		return out
 	}
-	var out []Finding
 	if doc.AccessToken != "" && isLikelyCredentialValue(doc.AccessToken) {
 		out = append(out, Finding{
 			IdentityName: "claude_code.accessToken",
@@ -789,6 +807,33 @@ func ClaudeCredentials(_ string, content []byte) []Finding {
 		})
 	}
 	return out
+}
+
+// claudeCredentialFinding maps one parsed Claude credential to a Finding.
+func claudeCredentialFinding(c claudecli.Credential) (Finding, bool) {
+	if !isLikelyCredentialValue(c.Secret) {
+		return Finding{}, false
+	}
+	meta := map[string]any{"field": c.SecretField}
+	for k, v := range map[string]string{
+		"mcpServer": c.ServerName, "serverUrl": c.ServerURL, "scope": c.Scope, "clientId": c.ClientID,
+		"issuer": c.Issuer, "storeKey": c.StoreKey, "subscriptionType": c.SubscriptionType,
+	} {
+		if v != "" {
+			meta[k] = v
+		}
+	}
+	if c.AccessTokenExpiresAt > 0 {
+		meta["accessTokenExpiresAt"] = int(c.AccessTokenExpiresAt)
+	}
+	return Finding{
+		IdentityName: c.Name,
+		IdentityType: "OAuth Token",
+		RiskLevel:    "HIGH",
+		Secret:       c.Secret,
+		ExpiryDate:   int(c.RefreshTokenExpiresAt),
+		Metadata:     meta,
+	}, true
 }
 
 // ============================================================================

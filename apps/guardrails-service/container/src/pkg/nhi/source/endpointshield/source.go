@@ -2,6 +2,7 @@ package endpointshield
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +39,7 @@ type Source struct {
 	mu             sync.Mutex
 	cursor         int // last processed executedAt
 	ruleIDToTarget map[string]Target
+	logins         map[string]string // loginKey(device, home, agent) -> email
 }
 
 // NewSource builds the source. interval <= 0 uses the default cadence (30 min);
@@ -56,6 +58,7 @@ func NewSource(client *dbabstractor.Client, publisher *nhi.Publisher, logger *za
 		interval:       interval,
 		logger:         logger,
 		ruleIDToTarget: make(map[string]Target),
+		logins:         make(map[string]string),
 	}
 }
 
@@ -162,7 +165,7 @@ func (s *Source) drainResults(ctx context.Context) error {
 		}
 
 		maxSeen := since
-		for _, r := range results {
+		for _, r := range s.loginsFirst(results) {
 			s.processResult(r)
 			if r.ExecutedAt > maxSeen {
 				maxSeen = r.ExecutedAt
@@ -177,6 +180,14 @@ func (s *Source) drainResults(ctx context.Context) error {
 }
 
 func (s *Source) processResult(r dbabstractor.FileInspectionResult) {
+	if r.Agent != "" {
+		target, ok := agentTarget(r)
+		if !ok {
+			return // agent or role without a parser yet
+		}
+		s.processMatches(r, target)
+		return
+	}
 	target, ok := s.lookupTarget(r.RuleID)
 	if !ok {
 		// Result came from a rule we didn't register (e.g. created by another
@@ -193,7 +204,10 @@ func (s *Source) processResult(r dbabstractor.FileInspectionResult) {
 		zap.String("ruleId", r.RuleID),
 		zap.String("agent", target.AgentName),
 		zap.Int("matches", len(r.Matches)))
+	s.processMatches(r, target)
+}
 
+func (s *Source) processMatches(r dbabstractor.FileInspectionResult, target Target) {
 	for _, m := range r.Matches {
 		if m.IsDir != nil && *m.IsDir {
 			continue
@@ -212,6 +226,20 @@ func (s *Source) processResult(r dbabstractor.FileInspectionResult) {
 		if len(content) == 0 {
 			continue
 		}
+		home := homeOf(r, target, m)
+		if target.Login != nil {
+			if email, ok := target.Login(content, s.logInfo); ok {
+				s.setLogin(r.DeviceID, home, target.AgentName, email)
+			}
+		}
+		source := m.Path
+		if strings.HasPrefix(m.Path, keychainPathPrefix) && home != "" {
+			// one Keychain item per OS user; without the home, users of one device overwrite each other
+			source = home + "#" + m.Path
+		}
+		if target.Extractor == nil {
+			continue
+		}
 		findings := target.Extractor(m.Path, content)
 		s.logger.Debug("NHI: extractor ran",
 			zap.String("path", m.Path),
@@ -222,7 +250,8 @@ func (s *Source) processResult(r dbabstractor.FileInspectionResult) {
 		s.publisher.Publish(nhi.PublishContext{
 			DeviceID:      r.DeviceID,
 			DeviceLabel:   r.DeviceLabel,
-			Source:        m.Path,
+			OwnerEmail:    s.login(r.DeviceID, home, target.AgentName),
+			Source:        source,
 			SourceType:    target.SourceType,
 			AgentName:     target.AgentName,
 			AgentType:     target.AgentType,
@@ -280,12 +309,14 @@ var _ nhi.Source = (*Source)(nil)
 // Target ties one file path (or glob) to the extractor that parses it.
 // Each Target becomes one FileInspectionRule registered with cyborg.
 type Target struct {
-	Path      string
-	MaxDepth  int
+	Path       string
+	MaxDepth   int
 	SourceType string
-	AgentName string
-	AgentType string
-	Extractor extract.ExtractorFunc
+	AgentName  string
+	AgentType  string
+	Extractor  extract.ExtractorFunc
+	// Login is set on the target that holds the agent's login (e.g. ~/.claude.json for Claude Code).
+	Login extract.LoginFunc
 }
 
 // DefaultTargets is the curated set of credential locations the guardrails
@@ -333,19 +364,9 @@ func DefaultTargets() []Target {
 		"~/AppData/Roaming/Claude/claude_desktop_config.json",
 		"~/AppData/Local/AnthropicClaude/claude_desktop_config.json",
 	)
-	targets = append(targets, Target{
-		Path: "~/.claude.json", SourceType: "mcp_config",
-		AgentName: "Claude Code", AgentType: "CODE_EDITOR",
-		Extractor: extract.ClaudeCodeConfig,
-	})
-	targets = append(targets, Target{
-		Path: "~/.claude/credentials.json", SourceType: "claude_credentials",
-		AgentName: "Claude Code", AgentType: "CODE_EDITOR",
-		Extractor: extract.ClaudeCredentials,
-	})
+	// Claude Code, Codex and Cursor CLI files come from agent rules (agents.go).
 
 	addMCP("Cursor",
-		"~/.cursor/mcp.json",
 		"~/Library/Application Support/Cursor/User/mcp.json",
 		"~/.config/Cursor/User/mcp.json",
 		"~/AppData/Roaming/Cursor/User/mcp.json",
@@ -459,7 +480,6 @@ func DefaultTargets() []Target {
 	for _, t := range []Target{
 		{Path: "~/.config/openai/auth.json", SourceType: "openai_auth", AgentName: "OpenAI CLI", AgentType: "AI_AGENT", Extractor: extract.OpenAIAuth},
 		{Path: "~/AppData/Roaming/openai/auth.json", SourceType: "openai_auth", AgentName: "OpenAI CLI", AgentType: "AI_AGENT", Extractor: extract.OpenAIAuth},
-		{Path: "~/.codex/auth.json", SourceType: "codex_auth", AgentName: "Codex CLI", AgentType: "AI_AGENT", Extractor: extract.OpenAIAuth},
 		{Path: "~/.config/gemini/oauth_creds.json", SourceType: "gemini_auth", AgentName: "Gemini CLI", AgentType: "AI_AGENT", Extractor: extract.OpenAIAuth},
 		{Path: "~/AppData/Roaming/gemini/oauth_creds.json", SourceType: "gemini_auth", AgentName: "Gemini CLI", AgentType: "AI_AGENT", Extractor: extract.OpenAIAuth},
 		{Path: "~/.gemini/.env", SourceType: "gemini_auth", AgentName: "Gemini CLI", AgentType: "AI_AGENT", Extractor: extract.DotEnv},
