@@ -117,10 +117,10 @@ public class TestUsageMetricCalculator extends MongoBasedTest {
     }
 
     @Test
-    public void aiAssetsIncludesUnauthenticatedMcpToolsGroup() {
-        // Same collection set as the AGENTIC context, which always includes this group.
+    public void aiAssetsDoesNotCountTheUnauthenticatedMcpToolsGroup() {
+        // The dashboard's AGENTIC context lists this group, but it holds no endpoints of its own.
         seed(UnauthenticatedEndpoint.UNAUTHENTICATED_MCP_TOOLS_GROUP_ID, false);
-        assertEquals(4, UsageMetricCalculator.calculateAgenticAssets());
+        assertEquals(3, UsageMetricCalculator.calculateAgenticAssets());
     }
 
     @Test

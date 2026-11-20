@@ -18,6 +18,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.usage.MetricTypes;
@@ -214,11 +215,13 @@ public class UsageMetricCalculator {
 
     /*
      * AI_ASSET_COUNT counts collections, not endpoints: the collections that make up the AGENTIC
-     * context (same filter the dashboard uses), minus demos and deactivated collections.
+     * context (same filter the dashboard uses), minus demos and deactivated collections, and minus
+     * the unauthenticated MCP tools group, which is a group with no endpoints of its own.
      */
     static int calculateAgenticAssets() {
         Bson filter = Filters.and(
             UsersCollectionsList.agenticCollectionsFilter(),
+            Filters.ne(Constants.ID, UnauthenticatedEndpoint.UNAUTHENTICATED_MCP_TOOLS_GROUP_ID),
             excludeDemosAndDeactivated(Constants.ID)
         );
         return (int) ApiCollectionsDao.instance.getMCollection().countDocuments(filter);

@@ -348,11 +348,10 @@ public class HttpCallParser {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), MetricTypes.ACTIVE_ENDPOINTS);
             SyncLimit syncLimit = featureAccess.fetchSyncLimit();
 
-            SyncLimit mcpAssetsSyncLimit = fetchSyncLimit(MetricTypes.MCP_ASSET_COUNT);
-            SyncLimit aiAssetsSyncLimit = fetchSyncLimit(MetricTypes.AI_ASSET_COUNT);
+            FeatureAccess aiAssetAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), MetricTypes.AI_ASSET_COUNT);
 
             numberOfSyncs++;
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, mcpAssetsSyncLimit, aiAssetsSyncLimit,
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, aiAssetAccess,
                 responseParams.get(0).getSource());
             if (!skipDependencyAnalysis && DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
@@ -922,14 +921,6 @@ public class HttpCallParser {
     private Bson getUpdatesForTags(List<CollectionTags> tagsToApply, Bson updates) {
         if (tagsToApply == null || tagsToApply.isEmpty()) return updates;
         return Updates.combine(updates, Updates.setOnInsert(ApiCollection.TAGS_STRING, tagsToApply));
-    }
-
-    private SyncLimit fetchSyncLimit(MetricTypes metricType) {
-        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), metricType);
-        if (featureAccess.equals(FeatureAccess.noAccess)) {
-            featureAccess.setUsageLimit(0);
-        }
-        return featureAccess.fetchSyncLimit();
     }
 
     public void setSkipDependencyAnalysis(boolean skipDependencyAnalysis) {
