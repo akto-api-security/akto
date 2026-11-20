@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"path"
 	"strings"
@@ -26,11 +28,12 @@ var zipVectorExts = map[string]bool{".emf": true, ".wmf": true}
 // Office and ODF keep a rendered preview of the document here; its text is the document's own.
 var zipThumbnailPrefixes = []string{"docprops/thumbnail", "thumbnails/"}
 
-// embeddedImages is what a document holds besides its text layer: the distinct images worth
-// reading, in document order, and how many were left out.
+// embeddedImages is what a document holds besides its text layer: each distinct image worth
+// reading goes to onAdd, numbered in document order, up to limit of them.
 type embeddedImages struct {
-	data       [][]byte
+	onAdd      func(i int, img []byte)
 	seen       map[[32]byte]bool
+	count      int
 	limit      int
 	unreadable int  // found but undecodable, oversized or in a format OCR can't take
 	truncated  bool // more images than limit
@@ -44,27 +47,26 @@ func (e *embeddedImages) add(img []byte) {
 	if e.seen[sum] {
 		return // the same logo on every page is read once
 	}
-	if len(e.data) >= e.limit {
+	if e.count >= e.limit {
 		e.truncated = true
 		return
 	}
 	e.seen[sum] = true
-	e.data = append(e.data, img)
+	e.onAdd(e.count, img)
+	e.count++
 }
 
 // full reports that collecting further can't change the outcome.
 func (e *embeddedImages) full() bool { return e.truncated }
 
-// collectImages finds the images in the document at path, keeping at most limit of them.
-// maxBytes caps one image stored in a zip-based document.
-func collectImages(path, ext string, limit, maxBytes int) embeddedImages {
-	images := embeddedImages{limit: limit}
+// collectImages finds the images in the document at path. maxBytes caps one image stored in a
+// zip-based document.
+func collectImages(path, ext string, maxBytes int, images *embeddedImages) {
 	if ext == ".pdf" {
-		collectPDFImages(path, &images)
+		collectPDFImages(path, images)
 	} else {
-		collectZipImages(path, maxBytes, &images)
+		collectZipImages(path, maxBytes, images)
 	}
-	return images
 }
 
 // collectPDFImages reads the image XObjects drawn on each page. Images inside form XObjects and
@@ -102,15 +104,53 @@ func collectPDFImages(file string, images *embeddedImages) {
 				continue
 			}
 			normalizeICCColorSpace(img)
-			png, err := img.ToPNG()
+			data, err := pdfImageBytes(img)
 			if err != nil {
 				images.unreadable++
 				continue
 			}
-			images.add(png)
+			images.add(data)
 		}
 	}
 }
+
+// pdfImageBytes encodes a PDF image for OCR. A JPEG stored in the PDF (a scan, a photo) goes as it
+// is, and 8-bit RGB or grey pixels are PNG-encoded for speed: tabula's ToPNG, kept for the rest,
+// spends most of a scanned page's time re-encoding it at default compression.
+func pdfImageBytes(img *reader.PageImage) ([]byte, error) {
+	if isJPEG(img.Data) && img.ColorSpace != "Separation" {
+		// CMYK JPEGs are often stored inverted (Adobe), so those go through tabula's decoding.
+		if cfg, _, err := image.DecodeConfig(bytes.NewReader(img.Data)); err == nil && cfg.ColorModel != color.CMYKModel {
+			return img.Data, nil
+		}
+		return img.ToPNG()
+	}
+	w, h := img.Width, img.Height
+	rect := image.Rect(0, 0, w, h)
+	var pixels image.Image
+	switch {
+	case img.BitsPerComponent != 8:
+		return img.ToPNG()
+	case img.ColorSpace == "DeviceRGB" && len(img.Data) >= w*h*3:
+		rgba := image.NewRGBA(rect)
+		for i, j := 0, 0; i < w*h*3; i, j = i+3, j+4 {
+			copy(rgba.Pix[j:j+3], img.Data[i:i+3])
+			rgba.Pix[j+3] = 0xff
+		}
+		pixels = rgba
+	case img.ColorSpace == "DeviceGray" && len(img.Data) >= w*h:
+		pixels = &image.Gray{Pix: img.Data[:w*h], Stride: w, Rect: rect}
+	default:
+		return img.ToPNG()
+	}
+	var buf bytes.Buffer
+	if err := (&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&buf, pixels); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func isJPEG(data []byte) bool { return len(data) >= 2 && data[0] == 0xFF && data[1] == 0xD8 }
 
 // normalizeICCColorSpace names an ICC-based image's colour space by its component count, which
 // the pixel data gives away; tabula would otherwise decode an RGB image as greyscale.

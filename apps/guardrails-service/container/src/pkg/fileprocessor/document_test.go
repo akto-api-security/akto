@@ -13,6 +13,7 @@ import (
 	"image/png"
 	"io"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 )
@@ -190,18 +191,57 @@ func TestDocumentKeepsTheTextLayerBeforeTheImages(t *testing.T) {
 	}
 }
 
-// An RGB image under an ICC profile must reach OCR in colour, not as its bytes read as greyscale.
-func TestDocumentDecodesICCBasedRGBImages(t *testing.T) {
-	raw := bytes.Repeat([]byte{255, 0, 0}, 40*40)
+func flateXObject(w, h int, colorSpace string, pixel []byte) pdfImage {
 	var z bytes.Buffer
 	zw := zlib.NewWriter(&z)
-	_, _ = zw.Write(raw)
+	_, _ = zw.Write(bytes.Repeat(pixel, w*h))
 	_ = zw.Close()
-	img := pdfImage{w: 40, h: 40, filter: "FlateDecode", colorSpace: "ICC", data: z.Bytes()}
+	return pdfImage{w: w, h: h, filter: "FlateDecode", colorSpace: colorSpace, data: z.Bytes()}
+}
 
-	text, err := extract(t, NewDocumentProcessor(&fakeOCR{}, 10, 1<<20), buildPDF(t, "", []pdfImage{img}), ".pdf")
-	if err != nil || text != "image 40x40 rgb(255,0,0)" {
-		t.Fatalf("text = %q, err = %v; want the red image read as red", text, err)
+// Raw pixels reach OCR in their colours: RGB under an ICC profile (tabula alone would read it as
+// grey), plain RGB and grey.
+func TestDocumentDecodesRawPDFImages(t *testing.T) {
+	for name, tc := range map[string]struct {
+		img  pdfImage
+		want string
+	}{
+		"ICC-based RGB": {flateXObject(40, 40, "ICC", []byte{255, 0, 0}), "image 40x40 rgb(255,0,0)"},
+		"device RGB":    {flateXObject(40, 40, "DeviceRGB", []byte{0, 0, 255}), "image 40x40 rgb(0,0,255)"},
+		"device grey":   {flateXObject(40, 40, "DeviceGray", []byte{128}), "image 40x40 rgb(128,128,128)"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			text, err := extract(t, NewDocumentProcessor(&fakeOCR{}, 10, 1<<20), buildPDF(t, "", []pdfImage{tc.img}), ".pdf")
+			if err != nil || text != tc.want {
+				t.Fatalf("text = %q, err = %v; want %q", text, err, tc.want)
+			}
+		})
+	}
+}
+
+// captureOCR keeps the bytes it was sent.
+type captureOCR struct {
+	mu   sync.Mutex
+	sent [][]byte
+}
+
+func (o *captureOCR) ExtractText(_ context.Context, r io.Reader) (string, error) {
+	b, err := io.ReadAll(r)
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.sent = append(o.sent, b)
+	return "text", err
+}
+
+// A scanned page is a JPEG in the PDF: it goes to OCR as stored, not decoded and re-encoded.
+func TestDocumentSendsAStoredJPEGAsIs(t *testing.T) {
+	page := jpegXObject(t, 300, 200, red)
+	ocr := &captureOCR{}
+	if _, err := extract(t, NewDocumentProcessor(ocr, 10, 1<<20), buildPDF(t, "", []pdfImage{page}), ".pdf"); err != nil {
+		t.Fatal(err)
+	}
+	if len(ocr.sent) != 1 || !bytes.Equal(ocr.sent[0], page.data) {
+		t.Fatalf("OCR got %d images; want the page's JPEG byte for byte", len(ocr.sent))
 	}
 }
 

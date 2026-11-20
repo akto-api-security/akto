@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 
@@ -34,64 +35,80 @@ func (*DocumentProcessor) SupportedExtensions() []string {
 
 // ExtractContent returns the text layer followed by the text OCR read from the embedded images.
 // When some images were not read, the text it has is returned together with ErrIncomplete.
+// Each image's OCR starts as soon as the image is found, while the rest of the document is parsed.
 func (p *DocumentProcessor) ExtractContent(ctx context.Context, r io.Reader, ext string) (string, error) {
 	// Without OCR one image is enough to know the document can't be fully read.
 	limit := p.maxImages
 	if p.ocr == nil {
 		limit = 0
 	}
-	var images embeddedImages
+	run := &ocrRun{ctx: ctx, ocr: p.ocr, sem: make(chan struct{}, ocrConcurrency), texts: map[int]string{}}
+	images := embeddedImages{limit: limit, onAdd: run.start}
 	text, err := withTempFile(r, ext, func(path string) (string, error) {
+		collectImages(path, ext, p.maxImageBytes, &images)
 		text, _, err := tabula.Open(path).Text()
 		if err != nil {
 			return "", err
 		}
-		images = collectImages(path, ext, limit, p.maxImageBytes)
 		return strings.TrimSpace(text), nil
 	})
+	read, failed := run.wait()
 	if err != nil {
 		return "", err
 	}
 
-	read, failed := p.readImages(ctx, images.data)
 	if len(read) > 0 {
 		text = strings.TrimSpace(strings.Join(append([]string{text}, read...), "\n\n"))
 	}
 	if images.unreadable > 0 || failed > 0 || images.truncated {
 		return text, fmt.Errorf("%w: embedded images: %d read, %d failed OCR, %d unreadable, more than %d: %t",
-			ErrIncomplete, len(images.data)-failed, failed, images.unreadable, limit, images.truncated)
+			ErrIncomplete, images.count-failed, failed, images.unreadable, limit, images.truncated)
 	}
 	return text, nil
 }
 
-// readImages OCRs images in parallel and returns the non-empty texts in document order, with the
-// number of images that could not be read.
-func (p *DocumentProcessor) readImages(ctx context.Context, images [][]byte) ([]string, int) {
-	texts := make([]string, len(images))
-	errs := make([]error, len(images))
-	sem := make(chan struct{}, ocrConcurrency)
-	var wg sync.WaitGroup
-	for i, img := range images {
-		wg.Add(1)
-		go func(i int, img []byte) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			texts[i], errs[i] = ocrImage(ctx, p.ocr, img)
-		}(i, img)
-	}
-	wg.Wait()
+// ocrRun OCRs images in the background, ocrConcurrency at a time.
+type ocrRun struct {
+	ctx    context.Context
+	ocr    mediaprovider.OCRProvider
+	sem    chan struct{}
+	wg     sync.WaitGroup
+	mu     sync.Mutex
+	texts  map[int]string
+	failed int
+}
 
-	var read []string
-	failed := 0
-	for i, err := range errs {
+// start reads image i of the document.
+func (r *ocrRun) start(i int, img []byte) {
+	r.wg.Add(1)
+	go func() {
+		defer r.wg.Done()
+		r.sem <- struct{}{}
+		defer func() { <-r.sem }()
+		text, err := ocrImage(r.ctx, r.ocr, img)
+		r.mu.Lock()
+		defer r.mu.Unlock()
 		if err != nil {
-			failed++
-			continue
+			r.failed++
+			return
 		}
-		if t := strings.TrimSpace(texts[i]); t != "" {
-			read = append(read, t)
+		r.texts[i] = strings.TrimSpace(text)
+	}()
+}
+
+// wait returns the non-empty texts in document order and how many images could not be read.
+func (r *ocrRun) wait() ([]string, int) {
+	r.wg.Wait()
+	indexes := make([]int, 0, len(r.texts))
+	for i := range r.texts {
+		indexes = append(indexes, i)
+	}
+	sort.Ints(indexes)
+	var read []string
+	for _, i := range indexes {
+		if r.texts[i] != "" {
+			read = append(read, r.texts[i])
 		}
 	}
-	return read, failed
+	return read, r.failed
 }
