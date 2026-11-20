@@ -4,6 +4,7 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 import java.util.List;
 
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -82,6 +83,11 @@ public class TestingRun {
     // The smart agent chosen for this run's smart testing (a copy); mini-testing sends it with every smart test.
     // Null: smart testing exactly as before.
     private SmartAgentConfig smartAgentConfig;
+
+    public static final String CONTEXT_SOURCE_FIELD = "contextSource";
+    @Getter
+    @Setter
+    private CONTEXT_SOURCE contextSource;
 
     public TestingRun() { }
 
