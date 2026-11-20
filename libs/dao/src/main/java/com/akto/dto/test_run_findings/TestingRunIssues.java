@@ -60,6 +60,8 @@ public class TestingRunIssues {
     public static final String ID_URL = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL;
     public static final String ID_METHOD = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.METHOD;
 
+    public static final String WIZ_FINDING_CREATION_STATUS = "wizFindingCreationStatus";
+
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
                             int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId, String jiraIssueUrl, int lastUpdated) {
         this(id, severity, status, creationTime, lastSeen, latestTestingRunSummaryId, jiraIssueUrl, lastUpdated, false);
