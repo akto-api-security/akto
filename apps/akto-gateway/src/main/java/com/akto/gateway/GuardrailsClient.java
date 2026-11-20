@@ -192,10 +192,6 @@ public class GuardrailsClient {
             this.fileName = fileName;
             this.contentType = contentType;
         }
-
-        public String getFileName() {
-            return fileName;
-        }
     }
 
     @FunctionalInterface

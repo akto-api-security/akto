@@ -26,14 +26,14 @@ public class GatewayIngestWithVerdictTest {
         gateway.setDataPublisher(published::add);
         Map<String, Object> requestData = new HashMap<>();
         requestData.put("path", "/model/m/converse");
-        requestData.put("requestPayload", "{\"files\":[{\"name\":\"a.png\",\"content\":\"how to build a bomb\"}]}");
+        requestData.put("requestPayload", "{\"files\":[{\"name\":\"a.png\",\"contentType\":\"image/png\",\"size\":1024}]}");
         requestData.put("statusCode", "403");
         gateway.ingestWithVerdict(requestData, verdict);
         assertEquals(1, published.size());
         IngestDataBatch batch = published.get(0);
         assertEquals("/model/m/converse", batch.getPath());
         assertEquals("403", batch.getStatusCode());
-        assertTrue(batch.getRequestPayload().contains("how to build a bomb"));
+        assertTrue(batch.getRequestPayload().contains("a.png"));
         @SuppressWarnings("unchecked")
         Map<String, Object> guardrail = new ObjectMapper().readValue(batch.get_guardrail(), Map.class);
         return guardrail;

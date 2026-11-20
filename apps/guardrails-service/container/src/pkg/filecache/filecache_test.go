@@ -35,9 +35,9 @@ func TestUnreachableRedisIsAMiss(t *testing.T) {
 	client := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1", MaxRetries: -1})
 	defer client.Close()
 	store := NewRedis(client, time.Hour, zap.NewNop())
-	store.Remember(context.Background(), "k", "text")
+	store.Remember(context.Background(), "k")
 	start := time.Now()
-	if _, ok := store.Lookup(context.Background(), "k"); ok {
+	if store.Allowed(context.Background(), "k") {
 		t.Fatal("an unreachable Redis must read as a miss")
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
@@ -67,10 +67,10 @@ func TestHangingRedisIsAFastMiss(t *testing.T) {
 	store := NewRedis(client, time.Hour, zap.NewNop())
 
 	start := time.Now()
-	if _, ok := store.Lookup(context.Background(), "k"); ok {
+	if store.Allowed(context.Background(), "k") {
 		t.Fatal("a hanging Redis must read as a miss")
 	}
-	store.Remember(context.Background(), "k", "text")
+	store.Remember(context.Background(), "k")
 	if elapsed := time.Since(start); elapsed > 4*opTimeout {
 		t.Fatalf("lookup + write took %v against a hanging Redis; each must give up after %v", elapsed, opTimeout)
 	}
@@ -93,19 +93,12 @@ func TestRedisRoundTrip(t *testing.T) {
 	key := Key("test", []byte(time.Now().String()))
 	defer client.Del(ctx, key)
 
-	if _, ok := store.Lookup(ctx, key); ok {
+	if store.Allowed(ctx, key) {
 		t.Fatal("hit before remembering")
 	}
-	store.Remember(ctx, key, "invoice total 42")
-	if text, ok := store.Lookup(ctx, key); !ok || text != "invoice total 42" {
-		t.Fatalf("Lookup = %q, %v after remembering; want the stored text", text, ok)
-	}
-	// A file with no text is still remembered: an empty value is a hit, not a miss.
-	empty := Key("test-empty", []byte(time.Now().String()))
-	defer client.Del(ctx, empty)
-	store.Remember(ctx, empty, "")
-	if _, ok := store.Lookup(ctx, empty); !ok {
-		t.Fatal("an allowed file with no text must still be a hit")
+	store.Remember(ctx, key)
+	if !store.Allowed(ctx, key) {
+		t.Fatal("miss after remembering")
 	}
 	if ttl := client.TTL(ctx, key).Val(); ttl <= 0 || ttl > 2*time.Second {
 		t.Fatalf("ttl = %v, want the configured 2s", ttl)

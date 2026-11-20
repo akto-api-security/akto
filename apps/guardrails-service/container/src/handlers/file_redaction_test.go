@@ -195,7 +195,7 @@ func TestRedactedFileUploadIsBlocked(t *testing.T) {
 			fr := h.applyFileChunkResults(&fileResult{Filename: "escalation.png", Allowed: true}, tc.chunks)
 			recorder := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(recorder)
-			h.writeMultiFileResponse(c, []*fileResult{fr}, false, false)
+			h.writeMultiFileResponse(c, []*fileResult{fr}, false)
 
 			var resp struct {
 				Allowed         bool                 `json:"allowed"`
@@ -227,7 +227,7 @@ func TestRedactedFileUploadIsBlocked(t *testing.T) {
 		fr := h.applyFileChunkResults(&fileResult{Filename: "escalation.png", Allowed: true}, []*chunkResult{clean, redacted})
 		recorder := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(recorder)
-		h.writeMultiFileResponse(c, []*fileResult{fr}, false, false)
+		h.writeMultiFileResponse(c, []*fileResult{fr}, false)
 		assertFileAllowed(t, recorder, true)
 	})
 }

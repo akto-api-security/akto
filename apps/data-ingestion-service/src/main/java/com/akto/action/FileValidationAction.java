@@ -11,6 +11,9 @@ import org.apache.struts2.action.UploadedFilesAware;
 import org.apache.struts2.dispatcher.multipart.UploadedFile;
 
 import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -27,9 +30,9 @@ import java.util.Map;
  * When guardrails-service is unreachable or errors, GuardrailsClient fails open with
  * {@code allowed=true, failOpen=true}.
  *
- * With {@code ingest_data=true} the call is also ingested like an http-proxy call, so it shows in
- * Traces: the request carries the text read from each file and the response the verdict, which is
- * recorded as the trace's guardrail result.
+ * Every call is also ingested like an http-proxy call, so it shows in Traces: the request carries
+ * each file's metadata (name, content type, size, sha256; the URL for a fetched file), never its
+ * content, and the response the verdict, which is recorded as the trace's guardrail result.
  */
 @lombok.Getter
 @lombok.Setter
@@ -57,18 +60,18 @@ public class FileValidationAction extends ActionSupport implements UploadedFiles
     private String metadata;
     private String akto_account_id;
     private String akto_vxlan_id;
-    private String akto_connector;
-    private String ingest_data;
 
     private final List<GuardrailsClient.FilePart> files = new ArrayList<>();
+    private final List<Map<String, Object>> fileMetadata = new ArrayList<>();
     private Map<String, Object> data;
 
     @Override
     public void withUploadedFiles(List<UploadedFile> uploadedFiles) {
         for (UploadedFile uploaded : uploadedFiles) {
             if ("file".equals(uploaded.getInputName()) && uploaded.getContent() instanceof File) {
-                files.add(new GuardrailsClient.FilePart(
-                        (File) uploaded.getContent(), uploaded.getOriginalName(), uploaded.getContentType()));
+                File file = (File) uploaded.getContent();
+                files.add(new GuardrailsClient.FilePart(file, uploaded.getOriginalName(), uploaded.getContentType()));
+                fileMetadata.add(metadataOf(file, uploaded.getOriginalName(), uploaded.getContentType()));
             }
         }
     }
@@ -76,23 +79,15 @@ public class FileValidationAction extends ActionSupport implements UploadedFiles
     public String validateFile() {
         long start = System.currentTimeMillis();
         List<String> urls = url != null ? url : new ArrayList<>();
-        boolean ingest = "true".equalsIgnoreCase(ingest_data);
-        Map<String, String> fields = buildFields();
-        if (ingest) {
-            fields.put("return_content", "true");
-        }
-        data = guardrailsClient.callValidateFile(fields, files, urls);
-        if (ingest) {
-            ingest(data, urls);
-        }
+        data = guardrailsClient.callValidateFile(buildFields(), files, urls);
+        ingest(data, urls);
         loggerMaker.infoAndAddToDb("[validate-file] completed - path: {}, files: {}, urls: {}, account: {}, latencyMs: {}",
                 path, files.size(), urls.size(), akto_account_id, System.currentTimeMillis() - start);
         return Action.SUCCESS.toUpperCase();
     }
 
-    /** Publishes the call to Kafka; never changes the verdict, which goes back without the file text. */
+    /** Publishes the call to Kafka; a failure here never changes the verdict. */
     private void ingest(Map<String, Object> verdict, List<String> urls) {
-        Object read = verdict.remove("files");
         try {
             boolean allowed = !Boolean.FALSE.equals(verdict.get("allowed"));
             Map<String, Object> requestData = new HashMap<>();
@@ -100,7 +95,13 @@ public class FileValidationAction extends ActionSupport implements UploadedFiles
             requestData.put("method", method);
             requestData.put("requestHeaders", HttpProxyAction.normalizeHostInRequestHeaders(requestHeaders));
             requestData.put("responseHeaders", "{}");
-            requestData.put("requestPayload", new BasicDBObject("files", read instanceof List ? read : fileNames(urls)).toJson());
+            List<Map<String, Object>> described = new ArrayList<>(fileMetadata);
+            for (String u : urls) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("url", u);
+                described.add(entry);
+            }
+            requestData.put("requestPayload", new BasicDBObject("files", described).toJson());
             requestData.put("responsePayload", new BasicDBObject(verdict).toJson());
             requestData.put("statusCode", allowed ? "200" : "403");
             requestData.put("status", allowed ? "OK" : "Forbidden");
@@ -110,7 +111,7 @@ public class FileValidationAction extends ActionSupport implements UploadedFiles
             requestData.put("source", "MIRRORING");
             requestData.put("ip", ip);
             requestData.put("time", time != null && !time.isEmpty() ? time : String.valueOf(System.currentTimeMillis() / 1000));
-            requestData.put("tag", HttpProxyAction.withGuardrailMode(tag, akto_connector));
+            requestData.put("tag", HttpProxyAction.withGuardrailMode(tag, null));
             requestData.put("akto_account_id", akto_account_id);
             requestData.put("akto_vxlan_id", akto_vxlan_id);
             gateway.ingestWithVerdict(requestData, verdict);
@@ -119,20 +120,30 @@ public class FileValidationAction extends ActionSupport implements UploadedFiles
         }
     }
 
-    /** What is known about the files when guardrails-service read none (failed open, no policy). */
-    private List<Map<String, String>> fileNames(List<String> urls) {
-        List<Map<String, String>> names = new ArrayList<>();
-        for (GuardrailsClient.FilePart part : files) {
-            Map<String, String> entry = new HashMap<>();
-            entry.put("name", part.getFileName());
-            names.add(entry);
+    private static Map<String, Object> metadataOf(File file, String name, String contentType) {
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("name", name);
+        entry.put("contentType", contentType);
+        entry.put("size", file.length());
+        entry.put("sha256", sha256(file));
+        return entry;
+    }
+
+    private static String sha256(File file) {
+        try (InputStream in = Files.newInputStream(file.toPath())) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[8192];
+            for (int n; (n = in.read(buffer)) > 0; ) {
+                digest.update(buffer, 0, n);
+            }
+            StringBuilder hex = new StringBuilder();
+            for (byte b : digest.digest()) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            return null;
         }
-        for (String u : urls) {
-            Map<String, String> entry = new HashMap<>();
-            entry.put("url", u);
-            names.add(entry);
-        }
-        return names;
     }
 
     private Map<String, String> buildFields() {
