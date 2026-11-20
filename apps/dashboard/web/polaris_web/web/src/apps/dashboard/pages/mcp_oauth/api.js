@@ -1,18 +1,18 @@
 import request from "@/util/request"
 
 const mcpOAuthRequests = {
-    fetchAuthorizeRequest(requestId) {
+    fetchAuthorizeRequest(requestId, accountId) {
         return request({
             url: '/api/mcpOAuth/fetchAuthorizeRequest',
             method: 'post',
-            data: { requestId }
+            data: { requestId, accountId }
         })
     },
-    approveAuthorizeRequest(requestId, contextSource, confirmUnverified) {
+    approveAuthorizeRequest(requestId, contextSource, confirmUnverified, accountId) {
         return request({
             url: '/api/mcpOAuth/approveAuthorizeRequest',
             method: 'post',
-            data: { requestId, contextSource, confirmUnverified }
+            data: { requestId, contextSource, confirmUnverified, accountId }
         })
     },
     denyAuthorizeRequest(requestId) {
