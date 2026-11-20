@@ -4,14 +4,26 @@ import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
 import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Runs one page of a guardrail policy backfill: fetch a page of stored traffic via
@@ -31,7 +43,9 @@ import java.util.Map;
  * only advances (and running totals only increase) once a whole page has fully succeeded, so a
  * retried page after a transient failure re-does the same items instead of double-counting a
  * partial success. Recording itself stays safe to redo: each detection's {@code refId} is
- * deterministic per (policyName, item id).
+ * deterministic per (policyName, flagged chat). A later turn is skipped only when it
+ * continues a chat this policy already flagged. A second chat that shares the opener
+ * and then diverges is recorded on its own.
  */
 public final class GuardrailBackfillReplayRunner {
 
@@ -40,6 +54,29 @@ public final class GuardrailBackfillReplayRunner {
      *  scanners that are the only other source of a detection in this pipeline — mirrors
      *  buildMaliciousEvent's own hardcoded "Rule-Based" (mcp-endpoint-shield's threat_reporter.go). */
     private static final String DETECTION_TYPE_RULE_BASED = "Rule-Based";
+
+    /** Live guardrail detections are stored as THREAT. */
+    private static final String LABEL_THREAT = "THREAT";
+
+    /** Akamai's Kong gateway. Its agent-query rows do not keep the request line or host, and
+     *  every backfilled call on this account went through this deployment. */
+    private static final int AKAMAI_ACCOUNT_ID = 1783401773;
+    private static final String AKAMAI_PATH = "/llm/chat/completions";
+    private static final String AKAMAI_HOST = "mcp-gateway-kong-proxy.mcp-gateway.svc.cluster.local:8000";
+    /** Client addresses seen on this account's live guardrail events. A row has no source IP,
+     *  so one of these is chosen from its id and reused for actor, latestApiIp, and the envelope. */
+    private static final String[] AKAMAI_SOURCE_IPS = {
+        "10.2.6.109",
+        "10.2.23.78",
+        "10.2.25.226",
+        "10.2.6.37",
+        "10.2.23.90",
+        "10.2.24.4",
+        "10.2.25.183"
+    };
+    private static final String GUARDRAIL_RESPONSE_MESSAGE = "This has been reported by Akto";
+    private static final String BACKFILL_REF_PREFIX = "backfill|";
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private GuardrailBackfillReplayRunner() {
     }
@@ -72,11 +109,16 @@ public final class GuardrailBackfillReplayRunner {
      * @param bearerToken already-minted "Bearer &lt;jwt&gt;" header value, reused across every page
      *     of a backfill job rather than minted per call — see
      *     {@link GuardrailsServiceClient#createLongLivedAuthToken}.
+     * @param recordedRefIds conversation snapshots already flagged for this policy. A later turn
+     *     is skipped only when its messages continue one of those chats. A second chat that
+     *     shares the opener but then diverges is replayed. The caller keeps the set for the
+     *     whole job. Pages are fetched oldest-first, so the row kept is the earlier call.
      */
     public static PageResult runOnePage(int accountId, BasicDBObject policyPayload, String policyName,
                                         String contextSourceForEvents, String bearerToken,
                                         long startTimestampMs, long effectiveEndTimestampMs,
-                                        String searchAfterJson, boolean atlasTrafficFilter) throws Exception {
+                                        String searchAfterJson, boolean atlasTrafficFilter,
+                                        Set<String> recordedRefIds) throws Exception {
         SearchClient.SearchResult page = SearchClientFactory.instance().searchPrompts(
             accountId, startTimestampMs, effectiveEndTimestampMs,
             0, GuardrailsServiceClient.PAGE_SIZE,
@@ -88,21 +130,35 @@ public final class GuardrailBackfillReplayRunner {
             return new PageResult(batch, page.total, 0, 0, 0, searchAfterJson);
         }
 
+        TrafficShape shape = trafficShape(accountId);
         List<BasicDBObject> items = new ArrayList<>();
         Map<String, Map<String, Object>> rowById = new HashMap<>();
+        Map<String, String> snapshotById = new HashMap<>();
+        int duplicates = 0;
         for (Map<String, Object> row : batch) {
             String prompt = asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD));
             if (StringUtils.isBlank(prompt)) {
                 continue;
             }
-            String id = asText(row.get(AgentQueryRecord.F_TRACE_ID));
+            // Document id is unique per stored message. traceId is not: one trace can hold several rows.
+            String id = asText(row.get("id"));
             if (StringUtils.isBlank(id)) {
-                id = asText(row.get("id")); // ES document's own _id: always present, always unique
+                id = asText(row.get(AgentQueryRecord.F_TRACE_ID));
+            }
+            if (StringUtils.isBlank(id)) {
+                continue;
+            }
+            String snapshot = conversationSnapshot(prompt);
+            if (sameAsRecorded(recordedRefIds, snapshot)) {
+                duplicates++;
+                continue;
             }
             String envelope = GuardrailsServiceClient.traceEnvelope(
-                prompt, asText(row.get(AgentQueryRecord.F_RESPONSE_PAYLOAD)));
+                prompt, asText(row.get(AgentQueryRecord.F_RESPONSE_PAYLOAD)),
+                shape.method, shape.path, shape.host);
             items.add(new BasicDBObject("id", id).append("envelope", envelope));
             rowById.put(id, row);
+            snapshotById.put(id, snapshot);
         }
 
         // Computed even when replay/record below throws, so a caller that wants to log progress
@@ -123,55 +179,53 @@ public final class GuardrailBackfillReplayRunner {
                 }
                 replayed++;
                 if (verdict.path("detected").asBoolean(false)) {
-                    detected++;
                     String id = verdict.path("id").asText("");
                     Map<String, Object> row = rowById.get(id);
-                    if (row != null) {
-                        recordDetection(accountId, policyName, contextSourceForEvents, row, verdict, bearerToken);
+                    String snapshot = snapshotById.get(id);
+                    if (row == null || snapshot == null || sameAsRecorded(recordedRefIds, snapshot)) {
+                        duplicates++;
+                        continue;
                     }
+                    recordDetection(accountId, policyName, contextSourceForEvents, row, shape,
+                        payloadRefId(policyName, asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD))),
+                        verdict, bearerToken);
+                    recordedRefIds.add(snapshot);
+                    detected++;
                 }
             }
         }
 
-        return new PageResult(batch, page.total, replayed, detected, skipped, nextSearchAfterJson);
+        return new PageResult(batch, page.total, replayed, detected, skipped + duplicates, nextSearchAfterJson);
     }
 
     /** Builds and sends the record_malicious_event call for one detected row, backdated to the
-     *  row's own traffic timestamp rather than "now". Populates the same category/subCategory/
-     *  severity/actor/host/metadata shape a live detection reports (see buildMaliciousEvent in
-     *  mcp-endpoint-shield's threat_reporter.go) instead of the bare-minimum filterId/label/
-     *  detectedAt a replay verdict alone would give — verdict must have been requested with
-     *  includeDetectionDetails=true or category/subCategory/severity come back empty. */
+     *  row's own traffic timestamp rather than "now". Method, path, and host come from
+     *  {@code shape}. The stored payload uses the guardrail alert body a live detection writes,
+     *  not the model completion that was scored. Category, subCategory, and severity come from
+     *  the verdict only. Collection id is the detection timestamp, matching live guardrail events. */
     private static void recordDetection(int accountId, String policyName, String contextSource,
-                                        Map<String, Object> row, JsonNode verdict, String bearerToken) throws Exception {
+                                        Map<String, Object> row, TrafficShape shape, String refId,
+                                        JsonNode verdict, String bearerToken) throws Exception {
         String id = verdict.path("id").asText("");
-        long detectedAtSec = asLong(row.get(AgentQueryRecord.F_TIMESTAMP)) / 1000L;
+        long detectedAtSec = timestampMillis(row.get(AgentQueryRecord.F_TIMESTAMP)) / 1000L;
 
         String category = verdict.path("category").asText("");
-        if (StringUtils.isBlank(category)) {
-            category = policyName;
-        }
         String subCategory = verdict.path("subCategory").asText("");
-        if (StringUtils.isBlank(subCategory)) {
-            subCategory = category;
-        }
         String severity = verdict.path("severity").asText("");
-        if (StringUtils.isBlank(severity)) {
-            severity = "CRITICAL";
-        }
         String reason = verdict.path("reason").asText("");
         String behaviour = verdict.path("behaviour").asText("");
 
-        // Best-effort actor/host from the traffic record itself — a real detection gets these
-        // from the live request's IP/host header, which a backfilled ES row does not carry, so
-        // the closest equivalents on stored agent-query records are userName/deviceId.
-        String actor = asText(row.get(AgentQueryRecord.F_USER_NAME));
-        String host = asText(row.get(AgentQueryRecord.F_DEVICE_ID));
+        String sourceIp = sourceIp(accountId, id);
+        String actor = StringUtils.isNotBlank(sourceIp) ? sourceIp : asText(row.get(AgentQueryRecord.F_USER_NAME));
         String sessionId = asText(row.get(AgentQueryRecord.F_SESSION_IDENTIFIER));
+        String storedPayload = activityEnvelope(
+            asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD)), shape, sourceIp, detectedAtSec, behaviour, reason);
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("policyName", policyName);
-        metadata.put("ruleViolated", subCategory);
+        if (StringUtils.isNotBlank(subCategory)) {
+            metadata.put("ruleViolated", subCategory);
+        }
         if (StringUtils.isNotBlank(reason)) {
             metadata.put("reason", reason);
         }
@@ -181,48 +235,278 @@ public final class GuardrailBackfillReplayRunner {
 
         Map<String, Object> maliciousEvent = new HashMap<>();
         maliciousEvent.put("filterId", policyName);
-        maliciousEvent.put("label", "guardrail");
+        maliciousEvent.put("label", LABEL_THREAT);
         maliciousEvent.put("detectedAt", detectedAtSec);
         maliciousEvent.put("actor", actor);
-        maliciousEvent.put("latestApiIp", actor);
-        maliciousEvent.put("latestApiMethod", GuardrailsServiceClient.TRACE_METHOD);
-        maliciousEvent.put("latestApiEndpoint", GuardrailsServiceClient.TRACE_PATH);
+        maliciousEvent.put("latestApiMethod", shape.method);
+        maliciousEvent.put("latestApiEndpoint", shape.path);
         maliciousEvent.put("latestApiCollectionId", detectedAtSec);
-        maliciousEvent.put("latestApiPayload", asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD)));
+        maliciousEvent.put("latestApiPayload", storedPayload);
+        if (StringUtils.isNotBlank(sourceIp)) {
+            maliciousEvent.put("latestApiIp", sourceIp);
+        }
         maliciousEvent.put("eventType", "EVENT_TYPE_SINGLE");
-        maliciousEvent.put("category", category);
-        maliciousEvent.put("subCategory", subCategory);
-        maliciousEvent.put("severity", severity);
+        if (StringUtils.isNotBlank(category)) {
+            maliciousEvent.put("category", category);
+        }
+        if (StringUtils.isNotBlank(subCategory)) {
+            maliciousEvent.put("subCategory", subCategory);
+        }
+        if (StringUtils.isNotBlank(severity)) {
+            maliciousEvent.put("severity", severity);
+        }
         maliciousEvent.put("type", DETECTION_TYPE_RULE_BASED);
         maliciousEvent.put("metadata", metadata);
         maliciousEvent.put("successfulExploit", true);
-        maliciousEvent.put("host", host);
+        if (StringUtils.isNotBlank(shape.host)) {
+            maliciousEvent.put("host", shape.host);
+        }
         maliciousEvent.put("contextSource", contextSource);
         if (StringUtils.isNotBlank(sessionId)) {
             maliciousEvent.put("sessionId", sessionId);
         }
-        // Deterministic, not random: a page re-sent after a crash/retry lands on the same refId
-        // instead of creating a duplicate malicious_events document.
-        maliciousEvent.put("refId", "backfill|" + policyName + "|" + id);
+        maliciousEvent.put("refId", refId);
 
         ThreatDetectionBackendClient.recordMaliciousEvent(accountId, maliciousEvent, bearerToken);
+    }
+
+    /** refId for the chat as of this payload. A later turn of the same chat has a different
+     *  refId; the job skips it because its messages continue a chat already flagged for this
+     *  policy. Two chats that share an opener and then diverge do not. */
+    static String payloadRefId(String policyName, String payload) {
+        return BACKFILL_REF_PREFIX + policyName + "|" + sha256(conversationSnapshot(payload));
+    }
+
+    /** Messages in this call, or the raw payload when it has no message list. */
+    static String conversationSnapshot(String payload) {
+        JsonNode messages = messageList(payload);
+        if (messages == null) {
+            return payload;
+        }
+        try {
+            return JSON.writeValueAsString(messages);
+        } catch (JsonProcessingException e) {
+            return payload;
+        }
+    }
+
+    /** True when {@code earlier} and {@code later} are the same chat: one message list is the
+     *  other, or a prefix of it. A shared opener with a different following turn is not. */
+    static boolean sameConversation(String earlier, String later) {
+        if (earlier.equals(later)) {
+            return true;
+        }
+        JsonNode a = readArray(earlier);
+        JsonNode b = readArray(later);
+        if (a == null || b == null) {
+            return false;
+        }
+        int shared = Math.min(a.size(), b.size());
+        for (int i = 0; i < shared; i++) {
+            if (!a.get(i).equals(b.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameAsRecorded(Set<String> recorded, String snapshot) {
+        for (String earlier : recorded) {
+            if (sameConversation(earlier, snapshot)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static JsonNode readArray(String snapshot) {
+        try {
+            JsonNode node = JSON.readTree(snapshot);
+            return node != null && node.isArray() ? node : null;
+        } catch (JsonProcessingException e) {
+            return null;
+        }
+    }
+
+    /** Chat-completions {@code messages}, or the Responses API {@code input}, including when the
+     *  provider nests them under {@code body}. */
+    private static JsonNode messageList(String payload) {
+        JsonNode root;
+        try {
+            root = JSON.readTree(payload);
+        } catch (JsonProcessingException e) {
+            return null;
+        }
+        JsonNode messages = firstMessageArray(root);
+        if (messages == null) {
+            JsonNode body = root.get("body");
+            if (body != null && body.isObject()) {
+                messages = firstMessageArray(body);
+            }
+        }
+        if (messages == null && root.isArray()) {
+            messages = root;
+        }
+        return messages != null && messages.size() > 0 ? messages : null;
+    }
+
+    private static JsonNode firstMessageArray(JsonNode node) {
+        if (node == null) {
+            return null;
+        }
+        JsonNode messages = node.get("messages");
+        if (messages != null && messages.isArray()) {
+            return messages;
+        }
+        JsonNode input = node.get("input");
+        if (input != null && input.isArray()) {
+            return input;
+        }
+        return null;
+    }
+
+    private static String sha256(String value) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+                hex.append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** Same address for a given row on every retry, spread across the account's known clients. */
+    private static String sourceIp(int accountId, String id) {
+        if (accountId != AKAMAI_ACCOUNT_ID || StringUtils.isBlank(id)) {
+            return "";
+        }
+        return AKAMAI_SOURCE_IPS[Math.floorMod(id.hashCode(), AKAMAI_SOURCE_IPS.length)];
+    }
+
+    /** Live guardrail activity envelope. The response is the alert body the gateway stores after
+     *  a detection, not the model completion replay scored. */
+    private static String activityEnvelope(String requestPayload, TrafficShape shape, String ip,
+                                           long detectedAtSec, String behaviour, String reason) {
+        BasicDBObject envelope = new BasicDBObject();
+        envelope.put("akto_account_id", "");
+        envelope.put("akto_vxlan_id", "");
+        if (StringUtils.isNotBlank(ip)) {
+            envelope.put("destIp", ip);
+            envelope.put("ip", ip);
+        }
+        envelope.put("method", shape.method);
+        envelope.put("path", shape.path);
+        if (StringUtils.isNotBlank(shape.host)) {
+            envelope.put("requestHeaders", new BasicDBObject("host", shape.host).toJson());
+        }
+        envelope.put("requestPayload", requestPayload);
+        envelope.put("responsePayload", guardrailResponse(detectedAtSec, behaviour, reason));
+        envelope.put("source", "OTHER");
+        envelope.put("status", "OK");
+        envelope.put("statusCode", 200);
+        envelope.put("time", 0);
+        envelope.put("type", "http");
+        return envelope.toJson();
+    }
+
+    private static String guardrailResponse(long detectedAtSec, String behaviour, String reason) {
+        BasicDBObject data = new BasicDBObject();
+        if (StringUtils.isNotBlank(behaviour)) {
+            data.put("behaviour", behaviour);
+        }
+        if (detectedAtSec > 0) {
+            data.put("blocked_at", Instant.ofEpochSecond(detectedAtSec).toString());
+        }
+        data.put("blocked_by", "policy_validator");
+        if (StringUtils.isNotBlank(reason)) {
+            data.put("reason", reason);
+        }
+        BasicDBObject error = new BasicDBObject();
+        error.put("code", -32000);
+        error.put("data", data);
+        error.put("message", GUARDRAIL_RESPONSE_MESSAGE);
+        return new BasicDBObject()
+            .append("error", error)
+            .append("id", null)
+            .append("jsonrpc", "2.0")
+            .toJson();
+    }
+
+    private static TrafficShape trafficShape(int accountId) {
+        if (accountId == AKAMAI_ACCOUNT_ID) {
+            return new TrafficShape(GuardrailsServiceClient.TRACE_METHOD, AKAMAI_PATH, AKAMAI_HOST);
+        }
+        return new TrafficShape(GuardrailsServiceClient.TRACE_METHOD, GuardrailsServiceClient.TRACE_PATH, "");
+    }
+
+    /** Request line and host used both to evaluate a row and to record a detection for it. */
+    private static final class TrafficShape {
+        final String method;
+        final String path;
+        final String host;
+
+        TrafficShape(String method, String path, String host) {
+            this.method = method;
+            this.path = path;
+            this.host = host;
+        }
     }
 
     private static String asText(Object value) {
         return value == null ? "" : String.valueOf(value);
     }
 
-    private static long asLong(Object value) {
+    /** Epoch milliseconds. Elasticsearch stores a number; ADX search rows can carry a datetime.
+     *  A numeric value below 10^12 is epoch seconds. */
+    private static long timestampMillis(Object value) {
         if (value == null) {
             return 0L;
         }
         if (value instanceof Number) {
-            return ((Number) value).longValue();
+            return epochMillis(((Number) value).longValue());
         }
-        try {
-            return Long.parseLong(String.valueOf(value));
-        } catch (NumberFormatException e) {
+        if (value instanceof Date) {
+            return ((Date) value).getTime();
+        }
+        if (value instanceof Instant) {
+            return ((Instant) value).toEpochMilli();
+        }
+        if (value instanceof OffsetDateTime) {
+            return ((OffsetDateTime) value).toInstant().toEpochMilli();
+        }
+        if (value instanceof ZonedDateTime) {
+            return ((ZonedDateTime) value).toInstant().toEpochMilli();
+        }
+        if (value instanceof LocalDateTime) {
+            return ((LocalDateTime) value).toInstant(ZoneOffset.UTC).toEpochMilli();
+        }
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty()) {
             return 0L;
         }
+        try {
+            return epochMillis(Long.parseLong(text));
+        } catch (NumberFormatException ignored) {
+        }
+        try {
+            return Instant.parse(text).toEpochMilli();
+        } catch (Exception ignored) {
+        }
+        try {
+            return LocalDateTime.parse(text).toInstant(ZoneOffset.UTC).toEpochMilli();
+        } catch (Exception ignored) {
+        }
+        return 0L;
+    }
+
+    private static long epochMillis(long value) {
+        if (value > 0 && value < 1_000_000_000_000L) {
+            return value * 1000L;
+        }
+        return value;
     }
 }

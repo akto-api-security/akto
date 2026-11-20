@@ -78,13 +78,14 @@ public class GuardrailPolicyBackfillReplayExecutor extends AccountJobExecutor {
         // used over fetchMessages (no hard cap on how much of the range can be covered) and why a
         // failed page persists no partial progress (retrying it is safe and re-does it in full).
         String bearerToken = "Bearer " + rawApiToken;
+        Set<String> recordedRefIds = new HashSet<>();
         int pageIndex = 0;
         while (true) {
             GuardrailBackfillReplayRunner.PageResult result;
             try {
                 result = GuardrailBackfillReplayRunner.runOnePage(accountId, policyPayload, policyName,
                     contextSourceForEvents, bearerToken, startTimestampMs, effectiveEndTimestampMs,
-                    searchAfterJson, atlasTrafficFilter);
+                    searchAfterJson, atlasTrafficFilter, recordedRefIds);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Guardrail backfill job " + job.getId() + ": page " + (pageIndex + 1)
                     + " failed (cursor unchanged, will retry in full) - " + e.getMessage());

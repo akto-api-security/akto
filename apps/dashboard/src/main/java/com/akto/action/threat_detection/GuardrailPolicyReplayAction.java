@@ -272,7 +272,7 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
     /**
      * Schedules a background job that replays historical traffic through the currently active,
      * saved policy and, for anything it now catches, records a real guardrail activity
-     * (malicious_events, label GUARDRAIL) timestamped at the original traffic time — unlike
+     * (malicious_events, label THREAT) timestamped at the original traffic time — unlike
      * {@link #startPolicyReplay()}, which only ever reports a comparison and never persists.
      *
      * <p>Runs as one {@link AccountJob} (jobType {@link #BACKFILL_JOB_TYPE}) picked up by
