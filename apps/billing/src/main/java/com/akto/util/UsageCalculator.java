@@ -87,10 +87,6 @@ public class UsageCalculator {
 
     }
 
-    private void syncBillingEodWithSlack(OrganizationUsage lastUsageItem) {
-
-    }
-
     private UsageMetric getUsageMetricObj(OrganizationUsage ou, MetricTypes metricTypes, int usage) {
         UsageMetric usageMetric = new UsageMetric(
                 ou.getOrgId(),
@@ -104,6 +100,73 @@ public class UsageCalculator {
         return usageMetric;
     }
 
+    /*
+     * Stigg feature id for a metric, null if it has none (not configured, or not a reported metric).
+     * The retired MCP_ASSET_COUNT is deliberately not mapped: it is never reported, even if
+     * a usage document written before the retirement still carries it.
+     */
+    static String featureIdFor(MetricTypes metricType, Config.StiggConfig stiggConfig) {
+        if (stiggConfig == null) {
+            return null;
+        }
+        switch (metricType) {
+            case ACTIVE_ENDPOINTS:
+                return stiggConfig.getActiveEndpointsLabel();
+            case ACTIVE_ACCOUNTS:
+                return stiggConfig.getActiveAccountsLabel();
+            case TEST_RUNS:
+                return stiggConfig.getTestRunsLabel();
+            case CUSTOM_TESTS:
+                return stiggConfig.getCustomTestsLabel();
+            case AI_ASSET_COUNT:
+                return stiggConfig.getAiAssetsLabel();
+            case ENDPOINT_ASSET_COUNT:
+                return stiggConfig.getEndpointAssetsLabel();
+            default:
+                return null;
+        }
+    }
+
+    static final class StiggReport {
+        final BasicDBList updateList = new BasicDBList();
+        final List<UsageMetric> usageMetrics = new ArrayList<>();
+        final List<String> skipped = new ArrayList<>();
+    }
+
+    /*
+     * One metric that cannot be reported (unknown to this build, or no Stigg feature id configured)
+     * is skipped and listed, it does not stop the org's other metrics from being reported.
+     */
+    StiggReport buildStiggReport(OrganizationUsage lastUsageItem, Config.StiggConfig stiggConfig) {
+        StiggReport report = new StiggReport();
+
+        for(Map.Entry<String, Integer> entry: lastUsageItem.getOrgMetricMap().entrySet()) {
+            MetricTypes metricType;
+            try {
+                metricType = MetricTypes.valueOf(entry.getKey());
+            } catch (IllegalArgumentException e) {
+                loggerMaker.errorAndAddToDb("Unknown metric type, not reported: " + entry.getKey() + " org: " + lastUsageItem.getOrgId(), LoggerMaker.LogDb.BILLING);
+                report.skipped.add(entry.getKey());
+                continue;
+            }
+
+            String featureId = featureIdFor(metricType, stiggConfig);
+            if (featureId == null) {
+                loggerMaker.errorAndAddToDb("Feature id not found for metric: " + metricType + ", not reported. org: " + lastUsageItem.getOrgId(), LoggerMaker.LogDb.BILLING);
+                report.skipped.add(entry.getKey());
+                continue;
+            }
+
+            int value = entry.getValue();
+
+            BasicDBObject updateObject = StiggReporterClient.instance.getUpdateObject(value, lastUsageItem.getOrgId(), featureId);
+            report.updateList.add(updateObject);
+            report.usageMetrics.add(getUsageMetricObj(lastUsageItem, metricType, value));
+        }
+
+        return report;
+    }
+
     private void syncBillingEodWithStigg(OrganizationUsage lastUsageItem) {
         loggerMaker.infoAndAddToDb(String.format("Syncing usage for organization %s to Stigg", lastUsageItem.getOrgId()), LoggerMaker.LogDb.BILLING);
         Map<String, Integer> sinks = lastUsageItem.getSinks();
@@ -112,49 +175,11 @@ public class UsageCalculator {
             sinks = new HashMap<>();
         }
 
-        BasicDBList updateList = new BasicDBList();
-        List<UsageMetric> usageMetrics = new ArrayList<>();
-
-        for(Map.Entry<String, Integer> entry: lastUsageItem.getOrgMetricMap().entrySet()) {
-            MetricTypes metricType = MetricTypes.valueOf(entry.getKey());
-            String featureId = null;
-            Config.StiggConfig stiggConfig = StiggReporterClient.instance.getStiggConfig();
-            switch (metricType) {
-                case ACTIVE_ENDPOINTS:
-                    featureId = stiggConfig.getActiveEndpointsLabel();
-                    break;
-                case ACTIVE_ACCOUNTS:
-                    featureId = stiggConfig.getActiveAccountsLabel();
-                    break;
-                case TEST_RUNS:
-                    featureId = stiggConfig.getTestRunsLabel();
-                    break;
-                case CUSTOM_TESTS:
-                    featureId = stiggConfig.getCustomTestsLabel();
-                    break;
-                case AI_ASSET_COUNT:
-                    featureId = stiggConfig.getAiAssetsLabel();
-                    break;
-                case MCP_ASSET_COUNT:
-                    featureId = stiggConfig.getMcpAssetsLabel();
-                    break;
-
-                default:
-                    loggerMaker.errorAndAddToDb("This is not a standard metric type: " + metricType, LoggerMaker.LogDb.BILLING);
-                    break;
-            }
-
-            if (featureId == null) {
-                loggerMaker.errorAndAddToDb("Feature id not found for metric: " + metricType, LoggerMaker.LogDb.BILLING);
-                return;
-            }
-
-            int value = entry.getValue();
-
-            BasicDBObject updateObject = StiggReporterClient.instance.getUpdateObject(value, lastUsageItem.getOrgId(), featureId);
-            updateList.add(updateObject);
-            UsageMetric usageMetricObj = getUsageMetricObj(lastUsageItem, metricType, value);
-            usageMetrics.add(usageMetricObj);
+        StiggReport report = buildStiggReport(lastUsageItem, StiggReporterClient.instance.getStiggConfig());
+        BasicDBList updateList = report.updateList;
+        List<UsageMetric> usageMetrics = report.usageMetrics;
+        if (!report.skipped.isEmpty()) {
+            loggerMaker.errorAndAddToDb("Usage metrics skipped for org " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + ": " + report.skipped + ", reported: " + updateList.size(), LoggerMaker.LogDb.BILLING);
         }
 
         try {
@@ -225,7 +250,7 @@ public class UsageCalculator {
             Map<String, Integer> consolidatedUsage = new HashMap<String, Integer>();
 
             // Calculate account wise usage and consolidated usage
-            for (MetricTypes metricType : MetricTypes.values()) {
+            for (MetricTypes metricType : MetricTypes.measured()) {
                 String metricTypeString = metricType.toString();
 
                 for (int account : accounts) {
