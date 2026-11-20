@@ -97,7 +97,7 @@ public class Gateway {
             if ("true".equalsIgnoreCase(ingestData)) {
                 long kafkaStart = System.currentTimeMillis();
                 ingestData(requestData);
-                loggerMaker.infoAndAddToDb("Kafka ingestion completed - path: {}, latencyMs: {}",
+                loggerMaker.infoAndAddToDb("Ingestion publish step completed - path: {}, latencyMs: {}",
                     requestData.get("path"), System.currentTimeMillis() - kafkaStart);
             }
 
@@ -305,7 +305,8 @@ public class Gateway {
         if (dataPublisher != null) {
             try {
                 dataPublisher.publish(batch);
-                loggerMaker.infoAndAddToDb("Data ingested to Kafka - path: {}, method: {}",
+                // Delivery outcome (queued vs dropped) is logged by the DataPublisher implementation.
+                loggerMaker.infoAndAddToDb("Data handed to publisher - path: {}, method: {}",
                     requestData.get("path"), requestData.get("method"));
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error publishing data to Kafka: {}", e.getMessage());
