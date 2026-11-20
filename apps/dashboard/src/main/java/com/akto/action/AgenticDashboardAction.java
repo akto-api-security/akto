@@ -1353,7 +1353,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
             baseFilter = Filters.and(baseFilter, timeFilter);
 
-            result = ApiInfoDao.instance.findAll(baseFilter);
+            result = ApiInfoDao.instance.findAll(baseFilter,
+                Projections.include(ApiInfo.LAST_TESTED, ApiInfo.DISCOVERED_TIMESTAMP, ApiInfo.LAST_SEEN));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching ApiInfo records: " + e.getMessage());
         }
