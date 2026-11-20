@@ -93,7 +93,8 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         // falls back to scanning every OPEN doc past the {status} index. Small, additive,
         // idempotent — safe to add alongside the rest of this list.
         fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.KEY_SEVERITY};
-        
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
         // Index for the Wiz sync job - finds issues that are Wiz findings (wizFindingCreationStatus is set / equals a value)
         fieldNames = new String[]{TestingRunIssues.WIZ_FINDING_CREATION_STATUS};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
