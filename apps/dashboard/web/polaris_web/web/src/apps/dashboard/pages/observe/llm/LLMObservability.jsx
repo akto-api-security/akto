@@ -15,7 +15,7 @@ import "../../../components/layouts/style.css";
 import api from "./api";
 import { formatSparklineLabels } from "./utils";
 import { formatCompact, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
-import { ARGUS_TRACE_COL_DEFS } from "./columns";
+import { getArgusTraceColumnDefs } from "./columns";
 import SessionsView from "./SessionsView";
 import SessionFlyout from "./SessionFlyout";
 import ArgusTraceFlyout from "./ArgusTraceFlyout";
@@ -118,6 +118,29 @@ export default function LLMObservability() {
         if (!isAdmin) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
         setPendingReveal({ open: () => setSelectedTrace(row), traceId: row?.traceId, sessionId: row?.sessionIdentifier });
     }, [isAdmin]);
+
+    /**
+     * Opens a session from a trace row, which carries only the identifier. The flyout header
+     * needs the aggregate fields (message count, duration, tokens, models), so fetch the one
+     * session first. If that fetch fails the flyout still opens on the identifier alone — its
+     * Traces tab loads from the session id, so the conversation is readable either way.
+     */
+    const openSessionById = useCallback((sessionId) => {
+        if (!isAdmin) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
+        if (!sessionId) return;
+        setPendingReveal({
+            sessionId,
+            open: () => api
+                .fetchSessionById({ startTime: epochs.since, endTime: epochs.until, sessionId })
+                .then(session => setSelectedSession(session || { sessionIdentifier: sessionId }))
+                .catch(() => setSelectedSession({ sessionIdentifier: sessionId })),
+        });
+    }, [isAdmin, epochs]);
+
+    const argusColumnDefs = useMemo(
+        () => getArgusTraceColumnDefs({ onSessionClick: openSessionById }),
+        [openSessionById]
+    );
 
     // Opening the flyout fetches the content, and that fetch is what gets recorded in audit data.
     const confirmReveal = useCallback(() => {
@@ -363,24 +386,26 @@ export default function LLMObservability() {
                         </Box>
                     ) : topCards,
                     isArgus ? (
-                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && openTrace(p.data)} />
+                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={argusColumnDefs} onRowClicked={p => p.data && openTrace(p.data)} />
                     ) : (
                         <SessionsView key="sessions-table" currDateRange={currDateRange} onOpenSession={openSession} initialFilters={urlFilters} />
                     ),
                 ]}
             />
-            {isArgus ? (
+            {isArgus && (
                 <ArgusTraceFlyout
                     trace={selectedTrace}
                     onClose={() => setSelectedTrace(null)}
                 />
-            ) : (
-                <SessionFlyout
-                    session={selectedSession}
-                    currDateRange={currDateRange}
-                    onClose={() => setSelectedSession(null)}
-                />
             )}
+            {/* Both categories can open a session now - Atlas from its sessions table, Argus from
+                the session cell on a trace row - and the flyout renders nothing until one is
+                selected, so it is mounted for both rather than branched on. */}
+            <SessionFlyout
+                session={selectedSession}
+                currDateRange={currDateRange}
+                onClose={() => setSelectedSession(null)}
+            />
             <Modal
                 open={!!pendingReveal}
                 onClose={() => setPendingReveal(null)}

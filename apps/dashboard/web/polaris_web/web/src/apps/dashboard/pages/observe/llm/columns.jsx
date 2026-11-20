@@ -249,47 +249,70 @@ export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
 }
 
 // Argus traces table — no user/spans/traceId columns, short time format.
-export const ARGUS_TRACE_COL_DEFS = [
-    {
-        headerName: "Time",
-        field: "latestTimestamp",
-        width: 160,
-        sort: "desc",
-        cellStyle: FLEX_CELL,
-        valueFormatter: p => {
-            const ts = p.value;
-            if (!ts) return "-";
-            const ms = ts > 1e10 ? ts : ts * 1000;
-            return new Date(ms).toLocaleString("en-US", {
-                month: "numeric", day: "numeric", year: "2-digit",
-                hour: "numeric", minute: "2-digit", hour12: true,
-            });
+/**
+ * Columns for the Argus trace list.
+ *
+ * A factory rather than a constant so the session cell can carry a click handler: the session
+ * is the only column whose value opens something. With no handler it falls back to a plain id,
+ * so the list never shows a link that does nothing.
+ */
+export function getArgusTraceColumnDefs({ onSessionClick } = {}) {
+    return [
+        {
+            headerName: "Time",
+            field: "latestTimestamp",
+            width: 160,
+            sort: "desc",
+            cellStyle: FLEX_CELL,
+            valueFormatter: p => {
+                const ts = p.value;
+                if (!ts) return "-";
+                const ms = ts > 1e10 ? ts : ts * 1000;
+                return new Date(ms).toLocaleString("en-US", {
+                    month: "numeric", day: "numeric", year: "2-digit",
+                    hour: "numeric", minute: "2-digit", hour12: true,
+                });
+            },
+            ...NO_FILTER,
         },
-        ...NO_FILTER,
-    },
-    previewCol("Trace", "traceId"),
-    {
-        headerName: "Application",
-        field: "serviceId",
-        width: 170,
-        cellRenderer: AppCell,
-        cellStyle: FLEX_CELL,
-        ...NO_FILTER,
-    },
-    topicCol("Topics Queried"),
-    topicCol("SubTopic queried", false),
-    // {
-    //     headerName: "Model",
-    //     field: "_model",
-    //     width: 170,
-    //     cellRenderer: ModelChipCellRenderer,
-    //     cellStyle: FLEX_CELL,
-    //     ...NO_FILTER,
-    // },
-    tokensCol,
-    durationCol,
-    idCol("Session ID", "sessionIdentifier", 300),
-];
+        previewCol("Trace", "traceId"),
+        {
+            headerName: "Application",
+            field: "serviceId",
+            width: 170,
+            cellRenderer: AppCell,
+            cellStyle: FLEX_CELL,
+            ...NO_FILTER,
+        },
+        topicCol("Topics Queried"),
+        topicCol("SubTopic queried", false),
+        // {
+        //     headerName: "Model",
+        //     field: "_model",
+        //     width: 170,
+        //     cellRenderer: ModelChipCellRenderer,
+        //     cellStyle: FLEX_CELL,
+        //     ...NO_FILTER,
+        // },
+        tokensCol,
+        durationCol,
+        // SessionLinkCell renders a dash when the record carries no session, which is every record
+        // from before the session bridge and from any integration that sends none - so the column
+        // is simply blank for them rather than absent or filled with a placeholder.
+        onSessionClick
+            ? {
+                headerName: "Session ID",
+                field: "sessionIdentifier",
+                width: 300,
+                minWidth: 300,
+                cellRenderer: SessionLinkCell,
+                cellRendererParams: { onSessionClick },
+                cellStyle: FLEX_CELL,
+                ...NO_FILTER,
+            }
+            : idCol("Session ID", "sessionIdentifier", 300),
+        ];
+}
 
 // Messages table — flat span-level rows.
 export const MESSAGE_FLAT_COLUMN_DEFS = [

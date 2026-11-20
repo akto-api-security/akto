@@ -60,29 +60,36 @@ function SessionTopicsSection({ topicHierarchy }) {
 function OverviewContent({ session, traceCount, guardrailViolationCount }) {
     const totalTokens = (Number(session._inputTokens) || 0) + (Number(session._outputTokens) || 0);
 
+    // A session is only as described as its records are. Duration is derived from record
+    // timestamps, so a source that stamps every turn of a conversation identically has no
+    // duration to report - showing a confident "0s" there is worse than showing nothing.
     const stats = [
         { label: "Traces",       value: traceCount },
         { label: "Total tokens", value: formatCompact(totalTokens), tooltip: TOKEN_ESTIMATE_TOOLTIP },
-        { label: "Duration",     value: formatDurationMs(session.durationMs) },
+        session.durationMs > 0
+            ? { label: "Duration", value: formatDurationMs(session.durationMs) }
+            : null,
         {
             label: "Guardrail violations",
             value: `${guardrailViolationCount} / ${traceCount}`,
             valueColor: guardrailViolationCount > 0 ? "critical" : undefined,
         },
-    ];
+    ].filter(Boolean);
 
+    // DetailGrid renders an absent value as "-", so a field the source never populates would
+    // read as a known blank rather than as not applicable. Drop those instead.
     const detailItems = [
         { label: "User",        value: session.userName },
         { label: "Application", value: session.serviceId },
         { label: "Session ID",  value: truncate(session.sessionIdentifier, 36) },
         { label: "Models",      value: session._models?.length ? session._models.join(", ") : undefined },
         { label: "Endpoint ID", value: session.deviceId },
-    ];
+    ].filter(d => d.value);
 
     return (
         <Box padding="4">
             <VerticalStack gap="5">
-                <HorizontalGrid columns={4} gap="3">
+                <HorizontalGrid columns={stats.length} gap="3">
                     {stats.map(s => (
                         <VerticalStack gap="1" key={s.label}>
                             <Text variant="heading2xl" as="p" color={s.valueColor}>{s.value}</Text>

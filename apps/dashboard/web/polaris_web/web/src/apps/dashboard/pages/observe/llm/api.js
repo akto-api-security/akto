@@ -24,6 +24,24 @@ export default {
         }).then(r => r?.sessions ?? []);
     },
 
+    /**
+     * One session by id, with the aggregate fields the flyout header needs (message count,
+     * duration, token sums, models). Used where a session is opened from a context that only
+     * has the identifier — a trace row — rather than from the sessions table, which already
+     * holds the whole row.
+     */
+    fetchSessionById({ startTime, endTime, sessionId }) {
+        if (!sessionId) return Promise.resolve(null);
+        return request({
+            url: "/api/fetchLLMSessions",
+            method: "post",
+            data: { startTime, endTime, sessionsLimit: 1, sessionId },
+        }).then(r => {
+            const [session] = (r?.sessions ?? []).map(enrichRow);
+            return session || null;
+        });
+    },
+
     // Cursor-paginated sessions (composite agg) — used by the sessions table.
     // Returns { sessions, nextAfterKey, total }.
     fetchSessionsPaged({ startTime, endTime, limit, afterKey, filters, searchString }) {
