@@ -126,7 +126,7 @@ def test_password_supports_values_and_never_letters():
 
 
 def test_values_is_password_only():
-    for scanner in ("PromptInjection", "Toxicity", "BanTopics", "Gibberish", "BanCode"):
+    for scanner in ("Toxicity", "BanTopics", "Gibberish", "BanCode"):  # PromptInjection: always letters
         assert resolve_response_format(scanner, "prompt", "values") == ""
 
 

@@ -11,9 +11,9 @@ Two mechanical changes are applied:
    A <=0.09, B 0.10-0.49, C 0.50-0.89, D >=0.90.
 2. The trailing JSON-schema block becomes the four-letter contract.
 
-PromptInjection is deliberately NOT built this way — its INPUT_ABCD is a
-hand-tuned artifact copied from the ms-langchain evals and measured as-is, so it
-stays a literal. Everything else derives from here until someone measures it.
+PromptInjection is NOT built this way: it answers only in letters, so its
+prompts are literal letter templates (prompts/prompt_injection.py). Everything
+else derives from here until someone measures it.
 """
 
 import json
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 _JSON_TAIL_MARKER = "Analyze this text and respond ONLY with valid JSON:"
 _TEXT_SUFFIX = "\n\nText to analyze:\n%s"
 
-# p(flag is true) -> letter. Same bands as prompts/prompt_injection.py INPUT_ABCD.
+# p(flag is true) -> letter. The same bands PromptInjection's letter contract uses.
 _BANDS = ((0.09, "A"), (0.49, "B"), (0.89, "C"), (1.0, "D"))
 
 _CONTRACT = """Analyze {subject} and respond with ONE character and nothing else — no JSON, no punctuation, no explanation, no reason:
