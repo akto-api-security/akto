@@ -1432,6 +1432,13 @@ const settingRequests = {
             data: {tenantDataCenter, clientId, clientSecret}
         })
     },
+    updateWizBidirectionalSync(bidirectionalSyncEnabled) {
+        return request({
+            url: '/api/updateWizBidirectionalSync',
+            method: 'post',
+            data: {bidirectionalSyncEnabled}
+        })
+    },
     removeWizIntegration() {
         return request({
             url: '/api/removeWizIntegration',

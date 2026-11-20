@@ -1,4 +1,4 @@
-import { Button, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { Button, Checkbox, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
 import IntegrationsLayout from "./IntegrationsLayout"
 import PasswordTextField from "@/apps/dashboard/components/layouts/PasswordTextField"
 import { useEffect, useState } from "react"
@@ -13,13 +13,16 @@ function Wiz() {
     const [tenantDataCenter, setTenantDataCenter] = useState('')
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
+    const [isBidirectionalSyncEnabled, setIsBidirectionalSyncEnabled] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [isTogglingSync, setIsTogglingSync] = useState(false)
     const [isRemoveable, setIsRemoveable] = useState(false)
 
     const resetFields = () => {
         setTenantDataCenter('')
         setClientId('')
         setClientSecret('')
+        setIsBidirectionalSyncEnabled(false)
         setIsRemoveable(false)
     }
 
@@ -35,6 +38,7 @@ function Wiz() {
                 setTenantDataCenter(wizIntegration.tenantDataCenter || '')
                 setClientId(wizIntegration.clientId || '')
                 setClientSecret(null) // Don't show existing secret
+                setIsBidirectionalSyncEnabled(Boolean(wizIntegration.bidirectionalSyncEnabled))
                 setIsRemoveable(true)
             } else {
                 // No integration exists - reset everything
@@ -66,6 +70,19 @@ function Wiz() {
             func.setToast(true, true, error?.response?.data?.actionErrors?.[0] || "Failed to add Wiz Integration")
         } finally {
             setIsSaving(false)
+        }
+    }
+
+    async function toggleBidirectionalSync(checked) {
+        setIsTogglingSync(true)
+        try {
+            await settingFunctions.updateWizBidirectionalSync(checked)
+            setIsBidirectionalSyncEnabled(checked)
+            func.setToast(true, false, "Bidirectional sync " + (checked ? "enabled" : "disabled"))
+        } catch (error) {
+            func.setToast(true, true, error?.response?.data?.actionErrors?.[0] || "Failed to update bidirectional sync")
+        } finally {
+            setIsTogglingSync(false)
         }
     }
 
@@ -140,11 +157,34 @@ function Wiz() {
         </LegacyCard>
     )
 
+    const bidirectionalSyncCard = (
+        <LegacyCard>
+            <LegacyCard.Section>
+                <Text variant="headingMd">Bidirectional sync for issues</Text>
+            </LegacyCard.Section>
+            <LegacyCard.Section>
+                <Checkbox
+                    label="Sync issue status changes between Akto and Wiz."
+                    checked={isBidirectionalSyncEnabled}
+                    onChange={toggleBidirectionalSync}
+                    disabled={isTogglingSync || !canCall('api/updateWizBidirectionalSync')}
+                />
+            </LegacyCard.Section>
+        </LegacyCard>
+    )
+
+    const wizComponent = (
+        <VerticalStack gap="4">
+            {wizCard}
+            {isRemoveable && bidirectionalSyncCard}
+        </VerticalStack>
+    )
+
     return (
         <IntegrationsLayout
             title="Wiz"
             cardContent={cardContent}
-            component={wizCard}
+            component={wizComponent}
             docsUrl="https://docs.akto.io/integrations/wiz"
             readOnly={!canCall('api/addWizIntegration')}
         />
