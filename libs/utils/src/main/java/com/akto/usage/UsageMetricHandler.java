@@ -1,8 +1,11 @@
 package com.akto.usage;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import org.json.JSONObject;
 
@@ -136,6 +139,36 @@ public class UsageMetricHandler {
         return usageMetric;
     }
 
+    /**
+     * Records each metric on its own, so one metric that cannot be measured (a failed query, a
+     * metric that is not measured) does not stop the others. A failed metric writes no usage
+     * document, so it is never reported as 0.
+     *
+     * @return the metrics that failed, in order; empty when all were recorded
+     */
+    static List<MetricTypes> recordEachMetric(List<MetricTypes> metricTypes, Consumer<MetricTypes> recorder, int accountId) {
+        List<MetricTypes> failed = new ArrayList<>();
+        for (MetricTypes metricType : metricTypes) {
+            long startMs = System.currentTimeMillis();
+            try {
+                recorder.accept(metricType);
+            } catch (Exception e) {
+                failed.add(metricType);
+                loggerMaker.errorAndAddToDb(e, String.format("Usage metric %s not recorded for account %d after %dms. Error: %s",
+                        metricType, accountId, System.currentTimeMillis() - startMs, e.getMessage()), LogDb.DASHBOARD);
+            }
+        }
+
+        String summary = String.format("Usage recorded for account %d: measured=%d failed=%d%s",
+                accountId, metricTypes.size() - failed.size(), failed.size(), failed.isEmpty() ? "" : " " + failed);
+        if (failed.isEmpty()) {
+            loggerMaker.infoAndAddToDb(summary, LogDb.DASHBOARD);
+        } else {
+            loggerMaker.errorAndAddToDb(summary, LogDb.DASHBOARD);
+        }
+        return failed;
+    }
+
     public static void calcAndSyncAccountUsage(int accountId){
         try {
 
@@ -162,8 +195,7 @@ public class UsageMetricHandler {
             String organizationId = organization.getId();
             String dashboardVersion = accountSettings.getDashboardVersion();
 
-            for (MetricTypes metricType : MetricTypes.values()) {
-
+            recordEachMetric(MetricTypes.measured(), metricType -> {
                 UsageMetric usageMetric = createUsageMetric(organizationId, accountId, metricType, dashboardVersion);
 
                 //calculate usage for metric
@@ -182,7 +214,7 @@ public class UsageMetricHandler {
                 );
 
                 updateOrgMeteredUsage(organization);
-            }
+            }, accountId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
         }
