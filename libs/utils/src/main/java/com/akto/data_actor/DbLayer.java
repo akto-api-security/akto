@@ -554,6 +554,10 @@ public class DbLayer {
     }
 
     public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        return fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, null, null);
+    }
+
+    public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName, String moduleId, String moduleName) {
         if (moduleType == null) {
             return new ArrayList<>();
         }
@@ -567,6 +571,12 @@ public class DbLayer {
         filterConditions.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
         if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
             filterConditions.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
+        }
+        if (moduleId != null && !moduleId.isEmpty()) {
+            filterConditions.add(Filters.eq(ModuleInfoDao.ID, moduleId));
+        }
+        if (moduleName != null && !moduleName.isEmpty()) {
+            filterConditions.add(Filters.eq(ModuleInfo.NAME, moduleName));
         }
 
         Bson filter = Filters.and(filterConditions);
