@@ -31,6 +31,9 @@ public class WizSyncJobExecutor extends JobExecutor<WizSyncJobParams> {
                 return;
             }
 
+            // Fetch issue status changes from Wiz.
+            WizIntegrationUtils.syncTestingRunIssuesStatusFromWiz(wizIntegration);
+
             long secondsSinceLastUpload = (System.currentTimeMillis() / 1000L) - wizIntegration.getLastUploadedScanTs();
             boolean pastTwentyFourHours = secondsSinceLastUpload > 24 * 60 * 60;
 
