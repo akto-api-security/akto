@@ -31,8 +31,26 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
     public static final String COLLECTION_NAME = "sensitive_data_counts";
     public static final SensitiveDataCountDao instance = new SensitiveDataCountDao();
 
-    /** Longest alert window we expect (a month), plus margin. */
-    public static final int RETENTION_DAYS = 40;
+    /**
+     * Margin over the longest window an alert rule may ask for. Covers a late flush for an old
+     * hour and the fact that Mongo's TTL monitor sweeps periodically rather than deleting exactly
+     * on expiry.
+     */
+    public static final int RETENTION_SAFETY_DAYS = 10;
+
+    /**
+     * Buckets are kept for the longest window an alert rule may use, plus that margin.
+     *
+     * This has to cover the alert side's cap, which is 90 days. expireAt is written here, by the
+     * service producing the counts - the alert job never writes it - so a cap larger than what is
+     * retained would leave the aggregation summing only the buckets that survived the TTL. It
+     * would report a total below the real one and the threshold would simply never trip: a wrong
+     * answer with no error.
+     *
+     * Once SensitiveDataAlertRule exists on this branch this should become
+     * MAX_WINDOW_DAYS + RETENTION_SAFETY_DAYS so the two cannot drift apart.
+     */
+    public static final int RETENTION_DAYS = 90 + RETENTION_SAFETY_DAYS;
 
     /** Keys of requests already applied, so a retried request is not counted twice. */
     public static final String APPLIED_REQUESTS_COLLECTION = "sensitive_data_count_requests";
