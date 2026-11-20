@@ -84,6 +84,9 @@ func newCacheFixture() *cacheFixture {
 				return &mcp.ValidationResult{Allowed: false, Reason: "prompt injection"}, "", nil
 			case strings.Contains(p.RequestPayload, "FAIL"):
 				return nil, "", errors.New("scanner unavailable")
+			case strings.Contains(p.RequestPayload, "UNSCANNED"):
+				// The scan failed open: allowed, but the check didn't run (scanner error or timeout).
+				return &mcp.ValidationResult{Allowed: true, Incomplete: true}, "", nil
 			}
 			return &mcp.ValidationResult{Allowed: true}, "", nil
 		},
@@ -185,4 +188,63 @@ func TestFileCacheOffWithoutAStore(t *testing.T) {
 	f.upload(t, "same file", nil)
 	assertFileAllowed(t, f.upload(t, "same file", nil), true)
 	f.assertWork(t, 2, 2)
+}
+
+// A scan that failed open (agent-guard down, the validation deadline hit) is an allow on content
+// nobody checked: reported uninspected and never cached, so the next send is scanned again.
+func TestFileCacheNeverRemembersAnIncompleteScan(t *testing.T) {
+	f := newCacheFixture()
+	for range 2 {
+		recorder := f.upload(t, "UNSCANNED quarterly figures", nil)
+		assertFileAllowed(t, recorder, true)
+		assertUninspected(t, recorder, true)
+	}
+	f.assertWork(t, 2, 2)
+	if f.store.size() != 0 {
+		t.Fatal("an allow whose scan didn't run was remembered")
+	}
+}
+
+// stubOCR answers like agent-guard's /ocr: the text of the image, or "" for an image with none.
+type stubOCR struct{ calls atomic.Int32 }
+
+func (o *stubOCR) ExtractText(_ context.Context, r io.Reader) (string, error) {
+	o.calls.Add(1)
+	b, _ := io.ReadAll(r)
+	if strings.Contains(string(b), "BLANK") {
+		return "", nil
+	}
+	return "Quarterly sales summary", nil
+}
+
+func (f *cacheFixture) uploadImage(t *testing.T, content string) *httptest.ResponseRecorder {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = fileUploadRequest(t, "screenshot.png", content, nil)
+	f.h.ValidateFile(c)
+	return recorder
+}
+
+// An image whose OCR read no text is allowed, but not cached: a misread (a text image read as
+// blank) would otherwise be served as a clean pass for the whole TTL. An image with text still is.
+func TestFileCacheSkipsImagesWithNoText(t *testing.T) {
+	f := newCacheFixture()
+	ocr := &stubOCR{}
+	f.h.fileRegistry.RegisterWithLimit(fileprocessor.NewImageProcessor(ocr, 1024*1024), 1024*1024)
+
+	for range 2 {
+		recorder := f.uploadImage(t, "\x89PNG BLANK")
+		assertFileAllowed(t, recorder, true)
+		assertUninspected(t, recorder, false) // it was read; there was just nothing to scan
+	}
+	if got := ocr.calls.Load(); got != 2 || f.store.size() != 0 {
+		t.Fatalf("blank image: OCR calls = %d (want 2: never served from cache), cached = %d (want 0)", got, f.store.size())
+	}
+
+	f.uploadImage(t, "\x89PNG text")
+	f.uploadImage(t, "\x89PNG text")
+	if got := ocr.calls.Load(); got != 3 || f.store.size() != 1 {
+		t.Fatalf("image with text: OCR calls = %d (want 3: second send from cache), cached = %d (want 1)", got, f.store.size())
+	}
 }

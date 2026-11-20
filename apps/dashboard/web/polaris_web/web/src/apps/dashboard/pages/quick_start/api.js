@@ -138,6 +138,14 @@ const api = {
         })
     },
 
+    createAuthToken(name, scope, expiryTimeInMonth) {
+        return request({
+            url: '/api/createAuthToken',
+            method: 'post',
+            data: {name, scope, expiryTimeInMonth}
+        })
+    },
+
     fetchModuleTypes() {
         return request({
             url: '/api/fetchModuleTypes',
@@ -216,11 +224,11 @@ const api = {
         })
     },
 
-    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName) {
+    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName, httpMethod) {
         return request({
             url: '/api/importFromUrl',
             method: 'post',
-            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName}
+            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders, miniTestingName, method: httpMethod}
         })
     },
 
