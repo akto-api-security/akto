@@ -178,6 +178,11 @@ public class HttpProxyAction extends ActionSupport {
 
     private String buildTagJson() {
         if (!"true".equalsIgnoreCase(ingest_data)) return tag;
+        return withGuardrailMode(tag, akto_connector);
+    }
+
+    /** Adds the guardrail mode (observe for observe-mode connectors, else inline) to an ingested tag. */
+    static String withGuardrailMode(String tag, String akto_connector) {
         try {
             BasicDBObject tagObj = (tag != null && !tag.isEmpty()) ? BasicDBObject.parse(tag) : new BasicDBObject();
             if (!tagObj.containsField(Constants.AKTO_GUARDRAIL_MODE)) {
