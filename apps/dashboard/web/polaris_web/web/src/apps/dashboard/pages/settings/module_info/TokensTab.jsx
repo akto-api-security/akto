@@ -13,6 +13,8 @@ import { buildSortOptions, disambiguateLabel } from "./tableConfig"
 const DAY = 24 * 60 * 60
 const EXPIRING_SOON_DAYS = 15
 const EXPIRING_SOON_SECONDS = EXPIRING_SOON_DAYS * DAY
+// the expiry badge turns red at this many days left or fewer, yellow before that
+const EXPIRING_CRITICAL_DAYS = 3
 const IDLE_SECONDS = 30 * DAY
 // one name keeps the column narrow; the hover list holds the rest
 const MAX_USED_BY_CHIPS = 1
@@ -129,9 +131,14 @@ function lastUsedCell(token, state, now) {
 const isExpiringSoon = (token, now) => token.expiresAt > now && token.expiresAt - now < EXPIRING_SOON_SECONDS
 
 // rounded up, so a token with 3 hours left reads "1 day left" rather than "0 days left"
-function daysLeftLabel(token, now) {
+// the colour uses the same rounded number as the label, so "3 days left" is always red and "4 days left" always yellow
+function expiryBadge(token, now) {
     const days = Math.ceil((token.expiresAt - now) / DAY)
-    return `${days} ${days === 1 ? 'day' : 'days'} left`
+    return (
+        <Badge status={days <= EXPIRING_CRITICAL_DAYS ? 'critical' : 'warning'}>
+            {`${days} ${days === 1 ? 'day' : 'days'} left`}
+        </Badge>
+    )
 }
 
 function expiresCell(token, state, now) {
@@ -140,7 +147,7 @@ function expiresCell(token, state, now) {
     return (
         <HorizontalStack gap="1" wrap={false}>
             <span>{func.epochToDateTime(token.expiresAt)}</span>
-            {soon && <Badge status="warning">{daysLeftLabel(token, now)}</Badge>}
+            {soon && expiryBadge(token, now)}
         </HorizontalStack>
     )
 }
