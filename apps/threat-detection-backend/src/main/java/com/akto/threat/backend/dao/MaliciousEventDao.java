@@ -99,11 +99,6 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
             .aggregate(pipeline);
     }
 
-    public AggregateIterable<Document> aggregateRaw(String accountId, List<Document> pipeline, Bson hint) {
-        AggregateIterable<Document> iterable = aggregateRaw(accountId, pipeline);
-        return hint == null ? iterable : iterable.hint(hint);
-    }
-
     public MongoCollection<Document> getDocumentCollection(String accountId) {
         return getDatabase(accountId)
             .getCollection(getCollectionName(), Document.class);

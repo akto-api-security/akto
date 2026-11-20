@@ -672,7 +672,7 @@ public class ThreatActorService {
                 .append("severityActors",
                     new Document("$sum", new Document("$cond", Arrays.asList(new Document("$eq", Arrays.asList("$severity", 4)), 1, 0))))));
 
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline, hint).cursor()) {
+        try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
                 actors.add(
@@ -698,7 +698,7 @@ public class ThreatActorService {
         int totalActive = 0;
         int totalIgnored = 0;
         int totalUnderReview = 0;
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, summaryPipeline, hint).cursor()) {
+        try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, summaryPipeline), hint).cursor()) {
             while (cursor.hasNext()) {
                 Document d = cursor.next();
                 Document group = (Document) d.get("_id");
@@ -1427,7 +1427,7 @@ public class ThreatActorService {
 
     List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline, hint).cursor()) {
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         topApis.add(
@@ -1453,7 +1453,8 @@ public class ThreatActorService {
       hostPipeline.add(new Document("$match", new Document("$and", evaluationModeConditions)));
     }
     // Only consider documents where host exists and is not empty
-    hostPipeline.add(new Document("$match", new Document("host", new Document("$gt", ""))));
+    hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", null))));
+    hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", ""))));
     // Misconfigured Settings lists each misconfiguration once, so count it once here too.
     if ("only".equalsIgnoreCase(configEvalMode)) {
       hostPipeline.addAll(ThreatUtils.configScanDedupeStages(hostPipeline, contextSource));
@@ -1471,7 +1472,7 @@ public class ThreatActorService {
     hostPipeline.add(new Document("$limit", limit > 0 ? limit : 5));
 
     List<FetchTopNDataResponse.TopHostData> topHosts = new ArrayList<>();
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, hostPipeline, hint)
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, hostPipeline), hint)
         .maxTime(evaluationModeConditions.isEmpty() ? 0 : ThreatUtils.REGEX_MAX_TIME_MS, java.util.concurrent.TimeUnit.MILLISECONDS).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();

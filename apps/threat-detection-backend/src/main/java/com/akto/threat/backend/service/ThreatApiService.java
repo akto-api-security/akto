@@ -195,7 +195,7 @@ public class ThreatApiService {
     List<ThreatCategoryWiseCountResponse.SubCategoryCount> categoryWiseCounts = new ArrayList<>();
 
     // 5. Execute aggregation with controlled batch size
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline, hint).batchSize(1000).cursor()) {
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).batchSize(1000).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         Document agg = (Document) doc.get("_id");
@@ -264,7 +264,7 @@ public class ThreatApiService {
           .append("count", new Document("$sum", 1))));
 
     Map<String, Integer> severityToCount = new HashMap<>();
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline, hint)
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint)
         .maxTime(evaluationModeConditions.isEmpty() ? 0 : ThreatUtils.REGEX_MAX_TIME_MS, java.util.concurrent.TimeUnit.MILLISECONDS).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();

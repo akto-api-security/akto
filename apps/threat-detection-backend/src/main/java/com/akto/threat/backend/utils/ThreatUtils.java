@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.TextFormat;
+import com.mongodb.client.AggregateIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.IndexOptions;
@@ -215,6 +216,10 @@ public class ThreatUtils {
         Document keys = new Document();
         EVAL_TYPE_COVER_FIELDS.forEach(field -> keys.append(field, "detectedAt".equals(field) ? -1 : 1));
         return keys;
+    }
+
+    public static <T> AggregateIterable<T> withHint(AggregateIterable<T> iterable, Document hint) {
+        return hint == null ? iterable : iterable.hint(hint);
     }
 
     static boolean filtersOnlyCoverFields(Document match) {
