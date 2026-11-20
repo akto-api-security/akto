@@ -7,6 +7,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -806,5 +807,165 @@ public class WizIntegrationUtils {
         responseObj.put("lastUploadedScanTs", lastUploadedScanTs);
 
         return responseObj;
+    }
+
+    /**
+     * Maps a Wiz FindingCommonStatus (OPEN, RESOLVED, REJECTED) to the Akto issue status.
+     * Returns null if the Wiz status is null or not recognised.
+     */
+    public static GlobalEnums.TestRunIssueStatus getAktoIssueStatusFromWizStatus(String wizStatus) {
+        if (wizStatus == null) {
+            return null;
+        }
+
+        switch (wizStatus) {
+            case "OPEN":
+                return GlobalEnums.TestRunIssueStatus.OPEN;
+            case "RESOLVED":
+                return GlobalEnums.TestRunIssueStatus.FIXED;
+            case "REJECTED":
+                return GlobalEnums.TestRunIssueStatus.IGNORED;
+            default:
+                return GlobalEnums.TestRunIssueStatus.OPEN;
+        }
+    }
+
+    static class StatusChangeResult {
+        final Map<TestingIssuesId, GlobalEnums.TestRunIssueStatus> statusChanges;
+        final int failedIssues;
+
+        StatusChangeResult(Map<TestingIssuesId, GlobalEnums.TestRunIssueStatus> statusChanges, int failedIssues) {
+            this.statusChanges = statusChanges;
+            this.failedIssues = failedIssues;
+        }
+    }
+
+    /**
+     * Pure logic (no DB or network access) that decides which Akto issues need a status change,
+     * given the status of each Wiz finding keyed by Wiz finding id.
+     * Issues with no matching Wiz finding are skipped; issues that fail to process are counted and skipped.
+     */
+    static StatusChangeResult computeStatusChanges(List<TestingRunIssues> testingRunIssuesList, Map<String, String> wizFindingIdToStatusMap) {
+        Map<TestingIssuesId, GlobalEnums.TestRunIssueStatus> statusChanges = new LinkedHashMap<>();
+
+        // Iterate over testing run issues list
+        int failedIssues = 0;
+        for (TestingRunIssues issue : testingRunIssuesList) {
+            try {
+                TestingIssuesId id = issue.getId();
+                String status = issue.getTestRunIssueStatus().toString();
+
+                // Fetch the corresponding Wiz finding ID for this Akto issue
+                String wizFindingId = WizIntegrationUtils.fetchWizFindingId(id);
+                if (wizFindingId != null) {
+                    String wizFindingStatus = wizFindingIdToStatusMap.get(wizFindingId);
+                    if (wizFindingStatus == null) {
+                        // Newly created issue in Akto, not yet present in Wiz
+                        continue;
+                    }
+                    GlobalEnums.TestRunIssueStatus convertedStatus = WizIntegrationUtils.getAktoIssueStatusFromWizStatus(wizFindingStatus);
+                    if (!status.equals(convertedStatus.toString())) {
+                        statusChanges.put(id, convertedStatus);
+                    }
+                }
+            } catch (Exception e) {
+                failedIssues++;
+                loggerMaker.error(String.format("Error processing testing run issue %s for Wiz status sync, skipping: %s", issue.getId(), e.getMessage()));
+            }
+        }
+
+        return new StatusChangeResult(statusChanges, failedIssues);
+    }
+
+    public static void syncTestingRunIssuesStatusFromWiz(WizIntegration wizIntegration) {
+        if (wizIntegration == null) {
+            loggerMaker.infoAndAddToDb("Wiz integration not configured for this account. Skipping sync.");
+            return;
+        }
+
+        try {
+            // Get valid access token
+            String accessToken = getValidAccessToken();
+
+            // Build GraphQL API endpoint
+            String apiUrl = String.format(
+                WizIntegration.API_BASE_URL_PATTERN,
+                wizIntegration.getTenantDataCenter(),
+                WizIntegration.ENVIRONMENT
+            );
+
+            if (WizIntegrationUtils.isWizDevMode()) {
+                apiUrl = getWizDevGraphQLEndpoint();
+                loggerMaker.infoAndAddToDb("Wiz dev mode enabled. Using dev GraphQL endpoint: " + apiUrl);
+            }
+
+            List<BasicDBObject> attackSurfaceFindings = WizApiClient.fetchAllAttackSurfaceFindings(apiUrl, accessToken);
+            Map<String, String> wizFindingIdToStatusMap = new HashMap<>();
+            for (BasicDBObject finding : attackSurfaceFindings) {
+                String wizFindingId = finding.getString("id");
+                String status = finding.getString("status");
+                if (wizFindingId != null && status != null) {
+                    wizFindingIdToStatusMap.put(wizFindingId, status);
+                }
+            }
+
+            // Find all testing run issues in this account that need to be synced with Wiz
+            List<TestingRunIssues> testingRunIssuesList = new ArrayList<>();
+
+            Bson wizSyncFilter = Filters.and(
+                Filters.ne(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null)
+            );
+            Bson wizSyncProjection = Projections.include(Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS);
+            int skip = 0;
+            try {
+                List<TestingRunIssues> page;
+                do {
+                    page = TestingRunIssuesDao.instance.findAll(wizSyncFilter, skip, WIZ_SYNC_PAGE_SIZE, null, wizSyncProjection);
+                    if (page != null) {
+                        testingRunIssuesList.addAll(page);
+                        skip += page.size();
+                    }
+                } while (page != null && page.size() == WIZ_SYNC_PAGE_SIZE);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error fetching testing run issues for Wiz sync: " + e.getMessage());
+                return;
+            }
+
+            StatusChangeResult statusChangeResult = computeStatusChanges(testingRunIssuesList, wizFindingIdToStatusMap);
+            int failedIssues = statusChangeResult.failedIssues;
+
+            List<WriteModel<TestingRunIssues>> bulkUpdatesForStatusChanges = new ArrayList<>();
+            for (Map.Entry<TestingIssuesId, GlobalEnums.TestRunIssueStatus> change : statusChangeResult.statusChanges.entrySet()) {
+                bulkUpdatesForStatusChanges.add(
+                    new UpdateOneModel<> (
+                        Filters.eq(Constants.ID, change.getKey()),
+                        Updates.combine(
+                            Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, change.getValue().toString()),
+                            Updates.set(TestingRunIssues.LAST_UPDATED, Context.now())
+                        )
+                    )
+                );
+            }
+
+            if (!bulkUpdatesForStatusChanges.isEmpty()) {
+                TestingRunIssuesDao.instance.getMCollection().bulkWrite(bulkUpdatesForStatusChanges);
+            }
+
+            loggerMaker.infoAndAddToDb(String.format("Finished syncing testing run issues status from Wiz. Wiz findings: %d, Akto issues checked: %d, status updated: %d, failed to process: %d",
+                wizFindingIdToStatusMap.size(), testingRunIssuesList.size(), bulkUpdatesForStatusChanges.size(), failedIssues));
+
+            // If we reach here, the sync completed. Update the last synced finding status timestamp
+            try {
+                WizIntegrationDao.instance.updateOne(
+                    new BasicDBObject(),
+                    Updates.set(WizIntegration.LAST_SYNCED_FINDING_STATUS_TS, System.currentTimeMillis()/1000L)
+                );
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error updating Wiz integration last synced finding status timestamp: " + e.getMessage());
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error syncing testing run issues status from Wiz, no further issues will be updated in this run: " + e.getMessage());
+        }
     }
 }

@@ -20,6 +20,7 @@ public class WizApiClient {
     static final int HOST_FETCH_PAGE_SIZE = 500;
     static final int ENDPOINT_FETCH_PAGE_SIZE = 20;
     static final int ENDPOINT_META_FETCH_PAGE_SIZE = 500;
+    static final int FINDINGS_FETCH_PAGE_SIZE = 100;
 
     static Map<String, List<String>> buildHeaders(String accessToken) {
         Map<String, List<String>> headers = new HashMap<>();
@@ -82,6 +83,41 @@ public class WizApiClient {
 
         loggerMaker.infoAndAddToDb(String.format("fetchEndpointsPageByIds: %d ids", ids.size()));
         return executeAndGetRoot(apiUrl, graphqlQuery, buildHeaders(accessToken), "apiEndpoints");
+    }
+
+    /**
+     * Paginates attackSurfaceFindings with origin AKTO, fetching only id and status, returns the full list.
+     */
+    public static List<BasicDBObject> fetchAllAttackSurfaceFindings(String apiUrl, String accessToken) throws Exception {
+        List<BasicDBObject> results = new ArrayList<>();
+        String cursor = null;
+        boolean hasNextPage = true;
+        Map<String, List<String>> headers = buildHeaders(accessToken);
+
+        while (hasNextPage) {
+            String variablesPart = cursor == null
+                ? String.format("{\"first\":%d}", FINDINGS_FETCH_PAGE_SIZE)
+                : String.format("{\"first\":%d,\"after\":\"%s\"}", FINDINGS_FETCH_PAGE_SIZE, cursor);
+
+            String graphqlQuery = "{\"query\":\"query($first: Int, $after: String) { attackSurfaceFindings(first: $first, after: $after, filterBy: { origin: { equals: [AKTO] } }) { nodes { id status } pageInfo { endCursor hasNextPage } } }\",\"variables\":" + variablesPart + "}";
+
+            loggerMaker.infoAndAddToDb(String.format("fetchAllAttackSurfaceFindings: page cursor=%s", cursor));
+            BasicDBObject root = executeAndGetRoot(apiUrl, graphqlQuery, headers, "attackSurfaceFindings");
+
+            List<?> nodes = (List<?>) root.get("nodes");
+            BasicDBObject pageInfo = (BasicDBObject) root.get("pageInfo");
+
+            if (nodes != null) {
+                for (Object nodeObj : nodes) {
+                    results.add((BasicDBObject) nodeObj);
+                }
+            }
+
+            hasNextPage = pageInfo != null && pageInfo.getBoolean("hasNextPage", false);
+            cursor = pageInfo != null ? pageInfo.getString("endCursor") : null;
+        }
+
+        return results;
     }
 
     static BasicDBObject executeRaw(String apiUrl, String graphqlQuery, Map<String, List<String>> headers) throws Exception {
