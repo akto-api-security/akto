@@ -9708,7 +9708,8 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
+                <!-- USER_ACTIONS is read-write for every role, so anyone can create a token, and READ_WRITE keeps the audit-log entry -->
+                <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User generated a tracked authentication token</param>
             </interceptor-ref>
