@@ -117,6 +117,7 @@ public class DbAction extends ActionSupport {
     String configName;
     int lastFetchTimestamp;
     String lastSeenObjectId;
+    boolean hasLatestRagDetection;
     boolean resolveLoop;
     String fieldName;
     String version;
@@ -1060,7 +1061,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionSimple() {
         try {
-            DbLayer.createCollectionSimple(vxlanId);
+            DbLayer.createCollectionSimple(vxlanId, hasLatestRagDetection);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1069,7 +1070,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionForHost() {
         try {
-            DbLayer.createCollectionForHost(host, colId);
+            DbLayer.createCollectionForHost(host, colId, hasLatestRagDetection);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
