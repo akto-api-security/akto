@@ -881,16 +881,9 @@ public class ThreatActorService {
       pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
       pipeline.addAll(Arrays.asList(
 
-        // Stage 2: Project required fields and normalize timestamp to daily granularity
-        new Document("$project", new Document("dayStart",
-            new Document("$dateTrunc", new Document("date", 
-                new Document("$toDate", new Document("$multiply", Arrays.asList("$detectedAt", 1000L))))
-                    .append("unit", "day")))
-            .append("subCategory", "$subCategory")),
-
-        // Stage 3: Group by dayStart and subCategory, count occurrences
-        new Document("$group", new Document("_id", 
-            new Document("dayStart", "$dayStart").append("subCategory", "$subCategory"))
+        new Document("$group", new Document("_id",
+            new Document("dayStart", new Document("$subtract", Arrays.asList("$detectedAt", new Document("$mod", Arrays.asList("$detectedAt", 86400)))))
+                .append("subCategory", "$subCategory"))
             .append("count", new Document("$sum", 1))),
 
         // Stage 4: Reshape the output to group counts by day
@@ -899,14 +892,13 @@ public class ThreatActorService {
                 new Document("$push", new Document("subCategory", "$_id.subCategory").append("count", "$count"))))
         ));
 
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+        try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), ThreatUtils.coverIndexHint(accountId, match)).cursor()) {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
-                System.out.print(doc);
-                
+
                 String subCategory;
                 int count;
-                long ts = doc.getDate("_id").getTime() / 1000;
+                long ts = ((Number) doc.get("_id")).longValue();
 
                 List<ThreatActivityTimelineResponse.SubCategoryData> subCategoryData = new ArrayList<>();
                 try {
