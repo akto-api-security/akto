@@ -182,7 +182,9 @@ public class AktoPolicyNew {
         url = url.split("\\?")[0];
         String methodStr = httpResponseParams.getRequestParams().getMethod();
         URLMethods.Method method = URLMethods.Method.fromString(methodStr);
-        URLTemplate urlTemplate = APICatalogSync.tryParamteresingUrl(new URLStatic(url, method), mergeUrlsOnVersions);
+        URLTemplate urlTemplate = APICatalogSync.isEndpointTraffic(httpResponseParams, apiCollectionId)
+                ? null
+                : APICatalogSync.tryParamteresingUrl(new URLStatic(url, method), mergeUrlsOnVersions);
         if (urlTemplate != null) {
             url = urlTemplate.getTemplateString();
         }
