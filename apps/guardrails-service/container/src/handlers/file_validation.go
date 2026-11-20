@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -252,7 +253,12 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	}
 
 	rawText, err := processor.ExtractContent(ctx, input.Reader, ext)
-	if err != nil {
+	if errors.Is(err, fileprocessor.ErrIncomplete) {
+		// Part of the file (an embedded image) could not be read: validate what was, and an allow
+		// still leaves the file uninspected.
+		h.logger.Warn("File content only partly extracted; an allow leaves it uninspected", zap.Error(err), zap.String("file", input.Filename))
+		fr.Uninspected = true
+	} else if err != nil {
 		// Fail open when parsing fails; there is no extracted content to validate.
 		h.logger.Warn("Content extraction failed; allowing file", zap.Error(err), zap.String("file", input.Filename))
 		fr.Uninspected = true
@@ -262,7 +268,11 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	text := fileprocessor.SanitizeText(rawText)
 	rawText = "" // allow GC to reclaim the unsanitized copy
 	if strings.TrimSpace(text) == "" {
-		_, fr.NotCacheable = processor.(*fileprocessor.ImageProcessor)
+		// OCR may have misread text as nothing; a cached pass would hide that for the whole TTL.
+		switch processor.(type) {
+		case *fileprocessor.ImageProcessor, *fileprocessor.DocumentProcessor:
+			fr.NotCacheable = true
+		}
 		h.logger.Warn("No text extracted; allowing file", zap.String("file", input.Filename), zap.Bool("ocr", fr.NotCacheable))
 		return fr
 	}

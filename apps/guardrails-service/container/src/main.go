@@ -318,9 +318,11 @@ func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Confi
 
 	if ocr != nil {
 		registry.RegisterWithLimit(fileprocessor.NewImageProcessor(ocr, mc.MaxImageBytes), mc.MaxImageBytes)
+		registry.RegisterWithLimit(fileprocessor.NewDocumentProcessor(ocr, mc.MaxDocumentImages, mc.MaxImageBytes), cfg.File.MaxTextFileBytes)
 		logger.Info("Image processing enabled",
 			zap.String("provider", mc.Provider),
-			zap.Int("maxBytes", mc.MaxImageBytes))
+			zap.Int("maxBytes", mc.MaxImageBytes),
+			zap.Int("maxDocumentImages", mc.MaxDocumentImages))
 	}
 	if transcriber != nil {
 		registry.RegisterWithLimit(fileprocessor.NewAudioProcessor(transcriber, mc.MaxAudioBytes), mc.MaxAudioBytes)

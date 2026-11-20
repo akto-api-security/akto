@@ -11,6 +11,7 @@ import (
 	"io"
 
 	"github.com/akto-api-security/guardrails-service/pkg/mediaprovider"
+	_ "golang.org/x/image/bmp"
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/tiff"
 	_ "golang.org/x/image/webp"
@@ -42,12 +43,16 @@ func (p *ImageProcessor) ExtractContent(ctx context.Context, r io.Reader, _ stri
 	if len(data) > p.maxBytes {
 		return "", fmt.Errorf("image too large: exceeds %s limit", FormatBytes(p.maxBytes))
 	}
+	return ocrImage(ctx, p.ocr, data)
+}
 
+// ocrImage scales an image down to what OCR needs, refusing pixel bombs, and reads its text.
+func ocrImage(ctx context.Context, ocr mediaprovider.OCRProvider, data []byte) (string, error) {
 	resized, err := downsampleIfNeeded(data)
 	if err != nil {
 		return "", fmt.Errorf("image resize: %w", err)
 	}
-	return p.ocr.ExtractText(ctx, bytes.NewReader(resized))
+	return ocr.ExtractText(ctx, bytes.NewReader(resized))
 }
 
 // downsampleIfNeeded scales images exceeding maxImageDimension, preserving aspect ratio.
