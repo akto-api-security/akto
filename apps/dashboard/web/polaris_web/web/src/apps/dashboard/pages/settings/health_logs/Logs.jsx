@@ -49,6 +49,7 @@ const Logs = () => {
         { label: "Agentic Testing", value: "AGENTIC_TESTING" },
         { label: "Puppeteer", value: "PUPPETEER" },
         { label: "Threat", value: "THREAT_DETECTION" },
+        { label: "Endpoint Shield", value: "ENDPOINT_SHIELD" },
         { label: "Data Ingestion", value: "DATA_INGESTION" },
         { label: "AWS API Gateway", value: "AWS_API_GATEWAY" },
         { label: "Guardrails Service", value: "GUARDRAILS_SERVICE" },
