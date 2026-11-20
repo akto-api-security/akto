@@ -202,7 +202,7 @@ public class ThreatUtils {
     public static final String EVAL_TYPE_COVER_INDEX = "idx_ctx_status_detectedAt_evalType_cover";
     private static final List<String> EVAL_TYPE_COVER_FIELDS = Arrays.asList(
         "contextSource", "status", "detectedAt", MaliciousEventDto.EVAL_TYPE, "severity", "host", "category", "subCategory",
-        "actor", "successfulExploit", "latestApiEndpoint", "latestApiMethod");
+        "actor", "successfulExploit", "latestApiEndpoint", "latestApiMethod", "filterId");
     private static final Set<String> EVAL_TYPE_COVER_ACCOUNTS = ConcurrentHashMap.newKeySet();
 
     // Hint only when the cover index exists for the account and every filtered field is in it; the planner

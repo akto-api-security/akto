@@ -74,7 +74,8 @@ public class ThreatUtilsEvalTypeTest {
         .append("evalType", new Document("$ne", "SKILL"));
     assertTrue(ThreatUtils.filtersOnlyCoverFields(plain));
     assertTrue(ThreatUtils.filtersOnlyCoverFields(new Document("$and", Arrays.asList(plain, new Document("evalType", "CONFIG")))));
-    assertFalse(ThreatUtils.filtersOnlyCoverFields(new Document(plain).append("filterId", new Document("$in", Arrays.asList("a")))));
+    assertTrue(ThreatUtils.filtersOnlyCoverFields(new Document(plain).append("filterId", new Document("$in", Arrays.asList("a")))));
+    assertFalse(ThreatUtils.filtersOnlyCoverFields(new Document(plain).append("country", "IN")));
     assertFalse(ThreatUtils.filtersOnlyCoverFields(new Document("$and", Arrays.asList(plain, new Document("$or", Arrays.asList(new Document("host", "h")))))));
   }
 }
