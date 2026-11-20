@@ -15,9 +15,11 @@ import com.akto.dao.BrowserExtensionConfigCommonDao;
 import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.Account;
 import com.akto.merging.Cron;
 import com.akto.metrics.AllMetrics;
 import com.akto.metrics.CyborgMetricsConfig;
+import com.akto.util.AccountTask;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.EndpointRemoteCommandCleanupCron;
@@ -28,6 +30,7 @@ import com.mongodb.ConnectionString;
 import io.micrometer.core.instrument.binder.mongodb.MongoMetricsConnectionPoolListener;
 
 import java.util.Collections;
+import java.util.function.Consumer;
 
 
 public class InitializerListener implements ServletContextListener {
@@ -66,8 +69,13 @@ public class InitializerListener implements ServletContextListener {
                                 DaoInit.init(new ConnectionString(mongoURI));
                             }
                             TestingRunWebhookDao.instance.createIndicesIfAbsent();
-                            ModuleInfoDao.instance.createIndicesIfAbsent();
                             BrowserExtensionConfigCommonDao.instance.createIndicesIfAbsent();
+                            AccountTask.instance.executeTask(new Consumer<Account>() {
+                                @Override
+                                public void accept(Account account) {
+                                    ModuleInfoDao.instance.createIndicesIfAbsent();
+                                }
+                            }, "module-info-indices");
                             calledOnce = true;
                         }
                         checkMongoConnection();
