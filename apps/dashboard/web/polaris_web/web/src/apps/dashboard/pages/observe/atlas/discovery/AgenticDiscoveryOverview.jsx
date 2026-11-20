@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge, HorizontalGrid, VerticalStack } from "@shopify/polaris";
+import { CustomersMajor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import AskBar from "@/apps/dashboard/components/shared/AskBar";
 import useElementSize from "@/apps/dashboard/components/shared/useElementSize";
@@ -64,9 +65,9 @@ function AgenticDiscoveryOverview() {
         askRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, []);
 
-    // A team's employees on Devices & employees, narrowed to a tool type when that page has one for the category (skills do not).
+    // A team's employees on Devices & employees, narrowed to a tool type and the heatmap's window when that page has one for the category (skills do not).
     const openTeam = (team, category) => {
-        const toolType = PEOPLE_TOOL_TYPES.includes(category) ? `&category=${category}` : "";
+        const toolType = PEOPLE_TOOL_TYPES.includes(category) ? `&category=${category}&days=${data?.adoptionWindowDays || DEFAULT_ADOPTION_DAYS}` : "";
         openNewLayoutPage(navigate, `${DEVICES_PATH}?team=${encodeURIComponent(team)}${toolType}`);
     };
 
@@ -141,6 +142,7 @@ function AgenticDiscoveryOverview() {
                 status={statusOf("teamCategoryMatrix")}
                 matrix={teamsMatrix}
                 emptyText="Tag devices with a team to see adoption by team."
+                emptyIcon={CustomersMajor}
                 format={(value) => `${value}%`}
                 emptyCellText="0%"
                 labelWidth={110}

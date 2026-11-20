@@ -227,7 +227,8 @@ async def scan_with_model_map(
     config: dict[str, Any],
     store_fn: Any | None = None,
     schedule_fn: Any | None = None,
+    agent_host: str = "",
 ) -> dict[str, Any]:
     from model_map import ModelMapScanner
 
-    return await ModelMapScanner(scanner_name, scanner_type, text, config, store_fn, schedule_fn).run()
+    return await ModelMapScanner(scanner_name, scanner_type, text, config, store_fn, schedule_fn, agent_host).run()

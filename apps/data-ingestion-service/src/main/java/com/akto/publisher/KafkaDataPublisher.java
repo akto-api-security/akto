@@ -2,6 +2,7 @@ package com.akto.publisher;
 
 import com.akto.dto.IngestDataBatch;
 import com.akto.gateway.DataPublisher;
+import com.akto.kafka.Kafka;
 import com.akto.utils.KafkaUtils;
 import com.akto.log.LoggerMaker;
 
@@ -23,7 +24,11 @@ public class KafkaDataPublisher implements DataPublisher {
         try {
             logger.info("Publishing IngestDataBatch to Kafka - path: " + batch.getPath() + ", method: " + batch.getMethod());
             KafkaUtils.insertData(batch, false);
-            logger.info("Successfully published to Kafka");
+            // Kafka.send already logs the drop when the producer isn't ready; delivery itself is async.
+            Kafka producer = KafkaUtils.getKafkaProducer();
+            if (producer == null || producer.producerReady) {
+                logger.info("Queued for Kafka delivery");
+            }
         } catch (Exception e) {
             logger.errorAndAddToDb("Error publishing to Kafka: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
             throw e;

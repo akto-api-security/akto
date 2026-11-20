@@ -97,7 +97,7 @@ public class Gateway {
             if ("true".equalsIgnoreCase(ingestData)) {
                 long kafkaStart = System.currentTimeMillis();
                 ingestData(requestData);
-                loggerMaker.infoAndAddToDb("Kafka ingestion completed - path: {}, latencyMs: {}",
+                loggerMaker.infoAndAddToDb("Ingestion publish step completed - path: {}, latencyMs: {}",
                     requestData.get("path"), System.currentTimeMillis() - kafkaStart);
             }
 
@@ -167,6 +167,15 @@ public class Gateway {
      * apart from one that was never checked. The key names are the wire contract with mini-runtime.
      * Errors are only logged: a bad verdict must never stop traffic from being ingested.
      */
+    /**
+     * Ingests traffic whose guardrails verdict was reached outside processHttpProxy (validate/file),
+     * so its trace carries that verdict as an http-proxy call that ran guardrails would.
+     */
+    public void ingestWithVerdict(Map<String, Object> requestData, Map<String, Object> verdict) {
+        recordGuardrailVerdict(requestData, verdict);
+        ingestData(requestData);
+    }
+
     private void recordGuardrailVerdict(Map<String, Object> requestData, Map<String, Object> guardrailsResult) {
         if (requestData == null || guardrailsResult == null) return;
         try {
@@ -180,9 +189,11 @@ public class Gateway {
 
             Object metaObj = verdict.get("Metadata") != null ? verdict.get("Metadata") : verdict.get("metadata");
             if (metaObj instanceof Map) {
-                Map<?, ?> meta = (Map<?, ?>) metaObj;
-                putIfNotBlank(out, "guardrailPolicy", asString(meta.get("policyName")));
-                putIfNotBlank(out, "guardrailRule", asString(meta.get("ruleViolated")));
+                // guardrails-service writes these snake_case (types.ThreatMetadata); camelCase kept for older senders.
+                @SuppressWarnings("unchecked")
+                Map<String, Object> meta = (Map<String, Object>) metaObj;
+                putIfNotBlank(out, "guardrailPolicy", firstNonBlank(meta, "policy_name", "policyName"));
+                putIfNotBlank(out, "guardrailRule", firstNonBlank(meta, "rule_violated", "ruleViolated"));
             }
 
             requestData.put(GUARDRAIL_FIELD, objectMapper.writeValueAsString(out));
@@ -294,7 +305,8 @@ public class Gateway {
         if (dataPublisher != null) {
             try {
                 dataPublisher.publish(batch);
-                loggerMaker.infoAndAddToDb("Data ingested to Kafka - path: {}, method: {}",
+                // Delivery outcome (queued vs dropped) is logged by the DataPublisher implementation.
+                loggerMaker.infoAndAddToDb("Data handed to publisher - path: {}, method: {}",
                     requestData.get("path"), requestData.get("method"));
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error publishing data to Kafka: {}", e.getMessage());

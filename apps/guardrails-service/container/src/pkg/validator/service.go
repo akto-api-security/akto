@@ -2,7 +2,9 @@ package validator
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -774,13 +776,33 @@ func (s *Service) applicablePolicies(policies []types.Policy, valCtx *mcp.Valida
 }
 
 func (s *Service) HasApplicablePolicies(contextSource, requestHeaders, tag string) (bool, error) {
+	applicable, err := s.applicablePoliciesFor(contextSource, requestHeaders, tag)
+	return len(applicable) > 0, err
+}
+
+// ApplicablePoliciesFingerprint identifies the policies that apply to a caller, content included:
+// it changes when a policy is edited, added or removed, or stops applying. /api/validate/file keys
+// its verdict cache on it, so a policy change reaches a remembered file at once.
+func (s *Service) ApplicablePoliciesFingerprint(contextSource, requestHeaders, tag string) (string, error) {
+	applicable, err := s.applicablePoliciesFor(contextSource, requestHeaders, tag)
+	if err != nil {
+		return "", err
+	}
+	encoded, err := json.Marshal(applicable)
+	if err != nil {
+		return "", fmt.Errorf("failed to encode policies: %w", err)
+	}
+	sum := sha256.Sum256(encoded)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+// applicablePoliciesFor resolves the policies that apply to a caller from what a file request
+// carries; only McpServerName, RequestHeaders and Tag are read by the filters.
+func (s *Service) applicablePoliciesFor(contextSource, requestHeaders, tag string) ([]types.Policy, error) {
 	policies, _, compiledRules, _, err := s.getCachedPolicies(contextSource)
 	if err != nil {
-		return false, fmt.Errorf("failed to load policies: %w", err)
+		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
-
-	// Only McpServerName, RequestHeaders and Tag are read by the filters; the rest of the
-	// context is irrelevant to which policies apply.
 	valCtx := s.validationContextFromParams(&models.ValidateRequestParams{
 		ContextSource:  contextSource,
 		RequestHeaders: requestHeaders,
@@ -788,13 +810,13 @@ func (s *Service) HasApplicablePolicies(contextSource, requestHeaders, tag strin
 	}, "", "", "", "HasApplicablePolicies", nil, compiledRules)
 
 	applicable := s.applicablePolicies(policies, valCtx)
-	s.logger.Debug("HasApplicablePolicies - resolved",
+	s.logger.Debug("applicablePoliciesFor - resolved",
 		zap.String("contextSource", contextSource),
 		zap.String("mcpServerName", valCtx.McpServerName),
 		zap.Int("candidateCount", len(policies)),
 		zap.Int("applicableCount", len(applicable)),
 		zap.Strings("applicablePolicies", policyNames(applicable)))
-	return len(applicable) > 0, nil
+	return applicable, nil
 }
 
 // isServerApproved reports whether mcpServerName has a currently-valid approval entry.
@@ -2604,6 +2626,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        processResult.Metadata,
 		Behaviour:       processResult.Behaviour,
+		// The allow failed open on a check that didn't run; /api/validate/file must not cache it.
+		Incomplete: processResult.Incomplete,
 	}
 
 	s.logger.Info("ValidateRequest - completed",

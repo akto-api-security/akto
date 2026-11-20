@@ -154,6 +154,20 @@ export default {
             data: {testingIssuesIdList, partId, workItemType, aktoDashboardHost}
         })
     },
+    createLinearTickets(testingIssuesIdList, teamId, aktoDashboardHost) {
+        return request({
+            url: 'api/createLinearTickets',
+            method: 'post',
+            data: {testingIssuesIdList, teamId, aktoDashboardHost}
+        })
+    },
+    createPortIOTickets(testingIssuesIdList, aktoDashboardHost) {
+        return request({
+            url: 'api/createPortIOTickets',
+            method: 'post',
+            data: {testingIssuesIdList, aktoDashboardHost}
+        })
+    },
     createWizFindings(testingIssuesIdList) {
         return request({
             url: 'api/createWizFindings',

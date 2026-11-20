@@ -32,5 +32,7 @@ COPY docker/set-jvm-opts.sh /docker-entrypoint.d/00-set-jvm-opts.sh
 RUN chmod +x /docker-entrypoint.d/00-set-jvm-opts.sh \
     && chown -R jetty:jetty /var/lib/jetty/webapps /var/lib/jetty/start.d
 
+ENV JDK_JAVA_OPTIONS="-XX:-UseBASE64Intrinsics"
+
 USER jetty
 EXPOSE 8080

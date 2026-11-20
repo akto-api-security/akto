@@ -10,6 +10,10 @@ Touches three repos that must stay in sync:
 - `akto-mini-2/akto` (cyborg = the database-abstractor that mini-testing calls)
 - `akto-mini-services/akto` (mini-testing)
 
+Ask Akto writing and validating scripts is documented in `validation/CLAUDE.md`. Unsaved scripts being validated
+are `TestScriptDraft`s in their own TTL collection (`test_script_drafts`), never in `test_scripts`. The provider chain is
+Library → Drafts → Legacy.
+
 ## Id semantics (Java, JSON and JS must agree)
 `TestingRunConfig.preRequestScriptId` / `postRequestScriptId` (String). Interpreted ONLY by
 `ScriptSelection.from(rawId, type)`; no caller re-implements the checks.
@@ -53,7 +57,7 @@ flowchart LR
   results; never caches exceptions.
 - `ScriptSelection` (value object): DEFAULT / NONE / BY_ID. Pure data in libs/dao; the dispatch on
   the kind lives in `TestScriptResolver` (libs/dao cannot depend on the providers in libs/utils).
-- `TestScriptProviders` (Factory): per-runtime wiring. Main: Caching(Fallback(Library, Legacy)).
+- `TestScriptProviders` (Factory): per-runtime wiring. Main: Caching(Fallback(Library, Fallback(Drafts, Legacy))) (drafts: `validation/CLAUDE.md`).
   Cyborg: Fallback(Library, Legacy). Mini-testing: Caching(Remote).
 - `TestScriptService` + `TestScriptValidator` (pure) + `TestScriptException` (checked, user-facing
   message -> 422 action error): shared by `ScriptAction` and `StartTestAction`.

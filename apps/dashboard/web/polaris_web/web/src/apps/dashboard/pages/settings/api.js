@@ -869,6 +869,102 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchLinearIntegration() {
+        return request({
+            url: '/api/fetchLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchLinearTeams(apiToken) {
+        return request({
+            url: '/api/fetchLinearTeams',
+            method: 'post',
+            data: { apiToken }
+        })
+    },
+
+    createLinearTeam(apiToken, teamName, teamKey) {
+        return request({
+            url: '/api/createLinearTeam',
+            method: 'post',
+            data: { apiToken, teamName, teamKey }
+        })
+    },
+
+    addLinearIntegration(apiToken) {
+        return request({
+            url: '/api/addLinearIntegration',
+            method: 'post',
+            data: { apiToken }
+        })
+    },
+
+    saveLinearTeams(teamMappings) {
+        return request({
+            url: '/api/saveLinearTeams',
+            method: 'post',
+            data: { teamMappings }
+        })
+    },
+
+    saveLinearBiDirectionalSync(biDirectionalSyncEnabled) {
+        return request({
+            url: '/api/saveLinearBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled }
+        })
+    },
+
+    removeLinearIntegration() {
+        return request({
+            url: '/api/removeLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchPortIOIntegration() {
+        return request({
+            url: '/api/fetchPortIOIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addPortIOIntegration(clientId, clientSecret, workflowId) {
+        return request({
+            url: '/api/addPortIOIntegration',
+            method: 'post',
+            data: { clientId, clientSecret, workflowId }
+        })
+    },
+
+    savePortIOSeverityMapping(severityToPriority) {
+        return request({
+            url: '/api/savePortIOSeverityMapping',
+            method: 'post',
+            data: { severityToPriority }
+        })
+    },
+
+    savePortIOBiDirectionalSync(biDirectionalSyncEnabled, updateWorkflowId) {
+        return request({
+            url: '/api/savePortIOBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled, updateWorkflowId }
+        })
+    },
+
+    removePortIOIntegration() {
+        return request({
+            url: '/api/removePortIOIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     removeInvitation(email) {
         return request({
             url: '/api/removeInvitation',
@@ -1233,6 +1329,27 @@ const settingRequests = {
             url: '/api/rebootModules',
             method: 'post',
             data: {moduleIds, deleteTopicAndReboot}
+        })
+    },
+    fetchAuthTokens() {
+        return request({
+            url: '/api/fetchAuthTokens',
+            method: 'post',
+            data: {}
+        })
+    },
+    revokeAuthToken(tokenId, reason) {
+        return request({
+            url: '/api/revokeAuthToken',
+            method: 'post',
+            data: {tokenId, reason}
+        })
+    },
+    revokeAllAuthTokens(reason) {
+        return request({
+            url: '/api/revokeAllAuthTokens',
+            method: 'post',
+            data: {reason}
         })
     },
     updateModuleEnvAndReboot(moduleId, moduleName, envData) {

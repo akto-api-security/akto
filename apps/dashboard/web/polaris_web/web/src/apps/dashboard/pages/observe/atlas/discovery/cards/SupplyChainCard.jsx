@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CustomersMajor } from "@shopify/polaris-icons";
 import useElementSize from "@/apps/dashboard/components/shared/useElementSize";
 import AssetTopologyGraph from "@/apps/dashboard/pages/observe/agentic/AssetTopologyGraph";
 import { buildColumnGraph, RISKY_FOCUS } from "@/apps/dashboard/pages/observe/agentic/columnGraph";
@@ -34,7 +35,9 @@ export default function SupplyChainCard({ chain, status }) {
             legend={<FilterLegend items={CHAIN_LEGEND} selected={legendPick} onSelect={setLegendPick} />}
             status={status}
             empty={empty}
-            emptyText="No tool connections discovered yet."
+            emptyIcon={CustomersMajor}
+            emptyTone="subdued"
+            emptyText="Tag devices with a team to see the AI supply chain."
         >
             <div ref={frameRef}>
                 {graph && (

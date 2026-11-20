@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors AuthTokensDao.createIndicesIfAbsent and the tokenId index in ModuleInfoDao.createIndicesIfAbsent
+        for the tracked authentication tokens (Settings > Module Info > Authentication tokens).
+
+        - auth_tokens holds one record per generated or discovered token: name, creator, expiry, status
+          (ACTIVE or REVOKED) and last use. The record id is the sha256 of the token's signature; the token
+          itself is never stored.
+        - status_-1 serves the revoked-id lookup that cyborg runs to reject revoked tokens.
+        - deleteAt is the token's expiry plus 30 days and is unset for tokens that never expire; the TTL index
+          deletes the record then (expireAfterSeconds 0 = expire at the stored date). A record is kept until
+          its token has expired, or deleting a revoked one would un-revoke a token that still verifies.
+        - module_info.tokenId is stamped by cyborg on every heartbeat; the admin token list looks up the
+          modules of a token by it. Sparse because most rows have none.
+
+        Index names and options match the DAOs', so these are no-ops where a DAO already built them. Older
+        builds never read auth_tokens or tokenId, so rolling back only drops data nobody can reach.
+    -->
+
+    <changeSet id="043-account-create-auth-tokens" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="auth_tokens"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="auth_tokens"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="auth_tokens"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="043-account-auth-tokens-status-index" author="akto">
+        <mongodb:createIndex collectionName="auth_tokens">
+            <mongodb:keys>{ "status": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "status_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="auth_tokens">
+                <mongodb:keys>{ "status": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="043-account-auth-tokens-delete-at-ttl-index" author="akto">
+        <mongodb:createIndex collectionName="auth_tokens">
+            <mongodb:keys>{ "deleteAt": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "deleteAt_ttl", "expireAfterSeconds": 0 }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="auth_tokens">
+                <mongodb:keys>{ "deleteAt": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="043-account-module-info-token-id-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="module_info"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="module_info">
+            <mongodb:keys>{ "tokenId": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "tokenId_1", "sparse": true }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="module_info">
+                <mongodb:keys>{ "tokenId": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

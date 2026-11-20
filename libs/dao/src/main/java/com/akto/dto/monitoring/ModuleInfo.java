@@ -36,10 +36,28 @@ public class ModuleInfo {
     private boolean deleteTopicAndReboot;
     public static final String DELETE_TOPIC_AND_REBOOT = "deleteTopicAndReboot";
 
+    // id of the auth token the module heartbeats with, stamped by cyborg from the verified token
+    public static final String TOKEN_ID = "tokenId";
+    @Getter @Setter
+    private String tokenId;
+
     public static final String MINI_RUNTIME_NAME = "miniRuntimeName";
 
     @Getter @Setter
     private String miniRuntimeName;
+
+    // additionalData fields that name a device's owner, in priority order.
+    private static final String[] OWNER_USERNAME_FIELDS = {"username", "userName", "user", "email"};
+
+    /** The device owner's username from additionalData: the first non-empty owner field (may be "-"). Atlas Overview and Devices & employees both read owners this way. */
+    public static String ownerUsernameOf(Map<String, Object> additionalData) {
+        if (additionalData == null) return null;
+        for (String field : OWNER_USERNAME_FIELDS) {
+            Object value = additionalData.get(field);
+            if (value instanceof String && !((String) value).isEmpty()) return (String) value;
+        }
+        return null;
+    }
 
     public ModuleType getModuleType() {
         return moduleType;

@@ -366,6 +366,11 @@ export default {
             hasInlineLlm: resp?.assetHasInlineLlm || false,
             inlineToolNames: resp?.assetInlineToolNames || [],
             mcpComponentCount: resp?.assetMcpComponentCount || 0,
+            // Asset-level risk badge next to "AI Agent - Cursor" on the legacy devices page.
+            ...(resp?.assetRiskScore != null ? {
+                riskScore: resp.assetRiskScore,
+                riskScoreFactors: resp?.assetRiskScoreFactors || [],
+            } : {}),
         }
     },
     // Batch form of fetchAgenticAssetDetail, scoped to just mcpServers/mcpServerCollectionIds/
@@ -1428,15 +1433,12 @@ export default {
         })
     },
 
-    async getApiSequences(apiCollectionId) {
-        const resp = await request({
-            url: '/api/getApiSequences',
+    async fetchSessionSteps(apiCollectionId, path) {
+        return await request({
+            url: '/api/fetchSessionSteps',
             method: 'post',
-            data: {
-                apiCollectionId: apiCollectionId
-            }
+            data: { apiCollectionId, path }
         })
-        return resp
     },
 
     async fetchMcpToolsApiCalls(apiCollectionId) {

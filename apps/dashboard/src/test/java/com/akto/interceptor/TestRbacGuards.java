@@ -51,12 +51,12 @@ public class TestRbacGuards extends MongoBasedTest {
             "auth/login", "dashboard/accessToken", "api/me", "api/saveSubscription", "validate", "api/createNewTeam",
             "signup-email", "signup-google", "signup-github", "authorization-code/callback", "okta-initiate-login",
             "signup-azure-saml", "trigger-saml-sso", "callback-google-saml", "callback-jumpcloud-saml", "middleware/config",
-            "api/deleteApisBasedOnHeader", "api/logout", "auth0-logout", "api/fetchAccountConfig", "tools/publicApi",
-            "tools/fetchAllSubCategories", "api/fetchVulnerableRequests", "tools/fetchVulnerableRequests", "tools/fetchSampleData",
+            "api/deleteApisBasedOnHeader", "api/logout", "auth0-logout", "api/fetchAccountConfig",
+            "api/fetchVulnerableRequests",
             "api/fetchParamsStatus", "api/fetchRemediationInfo", "api/fetchActiveTestRunsStatus", "copilot/oauth/callback",
-            "api/fetchRuntimeInstances", "api/fetchRuntimeMetrics", "tools/runTestForGivenTemplate",
-            "api/fetchTestingRunPlaygroundStatus", "tools/createSampleDataJson", "callback", "tools/addLLmData",
-            "tools/convertSamleDataToBurpRequest", "tools/convertSampleDataToCurl", "api/downloadReportPDF",
+            "api/fetchRuntimeInstances", "api/fetchRuntimeMetrics", 
+            "api/fetchTestingRunPlaygroundStatus", "callback",
+            "api/downloadReportPDF",
             "auth/sendPasswordResetLink", "auth/resetPassword", "api/findSvcToSvcGraphEdges", "api/findSvcToSvcGraphNodes",
             "api/downloadSamplePdf", "api/wrapped",
             // MCP OAuth: public protocol endpoints, and consent APIs that check the user's role per product inside the action
@@ -360,13 +360,20 @@ public class TestRbacGuards extends MongoBasedTest {
         Set<Role> teamManagers = new HashSet<>(Arrays.asList(Role.ADMIN, Role.MEMBER, Role.THREAT_ENGINEER, Role.THREAT_VIEWER));
         Set<Role> threatSettings = new HashSet<>(Arrays.asList(Role.ADMIN, Role.THREAT_ENGINEER));
         Set<Role> integrationWriters = new HashSet<>(Arrays.asList(Role.ADMIN, Role.DEVELOPER));
+        // creating a token is a USER_ACTIONS write, which every role has, so every role except NO_ACCESS (Security Engineer and Guest included)
+        Set<Role> tokenCreators = new HashSet<>(Arrays.asList(Role.ADMIN, Role.MEMBER, Role.DEVELOPER, Role.GUEST, Role.THREAT_ENGINEER, Role.THREAT_VIEWER));
 
         Map<String, Set<Role>> expected = new HashMap<>();
         for (String action : Arrays.asList("api/createCustomRole", "api/updateCustomRole", "api/deleteCustomRole",
                 "api/saveSamlGroupRoleMapping", "api/removeUser", "api/makeAdmin", "api/resetUserPassword",
-                "api/updateUserCollections", "api/fetchApiAuditLogsFromDb")) {
+                "api/updateUserCollections", "api/fetchApiAuditLogsFromDb",
+                // the Tokens tab on Module Info: only an admin can list or revoke tokens
+                "api/fetchAuthTokens", "api/revokeAuthToken", "api/revokeAllAuthTokens")) {
             expected.put(action, adminOnly);
         }
+        expected.put("api/createAuthToken", tokenCreators);
+        // a READ check would skip the audit-log entry, which only READ_WRITE actions get
+        assertEquals("READ_WRITE", actions.get("api/createAuthToken").get("accessType"));
         // every role can call it (as before); who can change whom is decided inside the action
         expected.put("api/updateUserScopeRoleMapping", new HashSet<>(Arrays.asList(Role.ADMIN, Role.MEMBER, Role.DEVELOPER, Role.GUEST, Role.THREAT_ENGINEER, Role.THREAT_VIEWER)));
         expected.put("api/inviteUsers", teamManagers);

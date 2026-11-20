@@ -1,6 +1,7 @@
 import { flags } from "../components/flags/index.mjs";
 import SessionStore from "../../../../main/SessionStore";
 import PersistStore from "../../../../main/PersistStore";
+import LocalStore from "../../../../main/LocalStorageStore";
 import { getDashboardCategory, categoryToShortName, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import values from "@/util/values";
 import GUARDRAIL_RULE_DEFINITIONS from "../constants/guardrailRuleDefinitions";
@@ -15,6 +16,16 @@ const getCategoryParam = () => categoryToShortName[getDashboardCategory()];
 // both destination pages resolve ?range= before the timestamp params.
 const allTimeRange = values.ranges.find((r) => r.alias === "allTime");
 const allTimeStartTs = allTimeRange ? Math.floor(allTimeRange.period.since.getTime() / 1000) : 1;
+
+export const ACTIVITY_TAB = {
+    ACTIVE: "ACTIVE",
+    UNDER_REVIEW: "UNDER_REVIEW",
+    IGNORED: "IGNORED",
+    SKILLS_EVALUATIONS: "skills_evaluations",
+    MISCONFIGURED_SETTINGS: "misconfigured_settings",
+};
+export const CRITICAL_SEVERITY = "CRITICAL";
+export const SKILL_URL_PREFIX = "/skills/";
 
 const setTimeRangeParams = (params, filters, startKey, endKey) => {
     if (!filters.startTimestamp || !filters.endTimestamp) return;
@@ -188,7 +199,7 @@ const activityLink = (path, filters) => {
     if (filters.severity) filterParts.push(`severity__${filters.severity}`);
     if (filterParts.length > 0) params.set("filters", filterParts.join("&"));
     const eventStatus = filters.eventStatus
-        || (isMisconfigurationCategory(resolvedFilterId) ? "misconfigured_settings" : null);
+        || (isMisconfigurationCategory(resolvedFilterId) ? ACTIVITY_TAB.MISCONFIGURED_SETTINGS : null);
     if (eventStatus) params.set("eventStatus", eventStatus);
     setTimeRangeParams(params, filters, "startTimestamp", "endTimestamp");
     const categoryParam = getCategoryParam();
@@ -232,6 +243,30 @@ export const goToGuardrailActivity = (navigate, filters = {}) => {
         setFiltersMap({ ...filtersMap, [`${GUARDRAIL_ACTIVITY_PATH}/`]: { filters: saved, sort: [] } });
     }
     navigate(link);
+};
+
+// A date range from ?since= and ?until= (epoch seconds), or null when the link has none.
+export const dateRangeFromSearchParams = (searchParams) => {
+    const sinceTs = parseInt(searchParams.get("since"), 10);
+    const untilTs = parseInt(searchParams.get("until"), 10);
+    if (Number.isNaN(sinceTs) || Number.isNaN(untilTs)) return null;
+    return { title: "Custom", alias: "custom", period: { since: new Date(sinceTs * 1000), until: new Date(untilTs * 1000) } };
+};
+
+// Same-tab link into Guardrail Violations: policies and agent hosts as comma lists, a severity, and the date range.
+export const goToGuardrailViolations = (navigate, filters = {}) => {
+    // The page sends people back to the activity page unless the new layout is on.
+    LocalStore.getState().setGuardrailViolationsNewLayout(true);
+    const params = new URLSearchParams();
+    if (filters.latestAttack) params.set("policy", filters.latestAttack.split(",").map(subCategoryToFilterId).join(","));
+    if (filters.host) params.set("host", filters.host);
+    if (filters.severity) params.set("severity", filters.severity);
+    if (filters.startTimestamp && filters.endTimestamp) {
+        params.set("since", String(filters.startTimestamp));
+        params.set("until", String(filters.endTimestamp));
+    }
+    const query = params.toString();
+    navigate(`/dashboard/guardrails/violations${query ? `?${query}` : ""}`);
 };
 
 // The Agentic Guardrail Activity page (charts and table); its saved filters live under this path.

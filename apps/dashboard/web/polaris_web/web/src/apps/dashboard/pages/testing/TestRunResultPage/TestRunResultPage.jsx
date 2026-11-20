@@ -70,6 +70,7 @@ function TestRunResultPage(props) {
   const [azureBoardsWorkItemUrl, setAzureBoardsWorkItemUrl] = useState({});
   const [serviceNowTicketUrl, setServiceNowTicketUrl] = useState({});
   const [devrevWorkUrl, setDevRevWorkUrl] = useState({});
+  const [linearIssueUrl, setLinearIssueUrl] = useState("");
   const [wizFindingUrl, setWizFindingUrl] = useState("");
   const subCategoryMap = LocalStore(state => state.subCategoryMap);
   const params = useParams();
@@ -477,6 +478,36 @@ function TestRunResultPage(props) {
     })
   }
 
+  async function createPortIOTicket(issueId) {
+    setToast(true, false, "Creating Linear Ticket through Port.io")
+
+    await issuesApi.createPortIOTickets([issueId], window.location.origin).then(async (res) => {
+      await fetchData();
+      if (res?.errorMessage) {
+        setToast(true, false, res.errorMessage)
+      } else {
+        setToast(true, false, "Linear Ticket Created through Port.io, scroll down to view")
+      }
+    }).catch((err) => {
+      setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating Linear ticket through Port.io")
+    })
+  }
+
+  async function createLinearTicket(issueId, teamId) {
+    setToast(true, false, "Creating Linear Ticket")
+
+    await issuesApi.createLinearTickets([issueId], teamId, window.location.origin).then(async (res) => {
+      await fetchData();
+      if (res?.errorMessage) {
+        setToast(true, false, res.errorMessage)
+      } else {
+        setToast(true, false, "Linear Ticket Created, scroll down to view")
+      }
+    }).catch((err) => {
+      setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating Linear ticket")
+    })
+  }
+
   async function setData(testingRunResult, runIssues) {
 
     let tmp = testSubCategoryMap ? testSubCategoryMap : subCategoryMap
@@ -500,12 +531,14 @@ function TestRunResultPage(props) {
       let azureBoardsWorkItemUrlCopy = runIssues.azureBoardsWorkItemUrl || "";
       let serviceNowTicketUrlCopy = runIssues.servicenowIssueUrl || "";
       let devrevWorkUrlCopy = runIssues.devrevWorkUrl || "";
+      let linearIssueUrlCopy = runIssues.linearIssueUrl || "";
       let wizFindingUrlCopy = runIssues.wizFindingUrl || "";
       const moreInfoSections = transform.getInfoSectionsHeaders()
       setJiraIssueUrl(jiraIssueCopy)
       setAzureBoardsWorkItemUrl(azureBoardsWorkItemUrlCopy)
       setServiceNowTicketUrl(serviceNowTicketUrlCopy)
       setDevRevWorkUrl(devrevWorkUrlCopy)
+      setLinearIssueUrl(linearIssueUrlCopy)
       setWizFindingUrl(wizFindingUrlCopy)
       setInfoState(transform.fillMoreInformation(tmp[runIssues?.id?.testSubCategory], moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
       setRemediation(tmp[runIssues?.id?.testSubCategory]?.remediation)
@@ -542,6 +575,8 @@ function TestRunResultPage(props) {
           infoState={infoState}
           createJiraTicket={createJiraTicket}
           createDevRevTicket={createDevRevTicket}
+          createLinearTicket={createLinearTicket}
+          createPortIOTicket={createPortIOTicket}
           jiraIssueUrl={jiraIssueUrl}
           hexId={hexId}
           source={props?.source}
@@ -551,6 +586,7 @@ function TestRunResultPage(props) {
           azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
           serviceNowTicketUrl={serviceNowTicketUrl}
           devrevWorkUrl={devrevWorkUrl}
+          linearIssueUrl={linearIssueUrl}
           wizFindingUrl={wizFindingUrl}
           conversations={conversations}
           conversationRemediationText={conversationRemediationText}

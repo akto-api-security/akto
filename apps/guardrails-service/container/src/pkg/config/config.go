@@ -11,7 +11,6 @@ type Config struct {
 
 	DatabaseAbstractorURL   string
 	DatabaseAbstractorToken string
-	AgentGuardEngineURL     string
 	ThreatBackendURL        string
 	ThreatBackendToken      string
 	LogLevel                string
@@ -143,20 +142,31 @@ type FileConfig struct {
 	// set FILE_VALIDATE_BLOCK_ON_REDACTION=false to go back to allowing them.
 	BlockOnRedaction bool
 
+	// CacheTTLSec is how long an inspected, allowed file is remembered in Redis (REDIS_URL), keyed
+	// on its bytes and the policies that apply, so the copies an agent re-sends every turn are not
+	// inspected again. 0 turns the cache off; without REDIS_URL there is none.
+	CacheTTLSec int
+
 	Media MediaConfig
 }
 
 // MediaConfig holds configuration for external media processing APIs.
 // Vision and Speech have independent key/endpoint pairs for separate Azure resources.
+// Provider "agent_guard" (the default when MEDIA_PROVIDER is unset) sends images to
+// agent-guard's /ocr - the same agent-guard as the text scans (SCANNER_API_URL) - and
+// needs none of the Azure fields.
 type MediaConfig struct {
-	Provider      string // "azure" or "" (disabled)
+	Provider      string // "agent_guard" (default), "azure" or "none" (disabled)
 	VisionAPIKey  string
 	VisionBaseURL string
 	SpeechAPIKey  string
 	SpeechBaseURL string
 	MaxImageBytes int
-	MaxAudioBytes int
-	MaxVideoBytes int
+	// MaxDocumentImages caps how many distinct images embedded in one document (PDF, Office) are
+	// OCR'd; a document with more is validated on those and allowed as uninspected. 0 reads none.
+	MaxDocumentImages int
+	MaxAudioBytes     int
+	MaxVideoBytes     int
 }
 
 // defaultChunkSize keeps one chunk small enough that its LLM adjudication finishes well
@@ -194,7 +204,6 @@ func LoadConfig() *Config {
 		ServerPort:                       getEnvAsInt("SERVER_PORT", 8080),
 		DatabaseAbstractorURL:            getEnv("DATABASE_ABSTRACTOR_SERVICE_URL", "https://ultron.akto.io"),
 		DatabaseAbstractorToken:          dbAbstractorToken,
-		AgentGuardEngineURL:              getEnv("AGENT_GUARD_ENGINE_URL", "https://akto-agent-guard-engine.billing-53a.workers.dev"),
 		ThreatBackendURL:                 getEnv("THREAT_BACKEND_URL", "https://tbs.akto.io"),
 		ThreatBackendToken:               getEnv("THREAT_BACKEND_TOKEN", dbAbstractorToken),
 		LogLevel:                         getEnv("LOG_LEVEL", "info"),
@@ -237,7 +246,9 @@ func LoadConfig() *Config {
 			Agents:  getEnvAsList("GUARDRAILS_BROWSER_ATTACHMENT_AGENTS", defaultBrowserAttachmentAgents),
 		},
 		File: FileConfig{
-			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
+			// On unless FILE_VALIDATION_ENABLED=false: a file nobody inspects is a gap, and a caller with no
+			// applicable policy is allowed before any content is read.
+			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", true),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
 			MaxTextFileBytes: maxTextFileBytes,
 			ChunkSize:        chunkSize,
@@ -247,15 +258,17 @@ func LoadConfig() *Config {
 			MaxConcurrent:    getEnvAsInt("FILE_VALIDATE_MAX_CONCURRENT", 5),
 			URLTimeoutSec:    getEnvAsInt("FILE_VALIDATE_URL_TIMEOUT_SEC", 30),
 			BlockOnRedaction: getEnvAsBool("FILE_VALIDATE_BLOCK_ON_REDACTION", true),
+			CacheTTLSec:      getEnvAsInt("FILE_VALIDATE_CACHE_TTL_SEC", 3600),
 			Media: MediaConfig{
-				Provider:      getEnv("MEDIA_PROVIDER", ""),
-				VisionAPIKey:  getEnv("MEDIA_VISION_API_KEY", ""),
-				VisionBaseURL: getEnv("MEDIA_VISION_BASE_URL", ""),
-				SpeechAPIKey:  getEnv("MEDIA_SPEECH_API_KEY", ""),
-				SpeechBaseURL: getEnv("MEDIA_SPEECH_BASE_URL", ""),
-				MaxImageBytes: getEnvAsInt("MEDIA_MAX_IMAGE_BYTES", 2*1024*1024),
-				MaxAudioBytes: getEnvAsInt("MEDIA_MAX_AUDIO_BYTES", 10*1024*1024),
-				MaxVideoBytes: getEnvAsInt("MEDIA_MAX_VIDEO_BYTES", 25*1024*1024),
+				Provider:          getEnv("MEDIA_PROVIDER", "agent_guard"),
+				VisionAPIKey:      getEnv("MEDIA_VISION_API_KEY", ""),
+				VisionBaseURL:     getEnv("MEDIA_VISION_BASE_URL", ""),
+				SpeechAPIKey:      getEnv("MEDIA_SPEECH_API_KEY", ""),
+				SpeechBaseURL:     getEnv("MEDIA_SPEECH_BASE_URL", ""),
+				MaxImageBytes:     getEnvAsInt("MEDIA_MAX_IMAGE_BYTES", 2*1024*1024),
+				MaxDocumentImages: getEnvAsInt("MEDIA_MAX_DOCUMENT_IMAGES", 10),
+				MaxAudioBytes:     getEnvAsInt("MEDIA_MAX_AUDIO_BYTES", 10*1024*1024),
+				MaxVideoBytes:     getEnvAsInt("MEDIA_MAX_VIDEO_BYTES", 25*1024*1024),
 			},
 		},
 	}

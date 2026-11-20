@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Box, Button, Divider, Form, HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { Box, Button, Divider, Form, HorizontalStack, LegacyCard, Scrollable, Text, TextField, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import Pressable from "../../pages/dashboard/ask/components/Pressable";
 import "../../pages/dashboard/ask/askOverlay.css";
@@ -22,7 +22,12 @@ import { buildAgenticObserveChatMetadata } from "../../pages/observe/agentic/age
  *
  * chatData adds context to every question, e.g. the asset an asset panel is showing
  * (buildAgenticObserveChatMetadata's data). Remount with a new key to start a fresh chat.
+ * suggestionsLabel is the word before the suggestion chips ("Try" by default); an empty string leaves it out.
+ * maxResultsHeight (e.g. "420px") keeps the answers in a scrolling area of at most that height, so a long
+ * conversation does not keep growing the page. It follows the newest message. Unset, the answers just grow.
  */
+const SCROLL_TO_END = 1e7;
+
 function AskBar({
     label = "Ask Akto",
     placeholder,
@@ -31,6 +36,8 @@ function AskBar({
     chatData,
     conversationType = "AGENTIC_OBSERVE",
     request,
+    maxResultsHeight,
+    suggestionsLabel = "Try",
 }) {
     const [query, setQuery] = useState("");
     const [messages, setMessages] = useState([]);
@@ -38,6 +45,7 @@ function AskBar({
     const [loading, setLoading] = useState(false);
     const [focused, setFocused] = useState(false);
     const latestRequest = useRef(0);
+    const resultsRef = useRef(null);
 
     const submit = useCallback(async (text, clearInput = true) => {
         const question = (text ?? query).trim();
@@ -77,12 +85,27 @@ function AskBar({
         submit(request.question, false);
     }, [request?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    useEffect(() => {
+        if (maxResultsHeight) resultsRef.current?.scrollTo(SCROLL_TO_END);
+    }, [messages, loading, maxResultsHeight]);
+
     const clear = useCallback(() => {
         latestRequest.current += 1;
         setMessages([]);
         setConversationId(null);
         setLoading(false);
     }, []);
+
+    const conversation = (
+        <VerticalStack gap="3">
+            {messages.map((msg) => (
+                msg.role === "user"
+                    ? <AgenticUserMessage key={msg.id} content={msg.message} />
+                    : <AgenticStreamingResponse key={msg.id} content={msg.message} />
+            ))}
+            {loading && <AgenticThinkingBox />}
+        </VerticalStack>
+    );
 
     return (
         <LegacyCard>
@@ -139,7 +162,7 @@ function AskBar({
                     </Form>
                     {suggestions.length > 0 && (
                         <HorizontalStack gap="2" blockAlign="center">
-                            <Text variant="bodySm" color="subdued">Try</Text>
+                            {suggestionsLabel && <Text variant="bodySm" color="subdued">{suggestionsLabel}</Text>}
                             {suggestions.map((suggestion) => (
                                 <Pressable
                                     key={suggestion}
@@ -164,12 +187,9 @@ function AskBar({
                     {messages.length > 0 && (
                         <VerticalStack gap="3">
                             <Divider />
-                            {messages.map((msg) => (
-                                msg.role === "user"
-                                    ? <AgenticUserMessage key={msg.id} content={msg.message} />
-                                    : <AgenticStreamingResponse key={msg.id} content={msg.message} />
-                            ))}
-                            {loading && <AgenticThinkingBox />}
+                            {maxResultsHeight
+                                ? <Scrollable ref={resultsRef} shadow style={{ maxHeight: maxResultsHeight }}>{conversation}</Scrollable>
+                                : conversation}
                             <HorizontalStack align="end">
                                 <Button plain onClick={clear}>Clear conversation</Button>
                             </HorizontalStack>

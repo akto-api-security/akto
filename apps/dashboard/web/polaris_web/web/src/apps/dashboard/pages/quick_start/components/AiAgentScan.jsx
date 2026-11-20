@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Checkbox, Divider, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Box, Button, ButtonGroup, Checkbox, Divider, HorizontalStack, Select, Text, TextField, VerticalStack } from '@shopify/polaris';
 import { DeleteMinor } from '@shopify/polaris-icons';
 import { useState } from 'react'
 import api from '../api';
@@ -7,6 +7,12 @@ import TestRoleDropdown from '../../../components/shared/TestRoleDropdown';
 import MiniTestingSelector from './MiniTestingSelector';
 
 const MAX_HEADERS = 5
+const AGENT_TYPES = [{ label: 'HTTP', value: 'HTTP' }, { label: 'WebSocket', value: 'WEBSOCKET' }]
+const METHODS = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'].map(m => ({ label: m, value: m }))
+// a WebSocket handshake is an http(s) request (e.g. copied from Burp), so http(s) maps to ws(s) on the same endpoint
+const toWebSocketUrl = (value) => (value || '').trim().replace(/^http(s?):\/\//i, 'ws$1://')
+const IMPORT_POLL_INTERVAL_MS = 2000
+const IMPORT_MAX_POLLS = 300
 
 const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.", defaultRequestBody = { "model": "llama3.2", "prompt": "Why is the sky blue?" }, docsLink = "https://docs.akto.io/ai-security" }) => {
     const [loading, setLoading] = useState(false)
@@ -23,6 +29,13 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
     const [responseHeaders, setResponseHeaders] = useState([])
     const [useMiniTesting, setUseMiniTesting] = useState(false)
     const [miniTestingName, setMiniTestingName] = useState('')
+    const [agentType, setAgentType] = useState('HTTP')
+    const [method, setMethod] = useState('POST')
+
+    const isWebSocket = agentType === 'WEBSOCKET'
+    const hasEvent = isWebSocket && useCustomRequestBody && customRequestBody.trim().length > 0
+    // a WebSocket event can be sent to the connection imported earlier under the same agent name
+    const canImport = (url && url.length > 0) || (hasEvent && collectionName.trim().length > 0)
 
     function updateHeaderRow(setList, index, field, val) {
         setList(prev => {
@@ -52,15 +65,45 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
         return Object.keys(obj).length > 0 ? obj : null
     }
 
+    const waitForImport = async (uploadId) => {
+        for (let i = 0; i < IMPORT_MAX_POLLS; i++) {
+            await new Promise(resolve => setTimeout(resolve, IMPORT_POLL_INTERVAL_MS))
+            const res = await api.fetchAgentImportStatus(uploadId)
+            if (res.uploadStatus === 'SUCCEEDED') {
+                return true
+            }
+            if (res.uploadStatus === 'FAILED') {
+                func.setToast(true, true, res.errorMessage || "AI agent import failed.")
+                return false
+            }
+        }
+        func.setToast(true, true, "AI agent import is taking longer than expected. Please check again in a while.")
+        return false
+    }
+
     const handleImport = async () => {
-        if (!url || url.length === 0) {
+        if (!canImport) {
             func.setToast(true, true, "Please enter a valid URL.")
             return
         }
+        const urlToSend = isWebSocket && url ? toWebSocketUrl(url) : url
+        if (isWebSocket && !useCustomResponse && !(useMiniTesting && miniTestingName)) {
+            func.setToast(true, true, "WebSocket agents are reached via a mini-testing module, select one.")
+            return
+        }
 
-        const requestBodyToSend = useCustomRequestBody 
-            ? customRequestBody 
-            : JSON.stringify(defaultRequestBody)
+        // WebSocket: the body is the event, and none means import only the connection; GET has no body,
+        // only POST falls back to the default body
+        let requestBodyToSend
+        if (isWebSocket) {
+            requestBodyToSend = hasEvent ? customRequestBody : null
+        } else if (method === 'GET') {
+            requestBodyToSend = null
+        } else if (method !== 'POST') {
+            requestBodyToSend = useCustomRequestBody ? customRequestBody : null
+        } else {
+            requestBodyToSend = useCustomRequestBody ? customRequestBody : JSON.stringify(defaultRequestBody)
+        }
 
         setLoading(true)
         try {
@@ -73,11 +116,15 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                 : null
             const customResponseHeadersToSend = useCustomResponse ? headersArrayToObject(responseHeaders) : null
             const miniTestingNameToSend = useMiniTesting && !useCustomResponse ? (miniTestingName || null) : null
-            await api.importFromUrl(
-                url, testRoleToSend, requestBodyToSend || null, customHeaders, collectionNameToSend,
+            const started = await api.importFromUrl(
+                urlToSend, testRoleToSend, requestBodyToSend || null, customHeaders, collectionNameToSend,
                 customResponseBodyToSend, customResponseStatusCodeToSend, customResponseHeadersToSend,
-                miniTestingNameToSend
+                miniTestingNameToSend, isWebSocket ? null : method
             )
+            const succeeded = await waitForImport(started.uploadId)
+            if (!succeeded) {
+                return
+            }
             func.setToast(true, false, "AI agent imported successfully.")
             setUrl('')
             setCollectionName('')
@@ -92,6 +139,8 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
             setResponseHeaders([])
             setUseMiniTesting(false)
             setMiniTestingName('')
+            setAgentType('HTTP')
+            setMethod('POST')
         } finally {
             setLoading(false)
         }
@@ -110,13 +159,32 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
             <Box paddingBlockStart={3}><Divider /></Box>
 
             <VerticalStack gap="4">
+                <HorizontalStack gap="4">
+                    <Select
+                        label="Agent type"
+                        options={AGENT_TYPES}
+                        value={agentType}
+                        onChange={setAgentType}
+                    />
+                    {!isWebSocket && (
+                        <Select
+                            label="Method"
+                            options={METHODS}
+                            value={method}
+                            onChange={setMethod}
+                        />
+                    )}
+                </HorizontalStack>
+
                 <TextField
-                    label="AI Endpoint URL"
+                    label={isWebSocket ? "WebSocket URL" : "AI Endpoint URL"}
                     value={url}
                     onChange={setUrl}
                     placeholder="https://api.example.com/ai-agent"
                     type="url"
-                    helpText="Enter the AI endpoint URL"
+                    helpText={isWebSocket
+                        ? "Import the URL first (its connection is checked from mini-testing), then send events with the same agent name and no URL"
+                        : "Enter the AI endpoint URL"}
                 />
 
                 <TextField
@@ -127,15 +195,17 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                     helpText="If not provided, the hostname from the URL will be used"
                 />
 
-                <Checkbox
-                    label="Use custom request body"
-                    checked={useCustomRequestBody}
-                    onChange={setUseCustomRequestBody}
-                />
+                {(isWebSocket || method !== 'GET') && (
+                    <Checkbox
+                        label={isWebSocket ? "Send a WebSocket event" : "Use custom request body"}
+                        checked={useCustomRequestBody}
+                        onChange={setUseCustomRequestBody}
+                    />
+                )}
 
-                {useCustomRequestBody && (
+                {(isWebSocket || method !== 'GET') && useCustomRequestBody && (
                     <TextField 
-                        label="Custom Request Body" 
+                        label={isWebSocket ? "WebSocket event" : "Custom Request Body"} 
                         value={customRequestBody} 
                         onChange={setCustomRequestBody} 
                         placeholder='{"key": "value"}'
@@ -275,7 +345,7 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                         <Button 
                             onClick={handleImport} 
                             primary 
-                            disabled={!url || url.length === 0} 
+                            disabled={!canImport} 
                             loading={loading}
                         >
                             Import

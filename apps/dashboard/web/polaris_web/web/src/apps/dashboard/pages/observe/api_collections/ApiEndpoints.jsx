@@ -1276,7 +1276,7 @@ function ApiEndpoints(props) {
     const viewConfigs = [
         {
             key: 'sequences',
-            label: 'Display graph view',
+            label: 'Display session explorer',
             state: showSequencesFlow,
             setState: setShowSequencesFlow,
             condition: !isEndpointSecurityCategory()
@@ -2183,7 +2183,7 @@ function ApiEndpoints(props) {
 
     const handleSaveDescription = () => {
         // Check for special characters
-        const allowedChars = /^[a-zA-Z0-9\s.,!?;:'"()\-_/&]+$/;
+        const allowedChars = /^[a-zA-Z0-9\s.,!?;:'"()\-_/&@#$%*+=\[\]{}\\|^~`<>–—]+$/;
 
         if (editableDescription.length > 0 && !allowedChars.test(editableDescription)) {
             func.setToast(true, true, "Description contains invalid characters.");

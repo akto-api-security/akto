@@ -161,7 +161,7 @@ GET /health
 | `SERVER_PORT` | HTTP server port | `8080` |
 | `DATABASE_ABSTRACTOR_SERVICE_URL` | Database abstractor service URL | `https://cyborg.akto.io` |
 | `DATABASE_ABSTRACTOR_SERVICE_TOKEN` | JWT token for authentication | **Required** |
-| `AGENT_GUARD_ENGINE_URL` | Agent Guard Engine URL for NLP | `https://akto-agent-guard-engine.billing-53a.workers.dev` |
+| `SCANNER_API_URL` | agent-guard base URL: text scans (`/scan`) and image OCR (`/ocr`) | Akto SaaS |
 | `THREAT_BACKEND_URL` | Threat backend service URL | `https://tbs.akto.io` |
 | `THREAT_BACKEND_TOKEN` | Token for threat reporting | **Required** |
 | `LOG_LEVEL` | Logging level (debug, info, warn, error) | `info` |
@@ -204,7 +204,7 @@ docker run -p 8080:8080 \
   -e DATABASE_ABSTRACTOR_SERVICE_TOKEN="your-token" \
   -e DATABASE_ABSTRACTOR_SERVICE_URL="http://database-abstractor:9000" \
   -e THREAT_BACKEND_TOKEN="your-token" \
-  -e AGENT_GUARD_ENGINE_URL="https://akto-agent-guard-engine.billing-53a.workers.dev" \
+  -e SCANNER_API_URL="http://agent-guard:8090" \
   guardrails-service
 ```
 
@@ -222,7 +222,7 @@ services:
       - DATABASE_ABSTRACTOR_SERVICE_URL=http://database-abstractor:9000
       - DATABASE_ABSTRACTOR_SERVICE_TOKEN=${DATABASE_ABSTRACTOR_SERVICE_TOKEN}
       - THREAT_BACKEND_TOKEN=${THREAT_BACKEND_TOKEN}
-      - AGENT_GUARD_ENGINE_URL=https://akto-agent-guard-engine.billing-53a.workers.dev
+      - SCANNER_API_URL=http://agent-guard:8090
       - LOG_LEVEL=info
 ```
 
@@ -374,7 +374,7 @@ guardrails-service/
 ### Agent Guard Engine
 - **Purpose**: Heavy NLP computations for content analysis
 - **Integration**: Automatic via akto-gateway library
-- **Configuration**: `AGENT_GUARD_ENGINE_URL` environment variable
+- **Configuration**: `SCANNER_API_URL` (text scans and image OCR)
 
 ### Threat Backend Service
 - **Purpose**: Receives and displays threat reports in dashboard

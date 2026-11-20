@@ -9,6 +9,8 @@ public enum Resource {
     CONFIGS,
     DEVREV_INTEGRATION_SERVICE,
     JIRA_INTEGRATION,
+    LINEAR_INTEGRATION,
+    PORT_IO_INTEGRATION,
     TEST_EDITOR,
     TEST_RESULTS,
     TEST_ROLE,
@@ -18,4 +20,5 @@ public enum Resource {
     USER_ACCESS,
     CUSTOM_ROLE,
     SSO_CONFIG,
+    GUARDRAIL_ACTIVITY,
 }

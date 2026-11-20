@@ -31,8 +31,12 @@ const onActivate = (action) => (event) => {
     }
 };
 
+// Quadrant names, clockwise from the top left, and the Text color each one is drawn in.
+const CORNERS = [["top-left", "critical"], ["top-right", "warning"], ["bottom-left", "subdued"], ["bottom-right", "subdued"]];
+
 // Circles on a positioned grid; bubbles: [{ key, x, y, radius, fill, stroke, tip, label, priority, onClick }]
-export default function BubblePlot({ bubbles, height = 300, bands = 4, bandLabels, tickLabels, zone }) {
+// Optional quadrants: { splitX, heightPct, labels: [tl, tr, bl, br] } tints the top zones, draws dashed splits and names the corners.
+export default function BubblePlot({ bubbles, height = 300, bands = 4, bandLabels, tickLabels, zone, quadrants }) {
     const [plotRef, { width }] = useElementSize();
     // Names are placed once the plot's width is known, so none covers another name or circle.
     const labelSides = useMemo(() => placeLabels(bubbles, width, height), [bubbles, width, height]);
@@ -44,11 +48,24 @@ export default function BubblePlot({ bubbles, height = 300, bands = 4, bandLabel
                 </div>
             )}
             <Box width="100%">
-                <div ref={plotRef} className="bubble-plot" style={{ "--plot-height": `${height}px`, "--plot-grid": gridLines(bands), "--zone-color": RISKY_RED, "--glow-color": PURPLE_DARK }}>
+                <div ref={plotRef} className="bubble-plot" style={{ "--plot-height": `${height}px`, "--plot-grid": gridLines(bands), "--zone-color": RISKY_RED, "--glow-color": PURPLE_DARK, ...(quadrants && { "--quad-x": `${quadrants.splitX}%`, "--quad-y": `${quadrants.heightPct}%` }) }}>
                     {zone && (
                         <>
                             <div className="bubble-plot__zone" style={{ "--zone-width": `${zone.widthPct}%`, "--zone-height": `${zone.heightPct}%` }} />
                             <span className="bubble-plot__zone-label">{zone.label}</span>
+                        </>
+                    )}
+                    {quadrants && (
+                        <>
+                            <div className="bubble-plot__quad bubble-plot__quad--left" />
+                            <div className="bubble-plot__quad bubble-plot__quad--right" />
+                            <div className="bubble-plot__split-x" />
+                            <div className="bubble-plot__split-y" />
+                            {quadrants.labels.map((label, i) => (
+                                <span key={label} className={`bubble-plot__corner bubble-plot__corner--${CORNERS[i][0]}`}>
+                                    <Text as="span" variant="bodySm" fontWeight={i < 2 ? "semibold" : "regular"} color={CORNERS[i][1]}>{label}</Text>
+                                </span>
+                            ))}
                         </>
                     )}
                     {bubbles.map((bubble) => (
