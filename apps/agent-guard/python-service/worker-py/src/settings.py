@@ -89,6 +89,8 @@ _FIELDS = (
     "SCANNER_RESPONSE_FORMAT",
     # PromptInjection input-side rules: "v1" (default) or "v2" (prompts/prompt_injection.py).
     "PROMPT_INJECTION_PROMPT_VERSION",
+    # Rules for Atlas (contextSource=ENDPOINT) traffic: "atlas" (default) or "v1"/"v2" to roll back.
+    "PROMPT_INJECTION_ATLAS_PROMPT_VERSION",
     # Portable anonymizer service URL (e.g. http://anonymizer:8093).
     "ANONYMIZER_URL",
     # --- Per-scanner semantic cache (Redis vector store + embedder service) ---
@@ -204,6 +206,7 @@ class Settings:
     ENRICHMENT_MODEL_CONFIG_JSON: str
     SCANNER_RESPONSE_FORMAT: str
     PROMPT_INJECTION_PROMPT_VERSION: str
+    PROMPT_INJECTION_ATLAS_PROMPT_VERSION: str
     ANONYMIZER_URL: str
     DATABASE_ABSTRACTOR_SERVICE_TOKEN: str
     METRICS_PUSH_INTERVAL_SEC: str

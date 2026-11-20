@@ -62,7 +62,8 @@ def build_scan_prompt(
     """
     effective = resolve_response_format(scanner_name, scanner_type, response_format)
     if scanner_name == "PromptInjection":
-        return prompt_injection.build(scanner_type, text, effective)
+        context_source = str(config.get("contextSource", ""))
+        return prompt_injection.build(scanner_type, text, effective, context_source=context_source)
     if scanner_name == "BanTopics":
         return ban_topics.build(config, provider_name, text, effective)
     if scanner_name == "Toxicity":
