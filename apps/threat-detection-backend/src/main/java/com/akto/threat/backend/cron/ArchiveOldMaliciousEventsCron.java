@@ -200,7 +200,8 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
     }
 
     private void trimCollectionIfExceedsCap(String accountId, MongoCollection<Document> source) {
-        long approxCount = source.countDocuments();
+        // Metadata-based count: avoids a full collection scan; exactness isn't needed for a soft cap.
+        long approxCount = source.estimatedDocumentCount();
 
         if (approxCount <= MAX_SOURCE_DOCS) return;
 
