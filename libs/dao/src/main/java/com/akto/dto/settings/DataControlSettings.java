@@ -20,6 +20,10 @@ public class DataControlSettings {
     public static final String POSTGRES_COMMAND = "postgresCommand";
     String postgresCommand;
 
+    // TODO: remove this flag (make it the default behaviour) once it is rolled out in the next release
+    public static final String PUSH_SENSITIVE_SAMPLE_ONCE = "pushSensitiveSampleOnce";
+    boolean pushSensitiveSampleOnce;
+
     String postgresResult;
     String oldPostgresCommand;
     public DataControlSettings() {}
@@ -62,6 +66,14 @@ public class DataControlSettings {
 
     public void setDiscardOldApi(boolean discardOldApi) {
         this.discardOldApi = discardOldApi;
+    }
+
+    public boolean isPushSensitiveSampleOnce() {
+        return pushSensitiveSampleOnce;
+    }
+
+    public void setPushSensitiveSampleOnce(boolean pushSensitiveSampleOnce) {
+        this.pushSensitiveSampleOnce = pushSensitiveSampleOnce;
     }
 
     public String getPostgresCommand() {

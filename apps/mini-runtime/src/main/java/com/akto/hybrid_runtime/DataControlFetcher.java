@@ -74,4 +74,11 @@ public class DataControlFetcher {
     public static boolean discardNewApi() {
         return dataControlSettings != null && dataControlSettings.isDiscardNewApi();
     }
+
+    // on when the server setting is set, or env PUSH_SENSITIVE_SAMPLE_ONCE=true
+    // TODO: remove this flag once it is rolled out in the next release
+    public static boolean pushSensitiveSampleOnce() {
+        if ("true".equalsIgnoreCase(System.getenv("PUSH_SENSITIVE_SAMPLE_ONCE"))) return true;
+        return dataControlSettings != null && dataControlSettings.isPushSensitiveSampleOnce();
+    }
 }
