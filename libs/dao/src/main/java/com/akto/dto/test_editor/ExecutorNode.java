@@ -5,10 +5,14 @@ import java.util.Map;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ExecutorNode {
-    
+
+    private static final LoggerMaker logger = new LoggerMaker(ExecutorNode.class, LogDb.TESTING);
+
     private String nodeType;
     
     private List<ExecutorNode> childNodes;
@@ -67,6 +71,7 @@ public class ExecutorNode {
             Map<String,Object> mapValues = m.convertValue(this.getValues(), Map.class);
             str = (String) mapValues.get(key);
         } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error parsing ExecutorNode values as map for key: " + key);
             try {
                 List<Object> listValues = (List<Object>) this.getValues();
                 for (int i = 0; i < listValues.size(); i++) {
@@ -77,9 +82,8 @@ public class ExecutorNode {
                     }
                 }
             } catch (Exception er) {
-                // TODO: handle exception
+                logger.errorAndAddToDb(er, "Error parsing ExecutorNode values as list for key: " + key);
             }
-            // TODO: handle exception
         }
         return str;
     }
