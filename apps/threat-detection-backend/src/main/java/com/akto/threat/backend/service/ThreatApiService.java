@@ -173,11 +173,10 @@ public class ThreatApiService {
       match.putAll(contextFilter);
     }
     match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
-    Document hostScopeMatch = req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null;
-    Document hint = hostScopeMatch == null ? ThreatUtils.coverIndexHint(accountId, match) : null;
+    Document hint = req.hasHostScope() ? null : ThreatUtils.coverIndexHint(accountId, match);
 
     pipeline.add(new Document("$match", match));
-    ThreatUtils.addHostScope(pipeline, hostScopeMatch);
+    ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
 
     // 3. Collapse misconfiguration re-detections.
     pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
@@ -252,10 +251,9 @@ public class ThreatApiService {
       }
 
       List<Document> pipeline = new ArrayList<>();
-      Document hostScopeMatch = req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null;
-      Document hint = hostScopeMatch == null ? ThreatUtils.coverIndexHint(accountId, match) : null;
+      Document hint = req.hasHostScope() ? null : ThreatUtils.coverIndexHint(accountId, match);
       pipeline.add(new Document("$match", match));
-      ThreatUtils.addHostScope(pipeline, hostScopeMatch);
+      ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
       // The dedupe only collapses /config/ events; with those excluded it is a sort+group over every event for nothing.
       if (!"exclude".equalsIgnoreCase(configEvalMode)) {
           pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));

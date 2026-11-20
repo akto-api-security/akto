@@ -109,15 +109,11 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
     }
 
     public long countDocuments(String accountId, Bson filter, long maxTimeMs) {
-        return countDocuments(accountId, filter, maxTimeMs, null);
+        return getCollection(accountId).countDocuments(filter, new CountOptions().maxTime(maxTimeMs, TimeUnit.MILLISECONDS));
     }
 
     public long countDocuments(String accountId, Bson filter, long maxTimeMs, Bson hint) {
-        CountOptions options = new CountOptions().maxTime(maxTimeMs, TimeUnit.MILLISECONDS);
-        if (hint != null) {
-            options.hint(hint);
-        }
-        return getCollection(accountId).countDocuments(filter, options);
+        return getCollection(accountId).countDocuments(filter, new CountOptions().maxTime(maxTimeMs, TimeUnit.MILLISECONDS).hint(hint));
     }
 
     public void createIndexIfAbsent(String accountId) {
