@@ -4,7 +4,6 @@ import InfoCard from "../../../dashboard/new_components/InfoCard";
 import { HIGH_RISK_THRESHOLD, RISK_BUCKET_WIDTH, RISK_EXPLANATION, SEVERITY_SEGMENTS } from "./peopleConstants";
 import transform from "./transform";
 import { getRiskLevel } from "../../agentic/agenticPageBuilders";
-import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const BAR_WIDTH = 36;
 const CHART_OPTIONS = {
@@ -63,7 +62,7 @@ function RiskHistogramCard({ overview, status, onSelectBucket, onSelectHighRisk 
         </VerticalStack>
     );
 
-    return <InfoCard title="Employee risk scores" subtitle={`Highest ${mapLabel('API', getDashboardCategory())} risk score (0 to 5) across each employee's AI tools`} titleToolTip={transform.tooltip(RISK_EXPLANATION)} component={transform.cardBody(status, body)} />;
+    return <InfoCard title="Employee risk scores" subtitle="Highest risk level across each employee's AI tools" titleToolTip={transform.tooltip(RISK_EXPLANATION)} component={transform.cardBody(status, body)} />;
 }
 
 export default RiskHistogramCard;
