@@ -206,8 +206,6 @@ public class ThreatUtils {
         "actor", "successfulExploit", "latestApiEndpoint", "latestApiMethod", "filterId");
     private static final Set<String> EVAL_TYPE_COVER_ACCOUNTS = ConcurrentHashMap.newKeySet();
 
-    // Hint only when the cover index exists for the account and every filtered field is in it; the planner
-    // otherwise picks another index and fetches every full document.
     public static Document coverIndexHint(String accountId, Document match) {
         if (!USE_EVAL_TYPE_READS || !EVAL_TYPE_COVER_ACCOUNTS.contains(accountId)
             || !"ENDPOINT".equals(match.get("contextSource")) || !filtersOnlyCoverFields(match)) {
@@ -664,7 +662,6 @@ public class ThreatUtils {
         requiredIndexes.put("idx_context_detectedAt_category_subCategory", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("category"), Indexes.ascending("subCategory")));
         // Lets the Active tab count and its skills/config exclusion count be answered from index keys alone.
         requiredIndexes.put("idx_ctx_status_detected_endpoint", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending("status"), Indexes.descending("detectedAt"), Indexes.ascending("latestApiEndpoint")));
-        // Holds every field the Atlas counts and charts read, so they are answered from index keys alone.
         requiredIndexes.put(EVAL_TYPE_COVER_INDEX, Indexes.compoundIndex(
             Indexes.ascending("contextSource", "status"), Indexes.descending("detectedAt"),
             Indexes.ascending(EVAL_TYPE_COVER_FIELDS.subList(3, EVAL_TYPE_COVER_FIELDS.size()))));

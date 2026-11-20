@@ -629,7 +629,6 @@ public class ThreatActorService {
     }
 
     List<DailyActorsCountResponse.ActorsCount> actors = new ArrayList<>();
-        List<Document> pipeline = new ArrayList<>();
 
 
       Document matchConditions = new Document();
@@ -651,132 +650,29 @@ public class ThreatActorService {
     matchConditions.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
     ThreatUtils.andHostScope(matchConditions, hostScopeMatch);
 
-        pipeline.add(new Document("$match", matchConditions));
-    
-        pipeline.add(new Document("$project", 
-        new Document("actor", 1)
-        .append("severity", 1)
-        .append("severityPriority", 
-            new Document("$switch", 
-                new Document("branches", Arrays.asList(
-                    new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 4),
-                    new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 3),
-                    new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 2),
-                    new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 1)))
-                .append("default", 0)))
-        .append("dayStart", 
-            new Document("$dateTrunc", 
-                new Document("date", new Document("$toDate", new Document("$multiply", Arrays.asList("$detectedAt", 1000))))
-                    .append("unit", "day")))));
+        Document hint = ThreatUtils.coverIndexHint(accountId, matchConditions);
+        actors.addAll(dailyActorCounts(accountId, matchConditions, 4, hint));
 
-        pipeline.add(new Document("$group", 
-            new Document("_id", 
-                new Document("dayStart", "$dayStart")
-                    .append("actor", "$actor"))
-            .append("severity", new Document("$max", "$severityPriority"))));
-
-        pipeline.add(new Document("$project", 
-            new Document("dayStart", "$_id.dayStart")
-                .append("severity", 
-                    new Document("$switch", 
-                        new Document("branches", Arrays.asList(
-                            new Document("case", new Document("$eq", Arrays.asList("$severity", 4))).append("then", "CRITICAL"),
-                            new Document("case", new Document("$eq", Arrays.asList("$severity", 3))).append("then", "HIGH"),
-                            new Document("case", new Document("$eq", Arrays.asList("$severity", 2))).append("then", "MEDIUM"),
-                            new Document("case", new Document("$eq", Arrays.asList("$severity", 1))).append("then", "LOW")))
-                        .append("default", "UNKNOWN")))));
-
-        pipeline.add(new Document("$group", 
-            new Document("_id", "$dayStart")
-                .append("totalActors", new Document("$sum", 1))
-                .append("severityActors", 
-                    new Document("$sum", 
-                        new Document("$cond", 
-                            Arrays.asList(
-                                new Document("$eq", Arrays.asList("$severity", "CRITICAL")),
-                                1,
-                                0))))));
-
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
-            while (cursor.hasNext()) {
-                Document doc = cursor.next();
-                // Convert dayStart from Date (ms) back to seconds
-                long dayStartEpochSeconds = doc.getDate("_id").getTime() / 1000;
-                int totalActors = doc.getInteger("totalActors");
-                int highSeverityActors = doc.getInteger("severityActors");
-                System.out.println(totalActors);
-                System.out.println(highSeverityActors);
-                actors.add(
-                    DailyActorsCountResponse.ActorsCount.newBuilder()
-                        .setTs((int) dayStartEpochSeconds)
-                        .setTotalActors(doc.getInteger("totalActors"))
-                        .setCriticalActors(doc.getInteger("severityActors"))
-                        .build());
-            }
-        }
-
-        // Summary counts, deduped like the category breakdown.
         List<Document> dedupedEventsPipeline = new ArrayList<>();
         if (!matchConditions.isEmpty()) {
             dedupedEventsPipeline.add(new Document("$match", matchConditions));
         }
         dedupedEventsPipeline.addAll(ThreatUtils.configScanDedupeStages(dedupedEventsPipeline, contextSource));
-
-        List<Document> totalAnalysedPipeline = new ArrayList<>(dedupedEventsPipeline);
-        totalAnalysedPipeline.add(new Document("$count", "total"));
-        long totalAnalysed = 0;
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, totalAnalysedPipeline).cursor()) {
-            if (cursor.hasNext()) {
-                totalAnalysed = cursor.next().getInteger("total", 0);
-            }
-        }
-
-        // Total attacks
-        List<Document> totalAttacksPipeline = new ArrayList<>(dedupedEventsPipeline);
-        totalAttacksPipeline.add(new Document("$match", new Document("successfulExploit", true)));
-        totalAttacksPipeline.add(new Document("$count", "total"));
-        long totalAttacks = 0;
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, totalAttacksPipeline).cursor()) {
-            if (cursor.hasNext()) {
-                totalAttacks = cursor.next().getInteger("total", 0);
-            }
-        }
+        EventTotals totals = eventTotals(accountId, dedupedEventsPipeline, hint);
 
         int criticalActorsCount = 0;
         for (DailyActorsCountResponse.ActorsCount ac : actors) {
             criticalActorsCount += ac.getCriticalActors();
         }
-        // Status counts
-        List<Document> statusPipeline = new ArrayList<>(dedupedEventsPipeline);
-        statusPipeline.add(new Document("$group",
-            new Document("_id", "$status").append("count", new Document("$sum", 1))));
-
-        int totalActive = 0;
-        int totalIgnored = 0;
-        int totalUnderReview = 0;
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, statusPipeline).cursor()) {
-            while (cursor.hasNext()) {
-                Document d = cursor.next();
-                String status = d.getString("_id");
-                int c = d.getInteger("count", 0);
-                if ("ACTIVE".equalsIgnoreCase(status)) {
-                    totalActive = c;
-                } else if (ThreatDetectionConstants.IGNORED.equalsIgnoreCase(status)) {
-                    totalIgnored = c;
-                } else if ("UNDER_REVIEW".equalsIgnoreCase(status)) {
-                    totalUnderReview = c;
-                }
-            }
-        }
 
         return DailyActorsCountResponse.newBuilder()
             .addAllActorsCounts(actors)
-            .setTotalAnalysed((int) totalAnalysed)
-            .setTotalAttacks((int) totalAttacks)
+            .setTotalAnalysed(totals.analysed())
+            .setTotalAttacks(totals.attacks())
             .setCriticalActorsCount(criticalActorsCount)
-            .setTotalActive(totalActive)
-            .setTotalIgnored(totalIgnored)
-            .setTotalUnderReview(totalUnderReview)
+            .setTotalActive(totals.active())
+            .setTotalIgnored(totals.ignored())
+            .setTotalUnderReview(totals.underReview())
             .build();
   }
 
@@ -869,97 +765,90 @@ public class ThreatActorService {
     }
     eventsMatch.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
-    // Daily actor counts from malicious_events (for chart daily breakdown)
-    List<DailyActorsCountResponse.ActorsCount> dailyActors = new ArrayList<>();
-    List<Document> dailyPipeline = new ArrayList<>();
-    if (!eventsMatch.isEmpty()) {
-      dailyPipeline.add(new Document("$match", eventsMatch));
-    }
-    dailyPipeline.add(new Document("$project",
-        new Document("actor", 1)
-            .append("severity", 1)
-            .append("severityPriority",
-                new Document("$switch",
-                    new Document("branches", Arrays.asList(
-                        new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 4),
-                        new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 3),
-                        new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 2),
-                        new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 1)))
-                    .append("default", 0)))
-            .append("dayStart",
-                new Document("$dateTrunc",
-                    new Document("date", new Document("$toDate", new Document("$multiply", Arrays.asList("$detectedAt", 1000))))
-                        .append("unit", "day")))));
-    dailyPipeline.add(new Document("$group",
-        new Document("_id",
-            new Document("dayStart", "$dayStart").append("actor", "$actor"))
-            .append("severity", new Document("$max", "$severityPriority"))));
-    dailyPipeline.add(new Document("$group",
-        new Document("_id", "$_id.dayStart")
-            .append("totalActors", new Document("$sum", 1))
-            .append("severityActors",
-                new Document("$sum",
-                    new Document("$cond",
-                        Arrays.asList(
-                            new Document("$gte", Arrays.asList("$severity", 3)),
-                            1, 0))))));
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, dailyPipeline).cursor()) {
-      while (cursor.hasNext()) {
-        Document doc = cursor.next();
-        long dayStartEpochSeconds = doc.getDate("_id").getTime() / 1000;
-        dailyActors.add(
-            DailyActorsCountResponse.ActorsCount.newBuilder()
-                .setTs((int) dayStartEpochSeconds)
-                .setTotalActors(doc.getInteger("totalActors"))
-                .setCriticalActors(doc.getInteger("severityActors"))
-                .build());
-      }
-    }
-
-    // Total analysed - all events in time range
-    long totalAnalysed = maliciousEventDao.getCollection(accountId).countDocuments(eventsMatch);
-
-    // Total attacks - successful exploits in time range
-    Document attackMatch = new Document(eventsMatch);
-    attackMatch.append("successfulExploit", true);
-    long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(attackMatch);
-
-    // Status aggregation on malicious_events
-    List<Document> statusPipeline = new ArrayList<>();
-    if (!eventsMatch.isEmpty()) {
-        statusPipeline.add(new Document("$match", eventsMatch));
-    }
-    statusPipeline.add(new Document("$group",
-        new Document("_id", "$status").append("count", new Document("$sum", 1))));
-
-    int totalActive = 0;
-    int totalIgnored = 0;
-    int totalUnderReview = 0;
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, statusPipeline).cursor()) {
-        while (cursor.hasNext()) {
-            Document d = cursor.next();
-            String status = d.getString("_id");
-            int c = d.getInteger("count", 0);
-            if ("ACTIVE".equalsIgnoreCase(status)) {
-                totalActive = c;
-            } else if (ThreatDetectionConstants.IGNORED.equalsIgnoreCase(status)) {
-                totalIgnored = c;
-            } else if ("UNDER_REVIEW".equalsIgnoreCase(status)) {
-                totalUnderReview = c;
-            }
-        }
-    }
+    Document hint = ThreatUtils.coverIndexHint(accountId, eventsMatch);
+    List<DailyActorsCountResponse.ActorsCount> dailyActors = dailyActorCounts(accountId, eventsMatch, 3, hint);
+    EventTotals totals = eventTotals(accountId,
+        eventsMatch.isEmpty() ? new ArrayList<>() : Collections.singletonList(new Document("$match", eventsMatch)), hint);
 
     return DailyActorsCountResponse.newBuilder()
         .addAllActorsCounts(dailyActors)
-        .setTotalActive(totalActive)
+        .setTotalActive(totals.active())
         .setCriticalActorsCount((int) criticalActorsCount)
-        .setTotalAnalysed((int) totalAnalysed)
-        .setTotalAttacks((int) totalAttacks)
-        .setTotalIgnored(totalIgnored)
-        .setTotalUnderReview(totalUnderReview)
+        .setTotalAnalysed(totals.analysed())
+        .setTotalAttacks(totals.attacks())
+        .setTotalIgnored(totals.ignored())
+        .setTotalUnderReview(totals.underReview())
         .setActiveActorsCount((int) activeActorsCount)
         .build();
+  }
+
+  private record EventTotals(int analysed, int attacks, int active, int ignored, int underReview) {}
+
+  private List<DailyActorsCountResponse.ActorsCount> dailyActorCounts(String accountId, Document match, int criticalFrom, Document hint) {
+    Document severityRank = new Document("$switch", new Document("branches", Arrays.asList(
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 4),
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 3),
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 2),
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 1)))
+        .append("default", 0));
+    Document dayStart = new Document("$subtract", Arrays.asList("$detectedAt", new Document("$mod", Arrays.asList("$detectedAt", 86400))));
+
+    List<Document> pipeline = new ArrayList<>();
+    if (!match.isEmpty()) {
+      pipeline.add(new Document("$match", match));
+    }
+    pipeline.add(new Document("$group", new Document("_id", new Document("dayStart", dayStart).append("actor", "$actor"))
+        .append("severity", new Document("$max", severityRank))));
+    pipeline.add(new Document("$group", new Document("_id", "$_id.dayStart")
+        .append("totalActors", new Document("$sum", 1))
+        .append("severityActors", new Document("$sum",
+            new Document("$cond", Arrays.asList(new Document("$gte", Arrays.asList("$severity", criticalFrom)), 1, 0))))));
+
+    List<DailyActorsCountResponse.ActorsCount> actors = new ArrayList<>();
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        actors.add(DailyActorsCountResponse.ActorsCount.newBuilder()
+            .setTs((int) ((Number) doc.get("_id")).longValue())
+            .setTotalActors(doc.getInteger("totalActors"))
+            .setCriticalActors(doc.getInteger("severityActors"))
+            .build());
+      }
+    }
+    return actors;
+  }
+
+  private EventTotals eventTotals(String accountId, List<Document> stages, Document hint) {
+    List<Document> pipeline = new ArrayList<>(stages);
+    pipeline.add(new Document("$group", new Document("_id",
+        new Document("status", "$status").append("successfulExploit", "$successfulExploit"))
+        .append("count", new Document("$sum", 1))));
+
+    int analysed = 0;
+    int attacks = 0;
+    int active = 0;
+    int ignored = 0;
+    int underReview = 0;
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        Document group = (Document) doc.get("_id");
+        String status = group.getString("status");
+        int count = doc.getInteger("count", 0);
+        analysed += count;
+        if (Boolean.TRUE.equals(group.getBoolean("successfulExploit"))) {
+          attacks += count;
+        }
+        if ("ACTIVE".equalsIgnoreCase(status)) {
+          active += count;
+        } else if (ThreatDetectionConstants.IGNORED.equalsIgnoreCase(status)) {
+          ignored += count;
+        } else if ("UNDER_REVIEW".equalsIgnoreCase(status)) {
+          underReview += count;
+        }
+      }
+    }
+    return new EventTotals(analysed, attacks, active, ignored, underReview);
   }
 
   public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource, Document hostScopeMatch) {
