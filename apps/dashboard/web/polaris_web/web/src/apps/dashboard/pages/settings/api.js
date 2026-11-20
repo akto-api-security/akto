@@ -910,6 +910,14 @@ const settingRequests = {
         })
     },
 
+    saveLinearBiDirectionalSync(biDirectionalSyncEnabled) {
+        return request({
+            url: '/api/saveLinearBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled }
+        })
+    },
+
     removeLinearIntegration() {
         return request({
             url: '/api/removeLinearIntegration',
@@ -939,6 +947,14 @@ const settingRequests = {
             url: '/api/savePortIOSeverityMapping',
             method: 'post',
             data: { severityToPriority }
+        })
+    },
+
+    savePortIOBiDirectionalSync(biDirectionalSyncEnabled, updateWorkflowId) {
+        return request({
+            url: '/api/savePortIOBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled, updateWorkflowId }
         })
     },
 
@@ -1313,6 +1329,27 @@ const settingRequests = {
             url: '/api/rebootModules',
             method: 'post',
             data: {moduleIds, deleteTopicAndReboot}
+        })
+    },
+    fetchAuthTokens() {
+        return request({
+            url: '/api/fetchAuthTokens',
+            method: 'post',
+            data: {}
+        })
+    },
+    revokeAuthToken(tokenId, reason) {
+        return request({
+            url: '/api/revokeAuthToken',
+            method: 'post',
+            data: {tokenId, reason}
+        })
+    },
+    revokeAllAuthTokens(reason) {
+        return request({
+            url: '/api/revokeAllAuthTokens',
+            method: 'post',
+            data: {reason}
         })
     },
     updateModuleEnvAndReboot(moduleId, moduleName, envData) {

@@ -111,14 +111,20 @@ public class TestScriptService {
         if (selection.getKind() != ScriptSelection.Kind.BY_ID) {
             return;
         }
+        requireLibraryScript(selection.getScriptId(), type);
+    }
+
+    /** The library script with this id, which must be of the given type. */
+    public TestScript requireLibraryScript(String id, TestScript.Type type) throws TestScriptException {
         String label = type == TestScript.Type.PRE_REQUEST ? "pre-request" : "post-request";
-        TestScript script = TestScriptsDao.instance.findById(selection.getScriptId());
+        TestScript script = TestScriptsDao.instance.findById(id);
         if (script == null) {
             throw new TestScriptException("Selected " + label + " script does not exist");
         }
         if (script.getType() != type) {
             throw new TestScriptException("Selected " + label + " script '" + script.getName() + "' is not a " + label + " script");
         }
+        return script;
     }
 
     /** Same rule ScriptAction applied before the library existed. */

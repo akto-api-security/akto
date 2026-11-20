@@ -2,10 +2,8 @@ package com.akto.dto;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -30,17 +28,14 @@ import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.rbac.UsersCollectionsList;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessTypeTestingEndpoints;
 import com.akto.dto.testing.AuthTypeTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
-import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -188,7 +183,7 @@ public class ApiCollectionUsers {
         return Filters.and(filters);
     }
 
-    private static void operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove, Set<Integer> excludedOwners) {
+    private static void operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove) {
         Map<CollectionType, Bson> filtersMap = new HashMap<>();
         for (CollectionType type : CollectionType.values()) {
             Bson filter = getFilters(conditions, type);
@@ -196,115 +191,15 @@ public class ApiCollectionUsers {
                 filter = Filters.nor(filter);
             }
             Bson finalFilter = Filters.and(matchFilter, filter);
-            if (!excludedOwners.isEmpty()) {
-                finalFilter = Filters.and(finalFilter, Filters.nin(ownerField(type), excludedOwners));
-            }
             filtersMap.put(type, finalFilter);
         }
         updateCollectionsForCollectionId(filtersMap, update);
     }
 
-    private static String ownerField(CollectionType type) {
-        switch (type) {
-            case ApiCollectionId:
-                return SingleTypeInfo._API_COLLECTION_ID;
-            case Id_ApiCollectionId:
-                return ApiInfo.ID_API_COLLECTION_ID;
-            default:
-                return TestingRunIssues.ID_API_COLLECTION_ID;
-        }
-    }
-
-    /*
-     * Collections that own APIs but are not part of API Security (Argus, DAST, Endpoint).
-     * API Security groups must never contain their APIs.
-     */
-    private static Set<Integer> nonApiSecurityOwners(Set<Integer> apiSecurityIds) {
-        Set<Integer> owners = new HashSet<>();
-        try (MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection()
-                .find(Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.name()))
-                .projection(Projections.include(Constants.ID)).iterator()) {
-            while (cursor.hasNext()) {
-                int id = cursor.next().getId();
-                if (!apiSecurityIds.contains(id)) {
-                    owners.add(id);
-                }
-            }
-        }
-        return owners;
-    }
-
-    /*
-     * Groups that belong only to API Security. A group shared with another product, like the
-     * Unauthenticated MCP Tools group, is left alone, and so is the All APIs group, which spans
-     * every product and is scoped when read (AllAPIsGroup.visibleOwnerFilter).
-     */
-    private static boolean isApiSecurityOnlyGroup(int apiCollectionId, Set<Integer> apiSecurityIds, Set<Integer> otherProductIds) {
-        return apiCollectionId != AllAPIsGroup.ALL_APIS_GROUP_ID && apiSecurityIds.contains(apiCollectionId)
-                && !otherProductIds.contains(apiCollectionId);
-    }
-
-    private static Set<Integer> otherProductIds() {
-        Set<Integer> ids = new HashSet<>();
-        for (CONTEXT_SOURCE source : CONTEXT_SOURCE.values()) {
-            if (source != CONTEXT_SOURCE.API) {
-                ids.addAll(UsersCollectionsList.getContextCollections(source));
-            }
-        }
-        return ids;
-    }
-
-    // Owners to skip when adding to this group: non API Security owners if it is an API Security group, else none.
-    private static Set<Integer> ownersExcludedFromGroup(int apiCollectionId) {
-        Set<Integer> apiSecurityIds = UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.API);
-        if (!isApiSecurityOnlyGroup(apiCollectionId, apiSecurityIds, otherProductIds())) {
-            return Collections.emptySet();
-        }
-        return nonApiSecurityOwners(apiSecurityIds);
-    }
-
-    /*
-     * Removes API Security group ids from APIs owned outside API Security, e.g. Argus APIs that were
-     * added to "Admin APIs" or the risk score groups before group membership was scoped to API Security.
-     */
-    public static void removeNonApiSecurityApisFromApiSecurityGroups() {
-        Set<Integer> apiSecurityIds = UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.API);
-        Set<Integer> otherProductIds = otherProductIds();
-        List<Integer> apiSecurityGroupIds = new ArrayList<>();
-        try (MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection()
-                .find(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.name()))
-                .projection(Projections.include(Constants.ID)).iterator()) {
-            while (cursor.hasNext()) {
-                int id = cursor.next().getId();
-                if (isApiSecurityOnlyGroup(id, apiSecurityIds, otherProductIds)) {
-                    apiSecurityGroupIds.add(id);
-                }
-            }
-        }
-        Set<Integer> owners = nonApiSecurityOwners(apiSecurityIds);
-        if (apiSecurityGroupIds.isEmpty() || owners.isEmpty()) {
-            return;
-        }
-
-        Bson update = Updates.pullAll(SingleTypeInfo._COLLECTION_IDS, apiSecurityGroupIds);
-        for (Map.Entry<CollectionType, MCollection<?>[]> entry : COLLECTIONS_WITH_API_COLLECTION_ID.entrySet()) {
-            Bson filter = Filters.and(
-                Filters.in(ownerField(entry.getKey()), owners),
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, apiSecurityGroupIds)
-            );
-            for (MCollection<?> collection : entry.getValue()) {
-                UpdateResult res = collection.getMCollection().updateMany(filter, update);
-                if (res.getModifiedCount() > 0) {
-                    logger.info("Removed API Security groups from " + res.getModifiedCount() + " non API Security docs in " + collection.getCollName());
-                }
-            }
-        }
-    }
-
     public static void addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
         Bson update = Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false, ownersExcludedFromGroup(apiCollectionId));
+        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
     }
 
     public static void removeFromCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
@@ -321,9 +216,9 @@ public class ApiCollectionUsers {
         }
 
         if (isDeltaUpdateBasedApiGroup) {
-            operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false, Collections.emptySet());
+            operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
         } else {
-            operationForCollectionId(conditions, apiCollectionId, update, matchFilter, true, Collections.emptySet());
+            operationForCollectionId(conditions, apiCollectionId, update, matchFilter, true);
         }
 
     }

@@ -2,12 +2,14 @@ package com.akto.testing.scripts;
 
 /**
  * Wires the provider chain for runtimes that read Mongo directly (dashboard, apps/testing):
- * library first, legacy store only when the library has nothing (accounts not migrated yet).
+ * library first, then Ask Akto validation drafts (looked up only for draft ids), then the legacy store
+ * (accounts not migrated yet).
  */
 public final class TestScriptProviders {
 
     private static final TestScriptProvider DATABASE =
-        new FallbackTestScriptProvider(new LibraryTestScriptProvider(), new LegacyTestScriptAdapter());
+        new FallbackTestScriptProvider(new LibraryTestScriptProvider(),
+            new FallbackTestScriptProvider(new DraftTestScriptProvider(), new LegacyTestScriptAdapter()));
 
     private static final TestScriptProvider CACHED_DATABASE = new CachingTestScriptProvider(DATABASE);
 

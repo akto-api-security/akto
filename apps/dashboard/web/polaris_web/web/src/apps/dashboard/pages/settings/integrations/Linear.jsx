@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Box, Button, Card, Divider, HorizontalStack, LegacyCard, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Card, Checkbox, Divider, HorizontalStack, LegacyCard, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
 import settingFunctions from '../module'
 import IntegrationsLayout from './IntegrationsLayout'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
@@ -32,6 +32,8 @@ const Linear = () => {
     const [teams, setTeams] = useState([])
     const [workspaceTeams, setWorkspaceTeams] = useState([])
     const [isSavingTeams, setIsSavingTeams] = useState(false)
+    const [syncEnabled, setSyncEnabled] = useState(false)
+    const [isSavingSync, setIsSavingSync] = useState(false)
     const [loadingTeams, setLoadingTeams] = useState(false)
     const [createModalActive, setCreateModalActive] = useState(false)
     const [rowToReveal, setRowToReveal] = useState(null)
@@ -58,6 +60,7 @@ const Linear = () => {
                 return
             }
             setIsIntegrated(true)
+            setSyncEnabled(!!linearInteg.biDirectionalSyncEnabled)
             const savedTeams = Object.entries(linearInteg.teamMappings || {}).map(([teamId, mapping]) =>
                 newTeamRow(teamId, { ...DEFAULT_SEVERITY_TO_PRIORITY, ...mapping.severityToPriority })
             )
@@ -189,6 +192,19 @@ const Linear = () => {
         }
     }
 
+    async function toggleSync(enabled) {
+        setIsSavingSync(true)
+        try {
+            await settingFunctions.saveLinearBiDirectionalSync(enabled)
+            setSyncEnabled(enabled)
+            func.setToast(true, false, enabled ? 'Bi-directional sync enabled' : 'Bi-directional sync disabled')
+        } catch (error) {
+            func.setToast(true, true, errorMessageOf(error, 'Failed to update bi-directional sync'))
+        } finally {
+            setIsSavingSync(false)
+        }
+    }
+
     const canSaveTeams = !isSavingTeams && teams.length > 0 && teams.every(team => team.teamId)
     const isCreateDisabled = isCreatingTeam || newTeamName.trim().length === 0
 
@@ -317,6 +333,27 @@ const Linear = () => {
         </LegacyCard>
     )
 
+    const SyncCard = (
+        <LegacyCard>
+            <LegacyCard.Section>
+                <VerticalStack gap="4">
+                    <Text variant="headingMd">Bi-directional sync</Text>
+                    <Text variant="bodyMd" color="subdued">
+                        Every hour, Akto keeps issue status and Linear ticket status aligned for the saved teams. Open in Akto matches Linear's backlog, to do and in progress states, Fixed matches done, and Ignored matches canceled.
+                    </Text>
+                    <AllowedAction allowed={canCall('api/saveLinearBiDirectionalSync')}>
+                        <Checkbox
+                            label="Enable bi-directional sync"
+                            checked={syncEnabled}
+                            onChange={toggleSync}
+                            disabled={!isIntegrated || isSavingSync}
+                        />
+                    </AllowedAction>
+                </VerticalStack>
+            </LegacyCard.Section>
+        </LegacyCard>
+    )
+
     const CreateTeamModal = (
         <Modal
             open={createModalActive}
@@ -363,6 +400,7 @@ const Linear = () => {
                 <VerticalStack gap="4">
                     {KeyCard}
                     {isIntegrated ? TeamsCard : null}
+                    {isIntegrated ? SyncCard : null}
                     {CreateTeamModal}
                 </VerticalStack>
             }

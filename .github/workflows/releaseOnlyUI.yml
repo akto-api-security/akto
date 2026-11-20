@@ -34,7 +34,7 @@ jobs:
 
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web
-        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
+        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && NODE_OPTIONS=--max-old-space-size=4096 npm run build
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:

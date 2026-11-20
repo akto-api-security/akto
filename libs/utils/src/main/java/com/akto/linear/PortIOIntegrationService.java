@@ -10,7 +10,9 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.linear.LinearApiClient.LinearIssue;
 import com.akto.log.LoggerMaker;
+import com.akto.jobs.executors.PortIOTicketSyncJobExecutor;
 import com.akto.ticketing.ATicketIntegrationService;
+import com.akto.ticketing.TicketSyncScheduler;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -71,12 +73,41 @@ public class PortIOIntegrationService extends ATicketIntegrationService<PortIOIn
         return redacted(saved);
     }
 
+    public PortIOIntegration saveBiDirectionalSync(boolean enabled, String updateWorkflowId) throws Exception {
+        if (fetchIntegration() == null) {
+            throw new Exception("Save Port.io credentials before enabling sync.");
+        }
+        if (enabled && StringUtils.isBlank(updateWorkflowId)) {
+            throw new Exception("Please enter the update workflow identifier.");
+        }
+
+        if (enabled) {
+            TicketSyncScheduler.start(GlobalEnums.TicketSource.LINEAR, PortIOTicketSyncJobExecutor.SYNC_KEY);
+        } else {
+            TicketSyncScheduler.stop(GlobalEnums.TicketSource.LINEAR, PortIOTicketSyncJobExecutor.SYNC_KEY);
+        }
+
+        Bson updates = StringUtils.isBlank(updateWorkflowId)
+            ? Updates.set(PortIOIntegration.BI_DIRECTIONAL_SYNC_ENABLED, enabled)
+            : Updates.combine(
+                Updates.set(PortIOIntegration.BI_DIRECTIONAL_SYNC_ENABLED, enabled),
+                Updates.set(PortIOIntegration.UPDATE_WORKFLOW_ID, updateWorkflowId.trim()));
+
+        PortIOIntegration saved = PortIOIntegrationDao.instance.getMCollection().findOneAndUpdate(
+            new BasicDBObject(),
+            Updates.combine(updates, Updates.set(PortIOIntegration.UPDATED_TS, Context.now())),
+            new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+        );
+        return redacted(saved);
+    }
+
     public PortIOIntegration fetchPortIOIntegration() {
         return redacted(fetchIntegration());
     }
 
     public void removeIntegration() throws Exception {
         try {
+            TicketSyncScheduler.stop(GlobalEnums.TicketSource.LINEAR, PortIOTicketSyncJobExecutor.SYNC_KEY);
             PortIOIntegrationDao.instance.getMCollection().deleteOne(new BasicDBObject());
         } catch (Exception e) {
             logger.errorAndAddToDb("Error removing Port integration: " + e.getMessage(),

@@ -22,6 +22,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.utils.AuthTokenService;
 import com.akto.utils.cloud.CloudType;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.UpdateFunctionRequest;
@@ -296,26 +297,15 @@ public class QuickStartAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // Tracked mint: every token created here gets an auth_tokens record.
     public static String createTokenForAuth(int expiryTimeInMonth, List<String> scope){
-        Map<String,Object> claims = new HashMap<>();
-        claims.put("accountId", Context.accountId.get());
-        if (scope != null && !scope.isEmpty()) {
-            claims.put("scope", scope);
-        }
-        String apiTokenVal = null;
         try {
-            apiTokenVal = JwtAuthenticator.createJWT(
-                claims,
-                "Akto",
-                "invite_user",
-                Calendar.MONTH,
-                expiryTimeInMonth
-            );
+            return AuthTokenService.createTokenForContextUser(
+                AuthTokenService.defaultName("quickstart"), scope, expiryTimeInMonth).apiToken;
         } catch (Exception e) {
             e.printStackTrace();
         }
-        
-        return apiTokenVal;
+        return null;
     }
 
     public String fetchRuntimeHelmCommand() {
@@ -323,7 +313,13 @@ public class QuickStartAction extends UserAction {
             addActionError("Expiry time must be between 1 and 24 months");
             return Action.ERROR.toUpperCase();
         }
-        this.apiToken = createTokenForAuth(this.expiryTimeInMonth, this.scope);
+        try {
+            this.apiToken = AuthTokenService.createToken(AuthTokenService.defaultName("quickstart"),
+                this.scope, this.expiryTimeInMonth, getSUser().getId(), getSUser().getLogin()).apiToken;
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 

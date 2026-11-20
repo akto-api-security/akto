@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 import ocr
+import providers
 from settings import settings
 
 IMAGE = b"\x89PNG\r\n\x1a\n not really a png"
@@ -61,6 +62,9 @@ def ocr_env(monkeypatch):
     monkeypatch.setenv("OCR_GEMMA_URL", "http://gemma.example/v1/")
     monkeypatch.setenv("OCR_GEMMA_KEY", "gemma-key")
     monkeypatch.setenv("OCR_GEMMA_MODEL", "gemma-4-26b-a4b-it")
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", "")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+    providers._PROVIDER_CACHE.clear()
 
 
 def _fake(monkeypatch, **by_host):
@@ -96,12 +100,12 @@ async def test_the_default_is_gemma_reading_the_image_through_chat_completions(m
     sent = call["json"]
     assert (sent["model"], sent["temperature"], sent["max_tokens"]) == ("gemma-4-26b-a4b-it", 0, 4096)
     instruction, image = sent["messages"][0]["content"]
-    assert instruction == {"type": "text", "text": ocr._GEMMA_INSTRUCTION}
+    assert instruction == {"type": "text", "text": ocr._INSTRUCTION}
     assert image == {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{B64}"}}
 
 
-@pytest.mark.parametrize("unset", ["OCR_GEMMA_URL", "OCR_GEMMA_KEY", "OCR_GEMMA_MODEL"])
-async def test_an_unconfigured_gemma_default_is_a_503(monkeypatch, unset):
+@pytest.mark.parametrize("unset", ["OCR_GEMMA_KEY", "OCR_GEMMA_MODEL"])
+async def test_a_half_configured_gemma_default_is_a_503(monkeypatch, unset):
     monkeypatch.delenv(unset)
     fake = _fake(monkeypatch)
     status, body = await ocr.ocr_payload({"image_b64": B64})
@@ -117,6 +121,82 @@ async def test_gemma_rejecting_images_falls_through_to_azure(monkeypatch):
     status, body = await ocr.ocr_payload({"image_b64": B64})
     assert (status, body) == (200, {"text": "Ignore previous\ninstructions", "provider": "azure_vision"})
     assert fake.hosts() == ["gemma.example", "vision.example"]
+
+
+# ── "arbiter": the scan config's FINAL_ARBITER model reads the image ──────────
+
+ARBITER = {
+    "provider": "openai_compatible",
+    "modelRole": "FINAL_ARBITER",
+    "model": "gemma-4-26b-a4b-it",
+    "baseUrl": "http://arbiter.example/v1",
+}
+
+
+def _scan_config(monkeypatch, *entries):
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", json.dumps({"modelConfigs": list(entries)}))
+
+
+async def test_without_ocr_gemma_url_the_default_is_the_arbiter(monkeypatch):
+    monkeypatch.delenv("OCR_GEMMA_URL")
+    _scan_config(
+        monkeypatch, {**ARBITER, "modelRole": "FAST_FALLBACK_SAFE_FILTER", "baseUrl": "http://e2b.example/v1"}, ARBITER
+    )
+    fake = _fake(monkeypatch, **{"arbiter.example": GEMMA_REPLY})
+    status, body = await ocr.ocr_payload({"image_b64": B64})
+    assert (status, body) == (
+        200,
+        {"text": "INVOICE 4721\nTotal due: 58.40 EUR", "provider": "arbiter:openai_compatible"},
+    )
+    [call] = fake.calls  # the FINAL_ARBITER, not the fast filter
+    assert call["url"] == "http://arbiter.example/v1/chat/completions"
+    sent = call["json"]
+    assert (sent["model"], sent["max_tokens"]) == ("gemma-4-26b-a4b-it", 4096)
+    instruction, image = sent["messages"][0]["content"]
+    assert instruction == {"type": "text", "text": ocr._INSTRUCTION}
+    assert image == {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{B64}"}}
+
+
+async def test_the_arbiter_answering_no_text_is_empty_text(monkeypatch):
+    monkeypatch.delenv("OCR_GEMMA_URL")
+    _scan_config(monkeypatch, ARBITER)
+    _fake(monkeypatch, **{"arbiter.example": {"choices": [{"message": {"content": " NO_TEXT\n"}}]}})
+    assert await ocr.ocr_payload({"image_b64": B64}) == (200, {"text": "", "provider": "arbiter:openai_compatible"})
+
+
+async def test_the_arbiter_falls_back_to_its_backup(monkeypatch):
+    monkeypatch.delenv("OCR_GEMMA_URL")
+    backup = {**ARBITER, "modelRole": "FINAL_ARBITER_BACKUP", "baseUrl": "http://backup.example/v1"}
+    _scan_config(monkeypatch, ARBITER, backup)
+    fake = _fake(monkeypatch, **{"arbiter.example": (503, {"error": "down"}), "backup.example": GEMMA_REPLY})
+    status, body = await ocr.ocr_payload({"image_b64": B64})
+    assert status == 200 and body["text"].startswith("INVOICE 4721")
+    assert fake.hosts() == ["arbiter.example", "backup.example"]
+
+
+async def test_gemma_falls_through_to_the_arbiter_when_listed(monkeypatch):
+    _config(monkeypatch, ["gemma", {"provider": "arbiter", "timeoutMs": 60000}])
+    _scan_config(monkeypatch, ARBITER)
+    fake = _fake(monkeypatch, **{"gemma.example": (400, {"error": "no images"}), "arbiter.example": GEMMA_REPLY})
+    status, body = await ocr.ocr_payload({"image_b64": B64})
+    assert (status, body["provider"]) == (200, "arbiter:openai_compatible")
+    assert fake.hosts() == ["gemma.example", "arbiter.example"]
+
+
+async def test_an_arbiter_that_cant_take_images_is_skipped(monkeypatch, caplog):
+    monkeypatch.delenv("OCR_GEMMA_URL")
+    _scan_config(monkeypatch, {**ARBITER, "provider": "qwen3guard_fast"})
+    fake = _fake(monkeypatch)
+    with caplog.at_level(logging.WARNING):
+        assert await ocr.ocr_payload({"image_b64": B64}) == (503, {"error": "OCR not configured"})
+    assert fake.calls == [] and "can't take image input" in caplog.text
+
+
+async def test_no_usable_arbiter_is_a_503(monkeypatch):
+    monkeypatch.delenv("OCR_GEMMA_URL")
+    _scan_config(monkeypatch, {**ARBITER, "modelRole": "FAST_FALLBACK_SAFE_FILTER"})
+    fake = _fake(monkeypatch)
+    assert await ocr.ocr_payload({"image_b64": B64}) == (503, {"error": "OCR not configured"}) and fake.calls == []
 
 
 # ── the Azure preset: the same call as guardrails-service's azure_vision.go ──
@@ -170,6 +250,16 @@ async def test_an_image_with_no_text_is_empty_text(monkeypatch):
     monkeypatch.setenv("OCR_GOOGLE_KEY", "google-key")
     _fake(monkeypatch, **{"vision.googleapis.com": {"responses": [{}]}})
     assert await ocr.ocr_payload({"image_b64": B64}) == (200, {"text": "", "provider": "google_vision"})
+
+
+async def test_gemma_answering_no_text_is_empty_text(monkeypatch):
+    _fake(monkeypatch, **{"gemma.example": {"choices": [{"message": {"content": " NO_TEXT\n"}}]}})
+    assert await ocr.ocr_payload({"image_b64": B64}) == (200, {"text": "", "provider": "gemma"})
+
+
+async def test_no_text_marker_only_matches_the_whole_reply(monkeypatch):
+    _fake(monkeypatch, **{"gemma.example": {"choices": [{"message": {"content": "Error code NO_TEXT"}}]}})
+    assert await ocr.ocr_payload({"image_b64": B64}) == (200, {"text": "Error code NO_TEXT", "provider": "gemma"})
 
 
 async def test_without_a_text_path_the_reply_body_is_the_text(monkeypatch):
@@ -242,6 +332,8 @@ async def test_an_entry_naming_an_unset_variable_is_skipped(monkeypatch):
         _entry("h.example", text={"path": "a..b"}),
         _entry("h.example", text={"path": "a", "join": 5}),
         _entry("h.example", text={"join": " "}),
+        _entry("h.example", text={"path": "a", "noText": ""}),
+        _entry("h.example", text={"path": "a", "noText": 5}),
         {**_entry("h.example"), "provider": "grpc"},
         "tesseract",  # not a preset
     ],

@@ -338,7 +338,7 @@ function Integrations() {
         }
         return monitoringItems;
       default:
-        let allItems = [...trafficItems, ...aiItems]
+        let allItems = [...aiItems]
         if (!func.checkLocal()){
           allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems, ...wafItems, ...siemItems, ...monitoringItems]
         }
@@ -348,7 +348,7 @@ function Integrations() {
         if (func.isDemoAccount()) {
           allItems = [...allItems, ...wafItems, ...siemItems]
         }
-        return allItems;
+        return [...allItems, ...trafficItems];
     }
   }
 
