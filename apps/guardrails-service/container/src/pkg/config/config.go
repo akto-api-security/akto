@@ -162,8 +162,11 @@ type MediaConfig struct {
 	SpeechAPIKey  string
 	SpeechBaseURL string
 	MaxImageBytes int
-	MaxAudioBytes int
-	MaxVideoBytes int
+	// MaxDocumentImages caps how many distinct images embedded in one document (PDF, Office) are
+	// OCR'd; a document with more is validated on those and allowed as uninspected. 0 reads none.
+	MaxDocumentImages int
+	MaxAudioBytes     int
+	MaxVideoBytes     int
 }
 
 // defaultChunkSize keeps one chunk small enough that its LLM adjudication finishes well
@@ -257,14 +260,15 @@ func LoadConfig() *Config {
 			BlockOnRedaction: getEnvAsBool("FILE_VALIDATE_BLOCK_ON_REDACTION", true),
 			CacheTTLSec:      getEnvAsInt("FILE_VALIDATE_CACHE_TTL_SEC", 3600),
 			Media: MediaConfig{
-				Provider:      getEnv("MEDIA_PROVIDER", "agent_guard"),
-				VisionAPIKey:  getEnv("MEDIA_VISION_API_KEY", ""),
-				VisionBaseURL: getEnv("MEDIA_VISION_BASE_URL", ""),
-				SpeechAPIKey:  getEnv("MEDIA_SPEECH_API_KEY", ""),
-				SpeechBaseURL: getEnv("MEDIA_SPEECH_BASE_URL", ""),
-				MaxImageBytes: getEnvAsInt("MEDIA_MAX_IMAGE_BYTES", 2*1024*1024),
-				MaxAudioBytes: getEnvAsInt("MEDIA_MAX_AUDIO_BYTES", 10*1024*1024),
-				MaxVideoBytes: getEnvAsInt("MEDIA_MAX_VIDEO_BYTES", 25*1024*1024),
+				Provider:          getEnv("MEDIA_PROVIDER", "agent_guard"),
+				VisionAPIKey:      getEnv("MEDIA_VISION_API_KEY", ""),
+				VisionBaseURL:     getEnv("MEDIA_VISION_BASE_URL", ""),
+				SpeechAPIKey:      getEnv("MEDIA_SPEECH_API_KEY", ""),
+				SpeechBaseURL:     getEnv("MEDIA_SPEECH_BASE_URL", ""),
+				MaxImageBytes:     getEnvAsInt("MEDIA_MAX_IMAGE_BYTES", 2*1024*1024),
+				MaxDocumentImages: getEnvAsInt("MEDIA_MAX_DOCUMENT_IMAGES", 10),
+				MaxAudioBytes:     getEnvAsInt("MEDIA_MAX_AUDIO_BYTES", 10*1024*1024),
+				MaxVideoBytes:     getEnvAsInt("MEDIA_MAX_VIDEO_BYTES", 25*1024*1024),
 			},
 		},
 	}
