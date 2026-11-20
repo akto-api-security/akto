@@ -689,10 +689,45 @@ public class TestAtlasDiscoveryService {
         devices.put("d1", Collections.singletonMap("username", "User.One"));
         devices.put("d2", Collections.singletonMap("username", " user.one "));
         devices.put("d3", Collections.singletonMap("username", "user.two"));
-        AtlasPeople people = AtlasPeople.of(devices, users("USER.ONE", "Platform"));
+        AtlasPeople people = AtlasPeople.of(devices, Collections.emptyMap(), users("USER.ONE", "Platform"));
         assertEquals(1, people.usersOf(Arrays.asList("d1", "d2")).size());
         assertEquals("Platform", people.teamOfDevice("d2"));
         assertEquals(1, people.membersByTeam().get("Platform").size());
         assertEquals(1, people.membersByTeam().get(AtlasPeople.UNTAGGED_TEAM).size());
+    }
+
+    @Test
+    public void teamHeadcountOnlyCountsUsersWhoOwnADevice() {
+        Map<String, Map<String, String>> devices = new HashMap<>();
+        devices.put("d1", Collections.singletonMap("username", "user.one"));
+        devices.put("d2", Collections.singletonMap("username", "-"));
+        AtlasPeople people = AtlasPeople.of(devices, Collections.emptyMap(), users("user.one", "Platform", "user.two", "Platform"));
+        assertEquals(Collections.singleton("user.one"), people.membersByTeam().get("Platform"));
+        assertFalse(people.membersByTeam().containsKey(AtlasPeople.UNTAGGED_TEAM));
+    }
+
+    @Test
+    public void browserHostsMatchTheirExtensionLikeDevicesAndEmployees() {
+        Map<String, Map<String, String>> devices = new HashMap<>();
+        Map<String, String> extension = new HashMap<>();
+        extension.put("username", "user.one@example.com");
+        extension.put("browserName", "chrome");
+        devices.put("user.one", extension);
+        devices.put("Desk-1", Collections.singletonMap("username", "user.two"));
+        AtlasPeople people = AtlasPeople.of(devices, Collections.emptyMap(), users("user.one@example.com", "Platform"));
+        assertEquals(Collections.singleton("user.one@example.com"), people.usersOf(Arrays.asList("userone", "useroneexamplecom-u1")));
+        assertEquals("Platform", people.teamOfDevice("useroneexamplecom"));
+        assertEquals(Collections.singleton("user.two"), people.usersOf(Collections.singletonList("desk-1")));
+    }
+
+    @Test
+    public void hookOnlyPeopleCountUnlessAlreadyAManagedEmployee() {
+        Map<String, Map<String, String>> devices = new HashMap<>();
+        devices.put("d1", Collections.singletonMap("username", "user.one@example.com"));
+        AtlasPeople people = AtlasPeople.of(devices, users("inference-hook-a", "User.One@example.com", "inference-hook-b", "user.two"), users("user.two", "Platform"));
+        assertTrue(people.usersOf(Collections.singletonList("inference-hook-a")).isEmpty());
+        assertEquals(Collections.singleton("user.two"), people.usersOf(Collections.singletonList("inference-hook-b")));
+        assertEquals(Collections.singleton("user.two"), people.membersByTeam().get("Platform"));
+        assertEquals(Collections.singleton("user.one@example.com"), people.membersByTeam().get(AtlasPeople.UNTAGGED_TEAM));
     }
 }
