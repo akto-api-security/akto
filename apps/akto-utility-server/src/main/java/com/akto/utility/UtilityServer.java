@@ -11,6 +11,7 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -52,7 +53,14 @@ public class UtilityServer {
                 t.setDaemon(true);
                 return t;
             });
-            server = HttpServer.create(new InetSocketAddress(port), 0);
+            httpExecutor = Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "akto-utility-http");
+                t.setDaemon(true);
+                return t;
+            });
+            // Bind IPv4 explicitly. On macOS a wildcard bind is IPv6-only, so
+            // Docker's host.docker.internal (IPv4) gets connection refused.
+            server = HttpServer.create(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), port), 0);
             UtilityAuthFilter auth = new UtilityAuthFilter(UtilityAuthFilter.tokenFromEnv());
             register("/utility/execute", new ExecuteApiHandler(jobStore, executorService), auth);
             register("/utility/result", new GetResultHandler(jobStore), auth);
@@ -65,7 +73,9 @@ public class UtilityServer {
             for (String apiName : DataActor.REDTEAM_LEARNING_APIS) {
                 register("/utility/" + apiName, new RedteamLearningsHandler(dataActor, apiName), auth);
             }
-            server.setExecutor(null);
+            // A null executor runs every handler on the accept thread. One slow
+            // insertAgenticTestingLog then stops the server from accepting connections.
+            server.setExecutor(httpExecutor);
             server.start();
             started = true;
             logger.info("akto-utility-server started on port " + port);
