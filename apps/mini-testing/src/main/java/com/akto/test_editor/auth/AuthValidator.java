@@ -92,7 +92,8 @@ public class AuthValidator {
 
     }
     
-    public static ExecutionResult checkAuth(Auth auth, RawApi rawApi, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    // collectionId: a WebSocket message is sent over its collection's connection
+    public static ExecutionResult checkAuth(Auth auth, RawApi rawApi, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes, boolean debug, List<TestingRunResult.TestLog> testLogs, int collectionId) {
 
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
         for (String header : auth.getHeaders()) {
@@ -112,7 +113,7 @@ public class AuthValidator {
 
         OriginalHttpResponse testResponse;
         try {
-            testResponse = ApiExecutor.sendRequest(rawApi.getRequest(), true, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+            testResponse = ApiExecutor.sendRequest(rawApi.getRequest(), true, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK, collectionId);
         } catch(Exception e) {
             return new ExecutionResult(false, "error running check auth " + e.getMessage(), rawApi.getRequest(), null);
         }

@@ -30,6 +30,7 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
+import com.akto.kafka.KafkaTopicManager;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
@@ -85,6 +86,10 @@ public class Main {
     public static final String kafkaUsername = KafkaConfig.getKafkaUsername();
     public static final String kafkaPassword = KafkaConfig.getKafkaPassword();
     public static final boolean isSendToThreatEnabled = System.getenv("SEND_TO_THREAT_ENABLED") != null && System.getenv("SEND_TO_THREAT_ENABLED").equalsIgnoreCase("true");
+
+    static final String HEARTBEAT_TOPIC_NAME = "akto.daemonset.producer.heartbeats";
+    static final String CONFIG_UPDATE_TOPIC_NAME = "akto.config.updates";
+    static final String THREAT_TOPIC_NAME = "akto.api.logs2";
 
     /**
      * Counting of custom sensitive data events per collection and hour, sent to the central store for
@@ -260,6 +265,51 @@ public class Main {
             topicName = "akto.api.producer.logs";
         }
         return topicName;
+    }
+
+    /**
+     * Topics this runtime reads from or writes to on its own Kafka cluster (AKTO_KAFKA_BROKER_URL).
+     * The central Kafka from account settings is not included, as this deployment does not manage it,
+     * and the detection corrector creates its own candidate topic.
+     */
+    static List<String> localKafkaTopics() {
+        // The threat topic is always included: collectors send threat traffic by default
+        // (AKTO_THREAT_ENABLED), whether or not this runtime forwards traffic to threat detection.
+        return Arrays.asList(
+                KafkaConfig.getTopicName(),    // traffic from the traffic collectors
+                getLogTopicName(),             // traffic collector logs
+                HEARTBEAT_TOPIC_NAME,          // traffic collector heartbeats
+                CONFIG_UPDATE_TOPIC_NAME,      // config updates for traffic collectors
+                Kafka.PING_TOPIC,              // local producer startup check
+                THREAT_TOPIC_NAME);            // traffic for threat detection
+    }
+
+    /**
+     * Creates the local Kafka topics that are missing. Brokers such as Amazon MSK do not create
+     * topics on first use, so without this the producers, which ping {@link Kafka#PING_TOPIC} on
+     * startup, and the consumers would fail until the topics were created by hand. Runs before the
+     * producers are built. Never fatal.
+     */
+    private static void ensureLocalKafkaTopics(String kafkaBrokerUrl) {
+        if (!KafkaTopicManager.isEnabled()) {
+            loggerMaker.info("Skipping Kafka topic check (runs for Amazon MSK IAM or "
+                    + KafkaTopicManager.ENV_CREATE_TOPICS + "=true)");
+            return;
+        }
+        List<String> topics = localKafkaTopics();
+        KafkaTopicManager.Result result = KafkaTopicManager.ensureTopics(kafkaBrokerUrl, topics);
+        if (!result.getCreated().isEmpty()) {
+            loggerMaker.infoAndAddToDb("Created Kafka topics: " + result.getCreated());
+        }
+        if (result.isSuccess()) {
+            loggerMaker.infoAndAddToDb("Kafka topics are present: " + topics);
+            return;
+        }
+        String fix = KafkaConfig.isMskIamAuthentication()
+                ? "grant the IAM role kafka-cluster:Connect, kafka-cluster:DescribeTopic and kafka-cluster:CreateTopic on these topics, or create them manually"
+                : "create the topics manually or allow this Kafka user to create them";
+        loggerMaker.errorAndAddToDb("Kafka topics may be missing, reads and writes to them will fail: "
+                + result.getFailed() + ". Fix: " + fix);
     }
 
 
@@ -448,6 +498,7 @@ public class Main {
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
         if (!isInMemoryQueueMode()) {
+            ensureLocalKafkaTopics(brokerUrlFinal);
             buildKafka();
             buildProtobufKafkaProducer(brokerUrlFinal);
             buildLocalKafkaProducer(kafkaBrokerUrl);
@@ -676,11 +727,11 @@ public class Main {
             }, 0, TimeUnit.SECONDS);
 
             // Pod heartbeat consumer thread
-            String heartbeatTopicName = "akto.daemonset.producer.heartbeats";
+            String heartbeatTopicName = HEARTBEAT_TOPIC_NAME;
             new AktoTrafficCollectorTelemetry(kafkaUrl, groupIdConfig, maxPollRecordsConfig, heartbeatTopicName, dataActor, customMiniRuntimeServiceName).run();
 
 
-            String configUpdateTopicName = "akto.config.updates";
+            String configUpdateTopicName = CONFIG_UPDATE_TOPIC_NAME;
             ConfigUpdatePoller configUpdatePoller = new ConfigUpdatePoller(customMiniRuntimeServiceName, localKafkaProducer, configUpdateTopicName);
             configUpdatePoller.start();
         }
@@ -1398,9 +1449,9 @@ public class Main {
 
             if (partitionKey != null && partitionKey.equals(AccountSettings.ThreatKafkaPartitionKey.IP)
                     && !ip.isEmpty()) {
-                record = new ProducerRecord<>("akto.api.logs2", ip, protobufBytes);
+                record = new ProducerRecord<>(THREAT_TOPIC_NAME, ip, protobufBytes);
             } else {
-                record = new ProducerRecord<>("akto.api.logs2", protobufBytes);
+                record = new ProducerRecord<>(THREAT_TOPIC_NAME, protobufBytes);
             }
             
             protobufKafkaProducer.send(record, (metadata, exception) -> {

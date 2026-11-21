@@ -11,6 +11,7 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.LinearAutoTicketParams;
+import com.akto.dto.jobs.PortIOAutoTicketParams;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
@@ -47,6 +48,7 @@ public class TestCompletion {
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestCompletion.class, LogDb.TESTING);
 
     private static final String LINEAR_TICKET_SOURCE = "LINEAR";
+    private static final String PORT_IO_TICKET_SOURCE = "PORT_IO";
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final AgentClient agentClient = new AgentClient(Constants.AGENT_BASE_URL);
@@ -250,6 +252,13 @@ public class TestCompletion {
                     testRunConfig.getAutoTicketingDetails().getProjectId(),
                     testRunConfig.getAutoTicketingDetails().getSeverities());
                 dataActor.scheduleAutoCreateTicketsJob(accountId, linearParams, JobExecutorType.DASHBOARD);
+                return;
+            }
+
+            if (PORT_IO_TICKET_SOURCE.equals(testRunConfig.getAutoTicketingDetails().getTicketSource())) {
+                PortIOAutoTicketParams portParams = new PortIOAutoTicketParams(testingRun.getId(), summaryId,
+                    testRunConfig.getAutoTicketingDetails().getSeverities());
+                dataActor.scheduleAutoCreateTicketsJob(accountId, portParams, JobExecutorType.DASHBOARD);
                 return;
             }
 

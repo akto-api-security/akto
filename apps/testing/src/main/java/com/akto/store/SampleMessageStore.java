@@ -92,13 +92,23 @@ public class SampleMessageStore {
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filterQ, 0, 10_000, null);
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {
-            if (sampleData.getSamples() == null) continue;
             Key key = sampleData.getId();
             ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(key.getApiCollectionId(), key.getUrl(), key.getMethod());
-            if (tempSampleDataMap.containsKey(apiInfoKey)) {
-                tempSampleDataMap.get(apiInfoKey).addAll(sampleData.getSamples());
+            
+            List<String> dataToAdd = new ArrayList<>();
+            
+            // For samples, use as-is (handles both HTTP and WebSocket connection samples)
+            if (sampleData.getSamples() != null) {
+                dataToAdd.addAll(sampleData.getSamples());
             } else {
-                tempSampleDataMap.put(apiInfoKey, sampleData.getSamples());
+                // Skip if no samples (don't use events - they require special handling)
+                continue;
+            }
+            
+            if (tempSampleDataMap.containsKey(apiInfoKey)) {
+                tempSampleDataMap.get(apiInfoKey).addAll(dataToAdd);
+            } else {
+                tempSampleDataMap.put(apiInfoKey, dataToAdd);
             }
         }
 

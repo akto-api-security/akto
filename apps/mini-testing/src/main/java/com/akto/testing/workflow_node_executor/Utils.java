@@ -11,10 +11,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
-
 import com.akto.dto.testing.*;
 import com.akto.test_editor.execution.Memory;
 import org.apache.commons.lang3.StringUtils;
@@ -31,6 +27,8 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.login_flow.LoginFlowNodes;
+import com.akto.testing.login_flow.PlaceholderResolver;
 import com.akto.util.JSONUtils;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.google.gson.Gson;
@@ -55,7 +53,7 @@ public class Utils {
 
         OtpTestData otpTestData = fetchOtpTestData(node, 4);
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
-        loggerMaker.warnAndAddToDb("OTP REQUEST [Node " + node.getId() + "]: " + workflowNodeDetails.toString());
+        loggerMaker.warnAndAddToDb("OTP REQUEST [Node " + node.getId() + "]: type=" + workflowNodeDetails.getType());
         String uuid = workflowNodeDetails.getOtpRefUuid();
 
         if (otpTestData == null) {
@@ -65,7 +63,7 @@ public class Utils {
             body.put("body", data);
             resp.put("response", body);
             testErrors.add(message);
-            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE_ERROR: " + valuesMap.toString());
+            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE_ERROR: keys=" + valuesMap.size());
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
         try {
@@ -80,8 +78,8 @@ public class Utils {
             body.put("body", data); 
             resp.put("response", body);
             valuesMap.put(node.getId() + ".response.body.otp", otp);
-            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_EXTRACTION: " + valuesMap.toString());
-            loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: " + resp.toString());
+            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_EXTRACTION: keys=" + valuesMap.size());
+            loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: errors=" + testErrors.size());
         } catch(Exception e) {
             message ="Error extracting otp data for uuid " + uuid + " error " + e.getMessage();
             loggerMaker.errorAndAddToDb(e, message);
@@ -89,12 +87,12 @@ public class Utils {
             body.put("body", data);
             resp.put("response", body);
             testErrors.add(message);
-            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE_EXCEPTION: " + valuesMap.toString());
-            loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: " + resp.toString());
+            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE_EXCEPTION: keys=" + valuesMap.size());
+            loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: errors=" + testErrors.size());
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
-        loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: " + resp.toString());
-        loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE: " + valuesMap.toString());
+        loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: errors=" + testErrors.size());
+        loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE: keys=" + valuesMap.size());
         return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
     }
 
@@ -126,7 +124,7 @@ public class Utils {
     }
 
     private static String extractOtpCode(String text, String regex) {
-        loggerMaker.warnAndAddToDb("OTP_EXTRACT_REQUEST: regex=" + regex + ", textPreview=" + (text == null ? "null" : text.substring(0, Math.min(text.length(), 200))));
+        loggerMaker.warnAndAddToDb("OTP_EXTRACT_REQUEST: regex=" + regex + ", textLength=" + (text == null ? "null" : text.length()));
 
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(text);
@@ -135,7 +133,7 @@ public class Utils {
             verificationCode = matcher.group(1);
         }
 
-        loggerMaker.warnAndAddToDb("OTP_EXTRACT_RESPONSE: verificationCode=" + verificationCode);
+        loggerMaker.warnAndAddToDb("OTP_EXTRACT_RESPONSE: found=" + (verificationCode != null));
 
         return verificationCode;
     }
@@ -163,7 +161,7 @@ public class Utils {
         for (String param: flattened.keySet()) {
             String key = node.getId() + ".response.body" + "." + param;
             valuesMap.put(key, flattened.get(param));
-	        loggerMaker.infoAndAddToDb("kv pair: " + key + " " + flattened.get(param));
+            loggerMaker.infoAndAddToDb("kv pair: " + key);
         }
         
         data.put("token", token);
@@ -215,8 +213,14 @@ public class Utils {
         return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, (RecordedLoginFlowInput) null);
     }
 
+    // login-flow entry: API steps resolve placeholders in login-flow mode (stepK, ${cookies...})
     public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, AuthMechanism authMechanism) {
-        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, authMechanism.getRecordedLoginFlowInput());
+        WorkflowNodeDetails.Type type = node.getWorkflowNodeDetails().getType();
+        if (type == WorkflowNodeDetails.Type.RECORDED || type == WorkflowNodeDetails.Type.OTP
+                || node.getWorkflowNodeDetails() instanceof YamlNodeDetails) {
+            return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, authMechanism.getRecordedLoginFlowInput());
+        }
+        return new ApiNodeExecutor(true).processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
     }
 
     public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, RecordedLoginFlowInput recordedLoginFlowInput) {
@@ -273,35 +277,29 @@ public class Utils {
         }
         
         Map<String, Object> valuesMap = constructValueMap(loginFlowParams);
-        loggerMaker.warnAndAddToDb("VALUES_MAP_CONSTRUCTED: " + valuesMap.toString());
+        loggerMaker.warnAndAddToDb("VALUES_MAP_CONSTRUCTED: keys=" + valuesMap.size());
 
         int index = 0;
         for (Node node: nodes) {
             loggerMaker.warnAndAddToDb("PROCESSING_NODE: " + node.getId());
-            boolean allowAllStatusCodes = false;
+            boolean allowAllStatusCodes = allowAllStatusCodes(authMechanism.getRequestData(), index);
             WorkflowTestResult.NodeResult nodeResult;
             try {
-                if (authMechanism.getRequestData() != null && authMechanism.getRequestData().size() > 0 && authMechanism.getRequestData().get(index).getAllowAllStatusCodes()) {
-                    allowAllStatusCodes = authMechanism.getRequestData().get(0).getAllowAllStatusCodes();
-                }
                 nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null, authMechanism);
             } catch (Exception e) {
-                loggerMaker.warnAndAddToDb("ERROR_PROCESSING_NODE: " + node.getId() + " " + e.getMessage());
+                loggerMaker.warnAndAddToDb("ERROR_PROCESSING_NODE: " + node.getId() + " " + e.getClass().getSimpleName());
                 List<String> testErrors = new ArrayList<>();
-                testErrors.add("Error Processing Node In Login Flow " + e.getMessage());
-                nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
+                testErrors.add("Error Processing Node In Login Flow: " + describeCause(e));
+                nodeResult = new WorkflowTestResult.NodeResult(null, false, testErrors);
             }
 
-            JSONObject respString = new JSONObject();
-            Map<String, Map<String, Object>> json = gson.fromJson(nodeResult.getMessage(), Map.class);
+            responses.add(buildStepResponse(nodeResult.getMessage()));
 
-            respString.put("headers", json.get("response").get("headers"));
-            respString.put("body", json.get("response").get("body"));
-            responses.add(respString.toString());
-            
-            if (nodeResult.getErrors().size() > 0) {
-                loggerMaker.warnAndAddToDb("FAILED_TO_PROCESS_NODE: " + node.getId());
-                return new LoginFlowResponse(responses, "Failed to process node " + node.getId(), false);
+            if (nodeResult.getErrors() != null && !nodeResult.getErrors().isEmpty()) {
+                String error = "Failed to process node " + LoginFlowNodes.label(node.getId()) + ": "
+                        + String.join("; ", nodeResult.getErrors());
+                loggerMaker.warnAndAddToDb("FAILED_TO_PROCESS_NODE: " + error);
+                return new LoginFlowResponse(responses, error, false);
             } else {
                 if (loginFlowParams != null && loginFlowParams.getFetchValueMap()) {
                     saveValueMapData(loginFlowParams, valuesMap);
@@ -315,37 +313,37 @@ public class Utils {
         int newExpiryTime = Context.now() + 1800; // 30 mins
         List<AuthParam> calculatedAuthParams = new ArrayList<>();
         for (AuthParam param : authMechanism.getAuthParams()) {
+            String value;
             try {
-                String value = executeCode(param.getValue(), valuesMap);
-                if (!param.getValue().equals(value) && value == null) {
-                    return new LoginFlowResponse(responses, "auth param not found at specified path " + 
-                    param.getValue(), false);
-                }
-
-                // checking on the value of if this is valid jwt token or valid cookie which has expiry time
-                String ogValue = param.getValue();
-                String tempVal = new String(value);
-                if (ogValue != null && ogValue.endsWith("response.body.cookieHeader}")) {
-                    // Cookie header value is a semicolon-separated list of key=value pairs;
-                    // expand it and check each cookie value for a JWT with an exp claim.
-                    String[] cookieParts = tempVal.split(";\\s*");
-                    for (String cookiePart : cookieParts) {
-                        int eqIdx = cookiePart.indexOf('=');
-                        if (eqIdx < 0) continue;
-                        String cookieVal = cookiePart.substring(eqIdx + 1).trim();
-                        newExpiryTime = Math.min(extractJwtExpiry(cookieVal), newExpiryTime);
-                    }
-                } else {
-                    if (tempVal.contains(" ")) {
-                        tempVal = value.split(" ")[1];
-                    }
-                    newExpiryTime = Math.min(extractJwtExpiry(tempVal), newExpiryTime);
-                }
-
-                calculatedAuthParams.add(new HardcodedAuthParam(param.getWhere(), param.getKey(), value, param.getShowHeader()));
-            } catch(Exception e) {
-                return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
+                value = resolveAuthParamValue(param.getValue(), valuesMap);
+            } catch (Exception e) {
+                // Nothing is cached on this path, so a literal ${...} can never become the role's token.
+                String error = "auth param " + param.getKey() + ": " + describeCause(e);
+                loggerMaker.warnAndAddToDb("AUTH_PARAM_RESOLUTION_FAILED: " + error);
+                return new LoginFlowResponse(responses, error, false);
             }
+            // checking on the value of if this is valid jwt token or valid cookie which has expiry time
+            String ogValue = param.getValue();
+            String tempVal = value;
+            if (ogValue != null && ogValue.endsWith("response.body.cookieHeader}")) {
+                // Cookie header value is a semicolon-separated list of key=value pairs;
+                // expand it and check each cookie value for a JWT with an exp claim.
+                String[] cookieParts = tempVal.split(";\\s*");
+                for (String cookiePart : cookieParts) {
+                    int eqIdx = cookiePart.indexOf('=');
+                    if (eqIdx < 0) continue;
+                    String cookieVal = cookiePart.substring(eqIdx + 1).trim();
+                    newExpiryTime = Math.min(extractJwtExpiry(cookieVal), newExpiryTime);
+                }
+            } else {
+                String[] parts = tempVal.split(" ");
+                if (parts.length > 1) {
+                    tempVal = parts[1];
+                }
+                newExpiryTime = Math.min(extractJwtExpiry(tempVal), newExpiryTime);
+            }
+
+            calculatedAuthParams.add(new HardcodedAuthParam(param.getWhere(), param.getKey(), value, param.getShowHeader()));
         }
 
         authMechanism.updateCacheExpiryEpoch(newExpiryTime);
@@ -354,6 +352,55 @@ public class Utils {
         return new LoginFlowResponse(responses, null, true);
     }
     
+    static boolean allowAllStatusCodes(List<RequestData> requestData, int index) {
+        if (requestData == null || index < 0 || index >= requestData.size()) return false;
+        RequestData step = requestData.get(index);
+        return step != null && step.getAllowAllStatusCodes();
+    }
+
+    private static final Pattern ANY_PLACEHOLDER = Pattern.compile("\\$\\{[^{}]*\\}");
+
+    // Strict, login-flow mode with no request URL (so ${cookies} is an error, ${cookies.<name>} works): a missing
+    // key, unsupported placeholder or failed filter throws with the path, and the caller fails the login instead of
+    // caching "Bearer ${x15.response.body.access_token}". mini-only: placeholders that all resolve to "" (which
+    // would cache "Bearer ") are rejected too.
+    static String resolveAuthParamValue(String template, Map<String, Object> valuesMap) throws Exception {
+        if (template == null) throw new Exception("value is not set");
+        // resolveTemplate: auth params went through executeCode before, so #[ ]# blocks keep being evaluated
+        String value = com.akto.testing.Utils.resolveTemplate(template, valuesMap,
+                PlaceholderResolver.Options.loginFlow(null, null));
+        List<String> placeholders = new ArrayList<>();
+        Matcher matcher = ANY_PLACEHOLDER.matcher(template);
+        while (matcher.find()) placeholders.add(matcher.group());
+        if (!placeholders.isEmpty() && value.trim().equals(ANY_PLACEHOLDER.matcher(template).replaceAll("").trim())) {
+            throw new Exception(String.join(", ", placeholders) + " resolved to an empty value");
+        }
+        return value;
+    }
+
+    // headers/body of one step for the LoginForm (same shape as akto's apps/testing buildStepResponse, which the
+    // dashboard renders in hybrid mode too); a step that failed before sending has no message
+    static String buildStepResponse(String message) {
+        JSONObject respString = new JSONObject();
+        Object headers = null;
+        Object body = null;
+        if (message != null) {
+            Map<String, Object> json = gson.fromJson(message, Map.class);
+            Object response = json == null ? null : json.get("response");
+            if (response instanceof Map) {
+                headers = ((Map<?, ?>) response).get("headers");
+                body = ((Map<?, ?>) response).get("body");
+            }
+        }
+        respString.put("headers", headers != null ? headers : "{}");
+        respString.put("body", body != null ? body : "{}");
+        return respString.toString();
+    }
+
+    static String describeCause(Exception e) {
+        return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+    }
+
     public static Map<String, Object> constructValueMap(LoginFlowParams loginFlowParams) {
         Map<String, Object> valuesMap = new HashMap<>();
         if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
@@ -368,17 +415,19 @@ public class Utils {
         }
 
         valuesMap = loginFlowStepData.getValuesMap();
+        removeNodeKeys(valuesMap, loginFlowParams.getNodeId());
+        return valuesMap;
+    }
 
+    // drops the re-run node's own values; "x1." so that x11, x13 ... keep theirs
+    public static void removeNodeKeys(Map<String, Object> valuesMap, String nodeId) {
         Set<String> keysToRemove = new HashSet<String>();
         for(String key : valuesMap.keySet()){
-            if(key.startsWith(loginFlowParams.getNodeId())){
+            if(key.startsWith(nodeId + ".")){
                 keysToRemove.add(key);
             }
         }
-
         valuesMap.keySet().removeAll(keysToRemove);
-
-        return valuesMap;
     }
 
     public static Map<String, Object> saveValueMapData(LoginFlowParams loginFlowParams, Map<String, Object> valuesMap) {
@@ -387,134 +436,19 @@ public class Utils {
         return valuesMap;
     }
 
+    // The three helpers below delegate to libs/utils so login-flow placeholders are resolved in exactly one place
+    // (ApiNodeExecutor already calls com.akto.testing.Utils directly). The old copies here evaluated #[ ]# with
+    // Nashorn, which is absent on the JDK 17 runtime.
     public static OriginalHttpRequest buildHttpRequest(WorkflowUpdatedSampleData updatedSampleData, Map<String, Object> valuesMap) throws Exception {
-
-        String sampleData = updatedSampleData.getOrig();
-        OriginalHttpRequest request = new OriginalHttpRequest();
-        request.buildFromSampleMessage(sampleData);
-
-        String queryParams = updatedSampleData.getQueryParams();
-        String requestHeaders = updatedSampleData.getRequestHeaders();
-        String requestPayload = updatedSampleData.getRequestPayload();
-        String requestUrl = updatedSampleData.getRequestUrl();
-
-        String queryFromReplacedUrl = null;
-
-        boolean userSuppliedQueryParamsNullOrEmpty = queryParams == null || queryParams.trim().length() == 0;
-        if (requestUrl != null) {
-            loggerMaker.infoAndAddToDb("requestUrl: " + requestUrl, LogDb.TESTING);
-            String rawUrl = executeCode(requestUrl, valuesMap);
-            loggerMaker.infoAndAddToDb("rawUrl: " + requestUrl, LogDb.TESTING);
-            // this url might contain urlQueryParams. We need to move it queryParams
-            String[] rawUrlArr = rawUrl.split("\\?");
-            request.setUrl(rawUrlArr[0]);
-            if (rawUrlArr.length > 1) {
-                queryFromReplacedUrl = rawUrlArr[1];
-            }
-            loggerMaker.infoAndAddToDb("final url: " + request.getUrl(), LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("queryFromReplacedUrl: " + queryFromReplacedUrl, LogDb.TESTING);
-        }
-
-        if (userSuppliedQueryParamsNullOrEmpty) {
-            loggerMaker.infoAndAddToDb("setting null", LogDb.TESTING);
-            request.setQueryParams(null);
-        }
-
-        if (requestPayload != null) {
-            String finalPayload =  executeCode(requestPayload, valuesMap);
-            request.setBody(finalPayload);
-        }
-
-        if (requestHeaders != null) {
-            String finalPayload = executeCode(requestHeaders, valuesMap);
-            Map<String, List<String>> res = OriginalHttpRequest.buildHeadersMap(finalPayload);
-            request.setHeaders(res);
-        }
-
-        boolean queryFromReplacedUrlNullOrEmpty = queryFromReplacedUrl == null || queryFromReplacedUrl.trim().isEmpty();
-
-        if (!userSuppliedQueryParamsNullOrEmpty) {
-            loggerMaker.infoAndAddToDb("user has supplied query params", LogDb.TESTING);
-            String finalQueryParams = executeCode(queryParams, valuesMap);
-            loggerMaker.infoAndAddToDb("finalQueryParams: " + finalQueryParams, LogDb.TESTING);
-            if (queryFromReplacedUrlNullOrEmpty) {
-                request.setQueryParams(finalQueryParams);
-            } else {
-                // combine original query params and user defined query params and latter overriding former
-                String combinedQueryParams = OriginalHttpRequest.combineQueryParams(queryFromReplacedUrl, finalQueryParams);
-                loggerMaker.infoAndAddToDb("combinedQueryParams: " + combinedQueryParams, LogDb.TESTING);
-                request.setQueryParams(combinedQueryParams);
-            }
-        } else if (!queryFromReplacedUrlNullOrEmpty) {
-            request.setQueryParams(queryFromReplacedUrl);
-        }
-
-        return request;
+        return com.akto.testing.Utils.buildHttpRequest(updatedSampleData, valuesMap);
     }
-
 
     public static String executeCode(String ogPayload, Map<String, Object> valuesMap) throws Exception {
-        ScriptEngineManager factory = new ScriptEngineManager();
-        String variablesReplacedPayload = replaceVariables(ogPayload,valuesMap, true);
-
-        String regex = "\\#\\[(.*?)]#";
-        Pattern p = Pattern.compile(regex);
-        Matcher matcher = p.matcher(variablesReplacedPayload);
-        StringBuffer sb = new StringBuffer();
-
-        // create a Nashorn script engine
-        ScriptEngine engine = factory.getEngineByName("nashorn");
-
-        while (matcher.find()) {
-            String code = matcher.group(1);
-            code = code.trim();
-            if (!code.endsWith(";")) code = code+";";
-            try {
-                Object val = engine.eval(code);
-                matcher.appendReplacement(sb, val.toString());
-            } catch (final ScriptException se) {
-            }
-
-        }
-
-        matcher.appendTail(sb); 
-        return sb.toString();
+        return com.akto.testing.Utils.executeCode(ogPayload, valuesMap);
     }
 
-
     public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
-        String regex = "\\$\\{((step|x)\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
-        Pattern p = Pattern.compile(regex);
-
-        // replace with values
-        Matcher matcher = p.matcher(payload);
-        StringBuffer sb = new StringBuffer();
-        while (matcher.find()) {
-            String key = matcher.group(1);
-            if (key == null) continue;
-            Object obj = valuesMap.get(key);
-            if (obj == null) {
-                loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
-                throw new Exception("Couldn't find " + key);
-            }
-            String val = obj.toString();
-            if (escapeString) {
-                val = val.replace("\\", "\\\\")
-                        .replace("\t", "\\t")
-                        .replace("\b", "\\b")
-                        .replace("\n", "\\n")
-                        .replace("\r", "\\r")
-                        .replace("\f", "\\f")
-                        .replace("\'", "\\'")
-                        .replace("\"", "\\\"");
-            }
-            matcher.appendReplacement(sb, "");
-            sb.append(val);
-        }
-
-        matcher.appendTail(sb);
-
-        return sb.toString();
+        return com.akto.testing.Utils.replaceVariables(payload, valuesMap, escapeString);
     }
 
     private static int extractJwtExpiry(String token) {

@@ -1,5 +1,6 @@
 package com.akto.agent;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,8 @@ public class AgenticUtils {
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentClient.class, LogDb.TESTING);
+
+    public static final String WEBSOCKET_METHOD = "WS";
 
     private static Map<String,String> getMcpAuthPairs(String roleName) {
 
@@ -66,6 +69,15 @@ public class AgenticUtils {
                 String requestBody = request.getBody();
                 String requestHeaders = request.fetchHeadersJsonString();
                 String requestMethod = request.getMethod();
+
+                // a WebSocket message goes out through the utility server, which connects via the
+                // collection's connection URL: method WS plus the collection id (removed there before sending)
+                if (request.getProtocolType() == OriginalHttpRequest.ProtocolType.WEBSOCKET) {
+                    OriginalHttpRequest wsRequest = request.copy();
+                    wsRequest.getHeaders().put(Constants.AKTO_API_COLLECTION_ID_HEADER, Collections.singletonList(String.valueOf(apiCollectionId)));
+                    requestHeaders = wsRequest.fetchHeadersJsonString();
+                    requestMethod = WEBSOCKET_METHOD;
+                }
 
                 agentClient.initializeAgent(url, requestHeaders, requestBody, requestMethod, conversationId);
                 return;

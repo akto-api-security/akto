@@ -1123,6 +1123,48 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
         return ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(apiInfoKey));
     }
 
+    /**
+     * The URL WebSocket messages of a collection are sent over: its connection-string API (the WS
+     * endpoint itself), else any API of the collection, on the collection's host. null when it has none.
+     */
+    public static String fetchWebSocketConnectionUrl(int apiCollectionId) {
+        Bson inCollection = Filters.eq("_id.apiCollectionId", apiCollectionId);
+        ApiInfo wsInfo = ApiInfoDao.instance.findOne(Filters.and(inCollection, Filters.eq(ApiInfo.IS_CONNECTION_STRING, true)));
+        if (wsInfo == null) {
+            wsInfo = ApiInfoDao.instance.findOne(inCollection);
+        }
+        if (wsInfo == null) {
+            return null;
+        }
+        ApiCollection apiCollection = fetchApiCollectionMeta(apiCollectionId);
+        return buildWebSocketUrl(apiCollection != null ? apiCollection.getHostName() : null, wsInfo.getId().getUrl());
+    }
+
+    // wss unless the host says otherwise (http/ws scheme or localhost), matching ApiExecutor.buildWebSocketUrl
+    private static String buildWebSocketUrl(String hostName, String path) {
+        if (path.startsWith("ws://") || path.startsWith("wss://")) {
+            return path;
+        }
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            return "ws" + path.substring("http".length());
+        }
+        if (hostName == null || hostName.isEmpty()) {
+            return path;
+        }
+        String host = hostName;
+        String scheme = host.toLowerCase().contains("localhost") ? "ws://" : "wss://";
+        if (host.startsWith("http://") || host.startsWith("ws://")) {
+            scheme = "ws://";
+        } else if (host.startsWith("https://") || host.startsWith("wss://")) {
+            scheme = "wss://";
+        }
+        host = host.replaceFirst("^(https?|wss?)://", "");
+        if (host.endsWith("/") && path.startsWith("/")) {
+            host = host.substring(0, host.length() - 1);
+        }
+        return scheme + host + path;
+    }
+
     public static SampleData fetchSampleDataById(int apiCollectionId, String url, URLMethods.Method method) {
         Bson filterQSampleData = Filters.and(
             Filters.eq("_id.apiCollectionId", apiCollectionId),

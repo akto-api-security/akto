@@ -101,6 +101,12 @@ public class SensitiveDataComputeDeltaIT {
         m.put("akto_vxlan_id", String.valueOf(collection));
         m.put("is_pending", pending ? "true" : "false");
         m.put("source", "MIRRORING");
+
+        // Counting now requires an identifiable caller, so these fixtures carry one. What each test
+        // asserts - which values are counted, for which collection and hour - is unaffected by it.
+        m.put("direction", HttpCallParser.DIRECTION_OUTBOUND);
+        m.put("tag", gson.toJson(Collections.singletonMap(
+                HttpCallParser.SERVICE_TAG_KEY, "counting-test-caller")));
         return HttpCallParser.parseKafkaMessage(gson.toJson(m));
     }
 

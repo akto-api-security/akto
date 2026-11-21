@@ -15,6 +15,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Kafka {
+    /** Topic the producer sends a test message to on startup; it must exist for the producer to be ready. */
+    public static final String PING_TOPIC = "akto.misc";
+
     private static final Logger logger = LoggerFactory.getLogger(Kafka.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(Kafka.class, LogDb.TESTING);
     private KafkaProducer<String, String> producer;
@@ -114,7 +117,7 @@ public class Kafka {
         // calling .get() blocks the thread till we receive a message
         // if any error then close the connection
         loggerMaker.infoAndAddToDb("Kafka init: attempting ping to broker: " + brokerIP);
-        ProducerRecord<String, String> record = new ProducerRecord<>("akto.misc", "ping");
+        ProducerRecord<String, String> record = new ProducerRecord<>(PING_TOPIC, "ping");
         try {
             producer.send(record).get();
             producerReady = true;

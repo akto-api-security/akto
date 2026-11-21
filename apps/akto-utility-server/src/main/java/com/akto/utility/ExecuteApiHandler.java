@@ -67,6 +67,10 @@ public class ExecuteApiHandler implements HttpHandler {
                 headers,
                 ""
         );
+        // a WebSocket message (red teaming): ApiExecutor connects via its collection's connection URL
+        if ("WS".equalsIgnoreCase(method)) {
+            request.setProtocolType(OriginalHttpRequest.ProtocolType.WEBSOCKET);
+        }
 
         jobStore.put(jobId, ApiExecutionJobStore.JobEntry.pending(conversationId));
 
