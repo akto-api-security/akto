@@ -123,6 +123,24 @@ public class AgentLearningRequestTest {
     }
 
     @Test
+    public void consolidateReportsADeclinedCallAsNotAccepted() throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        byte[] declined = "{\"accepted\":false,\"reason\":\"red-team learnings are not running (env_off)\"}".getBytes(StandardCharsets.UTF_8);
+        AtomicInteger calls = new AtomicInteger();
+        server.createContext("/consolidateLearnings", exchange -> {
+            calls.incrementAndGet();
+            exchange.sendResponseHeaders(202, declined.length);
+            exchange.getResponseBody().write(declined);
+            exchange.close();
+        });
+        server.start();
+        AgentClient client = new AgentClient("http://127.0.0.1:" + server.getAddress().getPort() + "/");
+
+        assertFalse(client.consolidateLearnings("summary1", 1));
+        assertEquals(1, calls.get());
+    }
+
+    @Test
     public void consolidateDoesNotRetryARefusedRequest() throws IOException {
         AtomicInteger calls = new AtomicInteger();
         AgentClient client = clientAnswering(Collections.singletonList(400), calls, new StringBuilder());

@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import static com.akto.agent.AgenticUtils.getTestModeFromRole;
@@ -69,8 +70,7 @@ public class AgentClient {
             .build();
     /** One dedicated thread; at most one call per finished run, so a small queue is plenty. */
     private static final ExecutorService consolidateExecutor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<>(50),
-            (task, executor) -> loggerMaker.errorAndAddToDb("consolidateLearnings: queue full, a finished run's learnings will not be consolidated"));
+            new ArrayBlockingQueue<>(50), new ThreadPoolExecutor.AbortPolicy());
 
     private static final OkHttpClient agentHttpClient = CoreHTTPClient.client.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -440,10 +440,15 @@ public class AgentClient {
             return false;
         }
         Integer accountId = Context.accountId.get();
-        consolidateExecutor.execute(() -> {
-            Context.accountId.set(accountId);
-            consolidateLearnings(testingRunResultSummaryId, CONSOLIDATE_BACKOFF_MILLIS);
-        });
+        try {
+            consolidateExecutor.execute(() -> {
+                Context.accountId.set(accountId);
+                consolidateLearnings(testingRunResultSummaryId, CONSOLIDATE_BACKOFF_MILLIS);
+            });
+        } catch (RejectedExecutionException e) {
+            loggerMaker.errorAndAddToDb("consolidateLearnings: queue full, learnings of summaryId=" + testingRunResultSummaryId + " will not be consolidated");
+            return false;
+        }
         return true;
     }
 
@@ -453,6 +458,12 @@ public class AgentClient {
         for (int attempt = 1; attempt <= CONSOLIDATE_MAX_ATTEMPTS; attempt++) {
             try (Response response = consolidateHttpClient.newCall(buildConsolidateRequest(testingRunResultSummaryId)).execute()) {
                 if (response.isSuccessful()) {
+                    String body = response.body() != null ? response.body().string() : "";
+                    if (isDeclined(body)) {
+                        // 202 with accepted:false is how the agent server says learnings are switched off; nothing was queued.
+                        loggerMaker.infoAndAddToDb("consolidateLearnings: declined for summaryId=" + testingRunResultSummaryId + ": " + body);
+                        return false;
+                    }
                     loggerMaker.infoAndAddToDb("consolidateLearnings: accepted for summaryId=" + testingRunResultSummaryId);
                     return true;
                 }
@@ -469,6 +480,15 @@ public class AgentClient {
         }
         loggerMaker.errorAndAddToDb("consolidateLearnings: not accepted for summaryId=" + testingRunResultSummaryId + ": " + failure);
         return false;
+    }
+
+    private static boolean isDeclined(String body) {
+        try {
+            JsonNode accepted = objectMapper.readTree(body).get("accepted");
+            return accepted != null && accepted.isBoolean() && !accepted.asBoolean();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static boolean sleepQuietly(long millis) {
