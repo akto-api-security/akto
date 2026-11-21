@@ -1,7 +1,8 @@
 """Fire-and-forget alerting for cascade scans.
 
 Async sinks, all no-ops when their target isn't configured:
-  - post_slack(...)         → Slack incoming webhook (SLACK_WEBHOOK_URL)
+  - post_slack(...)         → Slack incoming webhook (SLACK_WEBHOOK_URL); scan_handler sends only
+                              prompts that timed out (let through unscanned)
   - store_results(...)      → DB abstractor /api/storeGuardrailModelResults
   - store_tripwire_result() → one JSON blob per Tripwire answer (TRIPWIRE_RESULTS_BLOB_URL)
 
@@ -57,7 +58,10 @@ def _build_blocks(scanner_name: str, scanner_type: str, text: str, result: dict[
     # cascade would post "✅ ALLOWED" to Slack for every single request, with
     # nothing to tell a human watching the channel that nothing was actually
     # scanned at all.
-    if error:
+    timed_out = details.get("timed_out") or []
+    if timed_out:
+        verdict = "⏱️ TIMED OUT — let through unscanned"
+    elif error:
         verdict = "⚠️ DEGRADED (fail-open — not actually scanned)"
     else:
         verdict = "✅ ALLOWED" if is_valid else "🚫 BLOCKED"
@@ -94,6 +98,9 @@ def _build_blocks(scanner_name: str, scanner_type: str, text: str, result: dict[
         },
         {"type": "section", "text": {"type": "mrkdwn", "text": f"*Input:*\n```{preview}```"}},
     ]
+    if timed_out:
+        lines = ", ".join(f"`{t.get('provider')}` ({t.get('role')}) after {t.get('timeout_ms')} ms" for t in timed_out)
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Timed out:* {lines}"}})
     if error:
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Fail-open reason:* `{error}`"}})
     if reason:

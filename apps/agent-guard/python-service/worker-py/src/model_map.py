@@ -122,6 +122,10 @@ class ModelMapScanner:
         self.schedule = schedule_fn or _spawn
         self.completed_all: list[dict[str, Any]] = []
         self.tripwire_observes = False
+        # Cascade models that hit their timeout in this scan: {provider, role, timeout_ms}. Reported in
+        # details.timed_out when the scan fails open, since then it's why the prompt went unscanned.
+        self.timed_out: list[dict[str, Any]] = []
+        self._timeout_ms: dict[int, int] = {}  # id(entry) -> the timeout its call was given
 
     # ── Public entry point ──────────────────────────────────────────────────
 
@@ -229,6 +233,7 @@ class ModelMapScanner:
         for scanner, entry in pairs:
             # FallbackProvider: extra room for the backup after a primary timeout
             timeout = _timeout_s(entry, default_timeout_ms) + getattr(scanner.provider, "backup_timeout_s", 0.0)
+            self._timeout_ms[id(entry)] = round(timeout * 1000)
             coro = scanner.scan(self.scanner_name, self.scanner_type, self.text, self.config)
             out[asyncio.ensure_future(asyncio.wait_for(coro, timeout))] = entry
         return out
@@ -296,15 +301,24 @@ class ModelMapScanner:
         winner["is_valid"] = not unsafe
         return winner
 
-    @staticmethod
     def _record_outcome(
-        outcome: Any, entry: dict[str, Any], label: str, log: Callable[..., Any] = logger.error
+        self,
+        outcome: Any,
+        entry: dict[str, Any],
+        label: str,
+        log: Callable[..., Any] = logger.error,
+        cascade: bool = True,
     ) -> dict[str, Any] | None:
-        """Count a failed provider call, or record a successful one's latency. The result, or None if it failed."""
+        """Count a failed provider call, or record a successful one's latency. The result, or None if it failed.
+        A cascade model's timeout is also noted in self.timed_out; an observer's (cascade=False) isn't."""
         provider_name = entry.get("provider") or "unknown"
         if isinstance(outcome, BaseException):
             reason = "timeout" if isinstance(outcome, TimeoutError) else type(outcome).__name__
             metrics_push.COUNTS["provider_errors"].increment(f"{provider_name}:{reason}")
+            if cascade and isinstance(outcome, TimeoutError):
+                self.timed_out.append(
+                    {"provider": provider_name, "role": label, "timeout_ms": self._timeout_ms.get(id(entry))}
+                )
             log(
                 f"[ModelMap] {label} '{entry.get('provider')}' failed "
                 f"(model={entry.get('model') or '-'} baseUrl={entry.get('baseUrl') or '-'} "
@@ -319,7 +333,7 @@ class ModelMapScanner:
     async def _observe(self, observed: TaskMap, winner: dict[str, Any]) -> None:
         """Record the observers' verdicts next to the cascade's. A failed or slow observer is only logged."""
         for outcome, entry in await self._await_map(observed):
-            result = self._record_outcome(outcome, entry, "observer", logger.warning)
+            result = self._record_outcome(outcome, entry, "observer", logger.warning, cascade=False)
             if result is None:
                 continue
             self.completed_all.append(result)
@@ -417,6 +431,8 @@ class ModelMapScanner:
                 details[key] = winner_details[key]
         if "error" in winner_details:  # fail-open marker: callers must not cache degraded verdicts
             details["error"] = winner_details["error"]
+            if self.timed_out:  # the prompt went unscanned and models timed out: a timed-out prompt
+                details["timed_out"] = self.timed_out
         if winner_details.get("values"):  # Password: exact secret substrings to redact
             details["values"] = winner_details["values"]
         # Also carry decision_confidence from the top-level winner result if not

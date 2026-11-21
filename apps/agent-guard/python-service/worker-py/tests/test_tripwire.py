@@ -449,3 +449,9 @@ async def test_a_failed_open_scan_is_stored_as_failed_open_without_the_prompt():
     [record] = BLOBS
     assert record["scan"] == {"blocked": False, "risk_score": 0.0, "decided_by": "", "failed_open": True}
     assert "text" not in record
+
+
+async def test_a_tripwire_timeout_is_not_a_timed_out_prompt():
+    # Tripwire only observes: its timeout never makes a prompt "timed out" (the per-prompt Slack alert).
+    r = await _scan(RuntimeError("arbiter down"), TimeoutError())  # fails open on an error, Tripwire times out
+    assert r["details"]["error"] == "all arbiters failed" and "timed_out" not in r["details"]
