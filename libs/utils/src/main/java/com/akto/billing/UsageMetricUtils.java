@@ -16,6 +16,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.Config;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
@@ -242,121 +243,28 @@ public class UsageMetricUtils {
 
 
     /**
-     * Intelligently checks for agentic overage based on available limits:
-     * - If only MCP limit exists: check MCP overage only
-     * - If only GenAI limit exists: check GenAI overage only
-     * - If both limits exist: check if either limit is exceeded
+     * Whether endpoints of a collection must not be ingested because its asset metric (e.g.
+     * AI_ASSET_COUNT, which counts collections) is at or over its limit.
+     *
+     * Only assets created after the overage was first detected are blocked: collections that
+     * already existed (and are already counted) keep being ingested. An unknown overage time never
+     * blocks existing assets. An org without the entitlement is blocked, as before.
      */
-    public static boolean checkCombinedAgenticOverage(int accountId) {
-        try {
-            Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
-            if (organization == null) {
-                return false;
-            }
-
-            // Get both MCP and GenAI limits
-            FeatureAccess mcpAccess = getFeatureAccess(organization, MetricTypes.MCP_ASSET_COUNT);
-            FeatureAccess aiAccess = getFeatureAccess(organization, MetricTypes.AI_ASSET_COUNT);
-            
-            boolean hasMcpLimit = !mcpAccess.checkBooleanOrUnlimited();
-            boolean hasAiLimit = !aiAccess.checkBooleanOrUnlimited();
-            
-            // Case 1: No limits - no overage possible
-            if (!hasMcpLimit && !hasAiLimit) {
-                return false;
-            }
-            
-            // Case 2: Only MCP limit exists - check MCP overage only
-            if (hasMcpLimit && !hasAiLimit) {
-                return mcpAccess.getUsage() >= mcpAccess.getUsageLimit();
-            }
-            
-            // Case 3: Only GenAI limit exists - check GenAI overage only  
-            if (!hasMcpLimit && hasAiLimit) {
-                return aiAccess.getUsage() >= aiAccess.getUsageLimit();
-            }
-            
-            // Case 4: Both limits exist - check if either is exceeded
-            if (hasMcpLimit && hasAiLimit) {
-                boolean mcpOverage = mcpAccess.getUsage() >= mcpAccess.getUsageLimit();
-                boolean aiOverage = aiAccess.getUsage() >= aiAccess.getUsageLimit();
-                return mcpOverage || aiOverage;
-            }
-            
-            return false;
-            
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error checking combined agentic overage for account: " + accountId, LogDb.DASHBOARD);
+    public static boolean shouldSkipNewAsset(FeatureAccess featureAccess, ApiCollection apiCollection) {
+        if (apiCollection == null) {
             return false;
         }
-    }
-
-    /**
-     * Gets an intelligent sync limit for agentic assets based on available limits:
-     * - If only MCP limit exists: use MCP limit
-     * - If only GenAI limit exists: use GenAI limit  
-     * - If both limits exist: use combined agentic approach (sum of both)
-     */
-    public static SyncLimit getCombinedAgenticSyncLimit(int accountId) {
-        try {
-            Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
-            if (organization == null) {
-                return SyncLimit.noLimit;
-            }
-
-            // Get both MCP and GenAI limits
-            FeatureAccess mcpAccess = getFeatureAccess(organization, MetricTypes.MCP_ASSET_COUNT);
-            FeatureAccess aiAccess = getFeatureAccess(organization, MetricTypes.AI_ASSET_COUNT);
-            
-            boolean hasMcpLimit = !mcpAccess.checkBooleanOrUnlimited();
-            boolean hasAiLimit = !aiAccess.checkBooleanOrUnlimited();
-            
-            // Case 1: No limits at all - unlimited
-            if (!hasMcpLimit && !hasAiLimit) {
-                return SyncLimit.noLimit;
-            }
-            
-            // Case 2: Only MCP limit exists - use standalone MCP
-            if (hasMcpLimit && !hasAiLimit) {
-                int mcpUsageLeft = Math.max(mcpAccess.getUsageLimit() - mcpAccess.getUsage(), 0);
-                if (mcpAccess.getUsage() >= mcpAccess.getUsageLimit()) {
-                    return new SyncLimit(true, 0);
-                }
-                return new SyncLimit(true, mcpUsageLeft);
-            }
-            
-            // Case 3: Only GenAI limit exists - use standalone GenAI
-            if (!hasMcpLimit && hasAiLimit) {
-                int aiUsageLeft = Math.max(aiAccess.getUsageLimit() - aiAccess.getUsage(), 0);
-                if (aiAccess.getUsage() >= aiAccess.getUsageLimit()) {
-                    return new SyncLimit(true, 0);
-                }
-                return new SyncLimit(true, aiUsageLeft);
-            }
-            
-            // Case 4: Both limits exist - use combined agentic approach (sum)
-            if (hasMcpLimit && hasAiLimit) {
-                int mcpUsageLeft = Math.max(mcpAccess.getUsageLimit() - mcpAccess.getUsage(), 0);
-                int aiUsageLeft = Math.max(aiAccess.getUsageLimit() - aiAccess.getUsage(), 0);
-                
-                // If either limit is exceeded, no usage left
-                if (mcpAccess.getUsage() >= mcpAccess.getUsageLimit() ||
-                    aiAccess.getUsage() >= aiAccess.getUsageLimit()) {
-                    return new SyncLimit(true, 0);
-                }
-                
-                // Sum both remaining usages for maximum agentic flexibility
-                int combinedUsageLeft = mcpUsageLeft + aiUsageLeft;
-                return new SyncLimit(true, combinedUsageLeft);
-            }
-            
-            // Fallback - no limit
-            return SyncLimit.noLimit;
-            
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error getting combined agentic sync limit for account: " + accountId, LogDb.DASHBOARD);
-            return SyncLimit.noLimit;
+        if (!featureAccess.getIsGranted()) {
+            return true;
         }
+        if (featureAccess.checkBooleanOrUnlimited() || featureAccess.getUsage() < featureAccess.getUsageLimit()) {
+            return false;
+        }
+        int overageFirstDetected = featureAccess.getOverageFirstDetected();
+        if (overageFirstDetected <= 0) {
+            return false;
+        }
+        return apiCollection.getStartTs() > overageFirstDetected;
     }
 
     public static FeatureAccess getFeatureAccess(int accountId, MetricTypes metricType) {
