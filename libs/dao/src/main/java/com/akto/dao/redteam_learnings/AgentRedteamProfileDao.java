@@ -54,6 +54,11 @@ public class AgentRedteamProfileDao extends AgentRedteamDao<AgentRedteamProfile>
         replaceOne(Filters.eq("_id", profile.getId()), profile);
     }
 
+    /** One version by its deterministic id, without its grid cells; null when it was never saved. */
+    public AgentRedteamProfile findVersion(String id) {
+        return findOne(Filters.eq("_id", id), WITHOUT_CELLS);
+    }
+
     /**
      * The newest version for the agent, without its grid cells (the writers here need its insights and totals; the
      * cells are rebuilt from the observations); null when nothing has been learned about it.

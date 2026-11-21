@@ -39,18 +39,19 @@ public class AgentConversationResultDao extends AccountsContextDao<AgentConversa
 
     /**
      * The stored turns of each conversation in the order they were written (one document per turn, inserted in turn
-     * order), carrying only what was sent to the target and what it replied. A conversation with no stored turns is
-     * absent from the map. Served by the conversationId index.
+     * order), carrying only what was sent to the target and what it replied. At most MAX_TURNS_PER_CONVERSATION + 1 are
+     * read per conversation, so a caller can tell a cut-off conversation from a complete one; a conversation with no
+     * stored turns is absent from the map. One indexed query per conversation (the callers pass a few dozen at most),
+     * because a single shared limit let one long conversation use up the rows of all the others.
      */
     public Map<String, List<AgentConversationResult>> findTurns(List<String> conversationIds) {
         Map<String, List<AgentConversationResult>> turns = new LinkedHashMap<>();
-        if (conversationIds == null || conversationIds.isEmpty()) return turns;
-        List<AgentConversationResult> rows = findAll(Filters.in(CONVERSATION_ID, conversationIds),
-                0, conversationIds.size() * MAX_TURNS_PER_CONVERSATION, Sorts.ascending("_id"),
-                Projections.include(CONVERSATION_ID, FINAL_SENT_PROMPT, RESPONSE));
-        for (AgentConversationResult row : rows) {
-            List<AgentConversationResult> conversation = turns.computeIfAbsent(row.getConversationId(), id -> new ArrayList<>());
-            if (conversation.size() < MAX_TURNS_PER_CONVERSATION) conversation.add(row);
+        if (conversationIds == null) return turns;
+        for (String conversationId : conversationIds) {
+            List<AgentConversationResult> rows = findAll(Filters.eq(CONVERSATION_ID, conversationId),
+                    0, MAX_TURNS_PER_CONVERSATION + 1, Sorts.ascending("_id"),
+                    Projections.include(CONVERSATION_ID, FINAL_SENT_PROMPT, RESPONSE));
+            if (!rows.isEmpty()) turns.put(conversationId, rows);
         }
         return turns;
     }
