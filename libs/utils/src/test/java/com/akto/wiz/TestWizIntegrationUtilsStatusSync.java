@@ -7,11 +7,14 @@ import static org.junit.Assert.assertTrue;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.bson.BsonDocument;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.junit.Test;
 
 import com.mongodb.MongoClientSettings;
@@ -228,5 +231,31 @@ public class TestWizIntegrationUtilsStatusSync {
             assertTrue(!doc.getDocument("$set").containsKey("ignoreReason"));
             assertTrue(doc.getDocument("$unset").containsKey("ignoreReason"));
         }
+    }
+
+    // ---- collectAffectedSummaryIds ----
+
+    private static TestingRunIssues issueWithSummary(String testSubCategory, ObjectId summaryId) {
+        TestingRunIssues issue = issue(testSubCategory, TestRunIssueStatus.OPEN);
+        issue.setLatestTestingRunSummaryId(summaryId);
+        return issue;
+    }
+
+    // Only changed issues contribute; issues sharing a summary give one id; issues with no summary id are ignored.
+    @Test
+    public void testCollectAffectedSummaryIds() {
+        ObjectId summaryA = new ObjectId();
+        ObjectId summaryB = new ObjectId();
+        List<TestingRunIssues> issues = Arrays.asList(
+            issueWithSummary("NO_AUTH", summaryA),           // changed
+            issueWithSummary("BOLA", summaryA),              // changed, same summary: counted once
+            issueWithSummary("BFLA", summaryB),              // not changed: its summary is not affected
+            issueWithSummary("JWT_NONE_ALGO", null));        // changed but has no summary id: ignored
+        Set<TestingIssuesId> changed = new HashSet<>(Arrays.asList(issueId("NO_AUTH"), issueId("BOLA"), issueId("JWT_NONE_ALGO")));
+
+        Set<ObjectId> result = WizIntegrationUtils.collectAffectedSummaryIds(issues, changed);
+
+        assertEquals(1, result.size());
+        assertTrue(result.contains(summaryA));
     }
 }
