@@ -186,6 +186,86 @@ public class RedteamLearningsActionTest extends MongoBasedTest {
         assertEquals(false, response.get("finalVersionSavedInRun"));
     }
 
+    private static AgentConversationResult turn(String conversationId, int number) {
+        AgentConversationResult turn = new AgentConversationResult();
+        turn.setConversationId(conversationId);
+        turn.setFinalSentPrompt("sent " + number);
+        turn.setResponse("reply " + number);
+        return turn;
+    }
+
+    @Test
+    public void aLongConversationDoesNotUseUpTheTurnsOfTheOthersAndIsFlaggedAsCutOff() throws Exception {
+        store(observation("c1", "JUDGED", "2", "s1"), observation("c2", "JUDGED", "1", "s2"));
+        List<AgentConversationResult> turns = new ArrayList<>();
+        for (int i = 1; i <= 25; i++) turns.add(turn("c1", i));
+        turns.add(turn("c2", 1));
+        AgentConversationResultDao.instance.insertMany(turns);
+
+        RedteamLearningsAction action = action("{" + identity() + ",\"samplesPerVerdict\":5}");
+        assertEquals("SUCCESS", action.fetchRedteamConsolidationInput());
+        List<Map<String, Object>> samples = (List<Map<String, Object>>) action.getResponse().get("samples");
+
+        assertEquals("c1", ((AgentRedteamObservation) samples.get(0).get("observation")).getId());
+        assertEquals(AgentConversationResultDao.MAX_TURNS_PER_CONVERSATION, ((List<?>) samples.get(0).get("turns")).size());
+        assertEquals("cut off, not missing", true, samples.get(0).get("turnsTruncated"));
+        assertEquals("the other conversation still has its turn", 1, ((List<?>) samples.get(1).get("turns")).size());
+        assertEquals(true, samples.get(1).get("turnsAvailable"));
+        assertEquals(false, samples.get(1).get("turnsTruncated"));
+    }
+
+    @Test
+    public void rawTargetTextInASampleIsCapped() throws Exception {
+        store(observation("c1", "JUDGED", "2", "s1"));
+        AgentConversationResult huge = turn("c1", 1);
+        huge.setResponse(String.join("", Collections.nCopies(RedteamLearningsAction.MAX_TURN_TEXT_CHARS * 3, "x")));
+        AgentConversationResultDao.instance.insertMany(Collections.singletonList(huge));
+
+        RedteamLearningsAction action = action("{" + identity() + "}");
+        assertEquals("SUCCESS", action.fetchRedteamConsolidationInput());
+        List<Map<String, Object>> samples = (List<Map<String, Object>>) action.getResponse().get("samples");
+        String response = (String) ((List<Map<String, Object>>) samples.get(0).get("turns")).get(0).get("response");
+        assertEquals(RedteamLearningsAction.MAX_TURN_TEXT_CHARS, response.length());
+    }
+
+    @Test
+    public void aBatchVersionNeverReplacesTheFinalOneAndARetryKeepsItsAge() throws Exception {
+        store(observation("c1", "JUDGED", "2", "s1"));
+        String finalBody = "{" + identity() + ",\"batchNo\":1,\"finalVersion\":true,\"insights\":[" + insight("i1") + "]}";
+        assertEquals("SUCCESS", action(finalBody).saveRedteamProfile());
+        String versionId = AgentRedteamProfile.buildVersionId(COLLECTION, "POST", URL, RUN, 1);
+        AgentRedteamProfile first = AgentRedteamProfileDao.instance.findOne(Filters.eq("_id", versionId));
+
+        Thread.sleep(5);
+        assertEquals("a late batch with the same number is refused", "ERROR", save(1, insight("i2"), null).saveRedteamProfile());
+        AgentRedteamProfile afterLateBatch = AgentRedteamProfileDao.instance.findOne(Filters.eq("_id", versionId));
+        assertTrue(afterLateBatch.isFinalVersion());
+        assertEquals("i1", afterLateBatch.getInsights().get(0).getId());
+
+        assertEquals("SUCCESS", action(finalBody).saveRedteamProfile());
+        AgentRedteamProfile retried = AgentRedteamProfileDao.instance.findOne(Filters.eq("_id", versionId));
+        assertEquals("a retry does not make the version look newer", first.getCreatedAtMs(), retried.getCreatedAtMs());
+    }
+
+    @Test
+    public void anObservationOlderThanTheRetentionIsRefusedInsteadOfStoredAndDeleted() throws Exception {
+        long tooOld = NOW - 31L * 24 * 3600 * 1000;
+        String old = observation("c1", "JUDGED", "2", "s1").replace("\"eventTimeMs\":" + NOW, "\"eventTimeMs\":" + tooOld);
+        Map<String, Object> response = store(old);
+        assertEquals(0, response.get("stored"));
+        assertTrue(((List<?>) response.get("rejected")).get(0).toString().contains("retention"));
+    }
+
+    @Test
+    public void aDraftWithAnAbsurdNumberOfStrategiesIsRefused() throws Exception {
+        store(observation("c1", "JUDGED", "2", "s1"));
+        StringBuilder keys = new StringBuilder();
+        for (int i = 0; i < 5000; i++) keys.append(i == 0 ? "" : ",").append("\"s").append(i).append("\"");
+        String draft = draft("i1").replace("[\"s1\",\"s2\"]", "[" + keys + "]");
+        assertEquals("ERROR", save(1, insight("i1"), draft).saveRedteamProfile());
+        assertEquals(0, AgentRedteamProfileDao.instance.count(new BasicDBObject()));
+    }
+
     @Test
     public void anEmptyOrInsightlessVersionIsNeverSaved() throws Exception {
         RedteamLearningsAction nothingJudged = save(0, insight("i1"), null);

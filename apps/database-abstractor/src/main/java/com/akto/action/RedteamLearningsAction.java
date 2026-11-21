@@ -50,7 +50,10 @@ public class RedteamLearningsAction extends ActionSupport {
     static final int MAX_SHORT_TEXT_CHARS = 200;
     static final int MAX_LONG_TEXT_CHARS = 2000;
     static final int MAX_YAML_CHARS = 20000;
+    /** A failure on our side (answered 5xx, so callers retry); fail() is a refusal of this request (4xx, never retried). */
+    static final String SERVER_ERROR = "SERVER_ERROR";
     static final int MAX_TURNS = 50;
+    static final int MAX_TURN_TEXT_CHARS = 2000;
     static final int MAX_REFERENCED_IDS = 20;
     static final int MAX_STRATEGIES_PER_DRAFT = 13;
     static final int MAX_IMPORTANCE = 100;
@@ -205,6 +208,14 @@ public class RedteamLearningsAction extends ActionSupport {
             profile.setInsights(insights);
 
             AgentRedteamProfileDao.instance.ensureIndicesOnce();
+            AgentRedteamProfile existing = AgentRedteamProfileDao.instance.findVersion(profile.getId());
+            if (existing != null) {
+                if (existing.isFinalVersion() && !profile.isFinalVersion()) {
+                    return fail("this run already saved its final version for this agent; a batch version never replaces it");
+                }
+                // "Latest" is decided by createdAtMs, so a retry must not make an old version look new.
+                profile.setCreatedAtMs(existing.getCreatedAtMs());
+            }
             AgentRedteamProfileDao.instance.saveVersion(profile);
 
             int draftsInserted = 0;
@@ -297,6 +308,10 @@ public class RedteamLearningsAction extends ActionSupport {
         if (o.getTurns() < 0 || o.getTurns() > MAX_TURNS) return "turns must be between 0 and " + MAX_TURNS;
         if (o.getResponseChars() < 0) return "responseChars must not be negative";
         if (o.getEventTimeMs() <= 0 || o.getEventTimeMs() > now + MAX_FUTURE_SKEW_MS) return "eventTimeMs must be a real event time in milliseconds";
+        // An older observation would be given an expiry in the past and deleted within a minute of being "stored".
+        if (o.getEventTimeMs() < now - TimeUnit.DAYS.toMillis(AgentRedteamObservation.RETENTION_DAYS)) {
+            return "eventTimeMs is older than the " + AgentRedteamObservation.RETENTION_DAYS + "-day retention";
+        }
 
         o.setAgentBehaviorClass(clean(o.getAgentBehaviorClass(), MAX_KEY_CHARS));
         o.setTestSubType(clean(o.getTestSubType(), MAX_SHORT_TEXT_CHARS));
@@ -354,7 +369,7 @@ public class RedteamLearningsAction extends ActionSupport {
             }
             d.setYamlContent(clean(d.getYamlContent(), Integer.MAX_VALUE));
             if (d.getYamlContent() == null || d.getYamlContent().length() > MAX_YAML_CHARS) return "draft " + i + ": yamlContent is required (at most " + MAX_YAML_CHARS + " characters)";
-            List<String> strategies = cleanList(d.getStrategyKeys(), Integer.MAX_VALUE, Integer.MAX_VALUE);
+            List<String> strategies = cleanList(d.getStrategyKeys(), MAX_STRATEGIES_PER_DRAFT + 1, Integer.MAX_VALUE);
             if (strategies.isEmpty() || strategies.size() > MAX_STRATEGIES_PER_DRAFT) return "draft " + i + ": between 1 and " + MAX_STRATEGIES_PER_DRAFT + " strategyKeys";
             for (String key : strategies) {
                 if (key.length() > MAX_KEY_CHARS) return "draft " + i + ": a strategy key is longer than " + MAX_KEY_CHARS + " characters";
@@ -391,10 +406,12 @@ public class RedteamLearningsAction extends ActionSupport {
 
     private static Map<String, Object> sample(AgentRedteamObservation observation, List<AgentConversationResult> stored) {
         List<Map<String, Object>> turns = new ArrayList<>();
-        for (AgentConversationResult turn : stored) {
+        boolean truncated = stored.size() > AgentConversationResultDao.MAX_TURNS_PER_CONVERSATION;
+        for (AgentConversationResult turn : stored.subList(0, Math.min(stored.size(), AgentConversationResultDao.MAX_TURNS_PER_CONVERSATION))) {
             Map<String, Object> t = new LinkedHashMap<>();
-            t.put("sentPrompt", turn.getFinalSentPrompt());
-            t.put("response", turn.getResponse());
+            // Raw target output is capped so one response cannot make the whole answer too large to relay.
+            t.put("sentPrompt", clean(turn.getFinalSentPrompt(), MAX_TURN_TEXT_CHARS));
+            t.put("response", clean(turn.getResponse(), MAX_TURN_TEXT_CHARS));
             turns.add(t);
         }
         Map<String, Object> sample = new LinkedHashMap<>();
@@ -402,6 +419,8 @@ public class RedteamLearningsAction extends ActionSupport {
         sample.put("turns", turns);
         // The turns are written when the whole conversation ends, so a very recent one may not be there yet.
         sample.put("turnsAvailable", !turns.isEmpty());
+        // Only the first turns are returned for a long conversation; absent turns are cut off, not missing.
+        sample.put("turnsTruncated", truncated);
         return sample;
     }
 
@@ -447,6 +466,6 @@ public class RedteamLearningsAction extends ActionSupport {
     private String error(String message, Exception e) {
         logger.errorAndAddToDb(e, message + ": " + e.getMessage());
         addActionError(message);
-        return Action.ERROR.toUpperCase();
+        return SERVER_ERROR;
     }
 }
