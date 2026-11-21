@@ -107,6 +107,15 @@ public class FeatureAccess {
         return checkOverageAfterGrace();
     }
 
+    /**
+     * Whether a recorded overage has outlasted the grace period. Same rule as
+     * checkOverageAfterGrace, but reads only: it never records a new overage time.
+     */
+    public boolean overageOutlastedGrace() {
+        int grace = gracePeriod > 0 ? gracePeriod : STANDARD_GRACE_PERIOD;
+        return overageFirstDetected > 0 && overageFirstDetected + grace <= Context.now();
+    }
+
     private boolean checkOverageAfterGrace() {
         if (usage >= usageLimit) {
             if (overageFirstDetected == -1) {

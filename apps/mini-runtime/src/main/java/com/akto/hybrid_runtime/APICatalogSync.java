@@ -19,6 +19,7 @@ import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
@@ -1449,8 +1450,13 @@ public class APICatalogSync {
     static int lastBuildFromDb = 0;
     final static int DB_REFRESH_CYCLE = 15 * 60; // 15 minutes
 
+    /**
+     * @param collectionsWithTags the runtime's collections with their tags, which decide the limit a
+     *        collection gets (this method's own metadata fetch leaves tags out)
+     * @param endpointAssetAccess null when ENDPOINT_ASSET_COUNT is not configured: no limit
+     */
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit apiSyncLimit,
-        SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit) {
+        FeatureAccess aiAssetAccess, FeatureAccess endpointAssetAccess, Map<Integer, ApiCollection> collectionsWithTags) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI);
         this.origRedactor = PayloadRedaction.newOrigRedactor();
         List<Object> writesForParams = new ArrayList<>();
@@ -1489,15 +1495,17 @@ public class APICatalogSync {
              * Caching for the actual API call is done in getDeactivated() function.
              */
             demosAndDeactivatedCollections = getDemosAndDeactivated();
-            Pair<SyncLimit, MetricTypes> syncLimitPair = getSyncLimitForApiCollection(
-                apiCollectionMap.get(apiCollectionId), apiSyncLimit,
-                mcpAssetsSyncLimit, aiAssetsSyncLimit);
+            ApiCollection taggedCollection = collectionsWithTags != null && collectionsWithTags.containsKey(apiCollectionId)
+                ? collectionsWithTags.get(apiCollectionId) : apiCollectionMap.get(apiCollectionId);
+            Pair<SyncLimit, MetricTypes> syncLimitPair = SyncLimitPolicy.forCollection(
+                taggedCollection, apiSyncLimit, aiAssetAccess, endpointAssetAccess);
 
             SyncLimit syncLimit = syncLimitPair.getFirst();
 
             if (syncLimit.checkLimit && !demosAndDeactivatedCollections.contains(apiCollectionId)) {
                 
                 int deltaUsage = 0;
+                int skippedEndpoints = 0;
                 Iterator<Entry<URLStatic, RequestTemplate>> staticUrlIterator = deltaCatalog.getStrictURLToMethods().entrySet().iterator();
                 while (staticUrlIterator.hasNext()) {
                     Entry<URLStatic, RequestTemplate> entry = staticUrlIterator.next();
@@ -1513,6 +1521,7 @@ public class APICatalogSync {
                                 urlStatic.getUrl()
                             );
                             staticUrlIterator.remove();
+                            skippedEndpoints++;
                             aktoPolicyNew.removeApiInfo(apiCollectionId, urlStatic.getUrl(), urlStatic.getMethod());;
                             if (Utils.printDebugUrlLog(checkString)) {
                                 loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);
@@ -1540,6 +1549,7 @@ public class APICatalogSync {
                                 urlTemplate.getTemplateString()
                             );
                             templateUrlIterator.remove();
+                            skippedEndpoints++;
                             aktoPolicyNew.removeApiInfo(apiCollectionId, urlTemplate.getTemplateString(), urlTemplate.getMethod());
                             if (Utils.printDebugUrlLog(checkString)) {
                                 loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);
@@ -1551,7 +1561,15 @@ public class APICatalogSync {
                     }
                 }
 
-                dataActor.updateUsage(syncLimitPair.getSecond(), deltaUsage);
+                if (skippedEndpoints > 0) {
+                    loggerMaker.infoAndAddToDb("Limit reached for account " + Context.accountId.get() + ", skipped "
+                        + skippedEndpoints + " new endpoints in collection " + apiCollectionId);
+                }
+
+                // Only endpoint-counted metrics report endpoint deltas; asset metrics are measured by the usage cron.
+                if (syncLimitPair.getSecond() != null) {
+                    dataActor.updateUsage(syncLimitPair.getSecond(), deltaUsage);
+                }
                 loggerMaker.infoAndAddToDb("Syncing done after passing checking limit: " + deltaUsage);
             }
 
@@ -2089,21 +2107,4 @@ public class APICatalogSync {
         this.mergeUrlsOnVersions = mergeUrlsOnVersions;
     }
 
-    private Pair<SyncLimit, MetricTypes> getSyncLimitForApiCollection(ApiCollection apiCollection, SyncLimit apiSyncLimit,
-        SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit) {
-
-        if (apiCollection == null) {
-            return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
-        }
-
-        if (apiCollection.isMcpCollection()) {
-            return new Pair<>(mcpAssetsSyncLimit, MetricTypes.MCP_ASSET_COUNT);
-        }
-
-        if (apiCollection.isGenAICollection()) {
-            return new Pair<>(aiAssetsSyncLimit, MetricTypes.AI_ASSET_COUNT);
-        }
-
-        return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
-    }
 }
