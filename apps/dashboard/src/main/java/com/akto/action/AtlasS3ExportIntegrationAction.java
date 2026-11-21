@@ -13,7 +13,7 @@ import com.akto.jobs.JobScheduler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
-import com.mongodb.BasicDBObject;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
@@ -55,13 +55,14 @@ public class AtlasS3ExportIntegrationAction extends UserAction {
     private AtlasS3ExportIntegration atlasS3ExportIntegration;
 
     public String fetchAtlasS3ExportIntegration() {
-        atlasS3ExportIntegration = AtlasS3ExportIntegrationDao.instance.findOne(new BasicDBObject(),
+        atlasS3ExportIntegration = AtlasS3ExportIntegrationDao.instance.findOne(sourceFilter(),
             Projections.exclude(AtlasS3ExportIntegration.SECRET_ACCESS_KEY));
         return Action.SUCCESS.toUpperCase();
     }
 
     public String addAtlasS3ExportIntegration() {
-        if (DashboardMode.isOnPremDeployment()
+        CONTEXT_SOURCE source = Context.contextSource.get();
+        if ((source != CONTEXT_SOURCE.ENDPOINT && source != CONTEXT_SOURCE.AGENTIC) || DashboardMode.isOnPremDeployment()
             || !UsageMetricUtils.getFeatureAccessSaas(Context.accountId.get(), AtlasS3ExportIntegration.FEATURE_LABEL).getIsGranted()) {
             addActionError("Atlas log export to S3 is not enabled for this account.");
             return Action.ERROR.toUpperCase();
@@ -83,7 +84,7 @@ public class AtlasS3ExportIntegrationAction extends UserAction {
             addActionError("Please enter a valid AWS region, e.g. us-east-1.");
             return Action.ERROR.toUpperCase();
         }
-        AtlasS3ExportIntegration existing = AtlasS3ExportIntegrationDao.instance.findOne(new BasicDBObject());
+        AtlasS3ExportIntegration existing = AtlasS3ExportIntegrationDao.instance.findOne(sourceFilter());
         if (useAccessKeys) {
             if (!ACCESS_KEY_ID_PATTERN.matcher(accessKeyId).matches()) {
                 addActionError("Please enter a valid AWS access key ID (starts with AKIA).");
@@ -106,7 +107,7 @@ public class AtlasS3ExportIntegrationAction extends UserAction {
                 Filters.ne(Job.JOB_STATUS, JobStatus.STOPPED.name()))) == null) {
             // Checkpoint 0: the job starts from the oldest Atlas trace and sends all history, a batch per run.
             Job job = JobScheduler.scheduleRecurringJob(Context.accountId.get(),
-                new AtlasS3ExportJobParams(0), JobExecutorType.DASHBOARD, EXPORT_INTERVAL_SECONDS);
+                new AtlasS3ExportJobParams(0, source.name()), JobExecutorType.DASHBOARD, EXPORT_INTERVAL_SECONDS);
             if (job == null) {
                 addActionError("Failed to schedule Atlas S3 export. Please try again.");
                 return Action.ERROR.toUpperCase();
@@ -136,17 +137,22 @@ public class AtlasS3ExportIntegrationAction extends UserAction {
             updates.add(Updates.unset(AtlasS3ExportIntegration.ACCESS_KEY_ID));
             updates.add(Updates.unset(AtlasS3ExportIntegration.SECRET_ACCESS_KEY));
         }
-        AtlasS3ExportIntegrationDao.instance.updateOne(new BasicDBObject(), Updates.combine(updates));
+        AtlasS3ExportIntegrationDao.instance.updateOne(sourceFilter(), Updates.combine(updates));
         loggerMaker.infoAndAddToDb("Saved Atlas S3 export integration for bucket " + bucketName);
         return Action.SUCCESS.toUpperCase();
     }
 
+    // Atlas (ENDPOINT) and Argus (AGENTIC) dashboards each have their own export config and job.
+    private static Bson sourceFilter() {
+        return Filters.eq(AtlasS3ExportIntegration.SOURCE, Context.contextSource.get().name());
+    }
+
     public String removeAtlasS3ExportIntegration() {
-        AtlasS3ExportIntegration existing = AtlasS3ExportIntegrationDao.instance.findOne(new BasicDBObject());
+        AtlasS3ExportIntegration existing = AtlasS3ExportIntegrationDao.instance.findOne(sourceFilter());
         if (existing != null && existing.getExportJobId() != null) {
             JobScheduler.deleteJob(existing.getExportJobId());
         }
-        AtlasS3ExportIntegrationDao.instance.deleteAll(new BasicDBObject());
+        AtlasS3ExportIntegrationDao.instance.deleteAll(sourceFilter());
         loggerMaker.infoAndAddToDb("Removed Atlas S3 export integration");
         return Action.SUCCESS.toUpperCase();
     }
