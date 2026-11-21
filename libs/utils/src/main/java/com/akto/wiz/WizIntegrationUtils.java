@@ -56,6 +56,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 public class WizIntegrationUtils {
 
@@ -70,6 +71,8 @@ public class WizIntegrationUtils {
     private static final int TESTING_RUN_RESULT_BATCH_SIZE = 500;
     private static final int LARGE_TEXT_BATCH_SIZE = 50;
     private static final int WIZ_SYNC_PAGE_SIZE = 100;
+
+    private static final int WIZ_MARK_FINDINGS_BATCH_SIZE = 1000;
 
     public static boolean isWizDevMode() {
         String wizDevMode = System.getenv("WIZ_DEV_MODE");
@@ -726,16 +729,50 @@ public class WizIntegrationUtils {
 
     public static void markIssuesAsWizFinding(List<TestingIssuesId> testingIssuesIdList) throws Exception {
         try {
-            TestingRunIssuesDao.instance.updateMany(
-                Filters.in(Constants.ID, testingIssuesIdList),
-                Updates.combine(
-                    Updates.set(TestingRunIssues.WIZ_FINDING_URL, "unavailable"),
-                    Updates.set(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, WizIntegration.FindingCreationStatus.CREATION_REQUESTED.toString())
-                )
+            Bson markAsFinding = Updates.combine(
+                Updates.set(TestingRunIssues.WIZ_FINDING_URL, "unavailable"),
+                Updates.set(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, WizIntegration.FindingCreationStatus.CREATION_REQUESTED.toString())
             );
+            for (int from = 0; from < testingIssuesIdList.size(); from += WIZ_MARK_FINDINGS_BATCH_SIZE) {
+                List<TestingIssuesId> batch = testingIssuesIdList.subList(from, Math.min(from + WIZ_MARK_FINDINGS_BATCH_SIZE, testingIssuesIdList.size()));
+                TestingRunIssuesDao.instance.updateMany(Filters.in(Constants.ID, batch), markAsFinding);
+            }
         } catch (Exception e) {
             throw new Exception("Error marking issues as Wiz findings: " + e.getMessage());
         }
+    }
+
+    /**
+     * Auto-ticketing for Wiz: marks the OPEN issues of a test run summary, at the given severities, as Wiz findings.
+     * No job is scheduled; the recurring Wiz sync job uploads whatever is marked CREATION_REQUESTED.
+     * Issues that are already Wiz findings are left alone. Returns the number of issues marked.
+     */
+    public static int markSummaryIssuesAsWizFindings(ObjectId summaryId, List<String> severities) throws Exception {
+        if (WizIntegrationDao.instance.findOne(new BasicDBObject()) == null) {
+            loggerMaker.infoAndAddToDb("Wiz not integrated. Skipping auto-creation of Wiz findings.");
+            return 0;
+        }
+
+        List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
+            Filters.and(
+                Filters.eq(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, summaryId),
+                Filters.in(TestingRunIssues.KEY_SEVERITY, severities),
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                // matches a missing or null status: the exact complement of the sync job's `ne(status, null)` filter
+                Filters.eq(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null)
+            ),
+            Projections.include(Constants.ID)
+        );
+        if (issues.isEmpty()) {
+            return 0;
+        }
+
+        List<TestingIssuesId> issueIds = new ArrayList<>();
+        for (TestingRunIssues issue : issues) {
+            issueIds.add(issue.getId());
+        }
+        markIssuesAsWizFinding(issueIds);
+        return issueIds.size();
     }
 
     public static BasicDBObject checkLastUploadScanStatus() throws Exception {

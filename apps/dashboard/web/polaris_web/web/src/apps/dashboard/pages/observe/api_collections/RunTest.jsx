@@ -128,8 +128,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
     const [jiraProjectMap, setJiraProjectMap] = useState(null);
     const [linearTeamsMap, setLinearTeamsMap] = useState(null);
+    const wizIntegrated = window.WIZ_INTEGRATED === 'true'
     const portIOIntegrated = window.PORT_IO_INTEGRATED === 'true'
-    const ticketingAvailable = !!(jiraProjectMap || linearTeamsMap || portIOIntegrated)
+    const ticketingAvailable = !!(jiraProjectMap || linearTeamsMap || portIOIntegrated || wizIntegrated)
     const isAgenticCategory = getDashboardCategory() !== 'API Security'
     const [agenticMode, setAgenticMode] = useState(false)
 
@@ -879,6 +880,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
             jiraProjectMap={jiraProjectMap}
             linearTeamsMap={linearTeamsMap}
             portIOIntegrated={portIOIntegrated}
+            wizIntegrated={wizIntegrated}
             generateLabelForJiraIntegration={generateLabelForJiraIntegration}
             miniTestingServiceNames={miniTestingServiceNames}
             slackChannels={slackChannels}

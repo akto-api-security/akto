@@ -12,7 +12,7 @@ import { SCRIPT_TYPES } from '../../testing/scripts/scriptTypes';
 // value of the dropdown's default option (not empty: the dropdown matches values as patterns)
 const DEFAULT_SMART_TESTING = "DEFAULT_SMART_TESTING"
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, linearTeamsMap, portIOIntegrated, generateLabelForJiraIntegration, scriptsState}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, linearTeamsMap, portIOIntegrated, wizIntegrated, generateLabelForJiraIntegration, scriptsState}) => {
     console.log("isAgenticCategory in config", isAgenticCategory)
     // smart agents for the Smart agent dropdown, loaded once smart testing is switched on
     const [smartAgentOptions, setSmartAgentOptions] = useState([{ label: "Default smart testing", value: DEFAULT_SMART_TESTING }])
@@ -65,18 +65,20 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
     const ticketToolOptions = [
         ...(jiraProjectMap ? [{ label: 'Jira', value: 'JIRA' }] : []),
         ...(linearTeamsMap ? [{ label: 'Linear', value: 'LINEAR' }] : []),
-        ...(portIOIntegrated ? [{ label: 'Linear via Port.io', value: 'PORT_IO' }] : [])
+        ...(portIOIntegrated ? [{ label: 'Linear via Port.io', value: 'PORT_IO' }] : []),
+        ...(wizIntegrated ? [{ label: 'Wiz', value: 'WIZ' }] : [])
     ]
 
     const ticketSource = testRun?.autoTicketingDetails?.ticketSource || 'JIRA'
     const isLinearTicketing = ticketSource === 'LINEAR'
-    const isPortIOTicketing = ticketSource === 'PORT_IO'
+    // Port.io and Wiz need no project or team
+    const needsNoProject = ticketSource === 'PORT_IO' || ticketSource === 'WIZ'
 
     function firstProjectAndIssueTypeFor(source) {
         if (source === 'LINEAR') {
             return { projectId: linearTeams[0]?.value || "", issueType: "" }
         }
-        if (source === 'PORT_IO') {
+        if (source === 'PORT_IO' || source === 'WIZ') {
             return { projectId: "", issueType: "" }
         }
         const firstProject = allProjects[0]?.value || "";
@@ -107,7 +109,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
     }
 
     function toggleCreateTicketCheckbox() {
-        const defaultSource = jiraProjectMap ? 'JIRA' : (linearTeamsMap ? 'LINEAR' : 'PORT_IO');
+        const defaultSource = jiraProjectMap ? 'JIRA' : (linearTeamsMap ? 'LINEAR' : (portIOIntegrated ? 'PORT_IO' : 'WIZ'));
         const { projectId, issueType } = firstProjectAndIssueTypeFor(defaultSource);
 
         const checkPrevToggle = !testRun?.autoTicketingDetails?.shouldCreateTickets;
@@ -342,7 +344,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             />
             <HorizontalStack gap={4}>
             <Checkbox
-                    disabled={!jiraProjectMap && !linearTeamsMap && !portIOIntegrated}
+                    disabled={!jiraProjectMap && !linearTeamsMap && !portIOIntegrated && !wizIntegrated}
                     label={generateLabelForJiraIntegration()}
                     checked={testRun.autoTicketingDetails.shouldCreateTickets}
                     onChange={() => { toggleCreateTicketCheckbox()}}
@@ -358,7 +360,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                                 preSelected={selectedOf(ticketSource)}
                             />
                         }
-                        {isPortIOTicketing ? null : isLinearTicketing ?
+                        {needsNoProject ? null : isLinearTicketing ?
                             <DropdownSearch
                                 key="linear-team"
                                 optionsList={linearTeams}
@@ -408,6 +410,12 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
 
 
             </HorizontalStack>
+            {/* only one tool is integrated, so there is no picker: say where the tickets go */}
+            {testRun.autoTicketingDetails.shouldCreateTickets && ticketToolOptions.length === 1 && labelOf(ticketToolOptions, ticketSource) &&
+                <Text as="span" color="subdued">
+                    {"Tickets will be created in " + labelOf(ticketToolOptions, ticketSource)}
+                </Text>
+            }
             <HorizontalGrid columns={2}>
                 <Checkbox
                     label={"Use different target for " + mapLabel("testing", getDashboardCategory())}
