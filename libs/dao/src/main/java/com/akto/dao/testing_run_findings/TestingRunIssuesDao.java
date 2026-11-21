@@ -95,6 +95,10 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.KEY_SEVERITY};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
+        // Index for the Wiz sync job - finds issues that are Wiz findings (wizFindingCreationStatus is set / equals a value)
+        fieldNames = new String[]{TestingRunIssues.WIZ_FINDING_CREATION_STATUS};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
     }
 
     private List<Bson> getPipelineForSeverityCount(Bson filter, boolean expandApiGroups, BasicDBObject groupedId) {

@@ -1432,6 +1432,13 @@ const settingRequests = {
             data: {tenantDataCenter, clientId, clientSecret}
         })
     },
+    updateWizStatusSync(statusSyncEnabled) {
+        return request({
+            url: '/api/updateWizStatusSync',
+            method: 'post',
+            data: {statusSyncEnabled}
+        })
+    },
     removeWizIntegration() {
         return request({
             url: '/api/removeWizIntegration',

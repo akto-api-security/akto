@@ -20,6 +20,9 @@ public class WizApiClient {
     static final int HOST_FETCH_PAGE_SIZE = 500;
     static final int ENDPOINT_FETCH_PAGE_SIZE = 20;
     static final int ENDPOINT_META_FETCH_PAGE_SIZE = 500;
+    static final int FINDINGS_FETCH_PAGE_SIZE = 500;
+    // Safety cap on pages fetched in one run
+    static final int MAX_FINDINGS_PAGES = 1000;
 
     static Map<String, List<String>> buildHeaders(String accessToken) {
         Map<String, List<String>> headers = new HashMap<>();
@@ -82,6 +85,57 @@ public class WizApiClient {
 
         loggerMaker.infoAndAddToDb(String.format("fetchEndpointsPageByIds: %d ids", ids.size()));
         return executeAndGetRoot(apiUrl, graphqlQuery, buildHeaders(accessToken), "apiEndpoints");
+    }
+
+    /**
+     * Paginates attackSurfaceFindings with origin AKTO, fetching only id and status, returns the full list.
+     */
+    public static List<BasicDBObject> fetchAllAttackSurfaceFindings(String apiUrl, String accessToken) throws Exception {
+        List<BasicDBObject> results = new ArrayList<>();
+        String cursor = null;
+        boolean hasNextPage = true;
+        int pagesFetched = 0;
+        Map<String, List<String>> headers = buildHeaders(accessToken);
+
+        while (hasNextPage) {
+            String variablesPart = cursor == null
+                ? String.format("{\"first\":%d}", FINDINGS_FETCH_PAGE_SIZE)
+                : String.format("{\"first\":%d,\"after\":\"%s\"}", FINDINGS_FETCH_PAGE_SIZE, cursor);
+
+            String graphqlQuery = "{\"query\":\"query($first: Int, $after: String) { attackSurfaceFindings(first: $first, after: $after, filterBy: { origin: { equals: [AKTO] } }) { nodes { id status } pageInfo { endCursor hasNextPage } } }\",\"variables\":" + variablesPart + "}";
+
+            loggerMaker.infoAndAddToDb(String.format("fetchAllAttackSurfaceFindings: page cursor=%s", cursor));
+            BasicDBObject root = executeAndGetRoot(apiUrl, graphqlQuery, headers, "attackSurfaceFindings");
+
+            List<?> nodes = (List<?>) root.get("nodes");
+            BasicDBObject pageInfo = (BasicDBObject) root.get("pageInfo");
+
+            if (nodes != null) {
+                for (Object nodeObj : nodes) {
+                    results.add((BasicDBObject) nodeObj);
+                }
+            }
+
+            pagesFetched++;
+            hasNextPage = pageInfo != null && pageInfo.getBoolean("hasNextPage", false);
+            String nextCursor = pageInfo != null ? pageInfo.getString("endCursor") : null;
+
+            // Fail rather than loop forever on a bad response, so the caller never acts on an incomplete list of findings
+            if (hasNextPage) {
+                if (nextCursor == null) {
+                    throw new Exception("Wiz returned hasNextPage=true without an endCursor while fetching findings");
+                }
+                if (nextCursor.equals(cursor)) {
+                    throw new Exception("Wiz returned the same endCursor twice while fetching findings: " + nextCursor);
+                }
+                if (pagesFetched >= MAX_FINDINGS_PAGES) {
+                    throw new Exception("Stopped fetching Wiz findings after reaching the page cap of " + MAX_FINDINGS_PAGES);
+                }
+            }
+            cursor = nextCursor;
+        }
+
+        return results;
     }
 
     static BasicDBObject executeRaw(String apiUrl, String graphqlQuery, Map<String, List<String>> headers) throws Exception {

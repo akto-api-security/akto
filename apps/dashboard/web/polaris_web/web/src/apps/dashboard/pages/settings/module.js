@@ -522,6 +522,13 @@ const settingFunctions = {
       })
       return wizIntegration
     },
+    updateWizStatusSync: async function(statusSyncEnabled) {
+      let resp = {}
+      await settingRequests.updateWizStatusSync(statusSyncEnabled).then((r)=>{
+        resp = r
+      })
+      return resp
+    },
     removeWizIntegration: async function() {
       let trafficData = {}
       await settingRequests.removeWizIntegration().then((resp)=>{
