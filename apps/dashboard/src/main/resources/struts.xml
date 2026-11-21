@@ -19046,13 +19046,13 @@
             </result>
         </action>
 
-        <action name="api/updateWizBidirectionalSync" class="com.akto.action.WizIntegrationAction" method="updateWizBidirectionalSync" >
+        <action name="api/updateWizStatusSync" class="com.akto.action.WizIntegrationAction" method="updateWizStatusSync" >
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User updated Wiz bidirectional sync</param>
+                <param name="actionDescription">User updated Wiz status sync</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">

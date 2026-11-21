@@ -1432,11 +1432,11 @@ const settingRequests = {
             data: {tenantDataCenter, clientId, clientSecret}
         })
     },
-    updateWizBidirectionalSync(bidirectionalSyncEnabled) {
+    updateWizStatusSync(statusSyncEnabled) {
         return request({
-            url: '/api/updateWizBidirectionalSync',
+            url: '/api/updateWizStatusSync',
             method: 'post',
-            data: {bidirectionalSyncEnabled}
+            data: {statusSyncEnabled}
         })
     },
     removeWizIntegration() {

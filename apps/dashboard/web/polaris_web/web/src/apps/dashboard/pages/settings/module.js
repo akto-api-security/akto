@@ -522,9 +522,9 @@ const settingFunctions = {
       })
       return wizIntegration
     },
-    updateWizBidirectionalSync: async function(bidirectionalSyncEnabled) {
+    updateWizStatusSync: async function(statusSyncEnabled) {
       let resp = {}
-      await settingRequests.updateWizBidirectionalSync(bidirectionalSyncEnabled).then((r)=>{
+      await settingRequests.updateWizStatusSync(statusSyncEnabled).then((r)=>{
         resp = r
       })
       return resp

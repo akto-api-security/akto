@@ -13,7 +13,7 @@ function Wiz() {
     const [tenantDataCenter, setTenantDataCenter] = useState('')
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
-    const [isBidirectionalSyncEnabled, setIsBidirectionalSyncEnabled] = useState(false)
+    const [isStatusSyncEnabled, setIsStatusSyncEnabled] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [isTogglingSync, setIsTogglingSync] = useState(false)
     const [isRemoveable, setIsRemoveable] = useState(false)
@@ -22,7 +22,7 @@ function Wiz() {
         setTenantDataCenter('')
         setClientId('')
         setClientSecret('')
-        setIsBidirectionalSyncEnabled(false)
+        setIsStatusSyncEnabled(false)
         setIsRemoveable(false)
     }
 
@@ -38,7 +38,7 @@ function Wiz() {
                 setTenantDataCenter(wizIntegration.tenantDataCenter || '')
                 setClientId(wizIntegration.clientId || '')
                 setClientSecret(null) // Don't show existing secret
-                setIsBidirectionalSyncEnabled(Boolean(wizIntegration.bidirectionalSyncEnabled))
+                setIsStatusSyncEnabled(Boolean(wizIntegration.statusSyncEnabled))
                 setIsRemoveable(true)
             } else {
                 // No integration exists - reset everything
@@ -73,14 +73,14 @@ function Wiz() {
         }
     }
 
-    async function toggleBidirectionalSync(checked) {
+    async function toggleStatusSync(checked) {
         setIsTogglingSync(true)
         try {
-            await settingFunctions.updateWizBidirectionalSync(checked)
-            setIsBidirectionalSyncEnabled(checked)
-            func.setToast(true, false, "Bidirectional sync " + (checked ? "enabled" : "disabled"))
+            await settingFunctions.updateWizStatusSync(checked)
+            setIsStatusSyncEnabled(checked)
+            func.setToast(true, false, "Wiz status sync " + (checked ? "enabled" : "disabled"))
         } catch (error) {
-            func.setToast(true, true, error?.response?.data?.actionErrors?.[0] || "Failed to update bidirectional sync")
+            func.setToast(true, true, error?.response?.data?.actionErrors?.[0] || "Failed to update Wiz status sync")
         } finally {
             setIsTogglingSync(false)
         }
@@ -157,17 +157,18 @@ function Wiz() {
         </LegacyCard>
     )
 
-    const bidirectionalSyncCard = (
+    const statusSyncCard = (
         <LegacyCard>
             <LegacyCard.Section>
-                <Text variant="headingMd">Bidirectional sync for issues</Text>
+                <Text variant="headingMd">Sync issue status from Wiz</Text>
             </LegacyCard.Section>
             <LegacyCard.Section>
                 <Checkbox
-                    label="Sync issue status changes between Akto and Wiz."
-                    checked={isBidirectionalSyncEnabled}
-                    onChange={toggleBidirectionalSync}
-                    disabled={isTogglingSync || !canCall('api/updateWizBidirectionalSync')}
+                    label="Update Akto issue status from Wiz"
+                    helpText="Manage findings lifecycle in Wiz. Status changes made in Wiz are applied to the matching Akto issues and override status changes made in Akto."
+                    checked={isStatusSyncEnabled}
+                    onChange={toggleStatusSync}
+                    disabled={isTogglingSync || !canCall('api/updateWizStatusSync')}
                 />
             </LegacyCard.Section>
         </LegacyCard>
@@ -176,7 +177,7 @@ function Wiz() {
     const wizComponent = (
         <VerticalStack gap="4">
             {wizCard}
-            {isRemoveable && bidirectionalSyncCard}
+            {isRemoveable && statusSyncCard}
         </VerticalStack>
     )
 

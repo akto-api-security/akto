@@ -132,9 +132,9 @@ public class WizIntegrationAction extends UserAction {
 
     @Getter
     @Setter
-    private boolean bidirectionalSyncEnabled;
+    private boolean statusSyncEnabled;
 
-    public String updateWizBidirectionalSync() {
+    public String updateWizStatusSync() {
         WizIntegration existingIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
         if (existingIntegration == null) {
             addActionError("Wiz is not integrated.");
@@ -145,14 +145,14 @@ public class WizIntegrationAction extends UserAction {
             WizIntegrationDao.instance.getMCollection().updateOne(
                 new BasicDBObject(),
                 Updates.combine(
-                    Updates.set(WizIntegration.BIDIRECTIONAL_SYNC_ENABLED, bidirectionalSyncEnabled),
+                    Updates.set(WizIntegration.STATUS_SYNC_ENABLED, statusSyncEnabled),
                     Updates.set(WizIntegration.UPDATED_TS, Context.now())
                 )
             );
-            logger.infoAndAddToDb("Wiz bidirectional sync set to " + bidirectionalSyncEnabled + " for accountId: " + Context.accountId.get());
+            logger.infoAndAddToDb("Wiz status sync set to " + statusSyncEnabled + " for accountId: " + Context.accountId.get());
         } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Error updating Wiz bidirectional sync: " + e.getMessage());
-            addActionError("Failed to update bidirectional sync. Please try again.");
+            logger.errorAndAddToDb(e, "Error updating Wiz status sync: " + e.getMessage());
+            addActionError("Failed to update Wiz status sync. Please try again.");
             return Action.ERROR.toUpperCase();
         }
 
