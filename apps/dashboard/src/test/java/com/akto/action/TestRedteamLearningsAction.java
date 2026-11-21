@@ -14,6 +14,7 @@ import com.akto.dto.redteam_learnings.AgentRedteamRecord;
 import com.akto.dto.redteam_learnings.AgentRedteamTemplateDraft;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.service.redteam_learnings.RedteamLearningsService;
+import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
@@ -243,8 +244,16 @@ public class TestRedteamLearningsAction extends MongoBasedTest {
             assertEquals("ERROR", draftUpdate("d1", "SAVED", "CUSTOM_MISSING").updateRedteamDraftStatus());
             assertEquals(AgentRedteamTemplateDraft.STATUS_DRAFT, AgentRedteamTemplateDraftDao.instance.findOne("_id", "d1").getStatus());
 
+            YamlTemplate builtIn = new YamlTemplate();
+            builtIn.setId("AKTO_BUILT_IN");
+            builtIn.setSource(GlobalEnums.YamlTemplateSource.AKTO_TEMPLATES);
+            YamlTemplateDao.instance.insertOne(builtIn);
+            assertEquals("an Akto template is not where a draft is saved", "ERROR", draftUpdate("d1", "SAVED", "AKTO_BUILT_IN").updateRedteamDraftStatus());
+            assertEquals(AgentRedteamTemplateDraft.STATUS_DRAFT, AgentRedteamTemplateDraftDao.instance.findOne("_id", "d1").getStatus());
+
             YamlTemplate template = new YamlTemplate();
             template.setId("AKTO_LEARNED_X_CUSTOM_1");
+            template.setSource(GlobalEnums.YamlTemplateSource.CUSTOM);
             YamlTemplateDao.instance.insertOne(template);
             assertEquals("SUCCESS", draftUpdate("d1", "saved", "AKTO_LEARNED_X_CUSTOM_1").updateRedteamDraftStatus());
             AgentRedteamTemplateDraft saved = AgentRedteamTemplateDraftDao.instance.findOne("_id", "d1");
@@ -274,6 +283,61 @@ public class TestRedteamLearningsAction extends MongoBasedTest {
         assertEquals("no draft is ever created", 1, AgentRedteamTemplateDraftDao.instance.getMCollection().countDocuments());
     }
 
+    @Test
+    public void aSavedDraftIsNotReopened() {
+        AgentRedteamTemplateDraft saved = draft("d1", 123, AgentRedteamTemplateDraft.STATUS_SAVED, 1000);
+        saved.setSavedTemplateId("AKTO_LEARNED_X_CUSTOM_1");
+        AgentRedteamTemplateDraftDao.instance.insertOne(saved);
+        try (MockedStatic<UsersCollectionsList> rbac = userSees(null)) {
+            RedteamLearningsAction reopen = draftUpdate("d1", "DRAFT", null);
+            assertEquals("ERROR", reopen.updateRedteamDraftStatus());
+            assertTrue(reopen.getActionErrors().iterator().next().contains("cannot be reopened"));
+        }
+        AgentRedteamTemplateDraft after = AgentRedteamTemplateDraftDao.instance.findOneNoRbacFilter(Filters.eq("_id", "d1"), null);
+        assertEquals(AgentRedteamTemplateDraft.STATUS_SAVED, after.getStatus());
+        assertEquals("AKTO_LEARNED_X_CUSTOM_1", after.getSavedTemplateId());
+    }
+
+    @Test
+    public void aRunWithManyVersionsStillShowsEveryAgentAndOnlyAnOverflowIsCalledTruncated() {
+        List<AgentRedteamProfile> versions = new java.util.ArrayList<>();
+        for (int batch = 1; batch <= RedteamLearningsService.MAX_RUN_VERSIONS; batch++) versions.add(profile(123, RUN, batch, batch));
+        AgentRedteamProfileDao.instance.insertMany(versions);
+        try (MockedStatic<UsersCollectionsList> rbac = userSees(null)) {
+            RedteamLearningsAction exact = runRead(RUN);
+            assertEquals("SUCCESS", exact.fetchRunRedteamLearnings());
+            assertEquals(RedteamLearningsService.MAX_RUN_VERSIONS, exact.getRunLearnings().getVersions().size());
+            assertFalse("exactly the limit is not an overflow", exact.getRunLearnings().isVersionsTruncated());
+
+            // Another agent's only version, written last, while the first agent's batch numbers run past the limit:
+            // batch numbers count per agent, so ordering by them would cut this agent off.
+            List<AgentRedteamProfile> more = new java.util.ArrayList<>();
+            for (int batch = RedteamLearningsService.MAX_RUN_VERSIONS + 1; batch <= RedteamLearningsService.MAX_RUN_VERSIONS + 4; batch++) {
+                more.add(profile(123, RUN, batch, batch));
+            }
+            more.add(profile(456, RUN, 1, 5000));
+            AgentRedteamProfileDao.instance.insertMany(more);
+            RedteamLearningsAction over = runRead(RUN);
+            assertEquals("SUCCESS", over.fetchRunRedteamLearnings());
+            assertTrue(over.getRunLearnings().isVersionsTruncated());
+            assertEquals(RedteamLearningsService.MAX_RUN_VERSIONS, over.getRunLearnings().getVersions().size());
+            assertTrue(over.getRunLearnings().getAgentProfiles().stream().anyMatch(p -> p.getApiCollectionId() == 456));
+        }
+    }
+
+    @Test
+    public void moreAgentsThanTheRunCardHoldsAreReportedNotDropped() {
+        List<AgentRedteamProfile> versions = new java.util.ArrayList<>();
+        for (int i = 0; i <= RedteamLearningsService.MAX_RUN_AGENTS; i++) versions.add(profile(1000 + i, RUN, 1, 1000 + i));
+        AgentRedteamProfileDao.instance.insertMany(versions);
+        try (MockedStatic<UsersCollectionsList> rbac = userSees(null)) {
+            RedteamLearningsAction action = runRead(RUN);
+            assertEquals("SUCCESS", action.fetchRunRedteamLearnings());
+            assertEquals(RedteamLearningsService.MAX_RUN_AGENTS, action.getRunLearnings().getAgentProfiles().size());
+            assertTrue(action.getRunLearnings().isAgentsTruncated());
+        }
+    }
+
     // ── account toggle ───────────────────────────────────────────────────────
 
     @Test
@@ -289,5 +353,14 @@ public class TestRedteamLearningsAction extends MongoBasedTest {
         off.setRedteamLearningsEnabled(false);
         assertEquals("SUCCESS", off.updateRedteamLearningsEnabled());
         assertEquals(Boolean.FALSE, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getRedteamLearningsEnabled());
+    }
+
+    @Test
+    public void theToggleIsStoredEvenWhenTheAccountHasNoSettingsDocumentYet() {
+        AdminSettingsAction off = new AdminSettingsAction();
+        off.setRedteamLearningsEnabled(false);
+        assertEquals("SUCCESS", off.updateRedteamLearningsEnabled());
+        assertEquals(Boolean.FALSE, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getRedteamLearningsEnabled());
+        assertEquals(Boolean.FALSE, new RedteamLearningsService().accountLearningsEnabled());
     }
 }

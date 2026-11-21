@@ -8,11 +8,14 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.redteam_learnings.AgentRedteamProfile;
 import com.akto.dto.redteam_learnings.AgentRedteamRecord;
 import com.akto.dto.redteam_learnings.AgentRedteamTemplateDraft;
+import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import org.bson.conversions.Bson;
 import lombok.Getter;
 
 import java.util.ArrayList;
@@ -41,14 +44,14 @@ public class RedteamLearningsService {
 
     static final int MAX_AGENT_VERSIONS = 20;
     static final int MAX_OPEN_DRAFTS = 20;
-    static final int MAX_RUN_VERSIONS = 200;
-    static final int MAX_RUN_AGENTS = 20;
+    public static final int MAX_RUN_VERSIONS = 200;
+    public static final int MAX_RUN_AGENTS = 20;
     static final int MAX_RUN_DRAFTS = 50;
 
     public static final Set<String> DRAFT_STATUSES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             AgentRedteamTemplateDraft.STATUS_DRAFT, AgentRedteamTemplateDraft.STATUS_SAVED, AgentRedteamTemplateDraft.STATUS_DISMISSED)));
 
-    public enum DraftUpdate { UPDATED, NOT_FOUND, FORBIDDEN, TEMPLATE_NOT_FOUND }
+    public enum DraftUpdate { UPDATED, NOT_FOUND, FORBIDDEN, TEMPLATE_NOT_FOUND, CONFLICT }
 
     @Getter
     public static class AgentLearnings {
@@ -76,14 +79,17 @@ public class RedteamLearningsService {
         private final List<AgentRedteamTemplateDraft> drafts;
         /** True when the run wrote more versions than are read, so the list above is not complete. */
         private final boolean versionsTruncated;
+        /** True when the run tested more agents than agentProfiles holds. */
+        private final boolean agentsTruncated;
 
         RunLearnings(List<AgentRedteamProfile> agentProfiles, List<AgentRedteamProfile> versions,
-                     List<AgentRedteamTemplateDraft> drafts, boolean versionsTruncated) {
+                     List<AgentRedteamTemplateDraft> drafts, boolean versionsTruncated, boolean agentsTruncated) {
             this.state = versions.isEmpty() && drafts.isEmpty() ? STATE_NONE : STATE_READY;
             this.agentProfiles = agentProfiles;
             this.versions = versions;
             this.drafts = drafts;
             this.versionsTruncated = versionsTruncated;
+            this.agentsTruncated = agentsTruncated;
         }
     }
 
@@ -102,32 +108,42 @@ public class RedteamLearningsService {
 
     /** Only learnings about collections the user may see. */
     public RunLearnings forRun(String testingRunResultSummaryId, List<Integer> allowedCollectionIds) {
-        List<AgentRedteamProfile> read = AgentRedteamProfileDao.instance.findByRun(testingRunResultSummaryId, MAX_RUN_VERSIONS);
-        boolean truncated = read.size() >= MAX_RUN_VERSIONS;
-        List<AgentRedteamProfile> versions = visible(read, allowedCollectionIds);
+        // One more than the limit is read, so a run with exactly MAX_RUN_VERSIONS versions is not called truncated.
+        List<AgentRedteamProfile> read = AgentRedteamProfileDao.instance.findByRun(testingRunResultSummaryId, MAX_RUN_VERSIONS + 1);
+        boolean truncated = read.size() > MAX_RUN_VERSIONS;
+        List<AgentRedteamProfile> versions = visible(truncated ? read.subList(0, MAX_RUN_VERSIONS) : read, allowedCollectionIds);
         List<AgentRedteamTemplateDraft> drafts = visible(
                 AgentRedteamTemplateDraftDao.instance.findByRun(testingRunResultSummaryId, MAX_RUN_DRAFTS), allowedCollectionIds);
-        return new RunLearnings(newestPerAgent(versions), versions, drafts, truncated);
+        NewestPerAgent newest = newestPerAgent(versions);
+        return new RunLearnings(newest.profiles, versions, drafts, truncated, newest.truncated);
     }
 
     /**
-     * Sets a draft's status. SAVED needs the id of the template the user saved it as, and that template must exist,
-     * so a draft is never shown as saved without one; for the other statuses a given template id is ignored.
+     * Sets a draft's status. SAVED needs the id of the template the user saved it as, and that template must exist
+     * and be a custom one (a draft is saved through the editor, which always creates a custom template), so a draft is
+     * never shown as saved against an unrelated Akto template or none; for the other statuses a given template id is
+     * ignored. A saved draft is not put back to DRAFT.
      */
     public DraftUpdate updateDraftStatus(String draftId, String status, String savedTemplateId, List<Integer> allowedCollectionIds, long nowMs) {
         AgentRedteamTemplateDraft draft = AgentRedteamTemplateDraftDao.instance.findOne(Filters.eq("_id", draftId),
-                Projections.include(AgentRedteamRecord.API_COLLECTION_ID));
+                Projections.include(AgentRedteamRecord.API_COLLECTION_ID, AgentRedteamTemplateDraft.STATUS));
         if (draft == null) return DraftUpdate.NOT_FOUND;
         if (!canSee(allowedCollectionIds, draft.getApiCollectionId())) return DraftUpdate.FORBIDDEN;
+        if (AgentRedteamTemplateDraft.STATUS_DRAFT.equals(status) && AgentRedteamTemplateDraft.STATUS_SAVED.equals(draft.getStatus())) {
+            return DraftUpdate.CONFLICT;
+        }
         String templateId = null;
         if (AgentRedteamTemplateDraft.STATUS_SAVED.equals(status)) {
-            if (YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, savedTemplateId), Projections.include(Constants.ID)) == null) {
+            Bson custom = Filters.and(Filters.eq(Constants.ID, savedTemplateId),
+                    Filters.eq(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM));
+            if (YamlTemplateDao.instance.findOne(custom, Projections.include(Constants.ID)) == null) {
                 return DraftUpdate.TEMPLATE_NOT_FOUND;
             }
             templateId = savedTemplateId;
         }
         AgentRedteamTemplateDraft before = AgentRedteamTemplateDraftDao.instance.updateStatus(draftId, status, templateId, nowMs);
-        return before == null ? DraftUpdate.NOT_FOUND : DraftUpdate.UPDATED;
+        // The draft was just read, so nothing updated means it changed in between (it was saved meanwhile).
+        return before == null ? DraftUpdate.CONFLICT : DraftUpdate.UPDATED;
     }
 
     /** The account's setting: never set counts as on. Null when it could not be read, which is shown as unknown. */
@@ -150,16 +166,27 @@ public class RedteamLearningsService {
         return kept;
     }
 
+    private static class NewestPerAgent {
+        final List<AgentRedteamProfile> profiles;
+        final boolean truncated;
+
+        NewestPerAgent(List<AgentRedteamProfile> profiles, boolean truncated) {
+            this.profiles = profiles;
+            this.truncated = truncated;
+        }
+    }
+
     /** The full newest version (by write time) of each agent the run tested, at most MAX_RUN_AGENTS of them. */
-    private static List<AgentRedteamProfile> newestPerAgent(List<AgentRedteamProfile> versions) {
+    private static NewestPerAgent newestPerAgent(List<AgentRedteamProfile> versions) {
         List<AgentRedteamProfile> byTime = new ArrayList<>(versions);
         byTime.sort(Comparator.comparingLong(AgentRedteamProfile::getCreatedAtMs).reversed());
         Map<String, String> newestIdByAgent = new LinkedHashMap<>();
+        boolean truncated = false;
         for (AgentRedteamProfile version : byTime) {
             String agent = version.getApiCollectionId() + "|" + version.getMethod() + "|" + version.getUrl();
-            if (!newestIdByAgent.containsKey(agent) && newestIdByAgent.size() < MAX_RUN_AGENTS) {
-                newestIdByAgent.put(agent, version.getId());
-            }
+            if (newestIdByAgent.containsKey(agent)) continue;
+            if (newestIdByAgent.size() < MAX_RUN_AGENTS) newestIdByAgent.put(agent, version.getId());
+            else truncated = true;
         }
         Map<String, AgentRedteamProfile> fullById = new HashMap<>();
         for (AgentRedteamProfile full : AgentRedteamProfileDao.instance.findByIds(new ArrayList<>(newestIdByAgent.values()))) {
@@ -169,6 +196,6 @@ public class RedteamLearningsService {
         for (String id : newestIdByAgent.values()) {
             if (fullById.containsKey(id)) ordered.add(fullById.get(id));
         }
-        return ordered;
+        return new NewestPerAgent(ordered, truncated);
     }
 }

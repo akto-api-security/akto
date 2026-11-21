@@ -95,7 +95,8 @@ public class RedteamLearningsAction extends UserAction {
             switch (result) {
                 case UPDATED: return SUCCESS.toUpperCase();
                 case FORBIDDEN: return forbidden();
-                case TEMPLATE_NOT_FOUND: return fail("No test template with id " + savedTemplateId);
+                case TEMPLATE_NOT_FOUND: return fail("No custom test template with id " + savedTemplateId);
+                case CONFLICT: return fail("The draft was already saved as a test template and cannot be reopened");
                 default: return fail("No such draft");
             }
         } catch (Exception e) {

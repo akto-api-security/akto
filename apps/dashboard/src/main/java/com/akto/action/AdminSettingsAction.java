@@ -180,7 +180,8 @@ public class AdminSettingsAction extends UserAction {
         }
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
-                Updates.set(AccountSettings.REDTEAM_LEARNINGS_ENABLED, redteamLearningsEnabled));
+                Updates.set(AccountSettings.REDTEAM_LEARNINGS_ENABLED, redteamLearningsEnabled),
+                new UpdateOptions().upsert(true));
         return SUCCESS.toUpperCase();
     }
 
