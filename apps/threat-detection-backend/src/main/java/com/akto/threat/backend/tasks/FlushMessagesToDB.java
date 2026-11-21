@@ -162,7 +162,11 @@ public class FlushMessagesToDB {
                        event.getLatestApiEndpoint() + " + " + event.getFilterId());
         } else {
             // No ignored event exists, safe to insert
-            MaliciousEventDao.instance.insertOne(accountId, event);
+            if (event.getDedupeKey() != null) {
+                MaliciousEventDao.instance.upsertByDedupeKey(accountId, event);
+            } else {
+                MaliciousEventDao.instance.insertOne(accountId, event);
+            }
             lastSuccessfulMongoWriteEpochMs.set(System.currentTimeMillis());
 
             // Upsert actor_info table for optimized listThreatActors queries
