@@ -5366,11 +5366,18 @@ public class ClientActor extends DataActor {
     @Override
     public OriginalHttpResponse relayRedteamLearnings(String apiName, String requestJson) {
         try {
-            return ApiExecutor.sendRequestBackOff(buildRelayRedteamLearningsRequest(apiName, requestJson), true, null, false, null);
+            // A 4xx is the abstractor refusing this body (validation, auth); sending it again gets the same answer, so only
+            // an unreachable abstractor, 429 and 5xx are retried. The writes behind these APIs are idempotent.
+            return ApiExecutor.sendRequestBackOff(buildRelayRedteamLearningsRequest(apiName, requestJson), true, null, false, null,
+                    ClientActor::isRetryableRelayStatus);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in relayRedteamLearnings " + apiName + ": " + e, LoggerMaker.LogDb.TESTING);
             return null;
         }
+    }
+
+    static boolean isRetryableRelayStatus(int status) {
+        return status == 429 || status >= 500;
     }
 
     static OriginalHttpRequest buildRelayRedteamLearningsRequest(String apiName, String requestJson) {

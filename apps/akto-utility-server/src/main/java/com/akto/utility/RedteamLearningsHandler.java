@@ -2,6 +2,7 @@ package com.akto.utility;
 
 import com.akto.data_actor.DataActor;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.testing.ApiExecutor;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
@@ -45,6 +46,12 @@ public class RedteamLearningsHandler implements HttpHandler {
         OriginalHttpResponse response = dataActor.relayRedteamLearnings(apiName, rawBody);
         if (response == null || response.getBody() == null) {
             HttpUtil.sendError(exchange, 502, "Failed to reach the database-abstractor for " + apiName);
+            return;
+        }
+        // ApiExecutor reads at most MAX_RESPONSE_BYTES of a response; a body that long may be cut off, and cut-off JSON
+        // must not reach the caller as a 200.
+        if (response.getBody().getBytes(StandardCharsets.UTF_8).length >= ApiExecutor.MAX_RESPONSE_SIZE) {
+            HttpUtil.sendError(exchange, 502, "The response of " + apiName + " is larger than the relay can pass on");
             return;
         }
         HttpUtil.sendRawJson(exchange, response.getStatusCode(), response.getBody());
