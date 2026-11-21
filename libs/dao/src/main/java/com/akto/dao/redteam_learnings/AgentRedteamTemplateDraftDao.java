@@ -57,8 +57,9 @@ public class AgentRedteamTemplateDraftDao extends AgentRedteamDao<AgentRedteamTe
 
     /**
      * Sets the status, and the saved template's id when one is given: a null savedTemplateId leaves the stored one
-     * as it is. Never creates a draft. Returns the draft as it was before the update, or null when there is no such
-     * draft or the caller cannot see its collection.
+     * as it is. Never creates a draft. A saved draft is never put back to DRAFT (it would reappear in the open list
+     * beside its stale template id); that case matches nothing. Returns the draft as it was before the update, or null
+     * when nothing was updated: no such draft, a collection the caller cannot see, or a refused reopening.
      */
     public AgentRedteamTemplateDraft updateStatus(String draftId, String status, String savedTemplateId, long nowMs) {
         List<Bson> updates = new ArrayList<>();
@@ -67,6 +68,10 @@ public class AgentRedteamTemplateDraftDao extends AgentRedteamDao<AgentRedteamTe
         if (savedTemplateId != null) {
             updates.add(Updates.set(AgentRedteamTemplateDraft.SAVED_TEMPLATE_ID, savedTemplateId));
         }
-        return updateOneNoUpsert(Filters.eq("_id", draftId), Updates.combine(updates));
+        Bson filter = Filters.eq("_id", draftId);
+        if (AgentRedteamTemplateDraft.STATUS_DRAFT.equals(status)) {
+            filter = Filters.and(filter, Filters.ne(AgentRedteamTemplateDraft.STATUS, AgentRedteamTemplateDraft.STATUS_SAVED));
+        }
+        return updateOneNoUpsert(filter, Updates.combine(updates));
     }
 }

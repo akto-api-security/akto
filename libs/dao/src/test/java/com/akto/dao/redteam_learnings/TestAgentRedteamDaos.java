@@ -1,6 +1,7 @@
 package com.akto.dao.redteam_learnings;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -195,6 +196,21 @@ public class TestAgentRedteamDaos extends MongoBasedTest {
         assertEquals(AgentRedteamTemplateDraft.STATUS_DISMISSED, after.getStatus());
         assertEquals("CUSTOM_1", after.getSavedTemplateId());
         assertEquals(5000L, after.getUpdatedAtMs());
+    }
+
+    @Test
+    public void aSavedDraftCannotBePutBackToDraftButCanBeSavedAgainOrDismissed() {
+        AgentRedteamTemplateDraft saved = draft("d1", 123, AgentRedteamTemplateDraft.STATUS_SAVED, 1000);
+        saved.setSavedTemplateId("CUSTOM_1");
+        AgentRedteamTemplateDraftDao.instance.insertOne(saved);
+
+        assertNull(AgentRedteamTemplateDraftDao.instance.updateStatus("d1", AgentRedteamTemplateDraft.STATUS_DRAFT, null, 5000));
+        assertEquals(AgentRedteamTemplateDraft.STATUS_SAVED, AgentRedteamTemplateDraftDao.instance.findOne("_id", "d1").getStatus());
+
+        assertNotNull(AgentRedteamTemplateDraftDao.instance.updateStatus("d1", AgentRedteamTemplateDraft.STATUS_SAVED, "CUSTOM_1", 6000));
+        assertNotNull(AgentRedteamTemplateDraftDao.instance.updateStatus("d1", AgentRedteamTemplateDraft.STATUS_DISMISSED, null, 7000));
+        assertNotNull("a dismissed draft can be brought back",
+                AgentRedteamTemplateDraftDao.instance.updateStatus("d1", AgentRedteamTemplateDraft.STATUS_DRAFT, null, 8000));
     }
 
     @Test

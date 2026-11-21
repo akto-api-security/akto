@@ -58,7 +58,7 @@ public class AgentRedteamProfileDao extends AgentRedteamDao<AgentRedteamProfile>
     /** Every version written during one run, across the agents it tested, latest batch first, without cells and insights. */
     public List<AgentRedteamProfile> findByRun(String testingRunResultSummaryId, int limit) {
         return findAll(Filters.eq(AgentRedteamRecord.TESTING_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId), 0, limit,
-                Sorts.descending(AgentRedteamProfile.BATCH_NO),
+                Sorts.descending(AgentRedteamRecord.CREATED_AT_MS),
                 Projections.exclude(AgentRedteamProfile.CELLS, AgentRedteamProfile.INSIGHTS));
     }
 
