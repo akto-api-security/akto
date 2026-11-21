@@ -948,6 +948,32 @@ public class WizIntegrationUtils {
         }
 
         try {
+            // Find all testing run issues in this account that need to be synced with Wiz
+            List<TestingRunIssues> testingRunIssuesList;
+
+            // Only issues already uploaded to Wiz have a finding to sync. The creation status only moves forward
+            // (null -> REQUESTED -> INITIATED, see markIssuesAsWizFinding), so REQUESTED issues are not in Wiz yet.
+            Bson wizSyncFilter = Filters.eq(
+                TestingRunIssues.WIZ_FINDING_CREATION_STATUS,
+                WizIntegration.FindingCreationStatus.CREATION_INITIATED.toString()
+            );
+            Bson wizSyncProjection = Projections.include(Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID);
+            try {
+                // Single query, not skip/limit pages: skip re-walks all preceding results on every page
+                testingRunIssuesList = TestingRunIssuesDao.instance.findAll(wizSyncFilter, wizSyncProjection);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error fetching testing run issues for Wiz sync: " + e.getMessage());
+                return;
+            }
+            if (testingRunIssuesList.isEmpty()) {
+                // Nothing was sent to Wiz yet, so there is nothing to sync: avoid calling Wiz at all
+                loggerMaker.info("No testing run issues marked as Wiz findings. Skipping Wiz status sync.");
+                return;
+            }
+            if (testingRunIssuesList.size() >= WIZ_SYNC_MAX_ISSUES) {
+                loggerMaker.errorAndAddToDb("Wiz status sync: issue fetch hit the findAll limit of " + WIZ_SYNC_MAX_ISSUES + "; results truncated");
+            }
+
             // Get valid access token
             String accessToken = getValidAccessToken();
 
@@ -971,24 +997,6 @@ public class WizIntegrationUtils {
                 if (wizFindingId != null && status != null) {
                     wizFindingIdToStatusMap.put(wizFindingId, status);
                 }
-            }
-
-            // Find all testing run issues in this account that need to be synced with Wiz
-            List<TestingRunIssues> testingRunIssuesList;
-
-            Bson wizSyncFilter = Filters.and(
-                Filters.ne(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null)
-            );
-            Bson wizSyncProjection = Projections.include(Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID);
-            try {
-                // Single query, not skip/limit pages: skip re-walks all preceding results on every page
-                testingRunIssuesList = TestingRunIssuesDao.instance.findAll(wizSyncFilter, wizSyncProjection);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error fetching testing run issues for Wiz sync: " + e.getMessage());
-                return;
-            }
-            if (testingRunIssuesList.size() >= WIZ_SYNC_MAX_ISSUES) {
-                loggerMaker.errorAndAddToDb("Wiz status sync: issue fetch hit the findAll limit of " + WIZ_SYNC_MAX_ISSUES + "; results truncated");
             }
 
             StatusChangeResult statusChangeResult = computeStatusChanges(testingRunIssuesList, wizFindingIdToStatusMap);
