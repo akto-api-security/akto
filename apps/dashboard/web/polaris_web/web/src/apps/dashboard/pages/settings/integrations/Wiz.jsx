@@ -1,4 +1,4 @@
-import { Button, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { Button, Checkbox, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
 import IntegrationsLayout from "./IntegrationsLayout"
 import PasswordTextField from "@/apps/dashboard/components/layouts/PasswordTextField"
 import { useEffect, useState } from "react"
@@ -13,13 +13,16 @@ function Wiz() {
     const [tenantDataCenter, setTenantDataCenter] = useState('')
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
+    const [isStatusSyncEnabled, setIsStatusSyncEnabled] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [isTogglingSync, setIsTogglingSync] = useState(false)
     const [isRemoveable, setIsRemoveable] = useState(false)
 
     const resetFields = () => {
         setTenantDataCenter('')
         setClientId('')
         setClientSecret('')
+        setIsStatusSyncEnabled(false)
         setIsRemoveable(false)
     }
 
@@ -35,6 +38,7 @@ function Wiz() {
                 setTenantDataCenter(wizIntegration.tenantDataCenter || '')
                 setClientId(wizIntegration.clientId || '')
                 setClientSecret(null) // Don't show existing secret
+                setIsStatusSyncEnabled(Boolean(wizIntegration.statusSyncEnabled))
                 setIsRemoveable(true)
             } else {
                 // No integration exists - reset everything
@@ -66,6 +70,19 @@ function Wiz() {
             func.setToast(true, true, error?.response?.data?.actionErrors?.[0] || "Failed to add Wiz Integration")
         } finally {
             setIsSaving(false)
+        }
+    }
+
+    async function toggleStatusSync(checked) {
+        setIsTogglingSync(true)
+        try {
+            await settingFunctions.updateWizStatusSync(checked)
+            setIsStatusSyncEnabled(checked)
+            func.setToast(true, false, "Wiz status sync " + (checked ? "enabled" : "disabled"))
+        } catch (error) {
+            func.setToast(true, true, error?.response?.data?.actionErrors?.[0] || "Failed to update Wiz status sync")
+        } finally {
+            setIsTogglingSync(false)
         }
     }
 
@@ -140,11 +157,35 @@ function Wiz() {
         </LegacyCard>
     )
 
+    const statusSyncCard = (
+        <LegacyCard>
+            <LegacyCard.Section>
+                <Text variant="headingMd">Sync issue status from Wiz</Text>
+            </LegacyCard.Section>
+            <LegacyCard.Section>
+                <Checkbox
+                    label="Update Akto issue status from Wiz"
+                    helpText="Manage findings lifecycle in Wiz. Status changes made in Wiz are applied to the matching Akto issues and override status changes made in Akto."
+                    checked={isStatusSyncEnabled}
+                    onChange={toggleStatusSync}
+                    disabled={isTogglingSync || !canCall('api/updateWizStatusSync')}
+                />
+            </LegacyCard.Section>
+        </LegacyCard>
+    )
+
+    const wizComponent = (
+        <VerticalStack gap="4">
+            {wizCard}
+            {isRemoveable && statusSyncCard}
+        </VerticalStack>
+    )
+
     return (
         <IntegrationsLayout
             title="Wiz"
             cardContent={cardContent}
-            component={wizCard}
+            component={wizComponent}
             docsUrl="https://docs.akto.io/integrations/wiz"
             readOnly={!canCall('api/addWizIntegration')}
         />
