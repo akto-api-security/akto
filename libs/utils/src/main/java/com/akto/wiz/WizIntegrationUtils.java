@@ -863,7 +863,7 @@ public class WizIntegrationUtils {
             case "REJECTED":
                 return GlobalEnums.TestRunIssueStatus.IGNORED;
             default:
-                return GlobalEnums.TestRunIssueStatus.OPEN;
+                return null;
         }
     }
 
@@ -887,6 +887,8 @@ public class WizIntegrationUtils {
 
         // Iterate over testing run issues list
         int failedIssues = 0;
+        // Unrecognised Wiz statuses seen in this run, with the number of issues skipped for each (logged once at the end)
+        Map<String, Integer> unrecognisedWizStatusCounts = new HashMap<>();
         for (TestingRunIssues issue : testingRunIssuesList) {
             try {
                 TestingIssuesId id = issue.getId();
@@ -901,6 +903,11 @@ public class WizIntegrationUtils {
                         continue;
                     }
                     GlobalEnums.TestRunIssueStatus convertedStatus = WizIntegrationUtils.getAktoIssueStatusFromWizStatus(wizFindingStatus);
+                    if (convertedStatus == null) {
+                        // Unknown Wiz status: leave the Akto issue untouched rather than guess a status
+                        unrecognisedWizStatusCounts.merge(wizFindingStatus, 1, Integer::sum);
+                        continue;
+                    }
                     if (!status.equals(convertedStatus.toString())) {
                         statusChanges.put(id, convertedStatus);
                     }
@@ -911,9 +918,37 @@ public class WizIntegrationUtils {
             }
         }
 
+        if (!unrecognisedWizStatusCounts.isEmpty()) {
+            loggerMaker.errorAndAddToDb(String.format("Skipped issues with unrecognised Wiz status during status sync (status -> issues skipped): %s", unrecognisedWizStatusCounts));
+        }
+
         return new StatusChangeResult(statusChanges, failedIssues);
     }
 
+    static final String WIZ_REJECTED_IGNORE_REASON = "Rejected in Wiz";
+
+    /**
+     * Builds the update applied to an Akto issue when its status changes because of Wiz.
+     * Mirrors the dashboard's status update for ignoreReason: set when moving to IGNORED, removed when moving to any other status.
+     */
+    static Bson buildStatusChangeUpdate(GlobalEnums.TestRunIssueStatus newStatus) {
+        Bson update = Updates.combine(
+            Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, newStatus.toString()),
+            Updates.set(TestingRunIssues.LAST_UPDATED, Context.now())
+        );
+        if (newStatus == GlobalEnums.TestRunIssueStatus.IGNORED) {
+            return Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, WIZ_REJECTED_IGNORE_REASON));
+        }
+        return Updates.combine(update, Updates.unset(TestingRunIssues.IGNORE_REASON));
+    }
+
+    /**
+     * Syncs the status of Akto testing run issues that were sent to Wiz from the status of the matching Wiz findings.
+     *
+     * Wiz is the source of truth for status, by design: the sync is one-way (Wiz -> Akto) and Akto status changes
+     * are never pushed to Wiz. If a user changes the status of a Wiz-synced issue in Akto, the next sync run
+     * overwrites it with the status Wiz has for that finding. To change the status of such an issue, change it in Wiz.
+     */
     public static void syncTestingRunIssuesStatusFromWiz(WizIntegration wizIntegration) {
         if (wizIntegration == null) {
             loggerMaker.infoAndAddToDb("Wiz integration not configured for this account. Skipping sync.");
@@ -976,10 +1011,7 @@ public class WizIntegrationUtils {
                 bulkUpdatesForStatusChanges.add(
                     new UpdateOneModel<> (
                         Filters.eq(Constants.ID, change.getKey()),
-                        Updates.combine(
-                            Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, change.getValue().toString()),
-                            Updates.set(TestingRunIssues.LAST_UPDATED, Context.now())
-                        )
+                        buildStatusChangeUpdate(change.getValue())
                     )
                 );
             }

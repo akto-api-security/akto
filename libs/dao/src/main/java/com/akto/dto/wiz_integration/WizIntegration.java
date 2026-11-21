@@ -34,7 +34,7 @@ public class WizIntegration {
     public static final String SYSTEM_ACTIVITY_ID = "systemActivityId";
     public static final String LAST_UPLOADED_SCAN_TS = "lastUploadedScanTs";
     public static final String WIZ_SYNC_JOB_ID = "wizSyncJobId";
-    public static final String BIDIRECTIONAL_SYNC_ENABLED = "bidirectionalSyncEnabled";
+    public static final String STATUS_SYNC_ENABLED = "statusSyncEnabled";
     public static final String LAST_SYNCED_FINDING_STATUS_TS = "lastSyncedFindingStatusTs";
     public static final String WIZ_IMPORT_API_ENDPOINTS_JOB_ID = "wizImportApiEndpointsJobId";
     public static final String WIZ_IMPORT_API_ENDPOINTS_JOB_DELTA_ENDPOINT_COUNT = "wizImportApiEndpointsJobDeltaEndpointCount";
@@ -65,7 +65,7 @@ public class WizIntegration {
     private ObjectId wizSyncJobId;
 
     // Wiz Findings Status
-    private boolean isBidirectionalSyncEnabled;
+    private boolean statusSyncEnabled;
     private long lastSyncedFindingStatusTs;
     
     // Wiz Import API Endpoints Job
