@@ -31,6 +31,14 @@ public class WizSyncJobExecutor extends JobExecutor<WizSyncJobParams> {
                 return;
             }
 
+            // Fetch issue status changes from Wiz, only if Wiz status sync is enabled.
+            // Wiz is the source of truth for status (one-way, Wiz -> Akto): Akto-side status changes are overwritten.
+            if (wizIntegration.isStatusSyncEnabled()) {
+                WizIntegrationUtils.syncTestingRunIssuesStatusFromWiz(wizIntegration);
+            } else {
+                logger.info("Wiz status sync is disabled. Skipping status sync from Wiz.");
+            }
+
             long secondsSinceLastUpload = (System.currentTimeMillis() / 1000L) - wizIntegration.getLastUploadedScanTs();
             boolean pastTwentyFourHours = secondsSinceLastUpload > 24 * 60 * 60;
 
