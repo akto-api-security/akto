@@ -16,7 +16,6 @@ public class ForbiddenEndpointsFilter implements Filter {
             "api/checkStackCreationProgress",
             "api/fetchLoadBalancers",
             "api/fetchLogs",
-            "api/fetchLogsFromDb",
             "api/fetchTrafficMetrics",
             "api/fetchTrafficMetricsDesciptions",
             "api/googleConfig",

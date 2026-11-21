@@ -20,18 +20,42 @@ import { saveAs } from 'file-saver'
 import { ALL_STORED_LOG_KEYS, STORED_LOG_KEY_OPTIONS } from "./logKeysConstants"
 import { isDastCategory } from "@/apps/main/labelHelper"
 
+// These log groups are shown only on this customer account (Akto users see them everywhere).
+const ACCOUNT_RESTRICTED_LOG_GROUPS = ['DATA_INGESTION', 'GUARDRAILS_SERVICE']
+const ACCOUNT_RESTRICTED_LOG_GROUPS_ACCOUNT_ID = '1789954857'
+
+const LOG_GROUP_LABELS = {
+    DASHBOARD: "Dashboard",
+    RUNTIME: "Runtime",
+    TESTING: "Testing",
+    AGENTIC_TESTING: "Agentic Testing",
+    PUPPETEER: "Puppeteer",
+    THREAT_DETECTION: "Threat",
+    DATA_INGESTION: "Data Ingestion",
+    AWS_API_GATEWAY: "AWS API Gateway",
+    GUARDRAILS_SERVICE: "Guardrails Service",
+    SMART_TESTING: "Smart Testing",
+    MINI_TESTING_ORCHESTRATOR: "Mini Testing Orchestrator",
+    DAST: "DAST",
+    BILLING: "Billing",
+    ANALYSER: "Analyser",
+    ENDPOINT_SHIELD: "Endpoint Shield",
+    ACCOUNT_JOB_EXECUTOR: "Account Job Executor",
+}
+
 const Logs = () => {
     const fiveMins = 1000 * 60 * 5
 
     const [ logs, setLogs ] = useState({
         startTime: null,
         endTime: null,
-        logGroup: 'DASHBOARD',
+        logGroup: '',
         logData: []
     })
     const [ selectedLogKeys, setSelectedLogKeys ] = useState(() => [...ALL_STORED_LOG_KEYS])
     const [ logKeysPopoverOpen, setLogKeysPopoverOpen ] = useState(false)
     const [ pendingLogKeys, setPendingLogKeys ] = useState(() => [...ALL_STORED_LOG_KEYS])
+    const [ allowedLogGroups, setAllowedLogGroups ] = useState([])
     const [ loading, setLoading ] = useState(false)
     const [ logSearchQuery, setLogSearchQuery ] = useState('')
     const logGroupSelected = logs.logGroup !== ''
@@ -42,22 +66,26 @@ const Logs = () => {
         [selectedLogKeys]
     )
 
-    const logGroupOptions = [
-        { label: "Dashboard", value: "DASHBOARD" },
-        { label: "Runtime", value: "RUNTIME" },
-        { label: "Testing", value: "TESTING" },
-        { label: "Agentic Testing", value: "AGENTIC_TESTING" },
-        { label: "Puppeteer", value: "PUPPETEER" },
-        { label: "Threat", value: "THREAT_DETECTION" },
-        { label: "Data Ingestion", value: "DATA_INGESTION" },
-        { label: "AWS API Gateway", value: "AWS_API_GATEWAY" },
-        { label: "Guardrails Service", value: "GUARDRAILS_SERVICE" },
-        {label: "Smart Testing", value: "SMART_TESTING"},
-        { label: "Mini Testing Orchestrator", value: "MINI_TESTING_ORCHESTRATOR" },
-        // dast_logs is only populated for DAST deployments, so hide the option elsewhere.
-        ...(isDastCategory() ? [{ label: "DAST", value: "DAST" }] : []),
-    ];
-  
+    const logGroupOptions = useMemo(
+        () => allowedLogGroups.map((value) => ({ label: LOG_GROUP_LABELS[value] ?? value, value })),
+        [allowedLogGroups]
+    )
+
+    useEffect(() => {
+        if (!hasAccess) return
+        settingRequests.fetchAllowedLogGroups().then((resp) => {
+            // Which groups a user may see is decided by the backend; the filters below only narrow it down.
+            const restrictedGroupsAllowed = func.isAktoUser() || String(window.ACTIVE_ACCOUNT) === ACCOUNT_RESTRICTED_LOG_GROUPS_ACCOUNT_ID
+            const groups = (resp?.allowedLogGroups ?? []).filter((value) =>
+                // dast_logs is only populated for DAST deployments, so hide that option elsewhere.
+                (value !== 'DAST' || isDastCategory()) &&
+                (restrictedGroupsAllowed || !ACCOUNT_RESTRICTED_LOG_GROUPS.includes(value))
+            )
+            setAllowedLogGroups(groups)
+            setLogs(previousState => ({ ...previousState, logGroup: groups[0] ?? '' }))
+        }).catch(() => {})
+    }, [hasAccess])
+
     const handleSelectLogGroup = (logGroup) => {
        setLogSearchQuery('')
        setLogs(previousState => ({ ...previousState, logData: [], logGroup: logGroup }))
@@ -203,11 +231,14 @@ const Logs = () => {
             <LegacyCard.Section>
                 <Box paddingBlockEnd="3">
                     <div style={{ display: "grid", gridTemplateColumns: "1fr max-content", gap: "10px", width: "100%" }}>
-                        <Dropdown
-                            menuItems={logGroupOptions}
-                            initial="Dashboard"
-                            selected={handleSelectLogGroup}
+                        {/* Mounted only once the allowed groups are known: Dropdown reads `initial` just once */}
+                        {logGroupOptions.length > 0 && (
+                            <Dropdown
+                                menuItems={logGroupOptions}
+                                initial={logGroupOptions[0].label}
+                                selected={handleSelectLogGroup}
                             />
+                        )}
                         <ButtonGroup segmented>
                             <Button onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</Button>
                             <Button onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected || logs.startTime == null}>-5 minutes</Button>

@@ -119,6 +119,15 @@ const settingRequests = {
             }
         })
     },
+    fetchAllowedLogGroups() {
+        return request({
+            url: '/api/fetchAllowedLogGroups',
+            method: 'post',
+            data: {},
+            // non-admins get a 403 here; the nav just hides the Logs tab, so no error toast
+            suppress403Toast: true
+        })
+    },
     fetchLogsFromDb(startTime, endTime, logDb, logKeys) {
         const sendKeys = Array.isArray(logKeys) && logKeys.length > 0 && logKeys.length < ALL_STORED_LOG_KEYS.length
         return request({
