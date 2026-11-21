@@ -56,6 +56,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import com.mongodb.client.result.UpdateResult;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -739,6 +740,48 @@ public class WizIntegrationUtils {
         } catch (Exception e) {
             throw new Exception("Error marking issues as Wiz findings: " + e.getMessage());
         }
+    }
+
+    /**
+     * Auto-ticketing for Wiz: marks the OPEN issues of a test run summary, at the given severities, as Wiz findings.
+     * No job is scheduled; the recurring Wiz sync job uploads whatever is marked CREATION_REQUESTED.
+     * Issues that are already Wiz findings are left alone. Returns the number of issues marked.
+     */
+    public static int markSummaryIssuesAsWizFindings(ObjectId summaryId, List<String> severities) throws Exception {
+        // a null summaryId would match every issue that has no summary id
+        if (summaryId == null || severities == null || severities.isEmpty()) {
+            return 0;
+        }
+
+        if (WizIntegrationDao.instance.findOne(new BasicDBObject()) == null) {
+            loggerMaker.infoAndAddToDb("Wiz not integrated. Skipping auto-creation of Wiz findings.");
+            return 0;
+        }
+
+        // Single write with every eligibility predicate: eligibility is checked on the primary at write time, so
+        // there is no stale read (secondary reads in the new-testing path) and no race with the sync job or manual creation.
+        try {
+            UpdateResult result = TestingRunIssuesDao.instance.updateMany(
+                Filters.and(
+                    Filters.eq(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, summaryId),
+                    Filters.in(TestingRunIssues.KEY_SEVERITY, severities),
+                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                    // matches a missing or null status: the exact complement of the sync job's `ne(status, null)` filter
+                    Filters.eq(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null)
+                ),
+                wizFindingRequestedUpdate()
+            );
+            return (int) result.getModifiedCount();
+        } catch (Exception e) {
+            throw new Exception("Error marking issues as Wiz findings: " + e.getMessage());
+        }
+    }
+
+    private static Bson wizFindingRequestedUpdate() {
+        return Updates.combine(
+            Updates.set(TestingRunIssues.WIZ_FINDING_URL, "unavailable"),
+            Updates.set(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, WizIntegration.FindingCreationStatus.CREATION_REQUESTED.toString())
+        );
     }
 
     public static BasicDBObject checkLastUploadScanStatus() throws Exception {

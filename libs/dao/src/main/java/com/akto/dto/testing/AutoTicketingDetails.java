@@ -19,4 +19,16 @@ public class AutoTicketingDetails {
     private String projectId;
     private String issueType;
     private String ticketSource = TicketSource.JIRA.name();
+
+    /** The plan feature that gates auto-creating tickets in the given tool. */
+    public static String featureLabelFor(String ticketSource) {
+        // Port.io creates Linear tickets, so it shares Linear's feature
+        if (TicketSource.LINEAR.name().equals(ticketSource) || PORT_IO_TICKET_SOURCE.equals(ticketSource)) {
+            return "LINEAR_INTEGRATION";
+        }
+        if (TicketSource.WIZ.name().equals(ticketSource)) {
+            return "WIZ_INTEGRATION";
+        }
+        return "JIRA_INTEGRATION";
+    }
 }
