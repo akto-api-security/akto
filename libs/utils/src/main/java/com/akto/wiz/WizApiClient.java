@@ -20,7 +20,9 @@ public class WizApiClient {
     static final int HOST_FETCH_PAGE_SIZE = 500;
     static final int ENDPOINT_FETCH_PAGE_SIZE = 20;
     static final int ENDPOINT_META_FETCH_PAGE_SIZE = 500;
-    static final int FINDINGS_FETCH_PAGE_SIZE = 100;
+    static final int FINDINGS_FETCH_PAGE_SIZE = 500;
+    // Safety cap on pages fetched in one run
+    static final int MAX_FINDINGS_PAGES = 1000;
 
     static Map<String, List<String>> buildHeaders(String accessToken) {
         Map<String, List<String>> headers = new HashMap<>();
@@ -92,6 +94,7 @@ public class WizApiClient {
         List<BasicDBObject> results = new ArrayList<>();
         String cursor = null;
         boolean hasNextPage = true;
+        int pagesFetched = 0;
         Map<String, List<String>> headers = buildHeaders(accessToken);
 
         while (hasNextPage) {
@@ -113,8 +116,23 @@ public class WizApiClient {
                 }
             }
 
+            pagesFetched++;
             hasNextPage = pageInfo != null && pageInfo.getBoolean("hasNextPage", false);
-            cursor = pageInfo != null ? pageInfo.getString("endCursor") : null;
+            String nextCursor = pageInfo != null ? pageInfo.getString("endCursor") : null;
+
+            // Fail rather than loop forever on a bad response, so the caller never acts on an incomplete list of findings
+            if (hasNextPage) {
+                if (nextCursor == null) {
+                    throw new Exception("Wiz returned hasNextPage=true without an endCursor while fetching findings");
+                }
+                if (nextCursor.equals(cursor)) {
+                    throw new Exception("Wiz returned the same endCursor twice while fetching findings: " + nextCursor);
+                }
+                if (pagesFetched >= MAX_FINDINGS_PAGES) {
+                    throw new Exception("Stopped fetching Wiz findings after reaching the page cap of " + MAX_FINDINGS_PAGES);
+                }
+            }
+            cursor = nextCursor;
         }
 
         return results;

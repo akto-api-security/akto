@@ -39,6 +39,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.testing_utils.TestingUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,6 +57,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 public class WizIntegrationUtils {
 
@@ -906,6 +908,32 @@ public class WizIntegrationUtils {
     }
 
     /**
+     * Returns the distinct latest test run summary ids of the issues whose status changed (issues without one are ignored).
+     */
+    static Set<ObjectId> collectAffectedSummaryIds(List<TestingRunIssues> issues, Set<TestingIssuesId> changedIssueIds) {
+        Set<ObjectId> summaryIds = new HashSet<>();
+        for (TestingRunIssues issue : issues) {
+            if (issue.getId() != null && changedIssueIds.contains(issue.getId()) && issue.getLatestTestingRunSummaryId() != null) {
+                summaryIds.add(issue.getLatestTestingRunSummaryId());
+            }
+        }
+        return summaryIds;
+    }
+
+    /**
+     * Recounts the issue counts of each summary. A failure for one summary is logged and does not stop the others.
+     */
+    private static void recountSummaries(Set<ObjectId> summaryIds) {
+        for (ObjectId summaryId : summaryIds) {
+            try {
+                TestingUtils.recountAndUpdateSummaryCount(summaryId);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(String.format("Error recounting issues for summary %s after Wiz status sync: %s", summaryId, e.getMessage()));
+            }
+        }
+    }
+
+    /**
      * Syncs the status of Akto testing run issues that were sent to Wiz from the status of the matching Wiz findings.
      *
      * Wiz is the source of truth for status, by design: the sync is one-way (Wiz -> Akto) and Akto status changes
@@ -950,7 +978,7 @@ public class WizIntegrationUtils {
             Bson wizSyncFilter = Filters.and(
                 Filters.ne(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null)
             );
-            Bson wizSyncProjection = Projections.include(Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS);
+            Bson wizSyncProjection = Projections.include(Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID);
             int skip = 0;
             try {
                 List<TestingRunIssues> page;
@@ -981,6 +1009,9 @@ public class WizIntegrationUtils {
 
             if (!bulkUpdatesForStatusChanges.isEmpty()) {
                 TestingRunIssuesDao.instance.getMCollection().bulkWrite(bulkUpdatesForStatusChanges);
+
+                // The status changes affect the issue counts of the summaries these issues belong to
+                recountSummaries(collectAffectedSummaryIds(testingRunIssuesList, statusChangeResult.statusChanges.keySet()));
             }
 
             loggerMaker.infoAndAddToDb(String.format("Finished syncing testing run issues status from Wiz. Wiz findings: %d, Akto issues checked: %d, status updated: %d, failed to process: %d",
