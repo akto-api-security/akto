@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { Divider, LegacyCard, Spinner, Text, VerticalStack } from "@shopify/polaris"
+import { Divider, LegacyCard, Text, VerticalStack } from "@shopify/polaris"
 import learningsApi from "./api"
 import { AccountSettingBanner, DraftList, LOAD_STATE, LoadStateBanner, ProfileSummary, loadStateFromError } from "./LearningsView"
 
@@ -28,19 +28,23 @@ function RunLearningsCard({ summaryHexId }) {
     useEffect(() => { load() }, [load])
 
     if (!summaryHexId) return null
+    // Most runs are not agentic and learned nothing: no card while loading, and none when the read says there is nothing.
+    if (loadState === LOAD_STATE.LOADING) return null
     if (loadState === LOAD_STATE.LOADED && runLearnings?.state !== "READY") return null
 
-    const setDrafts = (drafts) => setRunLearnings((prev) => ({ ...prev, drafts }))
+    const removeDraft = (draftId) => setRunLearnings((prev) => ({ ...prev, drafts: (prev?.drafts || []).filter((d) => d.id !== draftId) }))
 
     return (
         <LegacyCard title="Red-team learnings from this run" sectioned key="redteam-learnings">
-            {loadState === LOAD_STATE.LOADING ? <Spinner size="small" /> : null}
             <LoadStateBanner loadState={loadState} onRetry={load} subject="This run's learnings" />
             {loadState === LOAD_STATE.LOADED ? (
                 <VerticalStack gap="4">
                     <AccountSettingBanner learningsEnabled={learningsEnabled} />
                     {runLearnings.versionsTruncated ? (
-                        <Text color="subdued">This run wrote more versions than are shown; the newest are listed.</Text>
+                        <Text color="subdued">This run wrote more versions than are read; only the newest are used below.</Text>
+                    ) : null}
+                    {runLearnings.agentsTruncated ? (
+                        <Text color="subdued">This run tested more agents than are shown; only the most recently updated are listed.</Text>
                     ) : null}
                     {(runLearnings.agentProfiles || []).map((profile) => (
                         <VerticalStack gap="3" key={profile.id}>
@@ -48,7 +52,7 @@ function RunLearningsCard({ summaryHexId }) {
                             <Divider />
                         </VerticalStack>
                     ))}
-                    <DraftList drafts={runLearnings.drafts} onDraftsChange={setDrafts} />
+                    <DraftList drafts={runLearnings.drafts} onDismissed={removeDraft} />
                 </VerticalStack>
             ) : null}
         </LegacyCard>

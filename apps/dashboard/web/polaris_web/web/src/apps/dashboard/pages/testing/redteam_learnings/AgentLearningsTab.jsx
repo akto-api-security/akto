@@ -37,7 +37,7 @@ function AgentLearningsTab({ apiCollectionId, url, method }) {
 
     useEffect(() => { load() }, [load])
 
-    const setDrafts = (openDrafts) => setAgentLearnings((prev) => ({ ...prev, openDrafts }))
+    const removeDraft = (draftId) => setAgentLearnings((prev) => ({ ...prev, openDrafts: (prev?.openDrafts || []).filter((d) => d.id !== draftId) }))
 
     return (
         <Box paddingBlockStart="4">
@@ -47,7 +47,7 @@ function AgentLearningsTab({ apiCollectionId, url, method }) {
                 <VerticalStack gap="4">
                     <AccountSettingBanner learningsEnabled={learningsEnabled} />
                     {agentLearnings.state !== "READY" ? (
-                        <Text color="subdued">Nothing has been learned about this agent yet. Learnings build up as agentic tests run against it.</Text>
+                        <Text color="subdued">Nothing has been learned about this agent yet. Learnings are written when an agentic run against it finishes, once red-team learnings are running for this account.</Text>
                     ) : (
                         <>
                             <ProfileSummary profile={agentLearnings.latestProfile} heading="Latest profile" />
@@ -63,7 +63,7 @@ function AgentLearningsTab({ apiCollectionId, url, method }) {
                             </VerticalStack>
                         </>
                     )}
-                    <DraftList drafts={agentLearnings.openDrafts} onDraftsChange={setDrafts} />
+                    <DraftList drafts={agentLearnings.openDrafts} onDismissed={removeDraft} />
                 </VerticalStack>
             ) : null}
         </Box>

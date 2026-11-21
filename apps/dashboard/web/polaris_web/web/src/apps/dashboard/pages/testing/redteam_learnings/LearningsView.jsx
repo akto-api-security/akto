@@ -45,8 +45,16 @@ export function LoadStateBanner({ loadState, onRetry, subject }) {
     return null
 }
 
+// true: on; false: switched off; null: the setting could not be read, which is not the same as on.
 export function AccountSettingBanner({ learningsEnabled }) {
-    if (learningsEnabled !== false) return null
+    if (learningsEnabled === true) return null
+    if (learningsEnabled === null || learningsEnabled === undefined) {
+        return (
+            <Banner status="warning">
+                Whether red-team learnings are turned on for this account could not be read. What is shown was learned before.
+            </Banner>
+        )
+    }
     return (
         <Banner status="info">
             Red-team learnings are turned off for this account (Testing → User config). What is shown was learned before.
@@ -136,7 +144,7 @@ export function ProfileSummary({ profile, heading }) {
 }
 
 /** Suggested templates: open one in the Test Editor to review and save it, or dismiss it. */
-export function DraftList({ drafts, onDraftsChange }) {
+export function DraftList({ drafts, onDismissed }) {
     const navigate = useNavigate()
     const { canCall } = usePermissions()
     const [busyId, setBusyId] = useState(null)
@@ -156,7 +164,8 @@ export function DraftList({ drafts, onDraftsChange }) {
         setBusyId(draft.id)
         try {
             await learningsApi.updateRedteamDraftStatus(draft.id, "DISMISSED")
-            onDraftsChange?.((drafts || []).filter((d) => d.id !== draft.id))
+            // The parent removes it from its current list, not from the one this render saw.
+            onDismissed?.(draft.id)
             func.setToast(true, false, "Draft dismissed")
         } catch (e) {
             // the request helper already showed the error

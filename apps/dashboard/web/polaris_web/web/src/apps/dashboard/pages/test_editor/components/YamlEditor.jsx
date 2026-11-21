@@ -66,17 +66,22 @@ const YamlEditor = ({ fetchAllTests }) => {
     }
 
     // The template is saved first; marking its draft saved is a second call whose failure is reported on its own.
+    // The call is idempotent (the same template id), so one retry covers a blip without a second prompt.
     const markRedteamDraftSaved = async (draftId, finalTestId) => {
-        try {
-            await learningsApi.updateRedteamDraftStatus(draftId, "SAVED", finalTestId)
-            clearStashedDraft()
-        } catch (error) {
-            setToastConfig({
-                isActive: true,
-                isError: true,
-                message: "The test was saved, but its suggested draft could not be marked as saved."
-            })
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                await learningsApi.updateRedteamDraftStatus(draftId, "SAVED", finalTestId)
+                clearStashedDraft()
+                return
+            } catch (error) {
+                // the second failure is reported below
+            }
         }
+        setToastConfig({
+            isActive: true,
+            isError: true,
+            message: "The test was saved, but its suggested draft could not be marked as saved. Dismiss it from the Learnings tab; saving it again would create a second test."
+        })
     }
 
     const handleSave = async () => {
