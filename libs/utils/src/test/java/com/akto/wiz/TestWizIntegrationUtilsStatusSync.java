@@ -10,7 +10,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.bson.BsonDocument;
+import org.bson.conversions.Bson;
 import org.junit.Test;
+
+import com.mongodb.MongoClientSettings;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -52,12 +56,11 @@ public class TestWizIntegrationUtilsStatusSync {
         assertEquals(TestRunIssueStatus.IGNORED, WizIntegrationUtils.getAktoIssueStatusFromWizStatus("REJECTED"));
     }
 
-    // A null Wiz status maps to null; an unrecognised one currently defaults to OPEN.
+    // A null or unrecognised Wiz status maps to null (never to a real Akto status).
     @Test
     public void testWizStatusMappingNullAndUnknown() {
         assertNull(WizIntegrationUtils.getAktoIssueStatusFromWizStatus(null));
-        // unknown statuses currently default to OPEN
-        assertEquals(TestRunIssueStatus.OPEN, WizIntegrationUtils.getAktoIssueStatusFromWizStatus("SOMETHING_NEW"));
+        assertNull(WizIntegrationUtils.getAktoIssueStatusFromWizStatus("SOMETHING_NEW"));
     }
 
     // ---- computeStatusChanges ----
@@ -115,6 +118,25 @@ public class TestWizIntegrationUtilsStatusSync {
 
         assertEquals(0, result.failedIssues);
         assertTrue(result.statusChanges.isEmpty());
+    }
+
+    // An unrecognised Wiz status must leave the Akto issue untouched (not reopen it) and is not a failure.
+    @Test
+    public void testUnrecognisedWizStatusIsSkippedWithoutFailing() throws Exception {
+        List<TestingRunIssues> issues = Arrays.asList(
+            issue("REMOVE_TOKENS", TestRunIssueStatus.FIXED),        // unknown Wiz status: must stay FIXED
+            issue("BFLA", TestRunIssueStatus.IGNORED),               // unknown Wiz status: must stay IGNORED
+            issue("JWT_NONE_ALGO", TestRunIssueStatus.OPEN));        // known status: still processed
+        Map<String, String> wizStatuses = new HashMap<>();
+        wizStatuses.put(wizId("REMOVE_TOKENS"), "SOMETHING_NEW");
+        wizStatuses.put(wizId("BFLA"), "SOMETHING_NEW");
+        wizStatuses.put(wizId("JWT_NONE_ALGO"), "RESOLVED");
+
+        StatusChangeResult result = WizIntegrationUtils.computeStatusChanges(issues, wizStatuses);
+
+        assertEquals(0, result.failedIssues);
+        assertEquals(1, result.statusChanges.size());
+        assertEquals(TestRunIssueStatus.FIXED, result.statusChanges.get(issueId("JWT_NONE_ALGO")));
     }
 
     // With a mix of changed, unchanged and missing issues, only the changed ones are returned.
@@ -177,5 +199,34 @@ public class TestWizIntegrationUtilsStatusSync {
 
         assertEquals(0, result.failedIssues);
         assertTrue(result.statusChanges.isEmpty());
+    }
+
+    // ---- buildStatusChangeUpdate ----
+
+    private static BsonDocument render(Bson update) {
+        return update.toBsonDocument(BsonDocument.class, MongoClientSettings.getDefaultCodecRegistry());
+    }
+
+    // Moving to IGNORED sets the status and an ignore reason, and removes nothing.
+    @Test
+    public void testUpdateForIgnoredSetsIgnoreReason() {
+        BsonDocument doc = render(WizIntegrationUtils.buildStatusChangeUpdate(TestRunIssueStatus.IGNORED));
+
+        assertEquals("IGNORED", doc.getDocument("$set").getString("testRunIssueStatus").getValue());
+        assertEquals(WizIntegrationUtils.WIZ_REJECTED_IGNORE_REASON, doc.getDocument("$set").getString("ignoreReason").getValue());
+        assertTrue(doc.getDocument("$set").containsKey("lastUpdated"));
+        assertTrue(!doc.containsKey("$unset"));
+    }
+
+    // Moving to OPEN or FIXED sets the status and removes any stale ignore reason.
+    @Test
+    public void testUpdateForNonIgnoredUnsetsIgnoreReason() {
+        for (TestRunIssueStatus status : new TestRunIssueStatus[]{TestRunIssueStatus.OPEN, TestRunIssueStatus.FIXED}) {
+            BsonDocument doc = render(WizIntegrationUtils.buildStatusChangeUpdate(status));
+
+            assertEquals(status.toString(), doc.getDocument("$set").getString("testRunIssueStatus").getValue());
+            assertTrue(!doc.getDocument("$set").containsKey("ignoreReason"));
+            assertTrue(doc.getDocument("$unset").containsKey("ignoreReason"));
+        }
     }
 }
