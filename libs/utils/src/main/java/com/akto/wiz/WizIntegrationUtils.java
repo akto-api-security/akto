@@ -726,7 +726,11 @@ public class WizIntegrationUtils {
     public static void markIssuesAsWizFinding(List<TestingIssuesId> testingIssuesIdList) throws Exception {
         try {
             TestingRunIssuesDao.instance.updateMany(
-                Filters.in(Constants.ID, testingIssuesIdList),
+                Filters.and(
+                    Filters.in(Constants.ID, testingIssuesIdList),
+                    // only issues that are not yet Wiz findings (missing or null), so an already requested/uploaded one is never reset
+                    Filters.eq(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null)
+                ),
                 Updates.combine(
                     Updates.set(TestingRunIssues.WIZ_FINDING_URL, "unavailable"),
                     Updates.set(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, WizIntegration.FindingCreationStatus.CREATION_REQUESTED.toString())
