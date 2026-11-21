@@ -286,6 +286,7 @@ public class DaoInit {
         ClassModel<RuntimeMetrics> RuntimeMetricsClassModel = ClassModel.builder(RuntimeMetrics.class).enableDiscriminator(true).build();
         ClassModel<JobParams> jobsParam = ClassModel.builder(JobParams.class).enableDiscriminator(true).build();
         ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
+        ClassModel<AuthToken> authTokenClassModel = ClassModel.builder(AuthToken.class).enableDiscriminator(true).build();
         ClassModel<ApiHitCountInfo> apiHitCountInfoClassModel = ClassModel.builder(ApiHitCountInfo.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
         ClassModel<File> fileClassModel = ClassModel.builder(File.class).enableDiscriminator(true).build();
@@ -343,7 +344,7 @@ public class DaoInit {
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
                 , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel, endpointCaRootClassModel, endpointDeviceCaClassModel
                 , newRelicIntegrationClassModel, openTelemetryIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel, agentModelClassModel
-                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel, copilotStudioIntegrationClassModel, endpointAgentOrganizationClassModel, endpointShieldDiagnosticClassModel, llmServiceConfigClassModel).automatic(true).build());
+                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel, copilotStudioIntegrationClassModel, endpointAgentOrganizationClassModel, endpointShieldDiagnosticClassModel, llmServiceConfigClassModel, authTokenClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -507,6 +508,7 @@ public class DaoInit {
         EndpointRemoteCommandExecutionDao.instance.createIndicesIfAbsent();
         EndpointShieldDiagnosticDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
+        AuthTokensDao.instance.createIndicesIfAbsent();
         SmartTestingRunDao.instance.createIndicesIfAbsent();
         SmartTestingEventDao.instance.createIndicesIfAbsent();
         SmartTestingMessageDao.instance.createIndicesIfAbsent();

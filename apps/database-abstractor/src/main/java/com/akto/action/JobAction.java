@@ -6,6 +6,7 @@ import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobType;
 import com.akto.dto.jobs.LinearAutoTicketParams;
+import com.akto.dto.jobs.PortIOAutoTicketParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -53,6 +54,9 @@ public class JobAction extends ActionSupport {
                 break;
             case LINEAR_AUTO_CREATE_TICKETS:
                 jobParams = mapper.convertValue(jobParamsMap, LinearAutoTicketParams.class);
+                break;
+            case PORT_IO_AUTO_CREATE_TICKETS:
+                jobParams = mapper.convertValue(jobParamsMap, PortIOAutoTicketParams.class);
                 break;
             default:
                 throw new IllegalArgumentException("Unhandled JobType: " + jobType);

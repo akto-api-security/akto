@@ -149,8 +149,24 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
         for (SensitiveDataCount inc : increments) {
             if (!isValid(inc)) continue;
 
+            // The caller is part of the key, so two services sending the same type to the same
+            // callee in one hour keep their own buckets instead of collapsing into one.
+            //
+            // An unattributed increment has to match a bucket written before this field existed,
+            // which has no senderCollectionId at all. Mongo treats a missing field as matching
+            // null but NOT as matching 0, so a plain eq(…, 0) would miss every such bucket: the
+            // upsert would find nothing, insert a second document beside it, and the original
+            // would stop accumulating from the moment this ships - or, where the pre-change unique
+            // index is still in place, collide with it and lose the increment outright.
+            Bson senderMatch = inc.getSenderCollectionId() == SensitiveDataCount.UNKNOWN_COLLECTION_ID
+                    ? Filters.or(
+                            Filters.eq(SensitiveDataCount.SENDER_COLLECTION_ID, SensitiveDataCount.UNKNOWN_COLLECTION_ID),
+                            Filters.exists(SensitiveDataCount.SENDER_COLLECTION_ID, false))
+                    : Filters.eq(SensitiveDataCount.SENDER_COLLECTION_ID, inc.getSenderCollectionId());
+
             Bson filter = Filters.and(
                     Filters.eq(SensitiveDataCount.API_COLLECTION_ID, inc.getApiCollectionId()),
+                    senderMatch,
                     Filters.eq(SensitiveDataCount.SUB_TYPE, inc.getSubType()),
                     Filters.eq(SensitiveDataCount.HOUR, inc.getHour()));
 
@@ -158,8 +174,12 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
             // flush for an old hour does not keep that hour around longer than the rest.
             Date expireAt = new Date((inc.getHour() + TimeUnit.DAYS.toSeconds(RETENTION_DAYS)) * 1000L);
 
+            // An $or does not supply a value the way an equality condition does, so a new bucket
+            // created through the branch above would otherwise be inserted without the field and
+            // be invisible to it ever after.
             Bson update = Updates.combine(
                     Updates.inc(SensitiveDataCount.COUNT, inc.getCount()),
+                    Updates.setOnInsert(SensitiveDataCount.SENDER_COLLECTION_ID, inc.getSenderCollectionId()),
                     Updates.setOnInsert(SensitiveDataCount.EXPIRE_AT, expireAt));
 
             writes.add(new UpdateOneModel<>(filter, update, new UpdateOptions().upsert(true)));

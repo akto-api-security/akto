@@ -1128,6 +1128,27 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // Paging for fetchKnownSequenceSteps: rows of sequenceOrder after lastSeqKey; lastSeqKey comes back null after the last page
+    @Getter @Setter
+    private int sequenceOrder;
+    @Getter @Setter
+    private String lastSeqKey;
+
+    public String fetchKnownSequenceSteps() {
+        try {
+            List<ApiSequences> page = ApiSequencesDao.instance.findKnownStepsPage(sequenceOrder, lastSeqKey);
+            lastSeqKey = page.size() < ApiSequencesDao.KNOWN_STEPS_PAGE_SIZE ? null : page.get(page.size() - 1).getSeqKey();
+            apiSequencesList = new ArrayList<>();
+            for (ApiSequences row : page) {
+                if (ApiSequencesDao.isKnownStep(row)) apiSequencesList.add(row);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchKnownSequenceSteps: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchApiSequences() {
         try {
             apiSequencesList = ApiSequencesDao.instance.findAll(new BasicDBObject(), skip, 1000, null);

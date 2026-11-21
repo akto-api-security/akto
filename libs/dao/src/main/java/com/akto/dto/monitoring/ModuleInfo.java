@@ -26,6 +26,11 @@ public class ModuleInfo {
     @Getter @Setter
     private String miniRuntimeName;
 
+    // id of the auth token the module heartbeats with, stamped by cyborg from the verified token
+    public static final String TOKEN_ID = "tokenId";
+    @Getter @Setter
+    private String tokenId;
+
     @Getter @Setter
     private boolean reboot;
     public static final String _REBOOT = "reboot";

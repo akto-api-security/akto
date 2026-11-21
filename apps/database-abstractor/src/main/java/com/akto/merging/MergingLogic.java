@@ -40,7 +40,7 @@ public class MergingLogic {
     static final Set<String> TEMPLATE_PLACEHOLDERS = new HashSet<>(Arrays.asList(
             "INTEGER", "STRING", "UUID", "OBJECT_ID", "FLOAT", "VERSIONED", "LOCALE"));
     // Account for which templates without a STRING segment (e.g. /api/INTEGER/BW48) are also merged
-    static final int TEMPLATE_MERGING_ACCOUNT_ID = 1772780065;
+    static final int TEMPLATE_MERGING_ACCOUNT_ID = URLTemplate.TEMPLATE_MERGING_ACCOUNT_ID;
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class, LogDb.DB_ABS);
     private static final int OPTIMIZED_MERGING_ACCOUNT_ID = 1736798101;
 

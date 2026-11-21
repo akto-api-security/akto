@@ -8,6 +8,7 @@ import com.mongodb.client.model.Filters;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.SignatureException;
 
 import java.io.IOException;
 import java.security.KeyFactory;
@@ -25,6 +26,9 @@ import java.nio.file.Paths;
 import java.nio.file.Files;
 
 public class JwtAuthenticator {
+    // Package-private so tests can swap in a loader that doesn't need a database
+    static PublicKeyCache publicKeyCache = new PublicKeyCache(JwtAuthenticator::loadPublicKey);
+
     public static String createJWT(Map<String, Object> claims, String issuer, String subject, int expiryUnit, int expiryDuration)
             throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
 
@@ -85,11 +89,19 @@ public class JwtAuthenticator {
     public static Jws<Claims> authenticate(String jwsString)
             throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
 
-         PublicKey publicKey = getPublicKey();
-         return Jwts.parserBuilder()
-                 .setSigningKey(publicKey)
-                 .build()
-                 .parseClaimsJws(jwsString);
+        try {
+            return parse(jwsString, publicKeyCache.get());
+        } catch (SignatureException e) {
+            // The key may have been rotated
+            return parse(jwsString, publicKeyCache.reload());
+        }
+    }
+
+    private static Jws<Claims> parse(String jwsString, PublicKey publicKey) {
+        return Jwts.parserBuilder()
+                .setSigningKey(publicKey)
+                .build()
+                .parseClaimsJws(jwsString);
     }
 
     public static byte[] readFileBytes(String filename) throws IOException
@@ -98,7 +110,7 @@ public class JwtAuthenticator {
         return Files.readAllBytes(path);        
     }
 
-    private static PublicKey getPublicKey() throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+    private static PublicKey loadPublicKey() throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         
         HybridSaasConfig config = null;
         try {
