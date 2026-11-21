@@ -35,7 +35,6 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.RuntimeUtil;
 import com.akto.metrics.AllMetrics;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
@@ -325,6 +324,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     if (filters != null && !filters.isEmpty()) {
       for (FilterConfig apiFilter : filters.values()) {
       boolean hasPassedFilter = false;
+      String sequenceReason = null;
       boolean successFilterPassed = false;
       boolean failureFilterPassed = false;
        // Create a fresh vulnerable list for each filter
@@ -357,20 +357,8 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       } else if (apiFilter.getId().equals(ThreatDetector.SEQUENCE_ANOMALY_FILTER_ID)) {
-        if (apiCollectionId != 0) {
-          // Same order as the catalog: exact catalog URL, then catalog template
-          Map<String, Set<URLMethods.Method>> catalogUrls = accountConfig != null ? accountConfig.getApiInfoUrlToMethods() : null;
-          List<URLTemplate> catalogTemplates = accountConfig != null && accountConfig.getApiCollectionUrlTemplates() != null
-              ? accountConfig.getApiCollectionUrlTemplates().get(apiCollectionId) : null;
-          String sequenceUrl = RuntimeUtil.findCatalogUrl(url, method, catalogUrl -> {
-            Set<URLMethods.Method> methods = catalogUrls == null ? null : catalogUrls.get(apiCollectionId + ":" + catalogUrl);
-            return methods != null && methods.contains(method);
-          }, catalogTemplates);
-          if (sequenceUrl == null) sequenceUrl = urlForAggregation;
-          boolean skippedRequiredStep = sequenceCache.checkSequenceAnomaly(responseParam, apiCollectionId, sequenceUrl, method);
-          boolean unknownPath = sequenceCache.checkUnknownPath(responseParam, apiCollectionId, sequenceUrl, method);
-          hasPassedFilter = skippedRequiredStep || unknownPath;
-        }
+        sequenceReason = sequenceCache.evaluate(responseParam, apiCollectionId, url, method, accountConfig, urlForAggregation);
+        hasPassedFilter = sequenceReason != null;
       } else {
         boolean hasSuccessFailureFilters = (apiFilter.getSuccessFilter() != null || apiFilter.getFailureFilter() != null);
 
@@ -445,6 +433,8 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
           reason = threatDetector.getWeakAuthenticationReason(responseParam);
         } else if (filterId.equals(ThreatDetector.VPN_DETECTION_FILTER_ID)) {
           reason = threatDetector.getVpnReason(responseParam);
+        } else if (filterId.equals(ThreatDetector.SEQUENCE_ANOMALY_FILTER_ID)) {
+          reason = sequenceReason;
         }
 
         // Later we will also add aggregation support

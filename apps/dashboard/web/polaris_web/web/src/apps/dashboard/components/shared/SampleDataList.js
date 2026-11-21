@@ -67,6 +67,36 @@ function SchemaValidationError({ sampleData}) {
     )
 }
 
+const SEQUENCE_ANOMALY_FILTER_ID = 'SequenceAnomaly';
+
+// The threat client's reason lists the unusual steps ("...: A → B (reused: id); C → D"), each one a call made right
+// after another call in an order real users don't follow; "(reused: ...)" names request parameters that carried
+// values from the previous call's response
+function UnusualSessionPath({ steps }) {
+    const parsed = steps.map(([from, to]) => {
+        const match = to.match(/^(.*) \(reused: (.*)\)$/);
+        return { from, to: match ? match[1] : to, reused: match ? match[2] : null };
+    });
+    const reusedCount = parsed.filter((step) => step.reused).length;
+    return (
+        <Banner title="Unusual session path" status="critical">
+            <VerticalStack gap="2">
+                <Text variant="bodyMd">
+                    This session was detected following unusual paths: {steps.length} of its recent API calls came in an order real users don't follow.
+                    {reusedCount > 0 ? ` In ${reusedCount} of them, the request used data returned by the call just before it.` : ''}
+                </Text>
+                <List type="number">
+                    {parsed.map((step, index) => (
+                        <List.Item key={index}>
+                            {step.from} → {step.to}{step.reused ? ` (sent ${step.reused} from the previous response)` : ''}
+                        </List.Item>
+                    ))}
+                </List>
+            </VerticalStack>
+        </Banner>
+    )
+}
+
 // Detector-supplied explanation of why the event was flagged (metadata.reason, e.g. WeakAuthentication).
 // API Security only: guardrail events also carry metadata.reason and are shown in their own views.
 function DetectionReason({ sampleData }) {
@@ -81,6 +111,12 @@ function DetectionReason({ sampleData }) {
     }
     if (!reason) {
         return null;
+    }
+
+    const pathStart = reason.indexOf(': ');
+    if (sampleData?.filterId === SEQUENCE_ANOMALY_FILTER_ID && pathStart >= 0) {
+        const steps = reason.slice(pathStart + 2).split('; ').map((step) => step.split(' → ')).filter((step) => step.length === 2);
+        if (steps.length > 0) return <UnusualSessionPath steps={steps} />;
     }
 
     return (
