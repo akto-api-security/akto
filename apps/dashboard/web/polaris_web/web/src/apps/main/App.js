@@ -116,6 +116,7 @@ import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDat
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
 import Linear from "../dashboard/pages/settings/integrations/Linear";
+import PortIO from "../dashboard/pages/settings/integrations/PortIO";
 import Wiz from "@/apps/dashboard/pages/settings/integrations/Wiz.jsx";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
@@ -133,6 +134,7 @@ import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies
 import GuardrailViolations from "../dashboard/pages/guardrails/violations/ViolationsPage";
 import GuardrailOverview from "../dashboard/pages/guardrails/overview/GuardrailOverview";
 import Misconfigurations from "../dashboard/pages/guardrails/Misconfigurations";
+import AtlasGuardrailsOverview from "../dashboard/pages/guardrails/atlasOverview/AtlasGuardrailsOverview";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 import ThreatProtectedLayout from "../dashboard/pages/threat_detection/ThreatProtectedLayout";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
@@ -144,6 +146,8 @@ import AgenticAssetDevicesPage from "../dashboard/pages/observe/agentic/AgenticA
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
 import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
 import AgenticDiscoveryOverview from "../dashboard/pages/observe/atlas/discovery/AgenticDiscoveryOverview.jsx";
+import AgentDiscovery from "../dashboard/pages/observe/agent_discovery/AgentDiscovery.jsx";
+import AgentInventory from "../dashboard/pages/observe/agent_discovery/inventory/AgentInventory.jsx";
 import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
@@ -279,6 +283,14 @@ const router = createBrowserRouter([
                             {
                                 path: "agentic-discovery",
                                 element: <AgenticDiscoveryOverview/>
+                            },
+                            {
+                                path: "agent-discovery",
+                                element: <AgentDiscovery/>
+                            },
+                            {
+                                path: "agent-inventory",
+                                element: <AgentInventory/>
                             },
                             {
                                 path: "users-and-devices",
@@ -429,6 +441,10 @@ const router = createBrowserRouter([
                             {
                                 path: "overview",
                                 element: <GuardrailOverview/>
+                            },
+                            {
+                                path: "atlas-overview",
+                                element: <AtlasGuardrailsOverview/>
                             },
                             {
                                 path: "activity",
@@ -582,6 +598,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/linear",
                         element: <Linear/>,
+                    },
+                    {
+                        path: "integrations/port",
+                        element: <PortIO/>,
                     },
                     {
                         path: "integrations/wiz",

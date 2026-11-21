@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors TestScriptDraftsDao.createIndicesIfAbsent for Ask Akto's script drafts
+        (see apps/dashboard/.../service/scripts/validation/CLAUDE.md).
+
+        - test_script_drafts holds the unsaved scripts a Validate replay runs (ids ai-draft-<validationId>-pre/post).
+          It is separate from test_scripts so the library collection never carries a TTL.
+        - Every draft has expireAt (24h after it is written); the TTL index deletes it at that time
+          (expireAfterSeconds 0 = expire at the stored date).
+
+        The index name matches the DAO's, so this is a no-op where the DAO already built it. Older builds never
+        read this collection, so rolling back only drops drafts nobody can reach.
+    -->
+
+    <changeSet id="041-account-create-test-script-drafts" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="test_script_drafts"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="test_script_drafts"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="test_script_drafts"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="041-account-test-script-drafts-expire-at-ttl-index" author="akto">
+        <mongodb:createIndex collectionName="test_script_drafts">
+            <mongodb:keys>{ "expireAt": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "expireAt_ttl", "expireAfterSeconds": 0 }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="test_script_drafts">
+                <mongodb:keys>{ "expireAt": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

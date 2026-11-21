@@ -15,13 +15,25 @@ import SessionStore from '../../../../main/SessionStore';
 import IssuesStore from '../../../pages/issues/issuesStore';
 import Dropdown from '../Dropdown';
 import Wrapped2025 from './Wrapped2025';
-import { isEndpointSecurityCategory, shortNameToCategory } from '../../../../main/labelHelper';
+import { isEndpointSecurityCategory, shortNameToCategory, CATEGORY_API_SECURITY, CATEGORY_AGENTIC_SECURITY, CATEGORY_ENDPOINT_SECURITY, CATEGORY_DAST } from '../../../../main/labelHelper';
 import insightsApi from '@/apps/dashboard/pages/observe/agentic/insights/insightsApi';
 import AskOverlayButton from '@/apps/dashboard/pages/dashboard/ask/AskOverlayButton';
 import { INSIGHT_GROUP, INSIGHT_GROUP_LABEL, INSIGHT_GROUP_ROUTE, INSIGHT_DEEP_LINK_PARAM } from '@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers';
 
 const INSIGHT_POPOVER_GROUPS = [INSIGHT_GROUP.ATLAS_DISCOVERY, INSIGHT_GROUP.GUARDRAIL_VIOLATIONS];
 const INSIGHT_POPOVER_TOP_N = 2;
+
+// Order matches the dropdown; used as the fallback when a user has no scope mapping.
+const DASHBOARD_CATEGORY_ORDER = [CATEGORY_API_SECURITY, CATEGORY_AGENTIC_SECURITY, CATEGORY_ENDPOINT_SECURITY, CATEGORY_DAST];
+
+// Accounts that only get Argus + Atlas in the product switcher (cosmetic gating only, not enforced by the backend).
+const ARGUS_ATLAS_ONLY_ACCOUNT_IDS = [1767812031];
+
+// Mirrors RBAC.getRoleForScope: once a scope mapping exists, a missing scope key is NO_ACCESS too.
+const hasScopeAccess = (mapping, scope) => {
+    const role = mapping?.[scope];
+    return !!role && role !== "NO_ACCESS" && role !== "NO ACCESS";
+};
 
 function ContentWithIcon({ icon, text, isAvatar = false }) {
     return (
@@ -227,51 +239,59 @@ export default function Header() {
         return disabled;
     }, [mcpSecurityGranted, agenticSecurityGranted, dastGranted, endpointSecurityGranted]);
 
-    // Only hide API Security / DAST for Argus/Atlas-only users.
-    // API users still see DAST (Stigg may disable it), and always see Argus/Atlas.
-    const hiddenDashboardCategories = useMemo(() => {
-        const mapping = window.SCOPE_ROLE_MAPPING;
-        if (func.checkLocal() || !mapping || Object.keys(mapping).length === 0) {
-            return [];
-        }
-        const hasAccess = (scope) => {
-            const role = mapping[scope];
-            return role && role !== "NO_ACCESS" && role !== "NO ACCESS";
-        };
-        const hasApiOrDast = hasAccess("API") || hasAccess("DAST");
-        const hasArgusOrAtlas = hasAccess("AGENTIC") || hasAccess("ENDPOINT");
-        if (!hasApiOrDast && hasArgusOrAtlas) {
-            return ["API Security", "DAST"];
-        }
-        return [];
-    }, []);
+    const scopeMapping = window.SCOPE_ROLE_MAPPING;
+    const hasScopeMapping = !!scopeMapping && Object.keys(scopeMapping).length > 0;
 
+    // A category is visible only if the user has access to its scope (missing or NO_ACCESS => hidden).
+    // DAST additionally needs func.isDastAllowedUser; restricted accounts only get Argus + Atlas.
+    const hiddenDashboardCategories = useMemo(() => {
+        const hidden = new Set();
+        if (!func.isDastAllowedUser()) {
+            hidden.add(CATEGORY_DAST);
+        }
+        if (ARGUS_ATLAS_ONLY_ACCOUNT_IDS.includes(Number(window.ACTIVE_ACCOUNT))) {
+            hidden.add(CATEGORY_API_SECURITY);
+            hidden.add(CATEGORY_DAST);
+        }
+        if (hasScopeMapping && !func.checkLocal()) {
+            Object.entries(shortNameToCategory).forEach(([scope, category]) => {
+                if (!hasScopeAccess(scopeMapping, scope)) {
+                    hidden.add(category);
+                }
+            });
+        }
+        return Array.from(hidden);
+    }, [scopeMapping, hasScopeMapping]);
+
+    // First scope in the user's role mapping that they can access and that is visible;
+    // without a mapping, the first visible category in dropdown order.
     const firstAccessibleCategory = useMemo(() => {
-        const mapping = window.SCOPE_ROLE_MAPPING || {};
-        const scope = Object.keys(mapping).find(key => {
-            const role = mapping[key];
-            return role && role !== "NO_ACCESS" && role !== "NO ACCESS";
-        });
-        return shortNameToCategory[scope] || "API Security";
-    }, []);
+        const fromMapping = hasScopeMapping
+            ? Object.keys(scopeMapping)
+                .filter(scope => hasScopeAccess(scopeMapping, scope))
+                .map(scope => shortNameToCategory[scope])
+                .find(category => category && !hiddenDashboardCategories.includes(category))
+            : null;
+        return fromMapping
+            || DASHBOARD_CATEGORY_ORDER.find(category => !hiddenDashboardCategories.includes(category))
+            || CATEGORY_API_SECURITY;
+    }, [scopeMapping, hasScopeMapping, hiddenDashboardCategories]);
 
     const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory) || hiddenDashboardCategories.includes(dashboardCategory)
         ? firstAccessibleCategory
         : (dashboardCategory || "API Security");
-    
+
     useEffect(() => {
         // Onboarding flow disabled - the `pathname !== "/dashboard/onboarding"` guard that
         // used to be part of this condition is dead, nothing routes there any more.
-        // if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0 && window.location.pathname !== "/dashboard/onboarding"){
-        if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0){
-            // Only leave categories hidden by scope (API users may use Argus/Atlas without those scopes)
-            if(hiddenDashboardCategories.includes(dashboardCategory)){
-                setDashboardCategory(firstAccessibleCategory);
-            }
-        }else if (disabledDashboardCategories.includes(dashboardCategory) && dashboardCategory !== "API Security") {
+        if (hiddenDashboardCategories.includes(dashboardCategory)) {
+            // Force the persisted category onto one the user can actually see.
+            setDashboardCategory(firstAccessibleCategory);
+        } else if (!hasScopeMapping && disabledDashboardCategories.includes(dashboardCategory) && dashboardCategory !== "API Security") {
+            // Stigg-disabled category for users without a scope mapping falls back to API Security.
             setDashboardCategory("API Security");
         }
-    }, [dashboardCategory, disabledDashboardCategories, hiddenDashboardCategories, firstAccessibleCategory, setDashboardCategory]);
+    }, [dashboardCategory, disabledDashboardCategories, hiddenDashboardCategories, firstAccessibleCategory, hasScopeMapping, setDashboardCategory]);
 
     /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)

@@ -39,9 +39,11 @@ function SampleDataComponent(props) {
         }
 
         if (isWebSocket || type === "events") {
-            const eventsMessage = func.formatWebSocketSampleDisplay(sampleData?.message, redactHeaders)
+            // the request or response part of the exchange; "events" shows all of it
+            const part = type === "events" ? undefined : type
+            const eventsMessage = func.formatWebSocketSampleDisplay(sampleData?.message, redactHeaders, part)
             const originalEventsMessage = sampleData?.originalMessage
-                ? func.formatWebSocketSampleDisplay(sampleData?.originalMessage, redactHeaders)
+                ? func.formatWebSocketSampleDisplay(sampleData?.originalMessage, redactHeaders, part)
                 : undefined
             setSampleJsonData((prev) => ({
                 ...prev,
@@ -340,7 +342,7 @@ function SampleDataComponent(props) {
                     <HorizontalStack padding="2" align='space-between'>
                         <Text variant="bodyMd" fontWeight="semibold">
                             {/* Hide the word 'response' if simpleJson is true */}
-                            {!simpleJson && (isWebSocket ? "Events" : func.toSentenceCase(type))}
+                            {!simpleJson && func.toSentenceCase(type)}
                             {!simpleJson && type==="response" && responseTime ? (` (${responseTime} ms)`) : ""}
                             {!simpleJson && type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ?
                                 (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`)
@@ -396,7 +398,7 @@ function SampleDataComponent(props) {
                 {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={handleEditorData} onAddAsSearchFilter={onAddAsSearchFilter} searchSide={searchSide}/> : null}
             </LegacyCard.Section>
 
-            <Modal open={expanded} onClose={() => setExpanded(false)} title={simpleJson ? " " : (isWebSocket ? "Events" : func.toSentenceCase(type))} large>
+            <Modal open={expanded} onClose={() => setExpanded(false)} title={simpleJson ? " " : func.toSentenceCase(type)} large>
                 <Modal.Section>
                     {sampleJsonData[type] ? <SampleData
                         data={sampleJsonData[type]}

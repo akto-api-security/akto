@@ -19,8 +19,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-// Flags a session that calls an API without first calling the APIs that almost always precede it.
-// Rules ("B requires A", "C requires A, B") come from cyborg's api_sequences.
+// Flags a session that calls an API without first calling the APIs that almost always precede it,
+// or that takes several steps in a row that users almost never take.
+// Rules ("B requires A", "C requires A, B") and known steps come from cyborg's api_sequences.
 public class SequenceCache {
 
     private static final LoggerMaker logger = new LoggerMaker(SequenceCache.class, LogDb.THREAT_DETECTION);
@@ -28,6 +29,7 @@ public class SequenceCache {
     private static final int REFRESH_INTERVAL_SEC = 15 * 60;
     private static final long HISTORY_WINDOW_MILLIS = TimeUnit.MINUTES.toMillis(15);
     private static final int MAX_SESSIONS = 100_000;
+    private static final int UNKNOWN_STEPS_TO_ALERT = 5;
 
     private final DataActor dataActor;
     private final SessionIdentifier sessionIdentifier = new SessionIdentifier();
@@ -37,6 +39,20 @@ public class SequenceCache {
     // APIs that appear as a requirement; only these are remembered per session
     private volatile Set<String> watched = new HashSet<>();
     private int lastUpdatedAt = 0;
+
+    // Steps "A|B" users take (cyborg leaves out rare ones), and every API with a call count; steps between other APIs are not judged
+    private volatile Set<String> knownSteps = new HashSet<>();
+    private volatile Set<String> knownApis = new HashSet<>();
+    private int stepsUpdatedAt = 0;
+
+    private final Cache<String, String> lastApi = Caffeine.newBuilder()
+            .maximumSize(MAX_SESSIONS)
+            .expireAfterAccess(HISTORY_WINDOW_MILLIS, TimeUnit.MILLISECONDS)
+            .build();
+    private final Cache<String, Integer> unknownRun = Caffeine.newBuilder()
+            .maximumSize(MAX_SESSIONS)
+            .expireAfterAccess(HISTORY_WINDOW_MILLIS, TimeUnit.MILLISECONDS)
+            .build();
 
     private final Cache<String, Map<String, Long>> sessionSeen = Caffeine.newBuilder()
             .maximumSize(MAX_SESSIONS)
@@ -70,6 +86,56 @@ public class SequenceCache {
         }
         if (watched.contains(apiKey)) seen.put(apiKey, now);
         return anomalous;
+    }
+
+    // True once a session has taken UNKNOWN_STEPS_TO_ALERT unknown steps in a row; a known step resets the run
+    public boolean checkUnknownPath(HttpResponseParams responseParam, int apiCollectionId, String url, Method method) {
+        refreshKnownSteps();
+        if (knownApis.isEmpty()) return false;
+        String sessionId = sessionIdentifier.extractUserId(responseParam);
+        if (sessionId == null) return false;
+        String apiKey = apiCollectionId + " " + normalizeUrl(url) + " " + method;
+        if (!knownApis.contains(apiKey)) return false;
+
+        String previous = lastApi.getIfPresent(sessionId);
+        lastApi.put(sessionId, apiKey);
+        if (previous == null || previous.equals(apiKey)) return false;
+
+        if (knownSteps.contains(previous + "|" + apiKey)) {
+            unknownRun.invalidate(sessionId);
+            return false;
+        }
+        int run = unknownRun.asMap().merge(sessionId, 1, Integer::sum);
+        if (run < UNKNOWN_STEPS_TO_ALERT) return false;
+        unknownRun.invalidate(sessionId);
+        return true;
+    }
+
+    private void refreshKnownSteps() {
+        int now = (int) (System.currentTimeMillis() / 1000);
+        if (stepsUpdatedAt != 0 && now - stepsUpdatedAt < REFRESH_INTERVAL_SEC) {
+            return;
+        }
+        stepsUpdatedAt = now;
+        try {
+            Set<String> steps = new HashSet<>();
+            Set<String> apis = new HashSet<>();
+            for (ApiSequences seq : dataActor.fetchKnownSequenceSteps()) {
+                String seqKey = seq.getSeqKey();
+                if (seqKey == null) continue;
+                if (seq.getOrder() == 0) {
+                    apis.add(normalizeKey(seqKey));
+                } else if (seq.getOrder() == 1) {
+                    int split = seqKey.indexOf('|');
+                    if (split > 0) steps.add(normalizeKey(seqKey.substring(0, split)) + "|" + normalizeKey(seqKey.substring(split + 1)));
+                }
+            }
+            knownSteps = steps;
+            knownApis = apis;
+            logger.infoAndAddToDb("SequenceCache known steps refreshed: " + steps.size() + " steps, " + apis.size() + " APIs");
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error refreshing known steps: " + e.getMessage());
+        }
     }
 
     private String resolve(int apiCollectionId, String url, Method method) {

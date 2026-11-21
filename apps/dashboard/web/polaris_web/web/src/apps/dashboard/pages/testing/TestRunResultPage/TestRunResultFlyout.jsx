@@ -44,7 +44,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, createLinearTicket, linearIssueUrl, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, createLinearTicket, createPortIOTicket, linearIssueUrl, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
     const [remediationText, setRemediationText] = useState("")
     const { canCall, canCallAll } = usePermissions()
     const [fullDescription, setFullDescription] = useState(false)
@@ -413,6 +413,10 @@ function TestRunResultFlyout(props) {
         }
     }
 
+    const handlePortClick = async () => {
+        await createPortIOTicket(issueDetails.id)
+    }
+
     const handleDevRevTicketCreation = async (issueId, labels) => {
         if (devrevPartId && devrevPartId.length > 0) {
             await createDevRevTicket(issueDetails.id, devrevPartId, devrevWorkItemType)
@@ -459,6 +463,13 @@ function TestRunResultFlyout(props) {
             allowed: canCallAll('api/fetchLinearIntegration', 'api/createLinearTickets'),
             ticketUrl: linearIssueUrl, ticketKey: hasTicket(linearIssueUrl) ? getLinearKey(linearIssueUrl) : '',
             onCreate: handleLinearClick
+        },
+        {
+            id: 'port', label: 'Linear via Port.io', logo: '/public/portio.svg',
+            integrated: window.PORT_IO_INTEGRATED === 'true',
+            allowed: canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets'),
+            ticketUrl: linearIssueUrl, ticketKey: hasTicket(linearIssueUrl) ? getLinearKey(linearIssueUrl) : '',
+            onCreate: handlePortClick
         }
     ]
 
@@ -779,6 +790,8 @@ function TestRunResultFlyout(props) {
                                 issueId={issueDetails.id}
                             />
                            
+                            {!showTicketMenu && window.PORT_IO_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets')}><Button id={"create-port-ticket-button"} primary onClick={handlePortClick} disabled={!!linearIssueUrl}>Create Linear Ticket via Port.io</Button></AllowedAction> : <></>}
+
                             { window?.WIZ_INTEGRATED === 'true' ? 
                                 <AllowedAction allowed={canCall('api/createWizFindings')}>
                                 <Button id={"create-wiz-finding-button"} primary onClick={handleWizFindingCreation} disabled={ wizFindingUrl?.length > 0 }>

@@ -15,7 +15,7 @@ import math
 import os
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Optional
@@ -172,6 +172,31 @@ class LLMProvider(ABC):
     @abstractmethod
     async def complete(self, prompt: str) -> str: ...
 
+    async def complete_with_image(self, prompt: str, image_b64: str, mime: str, max_tokens: int) -> str:
+        """The prompt with one image attached (POST /ocr). Only providers whose API carries images override this;
+        reads_images() says which."""
+        raise NotImplementedError(f"{self.name} can't take image input")
+
+
+def reads_images(provider: LLMProvider) -> bool:
+    """Whether a provider overrides complete_with_image; for a FallbackProvider, whether its primary does."""
+    if isinstance(provider, FallbackProvider):
+        return reads_images(provider.primary)
+    return type(provider).complete_with_image is not LLMProvider.complete_with_image
+
+
+def _image_messages(prompt: str, image_b64: str, mime: str) -> list[dict[str, Any]]:
+    """An OpenAI chat-completions user turn: the prompt, then the image as a data URL."""
+    return [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{image_b64}"}},
+            ],
+        }
+    ]
+
 
 class OpenAIProvider(LLMProvider):
     """OpenAI-compatible (OpenAI, Ollama, vLLM, LM Studio, …)."""
@@ -186,14 +211,20 @@ class OpenAIProvider(LLMProvider):
     include_metrics = False
 
     async def complete(self, prompt: str) -> str:
+        return await self._chat([{"role": "user", "content": prompt}], _max_tokens())
+
+    async def complete_with_image(self, prompt: str, image_b64: str, mime: str, max_tokens: int) -> str:
+        return await self._chat(_image_messages(prompt, image_b64, mime), max_tokens)
+
+    async def _chat(self, messages: list[dict[str, Any]], max_tokens: int) -> str:
         headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         payload = {
             "model": self.model,
             "temperature": _TEMPERATURE,
-            "max_tokens": _max_tokens(),
-            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+            "messages": messages,
         }
         if self.include_metrics:
             payload["include_metrics"] = True
@@ -414,6 +445,9 @@ class Qwen3GuardOutput:
     complete_with_logprobs over their own transport. LLMScanner routes any
     provider carrying this mixin through parse_qwen3guard_result."""
 
+    # A classifier, not a reader: no image input even over an OpenAI-compatible or Foundry transport.
+    complete_with_image = LLMProvider.complete_with_image
+
     async def complete_with_logprobs(
         self, text: str, top_logprobs: int = 5, temperature: float = 0.0
     ) -> tuple[str, list | None]:
@@ -503,13 +537,13 @@ class AzureFoundryProvider(LLMProvider):
         return await _post_json_logged(client, url, headers, body, self._log_tag, extra)
 
     async def complete(self, prompt: str) -> str:
-        body = await self._chat(
-            {
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 512,
-                "temperature": _TEMPERATURE,
-            }
-        )
+        return await self._chat_text([{"role": "user", "content": prompt}], 512)
+
+    async def complete_with_image(self, prompt: str, image_b64: str, mime: str, max_tokens: int) -> str:
+        return await self._chat_text(_image_messages(prompt, image_b64, mime), max_tokens)
+
+    async def _chat_text(self, messages: list[dict[str, Any]], max_tokens: int) -> str:
+        body = await self._chat({"messages": messages, "max_tokens": max_tokens, "temperature": _TEMPERATURE})
         content, _ = _choice_content_and_logprobs(body)
         return content
 
@@ -699,14 +733,15 @@ class BedrockMantleProvider(_BedrockAuthProvider):
         return f"https://bedrock-mantle.{region}.api.aws/openai/v1"
 
     async def complete(self, prompt: str) -> str:
+        return await self._chat_text([{"role": "user", "content": prompt}], 512)
+
+    async def complete_with_image(self, prompt: str, image_b64: str, mime: str, max_tokens: int) -> str:
+        return await self._chat_text(_image_messages(prompt, image_b64, mime), max_tokens)
+
+    async def _chat_text(self, messages: list[dict[str, Any]], max_tokens: int) -> str:
         body = await self._post(
             f"{self.base_url}/chat/completions",
-            {
-                "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 512,
-                "temperature": _TEMPERATURE,
-            },
+            {"model": self.model, "messages": messages, "max_tokens": max_tokens, "temperature": _TEMPERATURE},
         )
         content, _ = _choice_content_and_logprobs(body)
         return content
@@ -1025,7 +1060,9 @@ class TripwireProvider(LLMProvider):
 
     def _client(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
-            self._http = httpx.AsyncClient(timeout=10.0, limits=httpx.Limits(max_connections=self._MAX_CONNECTIONS))
+            self._http = http_client.UncancellableAsyncClient(
+                timeout=10.0, limits=httpx.Limits(max_connections=self._MAX_CONNECTIONS)
+            )
         return self._http
 
     async def detect(self, text: str) -> dict[str, Any]:
@@ -1245,7 +1282,9 @@ def _health_client() -> httpx.AsyncClient:
     # marked DOWN.
     global _HEALTH_CLIENT
     if _HEALTH_CLIENT is None or _HEALTH_CLIENT.is_closed:
-        _HEALTH_CLIENT = httpx.AsyncClient(timeout=_HEALTH_PROBE_TIMEOUT_S, limits=httpx.Limits(max_connections=4))
+        _HEALTH_CLIENT = http_client.UncancellableAsyncClient(
+            timeout=_HEALTH_PROBE_TIMEOUT_S, limits=httpx.Limits(max_connections=4)
+        )
     return _HEALTH_CLIENT
 
 
@@ -1313,26 +1352,34 @@ class FallbackProvider(LLMProvider):
         self.backup_timeout_s = backup_timeout_s  # extra time the caller allows for the backup after the primary
 
     async def complete(self, prompt: str) -> str:
+        return await self._call(lambda provider: provider.complete(prompt))
+
+    async def complete_with_image(self, prompt: str, image_b64: str, mime: str, max_tokens: int) -> str:
+        return await self._call(lambda provider: provider.complete_with_image(prompt, image_b64, mime, max_tokens))
+
+    async def _call(self, call: Callable[[LLMProvider], Awaitable[str]]) -> str:
         if self.health_url:
             _ensure_health_monitor(self.health_url)
             if not _PRIMARY_AVAILABLE.get(self.health_url, True):
-                return await self._complete_on_backup(prompt, "marked down by health check")
+                return await self._call_on_backup(call, "marked down by health check")
         try:
-            return await asyncio.wait_for(self.primary.complete(prompt), self.primary_timeout_s)
+            return await asyncio.wait_for(call(self.primary), self.primary_timeout_s)
         except Exception as exc:
             if self.health_url:
                 raise  # only the probe sends a health-checked primary's traffic to the backup, not one failed request
-            return await self._complete_on_backup(prompt, repr(exc), exc)
+            return await self._call_on_backup(call, repr(exc), exc)
 
-    async def _complete_on_backup(self, prompt: str, why: str, exc: Exception | None = None) -> str:
+    async def _call_on_backup(
+        self, call: Callable[[LLMProvider], Awaitable[str]], why: str, exc: Exception | None = None
+    ) -> str:
         backup = build_provider_from_config(self.backup_entry)
         if backup is None:
             if exc is not None:
                 raise exc
-            return await self.primary.complete(prompt)  # no usable backup: behave as without one
+            return await call(self.primary)  # no usable backup: behave as without one
         logger.warning(f"[FinalArbiter] primary {self.primary.name} failed ({why}), falling back to {backup.name}")
         alerts.note_fallback(self.primary.name, backup.name, alerts.fallback_reason(exc) if exc else "marked down")
-        return await backup.complete(prompt)
+        return await call(backup)
 
 
 def build_provider_from_env(provider_name: str, model: str = "") -> LLMProvider | None:

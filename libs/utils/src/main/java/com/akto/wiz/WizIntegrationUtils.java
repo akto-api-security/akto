@@ -7,6 +7,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.testing_utils.TestingUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,7 +56,9 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import com.mongodb.client.result.UpdateResult;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 public class WizIntegrationUtils {
 
@@ -68,7 +72,8 @@ public class WizIntegrationUtils {
     public static final String AUTH_ENDPOINT = "https://auth.app.wiz.io/oauth/token";
     private static final int TESTING_RUN_RESULT_BATCH_SIZE = 500;
     private static final int LARGE_TEXT_BATCH_SIZE = 50;
-    private static final int WIZ_SYNC_PAGE_SIZE = 100;
+    // MCollection.findAll without paging silently returns at most this many documents
+    private static final int WIZ_SYNC_MAX_ISSUES = 1_000_000;
 
     public static boolean isWizDevMode() {
         String wizDevMode = System.getenv("WIZ_DEV_MODE");
@@ -639,25 +644,21 @@ public class WizIntegrationUtils {
         }
 
         // Find all testing run issues in this account that need to be synced with Wiz
-        List<TestingRunIssues> testingRunIssuesList = new ArrayList<>();
+        List<TestingRunIssues> testingRunIssuesList;
         Bson wizSyncFilter = Filters.and(
             Filters.ne(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null),
             Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)
         );
         Bson wizSyncProjection = Projections.include(Constants.ID, TestingRunIssues.KEY_SEVERITY, TestingRunIssues.WIZ_FINDING_CREATION_STATUS);
-        int skip = 0;
         try {
-            List<TestingRunIssues> page;
-            do {
-                page = TestingRunIssuesDao.instance.findAll(wizSyncFilter, skip, WIZ_SYNC_PAGE_SIZE, null, wizSyncProjection);
-                if (page != null) {
-                    testingRunIssuesList.addAll(page);
-                    skip += page.size();
-                }
-            } while (page != null && page.size() == WIZ_SYNC_PAGE_SIZE);
+            // Single query, not skip/limit pages: skip re-walks all preceding results on every page
+            testingRunIssuesList = TestingRunIssuesDao.instance.findAll(wizSyncFilter, wizSyncProjection);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching testing run issues for Wiz sync: " + e.getMessage());
             return;
+        }
+        if (testingRunIssuesList.size() >= WIZ_SYNC_MAX_ISSUES) {
+            loggerMaker.errorAndAddToDb("Wiz upload: issue fetch hit the findAll limit of " + WIZ_SYNC_MAX_ISSUES + "; results truncated");
         }
         loggerMaker.infoAndAddToDb(String.format("Finished fetching testing run issues for wiz sync. Total: %d", testingRunIssuesList.size()));
 
@@ -726,7 +727,11 @@ public class WizIntegrationUtils {
     public static void markIssuesAsWizFinding(List<TestingIssuesId> testingIssuesIdList) throws Exception {
         try {
             TestingRunIssuesDao.instance.updateMany(
-                Filters.in(Constants.ID, testingIssuesIdList),
+                Filters.and(
+                    Filters.in(Constants.ID, testingIssuesIdList),
+                    // only issues that are not yet Wiz findings (missing or null), so an already requested/uploaded one is never reset
+                    Filters.eq(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null)
+                ),
                 Updates.combine(
                     Updates.set(TestingRunIssues.WIZ_FINDING_URL, "unavailable"),
                     Updates.set(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, WizIntegration.FindingCreationStatus.CREATION_REQUESTED.toString())
@@ -735,6 +740,48 @@ public class WizIntegrationUtils {
         } catch (Exception e) {
             throw new Exception("Error marking issues as Wiz findings: " + e.getMessage());
         }
+    }
+
+    /**
+     * Auto-ticketing for Wiz: marks the OPEN issues of a test run summary, at the given severities, as Wiz findings.
+     * No job is scheduled; the recurring Wiz sync job uploads whatever is marked CREATION_REQUESTED.
+     * Issues that are already Wiz findings are left alone. Returns the number of issues marked.
+     */
+    public static int markSummaryIssuesAsWizFindings(ObjectId summaryId, List<String> severities) throws Exception {
+        // a null summaryId would match every issue that has no summary id
+        if (summaryId == null || severities == null || severities.isEmpty()) {
+            return 0;
+        }
+
+        if (WizIntegrationDao.instance.findOne(new BasicDBObject()) == null) {
+            loggerMaker.infoAndAddToDb("Wiz not integrated. Skipping auto-creation of Wiz findings.");
+            return 0;
+        }
+
+        // Single write with every eligibility predicate: eligibility is checked on the primary at write time, so
+        // there is no stale read (secondary reads in the new-testing path) and no race with the sync job or manual creation.
+        try {
+            UpdateResult result = TestingRunIssuesDao.instance.updateMany(
+                Filters.and(
+                    Filters.eq(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, summaryId),
+                    Filters.in(TestingRunIssues.KEY_SEVERITY, severities),
+                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                    // matches a missing or null status: the exact complement of the sync job's `ne(status, null)` filter
+                    Filters.eq(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null)
+                ),
+                wizFindingRequestedUpdate()
+            );
+            return (int) result.getModifiedCount();
+        } catch (Exception e) {
+            throw new Exception("Error marking issues as Wiz findings: " + e.getMessage());
+        }
+    }
+
+    private static Bson wizFindingRequestedUpdate() {
+        return Updates.combine(
+            Updates.set(TestingRunIssues.WIZ_FINDING_URL, "unavailable"),
+            Updates.set(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, WizIntegration.FindingCreationStatus.CREATION_REQUESTED.toString())
+        );
     }
 
     public static BasicDBObject checkLastUploadScanStatus() throws Exception {
@@ -806,5 +853,230 @@ public class WizIntegrationUtils {
         responseObj.put("lastUploadedScanTs", lastUploadedScanTs);
 
         return responseObj;
+    }
+
+    /**
+     * Maps a Wiz FindingCommonStatus (OPEN, RESOLVED, REJECTED) to the Akto issue status.
+     * Returns null if the Wiz status is null or not recognised.
+     */
+    public static GlobalEnums.TestRunIssueStatus getAktoIssueStatusFromWizStatus(String wizStatus) {
+        if (wizStatus == null) {
+            return null;
+        }
+
+        switch (wizStatus) {
+            case "OPEN":
+                return GlobalEnums.TestRunIssueStatus.OPEN;
+            case "RESOLVED":
+                return GlobalEnums.TestRunIssueStatus.FIXED;
+            case "REJECTED":
+                return GlobalEnums.TestRunIssueStatus.IGNORED;
+            default:
+                return null;
+        }
+    }
+
+    static class StatusChangeResult {
+        final Map<TestingIssuesId, GlobalEnums.TestRunIssueStatus> statusChanges;
+        final int failedIssues;
+
+        StatusChangeResult(Map<TestingIssuesId, GlobalEnums.TestRunIssueStatus> statusChanges, int failedIssues) {
+            this.statusChanges = statusChanges;
+            this.failedIssues = failedIssues;
+        }
+    }
+
+    /**
+     * Pure logic (no DB or network access) that decides which Akto issues need a status change,
+     * given the status of each Wiz finding keyed by Wiz finding id.
+     * Issues with no matching Wiz finding are skipped; issues that fail to process are counted and skipped.
+     */
+    static StatusChangeResult computeStatusChanges(List<TestingRunIssues> testingRunIssuesList, Map<String, String> wizFindingIdToStatusMap) {
+        Map<TestingIssuesId, GlobalEnums.TestRunIssueStatus> statusChanges = new LinkedHashMap<>();
+
+        // Iterate over testing run issues list
+        int failedIssues = 0;
+        // Unrecognised Wiz statuses seen in this run, with the number of issues skipped for each (logged once at the end)
+        Map<String, Integer> unrecognisedWizStatusCounts = new HashMap<>();
+        for (TestingRunIssues issue : testingRunIssuesList) {
+            try {
+                TestingIssuesId id = issue.getId();
+                String status = issue.getTestRunIssueStatus().toString();
+
+                // Fetch the corresponding Wiz finding ID for this Akto issue
+                String wizFindingId = WizIntegrationUtils.fetchWizFindingId(id);
+                if (wizFindingId != null) {
+                    String wizFindingStatus = wizFindingIdToStatusMap.get(wizFindingId);
+                    if (wizFindingStatus == null) {
+                        // Newly created issue in Akto, not yet present in Wiz
+                        continue;
+                    }
+                    GlobalEnums.TestRunIssueStatus convertedStatus = WizIntegrationUtils.getAktoIssueStatusFromWizStatus(wizFindingStatus);
+                    if (convertedStatus == null) {
+                        // Unknown Wiz status: leave the Akto issue untouched rather than guess a status
+                        unrecognisedWizStatusCounts.merge(wizFindingStatus, 1, Integer::sum);
+                        continue;
+                    }
+                    if (!status.equals(convertedStatus.toString())) {
+                        statusChanges.put(id, convertedStatus);
+                    }
+                }
+            } catch (Exception e) {
+                failedIssues++;
+                loggerMaker.error(String.format("Error processing testing run issue %s for Wiz status sync, skipping: %s", issue.getId(), e.getMessage()));
+            }
+        }
+
+        if (!unrecognisedWizStatusCounts.isEmpty()) {
+            loggerMaker.errorAndAddToDb(String.format("Skipped issues with unrecognised Wiz status during status sync (status -> issues skipped): %s", unrecognisedWizStatusCounts));
+        }
+
+        return new StatusChangeResult(statusChanges, failedIssues);
+    }
+
+    static final String WIZ_REJECTED_IGNORE_REASON = "Rejected in Wiz";
+
+    /**
+     * Builds the update applied to an Akto issue when its status changes because of Wiz.
+     * Mirrors the dashboard's status update for ignoreReason: set when moving to IGNORED, removed when moving to any other status.
+     */
+    static Bson buildStatusChangeUpdate(GlobalEnums.TestRunIssueStatus newStatus) {
+        Bson update = Updates.combine(
+            Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, newStatus.toString()),
+            Updates.set(TestingRunIssues.LAST_UPDATED, Context.now())
+        );
+        if (newStatus == GlobalEnums.TestRunIssueStatus.IGNORED) {
+            return Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, WIZ_REJECTED_IGNORE_REASON));
+        }
+        return Updates.combine(update, Updates.unset(TestingRunIssues.IGNORE_REASON));
+    }
+
+    /**
+     * Returns the distinct latest test run summary ids of the issues whose status changed (issues without one are ignored).
+     */
+    static Set<ObjectId> collectAffectedSummaryIds(List<TestingRunIssues> issues, Set<TestingIssuesId> changedIssueIds) {
+        Set<ObjectId> summaryIds = new HashSet<>();
+        for (TestingRunIssues issue : issues) {
+            if (issue.getId() != null && changedIssueIds.contains(issue.getId()) && issue.getLatestTestingRunSummaryId() != null) {
+                summaryIds.add(issue.getLatestTestingRunSummaryId());
+            }
+        }
+        return summaryIds;
+    }
+
+    /**
+     * Recounts the issue counts of each summary. A failure for one summary is logged and does not stop the others.
+     */
+    private static void recountSummaries(Set<ObjectId> summaryIds) {
+        for (ObjectId summaryId : summaryIds) {
+            try {
+                TestingUtils.recountAndUpdateSummaryCount(summaryId);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(String.format("Error recounting issues for summary %s after Wiz status sync: %s", summaryId, e.getMessage()));
+            }
+        }
+    }
+
+    /**
+     * Syncs the status of Akto testing run issues that were sent to Wiz from the status of the matching Wiz findings.
+     *
+     * Wiz is the source of truth for status, by design: the sync is one-way (Wiz -> Akto) and Akto status changes
+     * are never pushed to Wiz. If a user changes the status of a Wiz-synced issue in Akto, the next sync run
+     * overwrites it with the status Wiz has for that finding. To change the status of such an issue, change it in Wiz.
+     */
+    public static void syncTestingRunIssuesStatusFromWiz(WizIntegration wizIntegration) {
+        if (wizIntegration == null) {
+            loggerMaker.infoAndAddToDb("Wiz integration not configured for this account. Skipping sync.");
+            return;
+        }
+
+        try {
+            // Find all testing run issues in this account that need to be synced with Wiz
+            List<TestingRunIssues> testingRunIssuesList;
+
+            // Only issues already uploaded to Wiz have a finding to sync. The creation status only moves forward
+            // (null -> REQUESTED -> INITIATED, see markIssuesAsWizFinding), so REQUESTED issues are not in Wiz yet.
+            Bson wizSyncFilter = Filters.eq(
+                TestingRunIssues.WIZ_FINDING_CREATION_STATUS,
+                WizIntegration.FindingCreationStatus.CREATION_INITIATED.toString()
+            );
+            Bson wizSyncProjection = Projections.include(Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID);
+            try {
+                // Single query, not skip/limit pages: skip re-walks all preceding results on every page
+                testingRunIssuesList = TestingRunIssuesDao.instance.findAll(wizSyncFilter, wizSyncProjection);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error fetching testing run issues for Wiz sync: " + e.getMessage());
+                return;
+            }
+            if (testingRunIssuesList.isEmpty()) {
+                // Nothing was sent to Wiz yet, so there is nothing to sync: avoid calling Wiz at all
+                loggerMaker.info("No testing run issues marked as Wiz findings. Skipping Wiz status sync.");
+                return;
+            }
+            if (testingRunIssuesList.size() >= WIZ_SYNC_MAX_ISSUES) {
+                loggerMaker.errorAndAddToDb("Wiz status sync: issue fetch hit the findAll limit of " + WIZ_SYNC_MAX_ISSUES + "; results truncated");
+            }
+
+            // Get valid access token
+            String accessToken = getValidAccessToken();
+
+            // Build GraphQL API endpoint
+            String apiUrl = String.format(
+                WizIntegration.API_BASE_URL_PATTERN,
+                wizIntegration.getTenantDataCenter(),
+                WizIntegration.ENVIRONMENT
+            );
+
+            if (WizIntegrationUtils.isWizDevMode()) {
+                apiUrl = getWizDevGraphQLEndpoint();
+                loggerMaker.infoAndAddToDb("Wiz dev mode enabled. Using dev GraphQL endpoint: " + apiUrl);
+            }
+
+            List<BasicDBObject> attackSurfaceFindings = WizApiClient.fetchAllAttackSurfaceFindings(apiUrl, accessToken);
+            Map<String, String> wizFindingIdToStatusMap = new HashMap<>();
+            for (BasicDBObject finding : attackSurfaceFindings) {
+                String wizFindingId = finding.getString("id");
+                String status = finding.getString("status");
+                if (wizFindingId != null && status != null) {
+                    wizFindingIdToStatusMap.put(wizFindingId, status);
+                }
+            }
+
+            StatusChangeResult statusChangeResult = computeStatusChanges(testingRunIssuesList, wizFindingIdToStatusMap);
+            int failedIssues = statusChangeResult.failedIssues;
+
+            List<WriteModel<TestingRunIssues>> bulkUpdatesForStatusChanges = new ArrayList<>();
+            for (Map.Entry<TestingIssuesId, GlobalEnums.TestRunIssueStatus> change : statusChangeResult.statusChanges.entrySet()) {
+                bulkUpdatesForStatusChanges.add(
+                    new UpdateOneModel<> (
+                        Filters.eq(Constants.ID, change.getKey()),
+                        buildStatusChangeUpdate(change.getValue())
+                    )
+                );
+            }
+
+            if (!bulkUpdatesForStatusChanges.isEmpty()) {
+                TestingRunIssuesDao.instance.getMCollection().bulkWrite(bulkUpdatesForStatusChanges);
+
+                // The status changes affect the issue counts of the summaries these issues belong to
+                recountSummaries(collectAffectedSummaryIds(testingRunIssuesList, statusChangeResult.statusChanges.keySet()));
+            }
+
+            loggerMaker.infoAndAddToDb(String.format("Finished syncing testing run issues status from Wiz. Wiz findings: %d, Akto issues checked: %d, status updated: %d, failed to process: %d",
+                wizFindingIdToStatusMap.size(), testingRunIssuesList.size(), bulkUpdatesForStatusChanges.size(), failedIssues));
+
+            // If we reach here, the sync completed. Update the last synced finding status timestamp
+            try {
+                WizIntegrationDao.instance.updateOne(
+                    new BasicDBObject(),
+                    Updates.set(WizIntegration.LAST_SYNCED_FINDING_STATUS_TS, System.currentTimeMillis()/1000L)
+                );
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error updating Wiz integration last synced finding status timestamp: " + e.getMessage());
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error syncing testing run issues status from Wiz, no further issues will be updated in this run: " + e.getMessage());
+        }
     }
 }

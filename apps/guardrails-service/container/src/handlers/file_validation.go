@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,6 +16,7 @@ import (
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/filecache"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
@@ -50,6 +53,13 @@ type fileResult struct {
 	FailedChunkIndex int
 	ChunkResults     []*chunkResult
 	FailedResult     *mcp.ValidationResult
+	// Uninspected marks a file allowed without its content being checked: unreadable, too
+	// large, an unsupported type, an extraction failure, a chunk with no verdict, or a chunk
+	// whose scan didn't run (a scanner failure or timeout the verdict failed open on).
+	Uninspected bool
+	// NotCacheable: allowed, but the file cache must not vouch for it. An image whose OCR read
+	// no text - a misread there would otherwise be served as a clean pass for the cache TTL.
+	NotCacheable bool
 }
 
 // ValidateFile handles POST /api/validate/file (multipart "file" uploads and/or "url" fields).
@@ -110,7 +120,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		}
 	}
 
-	inputs := h.resolveInputs(c.Request.Context(), form)
+	inputs, dropped := h.resolveInputs(c.Request.Context(), form)
 	defer closeInputs(inputs)
 	if len(inputs) == 0 {
 		h.logger.Warn("No file inputs to inspect; allowing request",
@@ -143,10 +153,11 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
+	cacheScope := h.fileCacheScope(c, meta)
 	var fileResults []*fileResult
 
 	for _, input := range inputs {
-		fr := h.validateSingleFile(ctx, input, meta, sessionID, requestID)
+		fr := h.validateCachedFile(ctx, input, meta, sessionID, requestID, cacheScope)
 		fileResults = append(fileResults, fr)
 
 		if !fr.Allowed {
@@ -164,7 +175,56 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		zap.Int("fileCount", len(inputs)),
 		zap.Int("allowedCount", allowedCount),
 		zap.String("sessionID", sessionID))
-	h.writeMultiFileResponse(c, fileResults)
+	h.writeMultiFileResponse(c, fileResults, dropped)
+}
+
+// fileCacheScope is everything besides a file's bytes that its verdict depends on: the account,
+// context source and tag, the policies that apply (content included, so an edited policy misses),
+// and the settings that turn chunk verdicts into a file verdict. "" turns the cache off for the
+// request, as when the policies can't be resolved.
+func (h *ValidationHandler) fileCacheScope(c *gin.Context, meta *models.ValidateRequestParams) string {
+	if h.fileCache == nil || h.policyFingerprint == nil {
+		return ""
+	}
+	policies, err := h.policyFingerprint(meta.ContextSource, meta.RequestHeaders, meta.Tag)
+	if err != nil {
+		h.logger.Warn("Could not fingerprint the applicable policies; file cache skipped", zap.Error(err))
+		return ""
+	}
+	// Partition by the deployment-owned account, never the untrusted body field alone.
+	owner := *meta
+	applyAuthenticatedAccount(c, &owner)
+	f := h.cfg.File
+	return fmt.Sprintf("%s|%s|%s|%s|redact=%t|chunks=%d/%d/%d", owner.AktoAccountID, meta.ContextSource, meta.Tag,
+		policies, f.BlockOnRedaction, f.ChunkSize, f.ChunkOverlap, f.MaxChunks)
+}
+
+// validateCachedFile serves a file from the cache when the same bytes were inspected and allowed
+// under the same scope, and remembers an inspected allow. Blocks and uninspected allows are never
+// remembered, so those files are checked again.
+func (h *ValidationHandler) validateCachedFile(ctx context.Context, input *fileInput, meta *models.ValidateRequestParams, sessionID, requestID, scope string) *fileResult {
+	if scope == "" || input.Err != nil {
+		return h.validateSingleFile(ctx, input, meta, sessionID, requestID)
+	}
+	// The bytes are needed for the key; they are already capped per type by resolveInputs.
+	data, err := io.ReadAll(input.Reader)
+	_ = input.Reader.Close()
+	input.Reader = io.NopCloser(bytes.NewReader(data))
+	if err != nil {
+		input.Err = fmt.Errorf("read file: %w", err)
+		return h.validateSingleFile(ctx, input, meta, sessionID, requestID)
+	}
+	key := filecache.Key(scope, data)
+	if h.fileCache.Allowed(ctx, key) {
+		h.logger.Info("File allowed from cache; already inspected under the same policies",
+			zap.String("file", input.Filename), zap.String("sessionID", sessionID))
+		return &fileResult{Filename: input.Filename, Allowed: true}
+	}
+	fr := h.validateSingleFile(ctx, input, meta, sessionID, requestID)
+	if fr.Allowed && !fr.Uninspected && !fr.NotCacheable {
+		h.fileCache.Remember(ctx, key)
+	}
+	return fr
 }
 
 func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileInput, meta *models.ValidateRequestParams, sessionID, requestID string) (fr *fileResult) {
@@ -172,10 +232,12 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	defer func() {
 		if p := recover(); p != nil {
 			h.logger.Error("File inspection panicked; allowing uninspected content", zap.Any("panic", p), zap.String("file", input.Filename))
+			fr.Uninspected = true
 		}
 	}()
 	if input.Err != nil {
 		h.logger.Warn("File unavailable for inspection; allowing file", zap.Error(input.Err), zap.String("file", input.Filename))
+		fr.Uninspected = true
 		return fr
 	}
 
@@ -186,20 +248,32 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 			zap.String("skipReason", "unsupported-file-type"),
 			zap.String("file", input.Filename), zap.String("ext", ext),
 			zap.Strings("supported", h.fileRegistry.SupportedExtensions()))
+		fr.Uninspected = true
 		return fr
 	}
 
 	rawText, err := processor.ExtractContent(ctx, input.Reader, ext)
-	if err != nil {
+	if errors.Is(err, fileprocessor.ErrIncomplete) {
+		// Part of the file (an embedded image) could not be read: validate what was, and an allow
+		// still leaves the file uninspected.
+		h.logger.Warn("File content only partly extracted; an allow leaves it uninspected", zap.Error(err), zap.String("file", input.Filename))
+		fr.Uninspected = true
+	} else if err != nil {
 		// Fail open when parsing fails; there is no extracted content to validate.
 		h.logger.Warn("Content extraction failed; allowing file", zap.Error(err), zap.String("file", input.Filename))
+		fr.Uninspected = true
 		return fr
 	}
 
 	text := fileprocessor.SanitizeText(rawText)
 	rawText = "" // allow GC to reclaim the unsanitized copy
 	if strings.TrimSpace(text) == "" {
-		h.logger.Warn("No text extracted; allowing file", zap.String("file", input.Filename))
+		// OCR may have misread text as nothing; a cached pass would hide that for the whole TTL.
+		switch processor.(type) {
+		case *fileprocessor.ImageProcessor, *fileprocessor.DocumentProcessor:
+			fr.NotCacheable = true
+		}
+		h.logger.Warn("No text extracted; allowing file", zap.String("file", input.Filename), zap.Bool("ocr", fr.NotCacheable))
 		return fr
 	}
 
@@ -233,7 +307,7 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 			zap.Int("chunkOverlap", h.cfg.File.ChunkOverlap))
 	}
 
-	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID, h.validatorService.ValidateRequest)
+	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID, h.validateFileChunk)
 	return h.applyFileChunkResults(fr, results)
 }
 
@@ -243,10 +317,12 @@ func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chu
 
 	for i, r := range results {
 		if r == nil {
+			fr.Uninspected = true
 			continue
 		}
 		if r.Err != nil {
 			h.logger.Warn("Chunk validation failed after retries; allowing chunk", zap.Error(r.Err), zap.String("file", fr.Filename), zap.Int("chunk", i+1))
+			fr.Uninspected = true
 			continue
 		}
 		if h.chunkStopsFile(r.Result) {
@@ -255,6 +331,10 @@ func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chu
 			fr.FailedChunkIndex = i + 1
 			fr.FailedResult = r.Result
 			return fr
+		}
+		if r.Result != nil && r.Result.Incomplete {
+			h.logger.Warn("Chunk allowed without every check running; allowing uninspected", zap.String("file", fr.Filename), zap.Int("chunk", i+1))
+			fr.Uninspected = true
 		}
 	}
 	return fr
@@ -319,7 +399,9 @@ func (h *ValidationHandler) fileRequestHeaders(c *gin.Context) string {
 	return string(b)
 }
 
-func (h *ValidationHandler) resolveInputs(ctx context.Context, form *multipart.Form) []*fileInput {
+// resolveInputs opens the uploads and fetches the URLs, up to the file limit; dropped
+// reports whether the limit cut any of them.
+func (h *ValidationHandler) resolveInputs(ctx context.Context, form *multipart.Form) (inputs []*fileInput, dropped bool) {
 	var fileHeaders []*multipart.FileHeader
 	if form != nil && form.File != nil {
 		fileHeaders = form.File["file"]
@@ -341,7 +423,7 @@ func (h *ValidationHandler) resolveInputs(ctx context.Context, form *multipart.F
 
 	// Uploads and URLs are no longer mutually exclusive: inspecting both is strictly safer
 	// than rejecting the request, and uploads go first so a URL can never crowd one out.
-	inputs := h.openUploads(capInputs(h.logger, fileHeaders, maxFiles, "file"))
+	inputs = h.openUploads(capInputs(h.logger, fileHeaders, maxFiles, "file"))
 	if remaining := maxFiles - len(inputs); remaining > 0 {
 		inputs = append(inputs, h.fetchFromURLs(ctx, capInputs(h.logger, rawURLs, remaining, "url"))...)
 	} else if len(rawURLs) > 0 {
@@ -349,7 +431,7 @@ func (h *ValidationHandler) resolveInputs(ctx context.Context, form *multipart.F
 			zap.String("skipReason", "max-files-exceeded"),
 			zap.Int("droppedURLs", len(rawURLs)), zap.Int("maxFiles", maxFiles))
 	}
-	return inputs
+	return inputs, len(inputs) < len(fileHeaders)+len(rawURLs)
 }
 
 // capInputs truncates items to limit, logging whatever it drops uninspected.
@@ -566,6 +648,10 @@ type fileValidationVerdict struct {
 	Reason          string               `json:"reason"`
 	Metadata        types.ThreatMetadata `json:"metadata"`
 	Behaviour       string               `json:"behaviour,omitempty"`
+	// Uninspected is set on an allow when at least one file was let through without its
+	// content being checked (see fileResult.Uninspected, dropped inputs and allowFile). Such
+	// an allow says nothing about the content, so a caller must not remember it as safe.
+	Uninspected bool `json:"uninspected,omitempty"`
 }
 
 func newFileValidationVerdict(r *mcp.ValidationResult) fileValidationVerdict {
@@ -582,8 +668,22 @@ func newFileValidationVerdict(r *mcp.ValidationResult) fileValidationVerdict {
 	}
 }
 
-func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult) {
-	c.JSON(http.StatusOK, newFileValidationVerdict(fileVerdict(results)))
+// dropped reports inputs that were cut, uninspected, by the file-count limit.
+func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult, dropped bool) {
+	verdict := newFileValidationVerdict(fileVerdict(results))
+	if verdict.Allowed {
+		verdict.Uninspected = dropped || anyUninspected(results)
+	}
+	c.JSON(http.StatusOK, verdict)
+}
+
+func anyUninspected(results []*fileResult) bool {
+	for _, fr := range results {
+		if fr.Uninspected {
+			return true
+		}
+	}
+	return false
 }
 
 // fileVerdict collapses the per-file results into a single mcp.ValidationResult so the
@@ -611,7 +711,9 @@ func fileVerdict(results []*fileResult) *mcp.ValidationResult {
 // allowFile writes the fail-open verdict shared by every path that cannot (or need not)
 // inspect content, in the same mcp.ValidationResult shape as a validated allow.
 func allowFile(c *gin.Context) {
-	c.JSON(http.StatusOK, newFileValidationVerdict(nil))
+	verdict := newFileValidationVerdict(nil)
+	verdict.Uninspected = true
+	c.JSON(http.StatusOK, verdict)
 }
 
 func marshalPromptPayload(content string) string {

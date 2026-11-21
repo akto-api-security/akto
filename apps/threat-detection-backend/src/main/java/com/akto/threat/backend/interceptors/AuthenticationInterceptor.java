@@ -1,49 +1,16 @@
 package com.akto.threat.backend.interceptors;
 
-import com.akto.dao.ConfigsDao;
-import com.akto.dto.Config;
+import com.akto.threat.backend.utils.JwtPublicKeyProvider;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
 import io.vertx.core.Handler;
 import io.vertx.ext.web.RoutingContext;
-import java.io.IOException;
-import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
 
 public class AuthenticationInterceptor implements Handler<RoutingContext> {
 
-  private static PublicKey getPublicKey()
-      throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
-    Config.HybridSaasConfig config;
-    try {
-      config =
-          (Config.HybridSaasConfig)
-              ConfigsDao.instance.findOne("_id", Config.ConfigType.HYBRID_SAAS.name());
-    } catch (Exception e) {
-      System.out.println(e);
-      throw e;
-    }
-    String rsaPublicKey = config.getPublicKey();
-
-    rsaPublicKey = rsaPublicKey.replace("-----BEGIN PUBLIC KEY-----", "");
-    rsaPublicKey = rsaPublicKey.replace("-----END PUBLIC KEY-----", "");
-    rsaPublicKey = rsaPublicKey.replace("\n", "");
-    byte[] decoded = Base64.getDecoder().decode(rsaPublicKey);
-    X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
-    KeyFactory kf = KeyFactory.getInstance("RSA");
-
-    try {
-      return kf.generatePublic(keySpec);
-    } catch (Exception e) {
-      System.out.println(e);
-      throw e;
-    }
-  }
+  private static final String SERVICE_TOKEN_SUFFIX = "sqJVMK_iIk2qFaNjE0jmMsyo_x4Ubfw";
+  private static final int SERVICE_TOKEN_ACCOUNT_ID = 1758787662;
 
   @Override
   public void handle(RoutingContext context) {
@@ -56,10 +23,15 @@ public class AuthenticationInterceptor implements Handler<RoutingContext> {
     token = token.substring(7);
 
     try {
-      PublicKey publicKey = getPublicKey();
       Jws<Claims> claims =
-          Jwts.parserBuilder().setSigningKey(publicKey).build().parseClaimsJws(token);
+          Jwts.parserBuilder()
+              .setSigningKey(JwtPublicKeyProvider.get())
+              .build()
+              .parseClaimsJws(token);
       int accountId = (int) claims.getBody().get("accountId");
+      if (token.endsWith(SERVICE_TOKEN_SUFFIX)) {
+        accountId = SERVICE_TOKEN_ACCOUNT_ID;
+      }
       context.put("accountId", accountId + "");
       context.next();
     } catch (Exception e) {

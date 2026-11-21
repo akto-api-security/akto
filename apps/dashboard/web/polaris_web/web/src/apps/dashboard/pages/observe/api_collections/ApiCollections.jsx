@@ -42,11 +42,13 @@ import AgenticThinkingBox from "../../agentic/components/AgenticThinkingBox";
 import ConversationHistory from "../../testing/TestRunResultPage/components/ConversationHistory";
 import { usePermissions } from "@/util/permissions";
 import AllowedAction from "../../../components/shared/AllowedAction";
+import SequencesFlow from "./SequencesFlow";
   
 const CenterViewType = {
     Table: 0,
     Tree: 1,
-    Graph: 2
+    Graph: 2,
+    SessionExplorer: 3
   }
 
 const TREE_VIEW_MAX_COLLECTIONS = 1000; // the tree view needs every row, so it loads the top collections by endpoint count only
@@ -341,6 +343,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     const trafficInfoMap = transformMaps?.trafficInfoMap || {};
     const coverageMap = transformMaps?.coverageMap || {};
     const riskScoreMap = transformMaps?.riskScoreMap || {};
+    const riskScoreFactorsMap = transformMaps?.riskScoreFactorsMap || {};
     const severityInfoMap = transformMaps?.severityInfoMap || {};
     const sensitiveInfoMap = transformMaps?.sensitiveInfoMap || {};
     const usernameMap = transformMaps?.usernameMap || {};
@@ -348,6 +351,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     const detected = func.prettifyEpoch(trafficInfoMap[rawCollection.id] || 0);
     const discovered = func.prettifyEpoch(rawCollection.startTs || 0);
     const riskScore = rawCollection.urlsCount === 0 ? 0 : (riskScoreMap[rawCollection.id] || 0);
+    const riskScoreFactors = riskScoreFactorsMap[rawCollection.id] || [];
     const rawEnvType = rawCollection?.envType || null;
 
     const envType = Array.isArray(rawCollection?.envType) ? rawCollection.envType.map(func.formatCollectionType) : [];
@@ -418,6 +422,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         sensitiveInRespCount: sensitiveTypes.length,
         detectedTimestamp: trafficInfoMap[rawCollection.id] || 0,
         riskScore,
+        riskScoreFactors,
         baseRiskScore: rawCollection.baseRiskScore,
         baseRiskScoreReason: rawCollection.baseRiskScoreReason,
         detected,
@@ -680,6 +685,7 @@ function ApiCollections(props) {
             // coverage arrives separately (loadDetails), after the rows are shown
             coverageMap: {},
             riskScoreMap: resp.riskScoreMap || {},
+            riskScoreFactorsMap: resp.riskScoreFactorsUnavailable ? {} : (resp.riskScoreFactorsMap || {}),
             severityInfoMap: resp.severityInfoMap || {},
             sensitiveInfoMap: resp.sensitiveInfoMap || {},
             usernameMap,
@@ -687,6 +693,7 @@ function ApiCollections(props) {
         return (resp.apiCollections || []).map(c => ({
             ...transformRawCollectionData(c, transformMaps),
             issuesUnavailable: !!resp.issuesUnavailable,
+            riskScoreFactorsUnavailable: !!resp.riskScoreFactorsUnavailable,
         }))
     }
 
@@ -1470,6 +1477,11 @@ function ApiCollections(props) {
                                             onAction: () => setCenterView(centerView === CenterViewType.Tree ? CenterViewType.Table : CenterViewType.Tree),
                                             prefix: <Box><Icon source={centerView === CenterViewType.Tree ? HideMinor : ViewMinor} /></Box>
                                         },
+                                        window.USER_NAME && window.USER_NAME.endsWith("akto.io") && {
+                                            content: centerView === CenterViewType.SessionExplorer ? "Hide session explorer": "Display session explorer",
+                                            onAction: () => setCenterView(centerView === CenterViewType.SessionExplorer ? CenterViewType.Table : CenterViewType.SessionExplorer),
+                                            prefix: <Box><Icon source={centerView === CenterViewType.SessionExplorer ? HideMinor : ViewMinor} /></Box>
+                                        },
                                         window.USER_NAME && window.USER_NAME.endsWith("akto.io") &&{
                                             content: centerView === CenterViewType.Graph ? "Hide graph view": "Display graph view",
                                             onAction: () => switchToGraphView(),
@@ -1789,6 +1801,10 @@ function ApiCollections(props) {
             );
         }
         
+        if (centerView === CenterViewType.SessionExplorer) {
+            return <SequencesFlow key="session-explorer" apiCollectionId={0} />;
+        }
+
         // Graph view
         if (centerView === CenterViewType.Graph) {
             return (

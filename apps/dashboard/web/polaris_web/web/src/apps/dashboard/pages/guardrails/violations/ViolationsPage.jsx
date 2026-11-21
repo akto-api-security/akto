@@ -51,7 +51,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents as expandRowsToEvents } from "@/apps/dashboard/pages/threat_detection/utils/activityGroups";
-import { fetchEndpointViolationCounts } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
+import { dateRangeFromSearchParams, fetchEndpointViolationCounts } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
 import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "./ViolationFlyoutSections";
@@ -64,6 +64,8 @@ import useInsightsEntryPoint from "@/apps/dashboard/pages/observe/agentic/insigh
 import { INSIGHT_GROUP } from "@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers";
 import { usePermissions } from "@/util/permissions";
 import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
+import ViolationStatusBadge from "@/apps/dashboard/components/shared/ViolationStatusBadge";
+import GuardrailActionBadge, { guardrailActionLabel } from "@/apps/dashboard/components/shared/GuardrailActionBadge";
 import ReviewCaseModal from "@/apps/dashboard/pages/guardrails/components/ReviewCaseModal";
 import useCaseOwners from "@/apps/dashboard/pages/threat_detection/utils/useCaseOwners";
 import { UNASSIGNED_OWNER, CASE_NOTES_FILTER_CHOICES, applyCaseUpdate, caseFilterRequestParams, ownerLabel, ownerOptionLabel, truncateText } from "@/apps/dashboard/pages/threat_detection/utils/caseManagement";
@@ -111,7 +113,7 @@ function getAssetServiceName(raw) {
     return raw;
 }
 
-function formatAssetDisplayName(raw) {
+export function formatAssetDisplayName(raw) {
     if (!raw) return null;
     return formatDisplayName(getAssetServiceName(raw));
 }
@@ -175,12 +177,11 @@ function ComplianceCellRenderer({ data }) {
 function ActionCellRenderer({ value, data }) {
     const isBackfill = isBackfillRefId(data?.refId);
     if (!value && !isBackfill) return null;
-    const status = value === "Blocked" ? "critical" : "warning";
     return (
         // One tag only: Backfill replaces the action badge.
         isBackfill
             ? <Badge size="small" status="info">Backfill</Badge>
-            : <Badge size="small" status={status}>{value}</Badge>
+            : <GuardrailActionBadge action={value} />
     );
 }
 
@@ -224,19 +225,8 @@ function ApproveCellRenderer({ data, onApprove }) {
 
 const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLOCKED" };
 
-const STATUS_LABEL = { ACTIVE: "Open", FIXED: "Fixed", IGNORED: "Ignored", UNDER_REVIEW: "In Review", HUMAN_APPROVAL: "Human Approval" };
-const STATUS_DOT_COLOR = { ACTIVE: "#9642FC", FIXED: "#5BC0DE", IGNORED: "#F5C451", UNDER_REVIEW: "#637381", HUMAN_APPROVAL: "#5BC0DE" };
 function StatusCellRenderer({ value }) {
-    if (!value) return null;
-    const key = String(value).toUpperCase();
-    const label = STATUS_LABEL[key] || value;
-    const color = STATUS_DOT_COLOR[key];
-    return (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-            {color && <span className="agentic-dot" style={{ "--dot-color": color }} />}
-            <span style={{ fontSize: "12px" }}>{label}</span>
-        </span>
-    );
+    return <ViolationStatusBadge status={value} />;
 }
 
 // ─── Column definitions ─────────────────────────────────────────────────────────
@@ -286,6 +276,9 @@ function DetectedCellRenderer({ value, data }) {
 // Skill and Config events already have their own tabs, so they are not offered here.
 const TYPE_FILTER_ACCOUNT_ID = 1791484402;
 const typeFilterEnabled = () => isEndpointSecurityCategory() && Number(window.ACTIVE_ACCOUNT) === TYPE_FILTER_ACCOUNT_ID;
+
+// Content access is audited only for Argus and Atlas, not API Security.
+const revealRequired = () => isEndpointSecurityCategory() || isAgenticSecurityCategory();
 
 const AGENTIC_TYPE_FILTER_VALUES = ["Prompt", "Tool", "Resource"];
 const ACTION_FILTER_LABELS = { block: "Blocked", alert: "Alert", flag: "Flagged" };
@@ -618,10 +611,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
 
     const { req: reqPayload, resp: respPayload, raw: rawPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
-    const action = rawBehaviour === "block" ? "Blocked"
-        : (rawBehaviour === "warn" || rawBehaviour === "flag") ? "Flagged"
-        : rawBehaviour ? func.toSentenceCase(rawBehaviour)
-        : "Flagged";
+    const action = guardrailActionLabel(rawBehaviour);
 
     const rawHost = event.host || event.actor || null;
     const resolvedUser = getUsernameForCollection({ displayName: rawHost }, usernameMap || {});
@@ -965,6 +955,8 @@ function Violations() {
     const [summaryData, setSummaryData] = useState(null);
     const [summaryLoading, setSummaryLoading] = useState(true);
     const [selectedViolation, setSelectedViolation] = useState(null);
+    const [pendingReveal, setPendingReveal] = useState(null);
+    const [revealing, setRevealing] = useState(false);
     // Deep link from openViolationInGuardrailViolations (?refId=...) — auto-opens that exact
     // row's flyout as soon as it shows up in a fetched page, instead of only landing on the
     // filtered list. Cleared once matched so it doesn't re-trigger on a later, unrelated fetch.
@@ -1061,9 +1053,11 @@ function Violations() {
     }, []);
 
     // values.ranges has no 30-day preset (it jumps 7 days -> 2 months), so pass the range inline.
+    // A link can carry its own range (?since=&until=, epoch seconds).
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        func.getAllTimeRangeForAccounts() || func.getLast30DaysRange(),
+        location.search,
+        (search) => dateRangeFromSearchParams(new URLSearchParams(search)) || func.getAllTimeRangeForAccounts() || func.getLast30DaysRange(),
     );
 
     const getTimeEpoch = useCallback((key) => {
@@ -1169,6 +1163,18 @@ function Violations() {
             });
             applyGridFilter("user", userNames);
         }
+        // ?severity=CRITICAL,HIGH is seeded the same way as user above.
+        const severities = (params.get("severity") || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (severities.length > 0) {
+            setActiveSeverityFilter(new Set(severities));
+            const key = gridFilterKey.current;
+            const { filtersMap, setFiltersMap } = PersistStore.getState();
+            setFiltersMap({
+                ...filtersMap,
+                [key]: { ...(filtersMap[key] || {}), filters: { ...(filtersMap[key]?.filters || {}), severity: severities } },
+            });
+            applyGridFilter("severity", severities);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.search]);
 
@@ -1211,6 +1217,15 @@ function Violations() {
         setActiveAssetFilter(new Set());
         triggerTableRefresh();
     }, [triggerTableRefresh]);
+
+    // Deep link from the Guardrail overview (?host=a,b): the agent hosts go into the filter the Agents card drives.
+    useEffect(() => {
+        const hosts = (new URLSearchParams(location.search).get("host") || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (hosts.length === 0) return;
+        setActiveAssetFilter(new Set(hosts));
+        triggerTableRefresh();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.search]);
 
     const handleOpenCardClick = useCallback(() => {
         if (currentTab === "active") return;
@@ -1601,7 +1616,8 @@ function Violations() {
             if (pendingDeepLinkRefId.current) {
                 const deepLinkMatch = value.find(r => r.refId === pendingDeepLinkRefId.current);
                 if (deepLinkMatch) {
-                    setSelectedViolation(deepLinkMatch);
+                    if (revealRequired()) setPendingReveal(deepLinkMatch);
+                    else setSelectedViolation(deepLinkMatch);
                     pendingDeepLinkRefId.current = null;
                 }
             }
@@ -1736,7 +1752,25 @@ function Violations() {
     }, [isHumanApprovalTab, bulkPendingCount, handleBulkStatusUpdate, handleBulkHumanApproval]);
 
     const handleRowClick = (e) => {
-        if (e?.data) setSelectedViolation(e.data);
+        if (!e?.data) return;
+        if (revealRequired()) setPendingReveal(e.data);
+        else setSelectedViolation(e.data);
+    };
+
+    // Opens the content only after the view is audited.
+    const confirmReveal = async () => {
+        const row = pendingReveal;
+        if (!row || revealing) return;
+        setRevealing(true);
+        try {
+            await threatDetectionApi.auditContentView(row.refId, row.id);
+            setSelectedViolation(row);
+            setPendingReveal(null);
+        } catch (e) {
+            func.setToast(true, true, "Could not record this access in audit data. Please try again.");
+        } finally {
+            setRevealing(false);
+        }
     };
 
     const handleAddSearchFilter = useCallback((text, side, line) => {
@@ -1928,6 +1962,21 @@ function Violations() {
             onStatusUpdate={handleCaseUpdate}
             onHumanApproval={(response) => selectedViolation && handleHumanApproval(selectedViolation, response)}
         />,
+        <Modal
+            key="reveal-content"
+            open={!!pendingReveal}
+            onClose={() => { if (!revealing) setPendingReveal(null); }}
+            title="Show Guardrail Activity?"
+            primaryAction={{ content: "Show content", onAction: confirmReveal, loading: revealing }}
+            secondaryActions={[{ content: "Cancel", onAction: () => setPendingReveal(null), disabled: revealing }]}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd">
+                    Guardrail Activity can contain sensitive data. Your email, IP address and the time of
+                    this access will be recorded in audit data.
+                </Text>
+            </Modal.Section>
+        </Modal>,
         <ReviewCaseModal
             key="review-case"
             open={reviewModalOpen}

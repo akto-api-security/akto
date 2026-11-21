@@ -156,6 +156,9 @@ export const FILTER_OPTION_LABELS = {
     categories: CATEGORY_LABELS,
 };
 
+// Team filter value for employees with no team tag; matches AtlasPeopleService.UNTAGGED_TEAM.
+export const UNTAGGED_TEAM = "untagged";
+
 export const EMPTY_PEOPLE_FILTERS = {
     teams: [],
     tags: [],
@@ -173,4 +176,8 @@ export const EMPTY_PEOPLE_FILTERS = {
     guardrailModes: [],
     riskMin: 0,
     riskMax: RISK_MAX,
+    // Epoch seconds; when set, only tools used since then count (0 is all time).
+    usedSince: 0,
 };
+
+export const DAY_SECONDS = 24 * 60 * 60;

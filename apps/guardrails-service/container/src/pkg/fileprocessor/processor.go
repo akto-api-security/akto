@@ -2,6 +2,7 @@ package fileprocessor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -11,6 +12,13 @@ import (
 	"strings"
 	"sync"
 )
+
+// ErrIncomplete comes back from ExtractContent together with the text that could be extracted when
+// some of the file's content could not be (an embedded image nobody read): the text is still worth
+// validating, but an allow must not count as having inspected the whole file.
+var ErrIncomplete = errors.New("file content only partly extracted")
+
+var errImageTooLarge = errors.New("image too large")
 
 // FileProcessor extracts text content from a file for guardrail validation.
 type FileProcessor interface {
@@ -112,6 +120,6 @@ func ExtensionFromURL(rawURL string) (string, error) {
 func DefaultRegistry(maxTextFileBytes int) *Registry {
 	r := NewRegistry()
 	r.RegisterWithLimit(TxtProcessor{}, maxTextFileBytes)
-	r.RegisterWithLimit(DocumentProcessor{}, maxTextFileBytes)
+	r.RegisterWithLimit(NewDocumentProcessor(nil, 0, 0), maxTextFileBytes)
 	return r
 }

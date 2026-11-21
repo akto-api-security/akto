@@ -235,8 +235,9 @@ public class InsightDataLoader {
         }
     }
 
-    /** AGENTIC reads only sensitiveByCollection — the Sensitive Data KPI and the sensitive-data,
-     *  protection-coverage and agent drills are its only bundle-level consumers. The Argus insight
+    /** AGENTIC reads sensitiveByCollection (the Sensitive Data KPI and the sensitive-data,
+     *  protection-coverage and agent drills) and auditRows (the discovery overview's reviewed/unreviewed split);
+     *  those are its only bundle-level consumers. The Argus insight
      *  cards read testing_run_issues/malicious_events/ElasticSearch directly, independent of this
      *  bundle. Everything else EndpointContextReader loads is ENDPOINT-only and deliberately not
      *  pulled in here — those are unbounded findAlls with no Argus consumer. */
@@ -247,8 +248,11 @@ public class InsightDataLoader {
             Future<Map<Integer, List<String>>> sensitiveByCollectionFuture = loader.submitTimed(accountId, userId, contextSource,
                     "sensitiveByCollection (3x SingleTypeInfoDao scans + per-collection lookup)",
                     () -> loader.loadSensitiveByCollection(collections), Map::size);
+            Future<List<McpAuditInfo>> auditRowsFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "auditRows (limit 5000)", () -> loader.loadAuditRows(contextSource), List::size);
 
             out.sensitiveByCollection = loader.getOrEmpty(sensitiveByCollectionFuture, Collections.emptyMap(), "sensitiveByCollection");
+            out.auditRows = loader.getOrEmpty(auditRowsFuture, Collections.emptyList(), "auditRows");
         }
     }
 

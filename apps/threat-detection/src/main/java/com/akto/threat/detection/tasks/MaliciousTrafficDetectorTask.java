@@ -367,7 +367,9 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
             return methods != null && methods.contains(method);
           }, catalogTemplates);
           if (sequenceUrl == null) sequenceUrl = urlForAggregation;
-          hasPassedFilter = sequenceCache.checkSequenceAnomaly(responseParam, apiCollectionId, sequenceUrl, method);
+          boolean skippedRequiredStep = sequenceCache.checkSequenceAnomaly(responseParam, apiCollectionId, sequenceUrl, method);
+          boolean unknownPath = sequenceCache.checkUnknownPath(responseParam, apiCollectionId, sequenceUrl, method);
+          hasPassedFilter = skippedRequiredStep || unknownPath;
         }
       } else {
         boolean hasSuccessFailureFilters = (apiFilter.getSuccessFilter() != null || apiFilter.getFailureFilter() != null);

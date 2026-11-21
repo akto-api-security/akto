@@ -594,7 +594,6 @@ function HomeDashboard() {
             totalAPIs = apiStats.totalAPIs
         }
         const apisTestedInLookBackPeriod = apiStats.apisTestedInLookBackPeriod
-        const apisInScopeForTesting = apiStats?.totalInScopeForTestingApis || apisTestedInLookBackPeriod
 
         if (totalAPIs && totalAPIs > 0 && totalRiskScore) {
             const tempRiskScore = totalRiskScore / totalAPIs
@@ -1545,31 +1544,6 @@ function HomeDashboard() {
 
     const dashboardComp = (
         <VerticalStack gap={4}>
-            {postureNotice.pending && (
-                <Banner status="info">
-                    <VerticalStack gap="2">
-                        {pendingPolls < MAX_PENDING_POLLS ? (
-                            <HorizontalStack gap="2" blockAlign="center">
-                                <Spinner size="small" accessibilityLabel="Counting" />
-                                <Text>
-                                    Counting the {mapLabel('APIs', getDashboardCategory())} of your collections{postureNotice.collections > 0 ? ` (${postureNotice.counted} of ${postureNotice.collections})` : ''}.
-                                    The numbers below are partial and fill in as it goes.
-                                </Text>
-                            </HorizontalStack>
-                        ) : (
-                            <Text>Still counting the {mapLabel('APIs', getDashboardCategory())} of your collections: the numbers below are partial. Reload in a while to see them complete.</Text>
-                        )}
-                        {postureNotice.collections > 0 && (
-                            <ProgressBar size="small" progress={Math.round(100 * postureNotice.counted / postureNotice.collections)} />
-                        )}
-                    </VerticalStack>
-                </Banner>
-            )}
-            {postureNotice.endApproximate && (
-                <Banner status="warning">
-                    Too many {mapLabel('APIs', getDashboardCategory())} were discovered after the end of this range to take them out of the numbers, so they are today's.
-                </Banner>
-            )}
             {components.map(({id, component}) => (
                 <div key={id}>{component}</div>
             ))}

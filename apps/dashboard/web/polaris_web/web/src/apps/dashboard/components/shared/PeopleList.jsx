@@ -1,6 +1,6 @@
 import { Avatar, HorizontalStack, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 
-const initialsOf = (name = "") => name.split(/[\s._@-]+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join("");
+export const initialsOf = (name = "") => name.split(/[\s._@-]+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join("");
 
 /*
  * People rows: initials avatar, name, a secondary line and right-aligned text (with an optional tooltip).

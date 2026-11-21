@@ -4,12 +4,15 @@ import com.akto.utils.ArgusCollectionScope;
 import com.akto.ProtoMessageUtils;
 import com.akto.action.threat_detection.utils.ThreatsUtils;
 import com.akto.action.waf.CloudflareWafAction;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.threat_detection.GuardrailComplianceInfosDao;
 import com.akto.dto.threat_detection.GuardrailComplianceInfo;
 import com.akto.dto.Config;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.threat_utils.AwsWafUtils;
 import com.akto.threat_utils.CloudflareWafUtils;
 import com.akto.dto.OriginalHttpRequest;
@@ -73,6 +76,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String actor;
   String filterId;
   List<String> eventIds; // a grouped activity row's events, shown as its attempts
+  String eventId; // audit metadata of auditContentView
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -321,6 +325,18 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
       this.actorActivities = this.actorActivities.stream().filter(a -> ownHosts.contains(a.getHost())).collect(Collectors.toList());
     }
 
+    return SUCCESS.toUpperCase();
+  }
+
+  @Audit(description = "User viewed Guardrail Activity content",
+         resource = Resource.GUARDRAIL_ACTIVITY,
+         operation = Operation.READ,
+         metadataGenerators = {"getRefId", "getEventId"})
+  public String auditContentView() {
+    if (refId == null || refId.trim().isEmpty()) {
+      addActionError("refId is required");
+      return ERROR.toUpperCase();
+    }
     return SUCCESS.toUpperCase();
   }
 
@@ -844,6 +860,14 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setEventIds(List<String> eventIds) {
     this.eventIds = eventIds;
+  }
+
+  public String getEventId() {
+    return eventId;
+  }
+
+  public void setEventId(String eventId) {
+    this.eventId = eventId;
   }
 
   public Map<String, Integer> getSort() {

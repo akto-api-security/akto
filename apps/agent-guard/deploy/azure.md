@@ -120,4 +120,4 @@ Per worker: **Custom domains** → add hostname → CNAME at DNS provider → ma
 | DNS #1 (v2) | `agent-guard-executor-v2` |
 | DNS #2 (prod cascade) | `agent-guard-executor` |
 
-Set `AGENT_GUARD_ENGINE_URL` on new installs to the matching HTTPS URL.
+Set guardrails-service's `SCANNER_API_URL` on new installs to the matching HTTPS URL; it is used for both text scans (`/scan`) and image OCR (`/ocr`).

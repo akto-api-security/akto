@@ -62,6 +62,7 @@
                     window.SERVICENOW_INTEGRATED ='${requestScope.servicenowIntegrated}'
                     window.DEVREV_INTEGRATED ='${requestScope.devrevIntegrated}'
                     window.LINEAR_INTEGRATED ='${requestScope.linearIntegrated}'
+                    window.PORT_IO_INTEGRATED ='${requestScope.portIOIntegrated}'
                     window.WIZ_INTEGRATED ='${requestScope.wizIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'

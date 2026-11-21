@@ -12,6 +12,7 @@ import func from "@/util/func"
 import api from "../api"
 import ScriptEditor from "./ScriptEditor"
 import { SCRIPT_TYPES, isDefaultScript, scriptTypeLabel } from "./scriptTypes"
+import AskOverlayStore from "../../dashboard/ask/askOverlayStore"
 
 const headers = [
     { title: "Script name", text: "Name", value: "nameComp" },
@@ -49,6 +50,8 @@ function ScriptsPage() {
     const { canCall } = usePermissions()
     const canCreate = canCall("api/addScript")
     const canUpdate = canCall("api/updateScript")
+    const canValidate = canCall("api/validateTestScript")
+    const openScriptMode = AskOverlayStore((state) => state.openScriptMode)
     const featureGranted = func.checkForFeatureSaas("TEST_PRE_SCRIPT")
 
     const [loading, setLoading] = useState(true)
@@ -196,6 +199,12 @@ function ScriptsPage() {
             }
             isFirstPage={true}
             primaryAction={featureGranted ? createAction : null}
+            secondaryActions={featureGranted ? (
+                // Opens the Ask Akto overlay in script-writing mode (service/scripts/validation/CLAUDE.md).
+                <AllowedAction allowed={canValidate}>
+                    <Button onClick={() => openScriptMode(null)}>Write with Ask Akto</Button>
+                </AllowedAction>
+            ) : null}
             components={components}
         />
     )

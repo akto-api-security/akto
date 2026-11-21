@@ -4,8 +4,11 @@ import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.LinearAutoTicketParams;
+import com.akto.dto.jobs.PortIOAutoTicketParams;
+import com.akto.dto.testing.AutoTicketingDetails;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.jobs.JobScheduler;
+import com.akto.wiz.WizIntegrationUtils;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.billing.OrganizationsDao;
@@ -112,9 +115,18 @@ public class TestCompletion {
                 return;
             }
 
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "JIRA_INTEGRATION");
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId,
+                AutoTicketingDetails.featureLabelFor(testRunConfig.getAutoTicketingDetails().getTicketSource()));
             if (!featureAccess.getIsGranted()) {
                 logger.error("Auto Create Tickets plan is not activated for the account - {}", accountId);
+                return;
+            }
+
+            if (TicketSource.WIZ.name().equals(testRunConfig.getAutoTicketingDetails().getTicketSource())) {
+                // No job needed: marking the issues as Wiz findings is enough, the Wiz sync job uploads them on its schedule
+                int marked = WizIntegrationUtils.markSummaryIssuesAsWizFindings(summaryId,
+                    testRunConfig.getAutoTicketingDetails().getSeverities());
+                logger.info("Marked {} issues as Wiz findings for summary {}", marked, summaryId);
                 return;
             }
 
@@ -122,6 +134,14 @@ public class TestCompletion {
                 JobScheduler.scheduleRunOnceJob(accountId,
                     new LinearAutoTicketParams(testingRun.getId(), summaryId,
                         testRunConfig.getAutoTicketingDetails().getProjectId(),
+                        testRunConfig.getAutoTicketingDetails().getSeverities()),
+                    JobExecutorType.DASHBOARD);
+                return;
+            }
+
+            if (AutoTicketingDetails.PORT_IO_TICKET_SOURCE.equals(testRunConfig.getAutoTicketingDetails().getTicketSource())) {
+                JobScheduler.scheduleRunOnceJob(accountId,
+                    new PortIOAutoTicketParams(testingRun.getId(), summaryId,
                         testRunConfig.getAutoTicketingDetails().getSeverities()),
                     JobExecutorType.DASHBOARD);
                 return;

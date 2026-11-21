@@ -4,11 +4,13 @@ import com.akto.utils.ArgusCollectionScope;
 import com.akto.action.AgenticObserveAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AgentUsersDao;
+import com.akto.dao.AuthTokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.AgenticUsers;
+import com.akto.dto.AuthToken;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.monitoring.InstalledAppVulnerability;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -104,6 +106,8 @@ public class ModuleInfoAction extends UserAction {
     @Getter private Map<String, Object> deviceStats;
     @Setter private String deviceScope;
     private static final LoggerMaker statsLogger = new LoggerMaker(ModuleInfoAction.class, LogDb.DASHBOARD);
+    // Modules Akto runs itself: customers don't see them in Module Info, and the Tokens tab shows them under a generic name.
+    public static final Set<String> AKTO_HOSTED_MODULE_TYPES = Collections.singleton(ModuleType.GUARDRAIL.name());
     private final InsightService insightService = new InsightService();
     // Builds and caches the Atlas Devices & Employees snapshot; every fetchAtlas* action delegates to it.
     private final AtlasPeopleService atlasPeopleService = new AtlasPeopleService();
@@ -306,6 +310,7 @@ public class ModuleInfoAction extends UserAction {
         int sk = Math.max(skip, 0);
 
         moduleInfos = aggregateEndpointShieldModules(filter, groupId, Context.now(), statuses, finalSort, sk, lim);
+        hideTokenIds(moduleInfos);
 
         filterEnvironmentVariables(moduleInfos);
         allowedEnvFields = computeAllowedEnvFields();
@@ -399,14 +404,14 @@ public class ModuleInfoAction extends UserAction {
 
     // Flattens a grouped ModuleInfo into the plain row AtlasPeopleService.build expects.
     private static Document toAtlasModuleRow(ModuleInfo module) {
-        Map<String, Object> additional = module.getAdditionalData() == null ? new HashMap<>() : module.getAdditionalData();
+        Map<String, Object> additionalData = module.getAdditionalData() == null ? new HashMap<>() : module.getAdditionalData();
         return new Document("deviceName", module.getName())
                 .append("moduleId", module.getId())
-                .append("status", additional.get("currentStatus"))
-                .append("username", additional.get("username"))
-                .append("os", additional.get("os"))
-                .append("platform", additional.get("platform"))
-                .append("browserName", additional.get("browserName"))
+                .append("status", additionalData.get("currentStatus"))
+                .append("username", ModuleInfo.ownerUsernameOf(additionalData))
+                .append("os", additionalData.get("os"))
+                .append("platform", additionalData.get("platform"))
+                .append("browserName", additionalData.get("browserName"))
                 .append(ModuleInfo.LAST_HEARTBEAT_RECEIVED, module.getLastHeartbeatReceived())
                 .append(ModuleInfo.CURRENT_VERSION, module.getCurrentVersion());
     }
@@ -716,6 +721,7 @@ public class ModuleInfoAction extends UserAction {
             ad.put("mcpServerCollectionNames", collectionNames);
         }
 
+        hideTokenIds(infos);
         moduleInfos = infos;
         return SUCCESS.toUpperCase();
     }
@@ -794,9 +800,12 @@ public class ModuleInfoAction extends UserAction {
             int deltaTime = Context.now() - heartbeatThresholdSeconds;
             filters.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTime));
         }
+        filters.add(Filters.nin(ModuleInfo.MODULE_TYPE, new ArrayList<>(AKTO_HOSTED_MODULE_TYPES)));
 
         Bson finalFilter = filters.isEmpty() ? Filters.empty() : Filters.and(filters);
         moduleInfos = ModuleInfoDao.instance.findAll(finalFilter);
+        markRevokedTokens(moduleInfos);
+        hideTokenIds(moduleInfos);
 
         // Filter environment variables to only expose whitelisted keys
         filterEnvironmentVariables(moduleInfos);
@@ -819,6 +828,40 @@ public class ModuleInfoAction extends UserAction {
 
     public List<Map<String, String>> getAllowedEnvFields() {
         return allowedEnvFields;
+    }
+
+    // Flags modules whose auth token is revoked, in memory only and without exposing token details.
+    private void markRevokedTokens(List<ModuleInfo> modules) {
+        if (modules == null) {
+            return;
+        }
+        try {
+            Set<String> tokenIds = modules.stream().map(ModuleInfo::getTokenId).filter(Objects::nonNull).collect(Collectors.toSet());
+            if (tokenIds.isEmpty()) {
+                return;
+            }
+            Set<String> revoked = AuthTokensDao.instance.findAll(
+                    Filters.and(Filters.in(AuthToken.ID, tokenIds), Filters.eq(AuthToken.STATUS, AuthToken.STATUS_REVOKED)),
+                    Projections.include(AuthToken.ID)).stream().map(AuthToken::getId).collect(Collectors.toSet());
+            for (ModuleInfo module : modules) {
+                if (module.getTokenId() == null || !revoked.contains(module.getTokenId())) {
+                    continue;
+                }
+                if (module.getAdditionalData() == null) {
+                    module.setAdditionalData(new HashMap<>());
+                }
+                module.getAdditionalData().put("tokenRevoked", true);
+            }
+        } catch (Exception e) {
+            statsLogger.errorAndAddToDb(e, "Failed to flag revoked module tokens: " + e.getMessage());
+        }
+    }
+
+    // The token id is only a server-side join key, so it never reaches the browser.
+    private static void hideTokenIds(List<ModuleInfo> modules) {
+        if (modules != null) {
+            modules.forEach(module -> module.setTokenId(null));
+        }
     }
 
     private List<Map<String, String>> computeAllowedEnvFields() {

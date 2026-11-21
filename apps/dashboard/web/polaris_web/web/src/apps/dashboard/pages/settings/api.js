@@ -910,9 +910,57 @@ const settingRequests = {
         })
     },
 
+    saveLinearBiDirectionalSync(biDirectionalSyncEnabled) {
+        return request({
+            url: '/api/saveLinearBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled }
+        })
+    },
+
     removeLinearIntegration() {
         return request({
             url: '/api/removeLinearIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchPortIOIntegration() {
+        return request({
+            url: '/api/fetchPortIOIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addPortIOIntegration(clientId, clientSecret, workflowId) {
+        return request({
+            url: '/api/addPortIOIntegration',
+            method: 'post',
+            data: { clientId, clientSecret, workflowId }
+        })
+    },
+
+    savePortIOSeverityMapping(severityToPriority) {
+        return request({
+            url: '/api/savePortIOSeverityMapping',
+            method: 'post',
+            data: { severityToPriority }
+        })
+    },
+
+    savePortIOBiDirectionalSync(biDirectionalSyncEnabled, updateWorkflowId) {
+        return request({
+            url: '/api/savePortIOBiDirectionalSync',
+            method: 'post',
+            data: { biDirectionalSyncEnabled, updateWorkflowId }
+        })
+    },
+
+    removePortIOIntegration() {
+        return request({
+            url: '/api/removePortIOIntegration',
             method: 'post',
             data: {}
         })
@@ -1283,6 +1331,27 @@ const settingRequests = {
             data: {moduleIds, deleteTopicAndReboot}
         })
     },
+    fetchAuthTokens() {
+        return request({
+            url: '/api/fetchAuthTokens',
+            method: 'post',
+            data: {}
+        })
+    },
+    revokeAuthToken(tokenId, reason) {
+        return request({
+            url: '/api/revokeAuthToken',
+            method: 'post',
+            data: {tokenId, reason}
+        })
+    },
+    revokeAllAuthTokens(reason) {
+        return request({
+            url: '/api/revokeAllAuthTokens',
+            method: 'post',
+            data: {reason}
+        })
+    },
     updateModuleEnvAndReboot(moduleId, moduleName, envData) {
         return request({
             url: '/api/updateModuleEnvAndReboot',
@@ -1361,6 +1430,13 @@ const settingRequests = {
             url: '/api/addWizIntegration',
             method: 'post',
             data: {tenantDataCenter, clientId, clientSecret}
+        })
+    },
+    updateWizStatusSync(statusSyncEnabled) {
+        return request({
+            url: '/api/updateWizStatusSync',
+            method: 'post',
+            data: {statusSyncEnabled}
         })
     },
     removeWizIntegration() {

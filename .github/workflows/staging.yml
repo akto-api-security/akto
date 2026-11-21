@@ -363,7 +363,7 @@ jobs:
         working-directory: ./apps/dashboard/web/polaris_web
         run: |
           npm install
-          RELEASE_VERSION=${{ steps.docker_tag.outputs.IMAGE_TAG }} npm run build
+          RELEASE_VERSION=${{ steps.docker_tag.outputs.IMAGE_TAG }} NODE_OPTIONS=--max-old-space-size=4096 npm run build
       - name: Sync dashboard frontend to S3
         if: needs.resolve-modules.outputs.dashboard == 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.skipFrontendBuild != 'true')
         run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{ steps.docker_tag.outputs.IMAGE_TAG }}/dist --delete

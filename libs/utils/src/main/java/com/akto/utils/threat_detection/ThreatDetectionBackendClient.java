@@ -15,6 +15,7 @@ import okhttp3.Response;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Thin client for threat-detection-backend's dashboard-facing HTTP API. Shared by every caller
@@ -28,6 +29,7 @@ public final class ThreatDetectionBackendClient {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
+    private static final OkHttpClient listMaliciousRequestsClient = httpClient.newBuilder().readTimeout(30, TimeUnit.SECONDS).build();
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
     private static final String RECORD_MALICIOUS_EVENT_PATH = "/api/threat_detection/record_malicious_event";
@@ -171,7 +173,7 @@ public final class ThreatDetectionBackendClient {
             requestBuilder.addHeader("x-skill-eval-mode", skillEvalMode);
         }
 
-        try (Response resp = httpClient.newCall(requestBuilder.build()).execute()) {
+        try (Response resp = listMaliciousRequestsClient.newCall(requestBuilder.build()).execute()) {
             String responseBody = resp.body() != null ? resp.body().string() : "";
             return ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
                 ListMaliciousRequestsResponse.class, responseBody
