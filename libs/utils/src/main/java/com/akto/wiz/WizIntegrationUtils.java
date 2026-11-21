@@ -71,7 +71,8 @@ public class WizIntegrationUtils {
     public static final String AUTH_ENDPOINT = "https://auth.app.wiz.io/oauth/token";
     private static final int TESTING_RUN_RESULT_BATCH_SIZE = 500;
     private static final int LARGE_TEXT_BATCH_SIZE = 50;
-    private static final int WIZ_SYNC_PAGE_SIZE = 100;
+    // MCollection.findAll without paging silently returns at most this many documents
+    private static final int WIZ_SYNC_MAX_ISSUES = 1_000_000;
 
     public static boolean isWizDevMode() {
         String wizDevMode = System.getenv("WIZ_DEV_MODE");
@@ -642,25 +643,21 @@ public class WizIntegrationUtils {
         }
 
         // Find all testing run issues in this account that need to be synced with Wiz
-        List<TestingRunIssues> testingRunIssuesList = new ArrayList<>();
+        List<TestingRunIssues> testingRunIssuesList;
         Bson wizSyncFilter = Filters.and(
             Filters.ne(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null),
             Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)
         );
         Bson wizSyncProjection = Projections.include(Constants.ID, TestingRunIssues.KEY_SEVERITY, TestingRunIssues.WIZ_FINDING_CREATION_STATUS);
-        int skip = 0;
         try {
-            List<TestingRunIssues> page;
-            do {
-                page = TestingRunIssuesDao.instance.findAll(wizSyncFilter, skip, WIZ_SYNC_PAGE_SIZE, null, wizSyncProjection);
-                if (page != null) {
-                    testingRunIssuesList.addAll(page);
-                    skip += page.size();
-                }
-            } while (page != null && page.size() == WIZ_SYNC_PAGE_SIZE);
+            // Single query, not skip/limit pages: skip re-walks all preceding results on every page
+            testingRunIssuesList = TestingRunIssuesDao.instance.findAll(wizSyncFilter, wizSyncProjection);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching testing run issues for Wiz sync: " + e.getMessage());
             return;
+        }
+        if (testingRunIssuesList.size() >= WIZ_SYNC_MAX_ISSUES) {
+            loggerMaker.errorAndAddToDb("Wiz upload: issue fetch hit the findAll limit of " + WIZ_SYNC_MAX_ISSUES + "; results truncated");
         }
         loggerMaker.infoAndAddToDb(String.format("Finished fetching testing run issues for wiz sync. Total: %d", testingRunIssuesList.size()));
 
@@ -973,25 +970,21 @@ public class WizIntegrationUtils {
             }
 
             // Find all testing run issues in this account that need to be synced with Wiz
-            List<TestingRunIssues> testingRunIssuesList = new ArrayList<>();
+            List<TestingRunIssues> testingRunIssuesList;
 
             Bson wizSyncFilter = Filters.and(
                 Filters.ne(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null)
             );
             Bson wizSyncProjection = Projections.include(Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID);
-            int skip = 0;
             try {
-                List<TestingRunIssues> page;
-                do {
-                    page = TestingRunIssuesDao.instance.findAll(wizSyncFilter, skip, WIZ_SYNC_PAGE_SIZE, null, wizSyncProjection);
-                    if (page != null) {
-                        testingRunIssuesList.addAll(page);
-                        skip += page.size();
-                    }
-                } while (page != null && page.size() == WIZ_SYNC_PAGE_SIZE);
+                // Single query, not skip/limit pages: skip re-walks all preceding results on every page
+                testingRunIssuesList = TestingRunIssuesDao.instance.findAll(wizSyncFilter, wizSyncProjection);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error fetching testing run issues for Wiz sync: " + e.getMessage());
                 return;
+            }
+            if (testingRunIssuesList.size() >= WIZ_SYNC_MAX_ISSUES) {
+                loggerMaker.errorAndAddToDb("Wiz status sync: issue fetch hit the findAll limit of " + WIZ_SYNC_MAX_ISSUES + "; results truncated");
             }
 
             StatusChangeResult statusChangeResult = computeStatusChanges(testingRunIssuesList, wizFindingIdToStatusMap);
