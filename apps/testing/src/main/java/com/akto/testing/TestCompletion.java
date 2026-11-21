@@ -8,7 +8,6 @@ import com.akto.dto.jobs.PortIOAutoTicketParams;
 import com.akto.dto.testing.AutoTicketingDetails;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.jobs.JobScheduler;
-import com.akto.wiz.WizIntegrationUtils;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.billing.OrganizationsDao;
@@ -115,18 +114,9 @@ public class TestCompletion {
                 return;
             }
 
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId,
-                AutoTicketingDetails.featureLabelFor(testRunConfig.getAutoTicketingDetails().getTicketSource()));
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "JIRA_INTEGRATION");
             if (!featureAccess.getIsGranted()) {
                 logger.error("Auto Create Tickets plan is not activated for the account - {}", accountId);
-                return;
-            }
-
-            if (TicketSource.WIZ.name().equals(testRunConfig.getAutoTicketingDetails().getTicketSource())) {
-                // No job needed: marking the issues as Wiz findings is enough, the Wiz sync job uploads them on its schedule
-                int marked = WizIntegrationUtils.markSummaryIssuesAsWizFindings(summaryId,
-                    testRunConfig.getAutoTicketingDetails().getSeverities());
-                logger.info("Marked {} issues as Wiz findings for summary {}", marked, summaryId);
                 return;
             }
 

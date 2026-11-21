@@ -1762,38 +1762,21 @@ public class StartTestAction extends UserAction {
     private boolean validateAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
         if (autoTicketingDetails != null && autoTicketingDetails.isShouldCreateTickets()) {
 
-            String ticketSource = autoTicketingDetails.getTicketSource();
-
-            // Per-tool rule: whether a project/team is needed
-            boolean projectRequired = true;
-            TicketSource source;
-            try {
-                source = TicketSource.valueOf(ticketSource);
-            } catch (IllegalArgumentException | NullPointerException e) {
-                addActionError("Invalid parameter: ticketSource.");
-                return false;
-            }
-            switch (source) {
-                case JIRA:
-                case LINEAR:
-                    break;
-                case PORT_IO:
-                case WIZ:
-                    projectRequired = false;
-                    break;
-                default:
-                    addActionError("Invalid parameter: ticketSource.");
-                    return false;
-            }
-
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.accountId.get(),
-                AutoTicketingDetails.featureLabelFor(ticketSource));
+                "JIRA_INTEGRATION");
             if (!featureAccess.getIsGranted()) {
                 addActionError("Auto Create Tickets plan is not activated for this account.");
                 return false;
             }
 
-            if (projectRequired && autoTicketingDetails.getProjectId() == null) {
+            String ticketSource = autoTicketingDetails.getTicketSource();
+            boolean isPortIO = AutoTicketingDetails.PORT_IO_TICKET_SOURCE.equals(ticketSource);
+            if (!TicketSource.JIRA.name().equals(ticketSource) && !TicketSource.LINEAR.name().equals(ticketSource) && !isPortIO) {
+                addActionError("Invalid parameter: ticketSource.");
+                return false;
+            }
+
+            if (!isPortIO && autoTicketingDetails.getProjectId() == null) {
                 addActionError("Project Id is required.");
                 return false;
             }
