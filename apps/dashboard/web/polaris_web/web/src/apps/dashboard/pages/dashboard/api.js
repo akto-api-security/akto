@@ -227,6 +227,24 @@ const api = {
         })
     },
 
+    // Agent inventory: the Summary and Analytics roll-up.
+    fetchArgusInventory: async () => {
+        return await request({
+            url: '/api/fetchArgusInventory',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    // One page of the inventory table: { skip, limit, sortKey, sortOrder, queryValue, platforms, flag, team, tool, ... }.
+    fetchArgusInventoryAgents: async (params) => {
+        return await request({
+            url: '/api/fetchArgusInventoryAgents',
+            method: 'post',
+            data: params
+        })
+    },
+
     // The 5 Argus posture insight cards — fast, Java-only data, no LLM call.
     fetchArgusPostureInsights: async (startTimestamp, endTimestamp) => {
         return await request({
