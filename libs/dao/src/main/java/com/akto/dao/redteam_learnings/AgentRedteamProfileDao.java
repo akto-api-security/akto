@@ -1,6 +1,5 @@
 package com.akto.dao.redteam_learnings;
 
-import java.util.Arrays;
 import java.util.List;
 
 import org.bson.conversions.Bson;
@@ -8,7 +7,6 @@ import org.bson.conversions.Bson;
 import com.akto.dto.redteam_learnings.AgentRedteamProfile;
 import com.akto.dto.redteam_learnings.AgentRedteamRecord;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 
@@ -32,21 +30,6 @@ public class AgentRedteamProfileDao extends AgentRedteamDao<AgentRedteamProfile>
     @Override
     public Class<AgentRedteamProfile> getClassT() {
         return AgentRedteamProfile.class;
-    }
-
-    @Override
-    public void createIndicesIfAbsent() {
-        ensureCollection();
-        createIndex(IDENTITY_CREATED_AT_INDEX, Indexes.compoundIndex(
-                Indexes.ascending(AgentRedteamRecord.API_COLLECTION_ID, AgentRedteamRecord.URL, AgentRedteamRecord.METHOD),
-                Indexes.descending(AgentRedteamRecord.CREATED_AT_MS)));
-        createIndex(RUN_BATCH_INDEX, Indexes.ascending(AgentRedteamRecord.TESTING_RUN_RESULT_SUMMARY_ID,
-                AgentRedteamProfile.BATCH_NO));
-    }
-
-    @Override
-    protected List<String> indexNames() {
-        return Arrays.asList(IDENTITY_CREATED_AT_INDEX, RUN_BATCH_INDEX);
     }
 
     /** Writes the version whole under its deterministic id, so repeating a consolidation rewrites the same version. */

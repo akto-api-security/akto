@@ -2,7 +2,6 @@ package com.akto.dao.redteam_learnings;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.List;
@@ -79,24 +78,6 @@ public class TestAgentRedteamDaos extends MongoBasedTest {
         d.setMethod("POST");
         d.setTestingRunResultSummaryId(RUN);
         return d;
-    }
-
-    // ── index self-healing ───────────────────────────────────────────────────
-
-    @Test
-    public void theFirstWriteOfAnAccountMakesEveryIndex() {
-        Context.accountId.set(ACCOUNT_ID + 1); // an account this process has not touched yet
-        try {
-            for (AgentRedteamDao<?> dao : Arrays.<AgentRedteamDao<?>>asList(AgentRedteamObservationDao.instance,
-                    AgentRedteamProfileDao.instance, AgentRedteamTemplateDraftDao.instance)) {
-                assertEquals(dao.indexNames(), dao.missingIndexNames());
-                dao.ensureIndicesOnce();
-                dao.ensureIndicesOnce();
-                assertTrue(dao.getCollName() + " still misses " + dao.missingIndexNames(), dao.missingIndexNames().isEmpty());
-            }
-        } finally {
-            Context.accountId.set(ACCOUNT_ID);
-        }
     }
 
     // ── observations ─────────────────────────────────────────────────────────

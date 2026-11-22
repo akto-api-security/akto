@@ -10,14 +10,12 @@ import org.bson.conversions.Bson;
 import com.akto.dto.redteam_learnings.AgentRedteamObservation;
 import com.akto.dto.redteam_learnings.AgentRedteamProfile;
 import com.akto.dto.redteam_learnings.AgentRedteamProfile.GridCell;
-import com.akto.dto.redteam_learnings.AgentRedteamRecord;
 import com.akto.dto.redteam_learnings.TemplateGridKey;
 import com.akto.dto.redteam_learnings.VerdictCounts;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.ReplaceOneModel;
 import com.mongodb.client.model.ReplaceOptions;
@@ -46,21 +44,6 @@ public class AgentRedteamObservationDao extends AgentRedteamDao<AgentRedteamObse
     public Class<AgentRedteamObservation> getClassT() {
         return AgentRedteamObservation.class;
     }
-
-    @Override
-    public void createIndicesIfAbsent() {
-        ensureCollection();
-        createIndex(RUN_IDENTITY_OUTCOME_INDEX, Indexes.ascending(AgentRedteamRecord.TESTING_RUN_RESULT_SUMMARY_ID,
-                AgentRedteamRecord.API_COLLECTION_ID, AgentRedteamRecord.URL, AgentRedteamRecord.METHOD,
-                AgentRedteamObservation.OUTCOME));
-        createTtlIndex(EXPIRE_AT_TTL_INDEX, AgentRedteamObservation.EXPIRE_AT);
-    }
-
-    @Override
-    protected List<String> indexNames() {
-        return Arrays.asList(RUN_IDENTITY_OUTCOME_INDEX, EXPIRE_AT_TTL_INDEX);
-    }
-
     /** Writes each observation whole under its conversation id, so a retried batch replaces rather than adds. */
     public void upsertAll(List<AgentRedteamObservation> observations) {
         if (observations == null || observations.isEmpty()) return;

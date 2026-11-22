@@ -113,7 +113,6 @@ public class RedteamLearningsAction extends ActionSupport {
             }
 
             AgentRedteamObservationDao dao = AgentRedteamObservationDao.instance;
-            dao.ensureIndicesOnce();
             dao.upsertAll(valid);
 
             response = new LinkedHashMap<>();
@@ -143,9 +142,6 @@ public class RedteamLearningsAction extends ActionSupport {
 
             AgentRedteamObservationDao observationDao = AgentRedteamObservationDao.instance;
             AgentRedteamProfileDao profileDao = AgentRedteamProfileDao.instance;
-            observationDao.ensureIndicesOnce();
-            profileDao.ensureIndicesOnce();
-
             List<AgentRedteamObservation> sampled = new ArrayList<>();
             for (String verdict : SAMPLE_VERDICT_ORDER) {
                 sampled.addAll(observationDao.findSamples(testingRunResultSummaryId, apiCollectionId, url, method, verdict, perVerdict));
@@ -207,7 +203,6 @@ public class RedteamLearningsAction extends ActionSupport {
             profile.setCells(observationDao.aggregateCells(testingRunResultSummaryId, apiCollectionId, url, method));
             profile.setInsights(insights);
 
-            AgentRedteamProfileDao.instance.ensureIndicesOnce();
             AgentRedteamProfile existing = AgentRedteamProfileDao.instance.findVersion(profile.getId());
             if (existing != null) {
                 if (existing.isFinalVersion() && !profile.isFinalVersion()) {
@@ -225,7 +220,6 @@ public class RedteamLearningsAction extends ActionSupport {
                     draft.setProfileVersionId(profile.getId());
                     draft.setUpdatedAtMs(now);
                 }
-                AgentRedteamTemplateDraftDao.instance.ensureIndicesOnce();
                 draftsInserted = AgentRedteamTemplateDraftDao.instance.insertNew(drafts);
             }
 
