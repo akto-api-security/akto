@@ -18,11 +18,13 @@ import com.mongodb.client.model.Projections;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 // Imports the API inventory from Imperva API Security, run by ImpervaApiEndpointsImportJobExecutor
@@ -49,8 +51,13 @@ public class ImpervaApiEndpointsImportJobUtil {
             loggerMaker.errorAndAddToDb(e, "Error fetching Imperva API inventory: " + e.getMessage());
             throw new RuntimeException("Error fetching Imperva API inventory: " + e.getMessage(), e);
         }
-        Map<String, List<EndpointSummary>> endpointsByHost = endpoints.stream()
+        // only the APIs matching the hostname and path filters set in the dashboard are imported
+        endpoints = endpoints.stream()
             .filter(e -> StringUtils.isNotBlank(e.getHostName()))
+            .filter(e -> matchesAnyPattern(e.getHostName(), integration.getHostFilter(), true)
+                && matchesAnyPattern(e.getResource(), integration.getPathFilter(), false))
+            .collect(Collectors.toList());
+        Map<String, List<EndpointSummary>> endpointsByHost = endpoints.stream()
             .collect(Collectors.groupingBy(e -> e.getHostName().trim().toLowerCase()));
         loggerMaker.infoAndAddToDb(String.format("Starting Imperva API import: %d endpoints across %d hosts", endpoints.size(), endpointsByHost.size()));
 
@@ -116,6 +123,25 @@ public class ImpervaApiEndpointsImportJobUtil {
         }
 
         loggerMaker.infoAndAddToDb(String.format("Imperva API import finished: %d endpoints, %d detail calls failed", endpoints.size(), detailsFailures));
+    }
+
+    // true if the value matches any of the comma-separated patterns, where * matches any characters; no patterns matches everything
+    static boolean matchesAnyPattern(String value, String patterns, boolean ignoreCase) {
+        List<String> patternList = Arrays.stream(StringUtils.defaultString(patterns).split(","))
+            .map(String::trim).filter(p -> !p.isEmpty()).collect(Collectors.toList());
+        if (patternList.isEmpty()) {
+            return true;
+        }
+        if (value == null) {
+            return false;
+        }
+        for (String pattern : patternList) {
+            String regex = Arrays.stream(pattern.split("\\*", -1)).map(Pattern::quote).collect(Collectors.joining(".*"));
+            if (Pattern.compile(regex, ignoreCase ? Pattern.CASE_INSENSITIVE : 0).matcher(value.trim()).matches()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static List<String> toAktoMessages(ImpervaSchema schema, EndpointSummary endpoint) {
