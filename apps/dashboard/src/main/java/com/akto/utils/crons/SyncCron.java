@@ -84,7 +84,7 @@ public class SyncCron {
                             if(lastRunTimerInfo != null){
                                 startTs = lastRunTimerInfo.getLastSyncedCron();
                                 startTsSeverity = lastRunTimerInfo.getLastUpdatedSeverity();
-                                resetTs = lastRunTimerInfo.getLastInfoResetted();
+                                resetTs = lastRunTimerInfo.getLastRiskScoreReset();
                             }
                             
                             // synced new parameters from STI and then inserted into activities
@@ -127,7 +127,7 @@ public class SyncCron {
 
                                 // update account settings docs
                                 update = Updates.combine(update,  
-                                        Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_INFO_RESETTED), endTs)
+                                        Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_RISK_SCORE_RESET), endTs)
                                     );
 
                                 if (t.getId() == 1763355072) {

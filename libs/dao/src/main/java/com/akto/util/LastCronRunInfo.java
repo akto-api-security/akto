@@ -15,6 +15,10 @@ public class LastCronRunInfo {
     public static final String LAST_INFO_RESETTED = "lastInfoResetted";
     private int lastInfoResetted ;
 
+    // dashboard SyncCron 24h full risk-score recalc; separate from lastInfoResetted (threat cron)
+    public static final String LAST_RISK_SCORE_RESET = "lastRiskScoreReset";
+    private int lastRiskScoreReset;
+
     public static final String LAST_THREAT_SCORE_SYNC = "lastThreatScoreSync";
     private int lastThreatScoreSync;
 
@@ -75,6 +79,14 @@ public class LastCronRunInfo {
 
     public void setLastInfoResetted(int lastInfoResetted) {
         this.lastInfoResetted = lastInfoResetted;
+    }
+
+    public int getLastRiskScoreReset() {
+        return lastRiskScoreReset;
+    }
+
+    public void setLastRiskScoreReset(int lastRiskScoreReset) {
+        this.lastRiskScoreReset = lastRiskScoreReset;
     }
 
     public int getLastThreatScoreSync() {
