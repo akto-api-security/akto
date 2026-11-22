@@ -90,7 +90,9 @@ public class AtlasRiskScoreSyncCron {
                                 Filters.eq("successfulExploit", true),
                                 Filters.eq("contextSource", CONTEXT_SOURCE.ENDPOINT.name())
                             )));
-                            pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severities", "$severity")));
+                            pipeline.add(Aggregates.group(groupedId,
+                                Accumulators.addToSet("severities", "$severity"),
+                                Accumulators.addToSet("filterIds", "$filterId")));
 
                             MongoCursor<BasicDBObject> cursor = MaliciousEventDao.instance
                                 .getCollection(String.valueOf(accountId))
@@ -100,6 +102,7 @@ public class AtlasRiskScoreSyncCron {
                             Map<String, Integer> hostToCollectionId = null;
 
                             Map<String, List<String>> apiInfoKeyToSeverities = new HashMap<>();
+                            Map<String, List<String>> apiInfoKeyToFilterIds = new HashMap<>();
                             while (cursor.hasNext()) {
                                 BasicDBObject document = cursor.next();
                                 BasicDBObject id = (BasicDBObject) document.get("_id");
@@ -140,19 +143,25 @@ public class AtlasRiskScoreSyncCron {
                                 if (severities == null || severities.isEmpty()) continue;
                                 if (method == null) continue;
 
+                                @SuppressWarnings("unchecked")
+                                List<String> filterIds = (List<String>) document.get("filterIds");
                                 String key = collectionId + " " + endpoint + " " + method;
                                 apiInfoKeyToSeverities.put(key, severities);
+                                apiInfoKeyToFilterIds.put(key, filterIds);
                             }
 
                             loggerMaker.infoAndAddToDb("Atlas malicious events count: " + apiInfoKeyToSeverities.size());
 
-                            Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = RiskScoreSyncCron.resolveThreatScores(
-                                apiInfoKeyToSeverities, AtlasRiskScoreSyncCron::computeRiskScore);
+                            RiskScoreSyncCron.ResolvedThreatScores resolved = RiskScoreSyncCron.resolveThreatScores(
+                                apiInfoKeyToSeverities, apiInfoKeyToFilterIds, AtlasRiskScoreSyncCron::computeRiskScore);
 
                             List<WriteModel<ApiInfo>> updates = new ArrayList<>();
-                            for (Map.Entry<ApiInfoKey, Float> entry : apiInfoKeyToThreatScore.entrySet()) {
+                            for (Map.Entry<ApiInfoKey, Float> entry : resolved.getScores().entrySet()) {
                                 Bson filter = ApiInfoDao.getFilter(entry.getKey());
-                                updates.add(new UpdateManyModel<>(filter, Updates.set(ApiInfo.THREAT_SCORE, entry.getValue())));
+                                List<String> names = resolved.getActivityNames().getOrDefault(entry.getKey(), new ArrayList<>());
+                                updates.add(new UpdateManyModel<>(filter, Updates.combine(
+                                    Updates.set(ApiInfo.THREAT_SCORE, entry.getValue()),
+                                    Updates.set(ApiInfo.THREAT_ACTIVITY_NAMES, names))));
                             }
 
                             if (!updates.isEmpty()) {
