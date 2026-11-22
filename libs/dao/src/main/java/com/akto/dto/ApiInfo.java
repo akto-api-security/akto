@@ -124,6 +124,9 @@ public class ApiInfo {
     private float threatScore;
     public static final String THREAT_SCORE = "threatScore";
 
+    public static final String THREAT_ACTIVITY_NAMES = "threatActivityNames";
+    private List<String> threatActivityNames;
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
@@ -313,7 +316,12 @@ public class ApiInfo {
             this.riskScoreFactors = that.riskScoreFactors;
             this.riskScoreFactorsScore = that.riskScoreFactorsScore;
         }
-        this.threatScore = Math.max(this.threatScore, that.threatScore);
+        if (that.threatScore > this.threatScore) {
+            this.threatScore = that.threatScore;
+            this.threatActivityNames = that.threatActivityNames;
+        } else {
+            this.threatScore = Math.max(this.threatScore, that.threatScore);
+        }
 
         if (that.lastCalculatedTime > this.lastCalculatedTime) {
             this.lastCalculatedTime = that.lastCalculatedTime;
@@ -646,5 +654,13 @@ public class ApiInfo {
 
     public float getThreatScore() {
         return threatScore;
+    }
+
+    public List<String> getThreatActivityNames() {
+        return threatActivityNames;
+    }
+
+    public void setThreatActivityNames(List<String> threatActivityNames) {
+        this.threatActivityNames = threatActivityNames;
     }
 }

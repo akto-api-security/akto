@@ -699,7 +699,7 @@ public class RiskScoreOfCollections {
             Filters.exists(ApiInfo.LAST_CALCULATED_TIME, false),
             Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)
         );
-        Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE, ApiInfo.COLLECTION_IDS, ApiInfo.RISK_SCORE, ApiInfo.PARENT_MCP_TOOL_NAMES, ApiInfo.THREAT_SCORE, ApiInfo.DISCOVERED_TIMESTAMP);
+        Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE, ApiInfo.COLLECTION_IDS, ApiInfo.RISK_SCORE, ApiInfo.PARENT_MCP_TOOL_NAMES, ApiInfo.THREAT_SCORE, ApiInfo.THREAT_ACTIVITY_NAMES, ApiInfo.DISCOVERED_TIMESTAMP);
 
         RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
 
