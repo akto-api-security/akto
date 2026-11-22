@@ -28,6 +28,12 @@ public class ImpervaIntegrationAction extends UserAction {
     @Setter
     private String apiKey;
 
+    @Setter
+    private String hostFilter;
+
+    @Setter
+    private String pathFilter;
+
     @Getter
     private ImpervaIntegration impervaIntegration;
 
@@ -42,7 +48,9 @@ public class ImpervaIntegrationAction extends UserAction {
 
         ImpervaIntegrationDao.instance.updateOne(new BasicDBObject(), Updates.combine(
             Updates.set(ImpervaIntegration.API_ID, apiId.trim()),
-            Updates.set(ImpervaIntegration.API_KEY, apiKey.trim())
+            Updates.set(ImpervaIntegration.API_KEY, apiKey.trim()),
+            Updates.set(ImpervaIntegration.HOST_FILTER, StringUtils.trimToEmpty(hostFilter)),
+            Updates.set(ImpervaIntegration.PATH_FILTER, StringUtils.trimToEmpty(pathFilter))
         ));
         return triggerImpervaImport();
     }

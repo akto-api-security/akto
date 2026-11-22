@@ -1397,11 +1397,11 @@ const settingRequests = {
             data: {}
         })
     },
-    addImpervaIntegration(apiId, apiKey) {
+    addImpervaIntegration(apiId, apiKey, hostFilter, pathFilter) {
         return request({
             url: '/api/addImpervaIntegration',
             method: 'post',
-            data: {apiId, apiKey}
+            data: {apiId, apiKey, hostFilter, pathFilter}
         })
     },
     triggerImpervaImport() {
