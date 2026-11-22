@@ -71,7 +71,8 @@ public final class RiskScoreExplainer {
         }
 
         if (threatScore > 0) {
-            factors.add(new RiskScoreFactor(threatScore, threatLabel(threatScore), null));
+            factors.add(new RiskScoreFactor(threatScore, threatLabel(threatScore),
+                    joinNames(apiInfo.getThreatActivityNames())));
         }
 
         float severityRiskPart = getRiskScoreValueFromSeverityScore(severityScore);
