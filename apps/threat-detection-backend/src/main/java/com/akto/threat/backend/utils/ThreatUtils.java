@@ -208,8 +208,13 @@ public class ThreatUtils {
     private static final Set<String> EVAL_TYPE_INDEX_ACCOUNTS = ConcurrentHashMap.newKeySet();
 
     public static Document coverIndexHint(String accountId, Document match) {
-        if (!USE_EVAL_TYPE_READS || !EVAL_TYPE_COVER_ACCOUNTS.contains(accountId)
-            || !"ENDPOINT".equals(match.get("contextSource")) || !filtersOnlyCoverFields(match)) {
+        if (!USE_EVAL_TYPE_READS || !"ENDPOINT".equals(fieldValue(match, "contextSource"))) {
+            return null;
+        }
+        if (fieldValue(match, MaliciousEventDto.EVAL_TYPE) instanceof String) {
+            return evalTypeIndexHint(accountId);
+        }
+        if (!EVAL_TYPE_COVER_ACCOUNTS.contains(accountId) || !filtersOnlyCoverFields(match)) {
             return null;
         }
         Document keys = new Document();
@@ -226,6 +231,22 @@ public class ThreatUtils {
 
     public static <T> AggregateIterable<T> withHint(AggregateIterable<T> iterable, Document hint) {
         return hint == null ? iterable : iterable.hint(hint);
+    }
+
+    static Object fieldValue(Document match, String field) {
+        if (match.containsKey(field)) {
+            return match.get(field);
+        }
+        Object and = match.get("$and");
+        if (and instanceof List) {
+            for (Object clause : (List<?>) and) {
+                Object value = clause instanceof Document ? fieldValue((Document) clause, field) : null;
+                if (value != null) {
+                    return value;
+                }
+            }
+        }
+        return null;
     }
 
     static boolean filtersOnlyCoverFields(Document match) {
