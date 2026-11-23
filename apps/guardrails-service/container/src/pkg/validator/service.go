@@ -59,8 +59,10 @@ type policyCache struct {
 	rejectedLLMSites map[string]auditScope
 	// rejectedAIAgents maps names of AI agents marked Rejected in Audit Data to their row and scope.
 	rejectedAIAgents map[string]rejectedAgent
-	lastFetched      time.Time
-	mu               sync.RWMutex
+	// rejectedSkills maps skill names marked Rejected in Audit Data to their per-agent rows and scope.
+	rejectedSkills map[string][]rejectedSkill
+	lastFetched    time.Time
+	mu             sync.RWMutex
 }
 
 // collectionTag represents a single key-value tag on a collection
@@ -1127,6 +1129,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.ignorePhraseMatchersByPolicy = ignorePhraseMatchersByPolicy
 	s.cache.rejectedLLMSites = decisions.llmSites
 	s.cache.rejectedAIAgents = decisions.agents
+	s.cache.rejectedSkills = decisions.skills
 	s.cache.lastFetched = time.Now()
 
 	s.logger.Info("Policy cache refreshed with ALL policies",
@@ -2529,6 +2532,9 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return blockResult, "", nil
 	}
 	if blockResult := s.checkRejectedAgent(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
+		return blockResult, "", nil
+	}
+	if blockResult := s.checkRejectedSkill(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
 		return blockResult, "", nil
 	}
 
