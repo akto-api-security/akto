@@ -352,48 +352,9 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     private BasicDBObject fetchApiDiscoveryStatsInternal(int startTimestamp, int endTimestamp) {
         BasicDBObject result = new BasicDBObject();
         try {
-            Bson baseFilter = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-            
-            // Apply time range filter: filter by discoveredTimestamp (or lastSeen if discoveredTimestamp doesn't exist)
-            // This matches the pattern from ApiInfoDao.fetchApiInfoStats
-            // Filter APIs that were discovered (or last seen) within the time range
-            Bson timeFilter;
-            if (startTimestamp > 0) {
-                // Time range: check both bounds
-                timeFilter = Filters.and(
-                    Filters.or(
-                        Filters.and(
-                            Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true),
-                            Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, startTimestamp),
-                            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp)
-                        ),
-                        Filters.and(
-                            Filters.or(
-                                Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
-                                Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, 0)
-                            ),
-                            Filters.gte(ApiInfo.LAST_SEEN, startTimestamp),
-                            Filters.lte(ApiInfo.LAST_SEEN, endTimestamp)
-                        )
-                    )
-                );
-            } else {
-                // All time: only check upper bound (APIs discovered/last seen up to endTimestamp)
-                timeFilter = Filters.or(
-                    Filters.and(
-                        Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true),
-                        Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp)
-                    ),
-                    Filters.and(
-                        Filters.or(
-                            Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
-                            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, 0)
-                        ),
-                        Filters.lte(ApiInfo.LAST_SEEN, endTimestamp)
-                    )
-                );
-            }
-            baseFilter = Filters.and(baseFilter, timeFilter);
+            Bson baseFilter = Filters.and(
+                UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID),
+                discoveredInRangeFilter(startTimestamp, endTimestamp));
 
             // Fetch all APIs once with needed fields to categorize them properly
             // This matches frontend logic which processes all endpoints in a single pass
@@ -1312,52 +1273,35 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     private List<ApiInfo> fetchAllApiInfo(int startTimestamp, int endTimestamp) {
         List<ApiInfo> result = new ArrayList<>();
         try {
-            Bson baseFilter = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-            
-            // Apply time range filter: filter by discoveredTimestamp (or lastSeen if discoveredTimestamp doesn't exist)
-            Bson timeFilter;
-            if (startTimestamp > 0) {
-                // Time range: check both bounds
-                timeFilter = Filters.and(
-                    Filters.or(
-                        Filters.and(
-                            Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true),
-                            Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, startTimestamp),
-                            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp)
-                        ),
-                        Filters.and(
-                            Filters.or(
-                                Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
-                                Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, 0)
-                            ),
-                            Filters.gte(ApiInfo.LAST_SEEN, startTimestamp),
-                            Filters.lte(ApiInfo.LAST_SEEN, endTimestamp)
-                        )
-                    )
-                );
-            } else {
-                // All time: only check upper bound (APIs discovered/last seen up to endTimestamp)
-                timeFilter = Filters.or(
-                    Filters.and(
-                        Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true),
-                        Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp)
-                    ),
-                    Filters.and(
-                        Filters.or(
-                            Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
-                            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, 0)
-                        ),
-                        Filters.lte(ApiInfo.LAST_SEEN, endTimestamp)
-                    )
-                );
-            }
-            baseFilter = Filters.and(baseFilter, timeFilter);
+            Bson baseFilter = Filters.and(
+                UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID),
+                discoveredInRangeFilter(startTimestamp, endTimestamp));
 
-            result = ApiInfoDao.instance.findAll(baseFilter);
+            result = ApiInfoDao.instance.findAll(baseFilter,
+                Projections.include(ApiInfo.LAST_TESTED, ApiInfo.DISCOVERED_TIMESTAMP, ApiInfo.LAST_SEEN));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching ApiInfo records: " + e.getMessage());
         }
         return result;
+    }
+
+    /**
+     * APIs discovered in range, or last seen in range when discoveredTimestamp is missing or <= 0.
+     * Kept as three flat branches so each can use the discoveredTimestamp index; startTimestamp <= 0 means all time.
+     */
+    private static Bson discoveredInRangeFilter(int startTimestamp, int endTimestamp) {
+        Bson lastSeenInRange = inRange(ApiInfo.LAST_SEEN, startTimestamp, endTimestamp);
+        return Filters.or(
+            inRange(ApiInfo.DISCOVERED_TIMESTAMP, startTimestamp, endTimestamp),
+            Filters.and(Filters.eq(ApiInfo.DISCOVERED_TIMESTAMP, null), Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false), lastSeenInRange),
+            Filters.and(Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, 0), lastSeenInRange)
+        );
+    }
+
+    private static Bson inRange(String field, int startTimestamp, int endTimestamp) {
+        return startTimestamp > 0
+            ? Filters.and(Filters.gte(field, startTimestamp), Filters.lte(field, endTimestamp))
+            : Filters.lte(field, endTimestamp);
     }
 
     // ========== Java-based Time Grouping Utilities ==========
