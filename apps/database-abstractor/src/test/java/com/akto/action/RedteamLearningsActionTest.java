@@ -332,19 +332,26 @@ public class RedteamLearningsActionTest extends MongoBasedTest {
     }
 
     @Test
-    public void learningsAreOnUntilTheAccountTurnsThemOff() throws Exception {
+    public void learningsAreOffUntilTheAccountTurnsThemOn() throws Exception {
         AccountSettingsDao.instance.getMCollection().deleteMany(AccountSettingsDao.generateFilter());
-        assertEquals(true, learningsSettings().get("enabled"));
+        assertEquals("never set is off", false, learningsSettings().get("enabled"));
         assertEquals(false, learningsSettings().get("configured"));
+
+        AccountSettingsDao.instance.getMCollection().updateOne(AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.REDTEAM_LEARNINGS_ENABLED, true), new UpdateOptions().upsert(true));
+        assertEquals(true, learningsSettings().get("enabled"));
+        assertEquals(true, learningsSettings().get("configured"));
 
         AccountSettingsDao.instance.getMCollection().updateOne(AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.REDTEAM_LEARNINGS_ENABLED, false), new UpdateOptions().upsert(true));
         assertEquals(false, learningsSettings().get("enabled"));
         assertEquals(true, learningsSettings().get("configured"));
 
+        AccountSettingsDao.instance.getMCollection().updateOne(AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.REDTEAM_LEARNINGS_ENABLED, true), new UpdateOptions().upsert(true));
         Context.accountId.set(ACCOUNT_ID + 1);
         try {
-            assertEquals("another account's setting does not apply", true, learningsSettings().get("enabled"));
+            assertEquals("another account's setting does not apply", false, learningsSettings().get("enabled"));
         } finally {
             Context.accountId.set(ACCOUNT_ID);
             AccountSettingsDao.instance.getMCollection().deleteMany(AccountSettingsDao.generateFilter());
