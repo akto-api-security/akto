@@ -54,7 +54,7 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
     }
 
     private static final Set<String> INSERT_ONLY_FIELDS = new HashSet<>(Arrays.asList(
-        "_id", "status", "caseOwner", "caseNotes", "caseTimeline", "jiraTicketUrl",
+        "_id", "refId", "status", "caseOwner", "caseNotes", "caseTimeline", "jiraTicketUrl",
         MaliciousEventDto.DEDUPE_KEY, MaliciousEventDto.FIRST_DETECTED_AT));
     private static final int UPSERT_ATTEMPTS = 2;
     private static final Set<String> DEDUPE_INDEX_ACCOUNTS = ConcurrentHashMap.newKeySet();
