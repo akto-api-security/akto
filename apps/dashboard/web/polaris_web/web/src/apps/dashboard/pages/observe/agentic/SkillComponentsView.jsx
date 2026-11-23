@@ -40,7 +40,16 @@ export function parseSkillSample(sampleMessage, skillName) {
 // Returns { markdown, collectionId, evidence } (collectionId is the one content was actually found in — a
 // plugin-bundled skill lives directly in the plugin's own collection, so callers can look up that
 // collection's plugin-name tag from it to show "bundled by plugin X"; evidence is parseSkillSample's).
+//
+// The same SKILL.md is captured on every device, but cyborg's evidence rides on only some of those
+// samples (the ones it annotated). Prefer a sample that carries evidence so its lines are highlighted;
+// fall back to the first sample with content when none does.
+function hasEvidence(evidence) {
+    return Boolean(evidence?.annotations?.length || evidence?.verdict?.isMalicious);
+}
+
 export async function fetchSkillMarkdownFromCollections(collectionIds, skillName) {
+    let fallback = null;
     for (const collectionId of (collectionIds || [])) {
         const infoResp = await observeApi.fetchApiInfosForCollection(collectionId);
         const infos = infoResp?.apiInfoList || [];
@@ -55,12 +64,15 @@ export async function fetchSkillMarkdownFromCollections(collectionIds, skillName
                 const samples = (resp?.sampleDataList || []).flatMap(s => s.samples || []);
                 for (const sample of samples) {
                     const skill = parseSkillSample(sample, skillName);
-                    if (skill?.markdown) return { markdown: skill.markdown, collectionId, evidence: skill.evidence };
+                    if (!skill?.markdown) continue;
+                    const found = { markdown: skill.markdown, collectionId, evidence: skill.evidence };
+                    if (hasEvidence(skill.evidence)) return found;
+                    if (!fallback) fallback = found;
                 }
             }
         }
     }
-    return { markdown: null, collectionId: null, evidence: null };
+    return fallback || { markdown: null, collectionId: null, evidence: null };
 }
 
 // Plugin-name tag off the collection a skill's content was actually found in (see
