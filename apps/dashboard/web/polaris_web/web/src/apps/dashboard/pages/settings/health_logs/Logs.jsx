@@ -55,7 +55,7 @@ const Logs = () => {
     const [ loading, setLoading ] = useState(false)
     const [ logSearchQuery, setLogSearchQuery ] = useState('')
     const logGroupSelected = logs.logGroup !== ''
-    const hasAccess = func.checkUserValidForIntegrations()
+    const hasAccess = func.canViewLogs()
 
     const selectedLogKeysSignature = useMemo(
         () => [...selectedLogKeys].sort().join(','),
