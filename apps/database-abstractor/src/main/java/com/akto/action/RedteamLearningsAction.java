@@ -249,7 +249,7 @@ public class RedteamLearningsAction extends ActionSupport {
     }
 
     /**
-     * Whether the account has red-team learnings on (Testing → User config). Never set counts as on; a failed read is
+     * Whether the account has red-team learnings on (Testing → User config). Never set counts as off; a failed read is
      * an ERROR, never a default, so the agent server keeps the value it last read.
      */
     public String fetchRedteamLearningsSettings() {
@@ -258,7 +258,7 @@ public class RedteamLearningsAction extends ActionSupport {
                     Projections.include(AccountSettings.REDTEAM_LEARNINGS_ENABLED));
             Boolean configured = settings == null ? null : settings.getRedteamLearningsEnabled();
             response = new LinkedHashMap<>();
-            response.put("enabled", !Boolean.FALSE.equals(configured));
+            response.put("enabled", Boolean.TRUE.equals(configured));
             response.put("configured", configured != null);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
