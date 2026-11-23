@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react"
 import { Divider, LegacyCard, Text, VerticalStack } from "@shopify/polaris"
 import learningsApi from "./api"
-import { DraftList, LOAD_STATE, LoadStateBanner, ProfileSummary, loadStateFromError } from "./LearningsView"
+import { DraftList, LOAD_STATE, ProfileSummary, loadStateFromError } from "./LearningsView"
 
 /**
- * What one run learned about the agents it tested. Renders nothing for a run that learned nothing (most runs are
- * not agentic), but a failed read is always shown.
+ * What one run learned about the agents it tested. Renders nothing unless the account has red-team learnings on and
+ * the run learned something.
  */
 function RunLearningsCard({ summaryHexId }) {
     const [loadState, setLoadState] = useState(LOAD_STATE.LOADING)
@@ -28,34 +28,31 @@ function RunLearningsCard({ summaryHexId }) {
     useEffect(() => { load() }, [load])
 
     if (!summaryHexId) return null
-    // Most runs are not agentic and learned nothing: no card while loading, and none when the read says there is nothing.
-    if (loadState === LOAD_STATE.LOADING) return null
-    if (loadState === LOAD_STATE.LOADED && runLearnings?.state !== "READY") return null
-    // Account setting off (or unreadable): no card and no banner. A failed learnings read is still shown below.
-    if (loadState === LOAD_STATE.LOADED && learningsEnabled !== true) return null
+    // Nothing at all unless the account has red-team learnings on and this run learned something: no card while loading,
+    // none for a run that learned nothing (most runs are not agentic), and none when the setting is off. The setting
+    // arrives with the read, so a failed read cannot tell on from off and hides the card like an off account does
+    // (same as the Learnings tab in ApiDetails.jsx).
+    if (loadState !== LOAD_STATE.LOADED || learningsEnabled !== true || runLearnings?.state !== "READY") return null
 
     const removeDraft = (draftId) => setRunLearnings((prev) => ({ ...prev, drafts: (prev?.drafts || []).filter((d) => d.id !== draftId) }))
 
     return (
         <LegacyCard title="Red-team learnings from this run" sectioned key="redteam-learnings">
-            <LoadStateBanner loadState={loadState} onRetry={load} subject="This run's learnings" />
-            {loadState === LOAD_STATE.LOADED ? (
-                <VerticalStack gap="4">
-                    {runLearnings.versionsTruncated ? (
-                        <Text color="subdued">This run wrote more versions than are read; only the newest are used below.</Text>
-                    ) : null}
-                    {runLearnings.agentsTruncated ? (
-                        <Text color="subdued">This run tested more agents than are shown; only the most recently updated are listed.</Text>
-                    ) : null}
-                    {(runLearnings.agentProfiles || []).map((profile) => (
-                        <VerticalStack gap="3" key={profile.id}>
-                            <ProfileSummary profile={profile} heading={`${profile.method} ${profile.url}`} />
-                            <Divider />
-                        </VerticalStack>
-                    ))}
-                    <DraftList drafts={runLearnings.drafts} onDismissed={removeDraft} />
-                </VerticalStack>
-            ) : null}
+            <VerticalStack gap="4">
+                {runLearnings.versionsTruncated ? (
+                    <Text color="subdued">This run wrote more versions than are read; only the newest are used below.</Text>
+                ) : null}
+                {runLearnings.agentsTruncated ? (
+                    <Text color="subdued">This run tested more agents than are shown; only the most recently updated are listed.</Text>
+                ) : null}
+                {(runLearnings.agentProfiles || []).map((profile) => (
+                    <VerticalStack gap="3" key={profile.id}>
+                        <ProfileSummary profile={profile} heading={`${profile.method} ${profile.url}`} />
+                        <Divider />
+                    </VerticalStack>
+                ))}
+                <DraftList drafts={runLearnings.drafts} onDismissed={removeDraft} />
+            </VerticalStack>
         </LegacyCard>
     )
 }
