@@ -36,8 +36,6 @@ public class SequenceCache {
     // Alert when this many of a session's last RECENT_STEPS steps are ones users almost never take
     private static final int UNKNOWN_STEPS_TO_ALERT = 5;
     private static final int RECENT_STEPS = 10;
-    // Check whether unusual steps reuse values from the previous response (reads response bodies of sessions with unusual steps)
-    private static final boolean DATA_REUSE_ENABLED = Boolean.parseBoolean(System.getenv("THREAT_DATA_REUSE_ENABLED"));
 
     private final DataActor dataActor;
     private final SessionIdentifier sessionIdentifier = new SessionIdentifier();
@@ -186,9 +184,10 @@ public class SequenceCache {
         String previous = recent.calls.peekLast();
         if (previous.equals(apiKey)) return null;
         boolean isUnknown = !knownSteps.contains(previous + "|" + apiKey);
-        List<String> reusedParams = DATA_REUSE_ENABLED && isUnknown ? DataReuse.findReuse(recent.lastResponse, responseParam) : null;
+        List<String> reusedParams = isUnknown ? DataReuse.findReuse(recent.lastResponse, responseParam) : null;
         recent.add(apiKey, isUnknown, reusedParams == null ? "" : String.join(", ", reusedParams));
-        recent.lastResponse = DATA_REUSE_ENABLED && recent.unknownCount > 0 ? DataReuse.fingerprint(responseParam) : null;
+        // Response bodies are read only for sessions that already took an unknown step
+        recent.lastResponse = recent.unknownCount > 0 ? DataReuse.fingerprint(responseParam) : null;
         if (!isUnknown || recent.unknownCount < UNKNOWN_STEPS_TO_ALERT) return null;
         String reason = recent.unknownCount + " of the last " + recent.unknown.size() + " steps were ones users almost never take: " + recent.describeUnknownSteps();
         sessionPath.put(sessionId, new RecentCalls(apiKey));
