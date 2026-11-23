@@ -115,13 +115,19 @@ public class TestRedteamLearningsAction extends MongoBasedTest {
     // ── agent ────────────────────────────────────────────────────────────────
 
     @Test
-    public void anAgentWithNothingLearnedIsNoneAndLearningsCountAsOnUntilTurnedOff() {
+    public void anAgentWithNothingLearnedIsNoneAndLearningsCountAsOffUntilTurnedOn() {
         try (MockedStatic<UsersCollectionsList> rbac = userSees(null)) {
             RedteamLearningsAction action = agentRead(123, "post");
             assertEquals("SUCCESS", action.fetchAgentRedteamLearnings());
             assertEquals(RedteamLearningsService.STATE_NONE, action.getAgentLearnings().getState());
             assertNull(action.getAgentLearnings().getLatestProfile());
-            assertEquals(Boolean.TRUE, action.getLearningsEnabled());
+            assertEquals("never set is off", Boolean.FALSE, action.getLearningsEnabled());
+
+            AccountSettingsDao.instance.getMCollection().updateOne(AccountSettingsDao.generateFilter(),
+                    Updates.set(AccountSettings.REDTEAM_LEARNINGS_ENABLED, true), new UpdateOptions().upsert(true));
+            RedteamLearningsAction on = agentRead(123, "POST");
+            assertEquals("SUCCESS", on.fetchAgentRedteamLearnings());
+            assertEquals(Boolean.TRUE, on.getLearningsEnabled());
 
             AccountSettingsDao.instance.getMCollection().updateOne(AccountSettingsDao.generateFilter(),
                     Updates.set(AccountSettings.REDTEAM_LEARNINGS_ENABLED, false), new UpdateOptions().upsert(true));

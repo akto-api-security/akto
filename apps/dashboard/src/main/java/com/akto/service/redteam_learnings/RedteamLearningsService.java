@@ -146,12 +146,12 @@ public class RedteamLearningsService {
         return before == null ? DraftUpdate.CONFLICT : DraftUpdate.UPDATED;
     }
 
-    /** The account's setting: never set counts as on. Null when it could not be read, which is shown as unknown. */
+    /** The account's setting: never set counts as off. Null when it could not be read, which is shown as unknown. */
     public Boolean accountLearningsEnabled() {
         try {
             AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(),
                     Projections.include(AccountSettings.REDTEAM_LEARNINGS_ENABLED));
-            return settings == null || !Boolean.FALSE.equals(settings.getRedteamLearningsEnabled());
+            return settings != null && Boolean.TRUE.equals(settings.getRedteamLearningsEnabled());
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Could not read the red-team learnings setting: " + e.getMessage());
             return null;

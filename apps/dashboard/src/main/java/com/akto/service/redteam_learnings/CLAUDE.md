@@ -33,7 +33,7 @@ both would otherwise write the same version document.
 ## On/off
 Learnings run only when **both** of these hold:
 - `REDTEAM_LEARNINGS_ENABLED=true` is set on test-editor-services. It defaults to off.
-- `AccountSettings.redteamLearningsEnabled` is not `false`. Null (never set) counts as on.
+- `AccountSettings.redteamLearningsEnabled` is `true`. Null (never set) counts as off, so an account opts in on Testing → User config.
 
 test-editor-services reads the account value at startup and then every 60 s, through
 `/utility/fetchRedteamLearningsSettings`:
@@ -136,8 +136,8 @@ Kill switch: unset the env, or turn the account toggle off; no deploy. Rollback 
 - **Prompt-injection loop.** Target replies reach the digest and insight LLM calls as quoted data, and the insights are
   stored and later placed in the enhancer's system prompt. Length caps, tag stripping, cited-id checks and the count
   filter limit it; a hostile target can still plant advice that steers later attacks. The judge never sees insights.
-- **On by default per account.** A never-set account counts as on, so target replies go to the consolidation LLM
-  once the env is on. Confirm that default before enabling the env widely.
+- **Off by default per account.** A never-set account counts as off; an admin opts in on User config. Accounts that
+  were learning before the default changed stop until they turn it on.
 - **Concurrent runs on one agent** each start from the profile they read, so the later version can lack the other's
   newest insights. Both versions are kept.
 - **The slot hand-over and the full-queue outcome (`queue_full`) have no test.**
