@@ -28,7 +28,7 @@ function UserConfig() {
     const [commonTestTemplate, setCommonTestTemplate] = useState({message: ""});
     const [commonTestTemplate2, setCommonTestTemplate2] = useState("");
     const [initialDeltaTime, setInitialDeltaTime] = useState(120) ;
-    // undefined until the admin settings load; null when never set, which counts as on
+    // undefined until the admin settings load; null when never set, which counts as off
     const [redteamLearningsEnabled, setRedteamLearningsEnabled] = useState(undefined);
     const [savingRedteamLearnings, setSavingRedteamLearnings] = useState(false);
     const { canCall } = usePermissions()
@@ -257,12 +257,12 @@ function UserConfig() {
                 <LegacyStack vertical spacing="tight">
                     <Checkbox
                         label="Learn from earlier conversations and runs"
-                        checked={redteamLearningsEnabled !== false}
+                        checked={redteamLearningsEnabled === true}
                         disabled={savingRedteamLearnings || !canCall('api/updateRedteamLearningsEnabled')}
                         onChange={(checked) => handleToggleRedteamLearnings(checked)}
                     />
                     <Text variant="bodySm" color="subdued">
-                        {redteamLearningsEnabled === null ? "On by default. " : ""}
+                        {redteamLearningsEnabled === null ? "Off by default. " : ""}
                         It also needs REDTEAM_LEARNINGS_ENABLED=true on the agentic testing service; without it nothing is learned.
                     </Text>
                 </LegacyStack>
