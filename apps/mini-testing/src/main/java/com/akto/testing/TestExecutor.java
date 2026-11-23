@@ -735,7 +735,8 @@ public class TestExecutor {
         }
     }
 
-    public static void updateTestSummary(ObjectId summaryId){
+    /** Returns the state the summary was finished with. */
+    public static State updateTestSummary(ObjectId summaryId){
         loggerMaker.infoAndAddToDb("Finished updating results count");
 
          TestingRunResultSummary currentSummary = dataActor.fetchTestingRunResultSummary(summaryId.toHexString());
@@ -756,6 +757,7 @@ public class TestExecutor {
             TestingConfigurations.getInstance().setRerunTestingRunResultSummary(null);
         }
         // GithubUtils.publishGithubComments(testingRunResultSummary);
+        return updatedState;
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){
@@ -1459,6 +1461,9 @@ public class TestExecutor {
         }
         if(testSubType != null) {
             varMap.put("testSubType", testSubType);
+        }
+        if(testSuperType != null) {
+            varMap.put("testCategory", testSuperType);
         }
         if(agenticTestingAllowed != null) {
             varMap.put("agenticTestingAllowed", agenticTestingAllowed);

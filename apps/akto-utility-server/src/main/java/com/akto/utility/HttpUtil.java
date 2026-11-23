@@ -119,7 +119,12 @@ public final class HttpUtil {
     }
 
     public static void sendJson(HttpExchange exchange, int statusCode, Object body) throws IOException {
-        byte[] bytes = GSON.toJson(body).getBytes(StandardCharsets.UTF_8);
+        sendRawJson(exchange, statusCode, GSON.toJson(body));
+    }
+
+    /** Sends a JSON body that is already serialized, byte for byte. */
+    public static void sendRawJson(HttpExchange exchange, int statusCode, String json) throws IOException {
+        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", CONTENT_TYPE_JSON);
         exchange.sendResponseHeaders(statusCode, bytes.length);
         try (OutputStream os = exchange.getResponseBody()) {
