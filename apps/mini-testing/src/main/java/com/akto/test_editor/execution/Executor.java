@@ -416,7 +416,9 @@ public class Executor {
             List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
             // agentic samples are often absolute URLs without a host header, so allow override in that case too
             boolean absoluteUrl = rawApi.getRequest().getUrl() != null && rawApi.getRequest().getUrl().startsWith("http");
-            if ((!originalHostHeaders.isEmpty() || absoluteUrl) && testingRunConfig != null
+            // imported (e.g. OpenAPI) samples can be a bare path with no host header: the override is the only host
+            boolean pathOnlyUrl = rawApi.getRequest().getUrl() != null && rawApi.getRequest().getUrl().startsWith("/");
+            if ((!originalHostHeaders.isEmpty() || absoluteUrl || pathOnlyUrl) && testingRunConfig != null
                 && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
 
                 Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
@@ -775,6 +777,8 @@ public class Executor {
             return rawApi;
         }
         ApiExecutorUtil.calculateHashAndAddAuth(prepared.getRequest(), true, testingRunConfig);
+        // smart testing sends its requests itself, so the run's advanced settings (e.g. an added header) go on here
+        ApiExecutor.applyAdvancedSettings(prepared.getRequest(), testingRunConfig);
         return prepared;
     }
 
