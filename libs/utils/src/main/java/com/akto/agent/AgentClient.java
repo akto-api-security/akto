@@ -13,6 +13,7 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import okhttp3.*;
@@ -92,6 +93,15 @@ public class AgentClient {
     }
 
     public List<TestResult> executeAgenticTest(RawApi rawApi, int apiCollectionId, String testingRunResultSummaryId, AgentLearningContext learningContext) throws Exception {
+        return executeAgenticTest(rawApi, apiCollectionId, testingRunResultSummaryId, learningContext, null);
+    }
+
+    /**
+     * @param testingRunConfig the run's config; its pre/post request script selection is registered for this
+     *                         conversation so the utility server's /utility/execute replays through the same
+     *                         scripts. Null registers nothing, and those replays use the default scripts.
+     */
+    public List<TestResult> executeAgenticTest(RawApi rawApi, int apiCollectionId, String testingRunResultSummaryId, AgentLearningContext learningContext, TestingRunConfig testingRunConfig) throws Exception {
         String conversationId = UUID.randomUUID().toString();
         if (testingRunResultSummaryId != null && !testingRunResultSummaryId.isEmpty()) {
             agenticSummaryIds.add(testingRunResultSummaryId);
@@ -114,6 +124,12 @@ public class AgentClient {
         }
         loggerMaker.infoAndAddToDb("executeAgenticTest: starting conversationId=" + conversationId + " apiCollectionId=" + apiCollectionId + " prompts=" + promptsList.size() + " copilot=" + isCopilot);
 
+        // from here every exit unregisters (the init-failure return and the finally below)
+        ApiExecutionJobStore scriptStore = testingRunConfig != null ? ApiExecutionJobStoreRegistry.get() : null;
+        if (scriptStore != null) {
+            scriptStore.registerConversationScripts(conversationId, testingRunConfig.getPreRequestScriptId(), testingRunConfig.getPostRequestScriptId());
+        }
+
         try {
             if (isCopilot) {
                 String accessToken = HttpRequestResponseUtils.getHeaderValue(
@@ -134,6 +150,9 @@ public class AgentClient {
             }
         } catch(Exception e){
             loggerMaker.errorAndAddToDb("executeAgenticTest: init failed conversationId=" + conversationId + " err=" + e.getMessage());
+            if (scriptStore != null) {
+                scriptStore.unregisterConversationScripts(conversationId);
+            }
             TestResult errorResult = new TestResult();
             errorResult.setMessage("Agentic test execution failed: " + e.getMessage());
             setAgenticResultFields(errorResult, conversationId, false, Arrays.asList(e.getMessage()), 0.0, TestResult.Confidence.LOW);
@@ -168,6 +187,9 @@ public class AgentClient {
         } finally {
             // a WebSocket target kept one connection open for this conversation's turns
             WebSocketSessionStore.closeConversation(conversationId);
+            if (scriptStore != null) {
+                scriptStore.unregisterConversationScripts(conversationId);
+            }
         }
     }
     

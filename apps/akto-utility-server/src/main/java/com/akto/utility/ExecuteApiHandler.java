@@ -5,6 +5,8 @@ import com.akto.dao.context.Context;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 
@@ -23,6 +25,8 @@ import com.sun.net.httpserver.HttpHandler;
 
 
 public class ExecuteApiHandler implements HttpHandler {
+
+    private static final LoggerMaker logger = new LoggerMaker(ExecuteApiHandler.class, LogDb.TESTING);
 
     private final ApiExecutionJobStore jobStore;
     private final ExecutorService executorService;
@@ -77,8 +81,7 @@ public class ExecuteApiHandler implements HttpHandler {
         executorService.submit(() -> {
             try {
                 Context.accountId.remove();
-                TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null, null, null);
-                testingRunConfig.setConversationId(conversationId);
+                TestingRunConfig testingRunConfig = buildRunConfig(jobStore, conversationId);
                 OriginalHttpResponse response = ApiExecutor.sendRequest(
                         request,
                         true,
@@ -104,6 +107,27 @@ public class ExecuteApiHandler implements HttpHandler {
             response.put("conversationId", conversationId);
         }
         HttpUtil.sendJson(exchange, 200, response);
+    }
+
+    /**
+     * The config this replay runs under. Its pre/post request script ids are the ones the conversation's
+     * testing run selected (registered by AgentClient), copied raw: null still means the default script and
+     * "" still means no script. A conversation with nothing registered keeps null ids, i.e. the default scripts.
+     */
+    static TestingRunConfig buildRunConfig(ApiExecutionJobStore jobStore, String conversationId) {
+        TestingRunConfig config = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null, null, null);
+        config.setConversationId(conversationId);
+        if (conversationId == null) {
+            return config;
+        }
+        ApiExecutionJobStore.ConversationScripts scripts = jobStore.getConversationScripts(conversationId);
+        if (scripts == null) {
+            logger.warn("No script selection registered for conversationId=" + conversationId + "; using the default pre/post request scripts");
+            return config;
+        }
+        config.setPreRequestScriptId(scripts.getPreRequestScriptId());
+        config.setPostRequestScriptId(scripts.getPostRequestScriptId());
+        return config;
     }
 
     /**

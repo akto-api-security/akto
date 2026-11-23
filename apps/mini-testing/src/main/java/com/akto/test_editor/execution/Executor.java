@@ -286,7 +286,7 @@ public class Executor {
                             testingRunResultSummaryIdHex = testingRunConfig.getTestRunResultSummaryId().toHexString();
                         }
                         agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId(), testingRunResultSummaryIdHex,
-                                AgentLearningContext.from(apiInfoKey, varMap));
+                                AgentLearningContext.from(apiInfoKey, varMap), testingRunConfig);
                         if (agenticResults != null && !agenticResults.isEmpty()) {
                             result.addAll(agenticResults);
                             // needed to check for vulnerable 

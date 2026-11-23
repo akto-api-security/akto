@@ -32,7 +32,7 @@ import okio.BufferedSink;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.UUID;
-
+import java.util.function.IntPredicate;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
