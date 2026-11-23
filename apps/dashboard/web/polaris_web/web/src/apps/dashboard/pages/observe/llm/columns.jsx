@@ -12,6 +12,8 @@ import {
     PreviewCell,
     TokensCell,
     TopicCell,
+    UnifiedIdCell,
+    UnifiedPromptCell,
     UserCell,
 } from "./LLMCellRenderers";
 import { formatDurationMs } from "./constants";
@@ -249,70 +251,137 @@ export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
 }
 
 // Argus traces table — no user/spans/traceId columns, short time format.
-/**
- * Columns for the Argus trace list.
- *
- * A factory rather than a constant so the session cell can carry a click handler: the session
- * is the only column whose value opens something. With no handler it falls back to a plain id,
- * so the list never shows a link that does nothing.
- */
-export function getArgusTraceColumnDefs({ onSessionClick } = {}) {
-    return [
-        {
-            headerName: "Time",
-            field: "latestTimestamp",
-            width: 160,
-            sort: "desc",
-            cellStyle: FLEX_CELL,
-            valueFormatter: p => {
-                const ts = p.value;
-                if (!ts) return "-";
-                const ms = ts > 1e10 ? ts : ts * 1000;
-                return new Date(ms).toLocaleString("en-US", {
-                    month: "numeric", day: "numeric", year: "2-digit",
-                    hour: "numeric", minute: "2-digit", hour12: true,
-                });
-            },
-            ...NO_FILTER,
+export const ARGUS_TRACE_COL_DEFS = [
+    {
+        headerName: "Time",
+        field: "latestTimestamp",
+        width: 160,
+        sort: "desc",
+        cellStyle: FLEX_CELL,
+        valueFormatter: p => {
+            const ts = p.value;
+            if (!ts) return "-";
+            const ms = ts > 1e10 ? ts : ts * 1000;
+            return new Date(ms).toLocaleString("en-US", {
+                month: "numeric", day: "numeric", year: "2-digit",
+                hour: "numeric", minute: "2-digit", hour12: true,
+            });
         },
-        previewCol("Trace", "traceId"),
-        {
-            headerName: "Application",
-            field: "serviceId",
-            width: 170,
-            cellRenderer: AppCell,
-            cellStyle: FLEX_CELL,
-            ...NO_FILTER,
+        ...NO_FILTER,
+    },
+    previewCol("Trace", "traceId"),
+    {
+        headerName: "Application",
+        field: "serviceId",
+        width: 170,
+        cellRenderer: AppCell,
+        cellStyle: FLEX_CELL,
+        ...NO_FILTER,
+    },
+    topicCol("Topics Queried"),
+    topicCol("SubTopic queried", false),
+    // {
+    //     headerName: "Model",
+    //     field: "_model",
+    //     width: 170,
+    //     cellRenderer: ModelChipCellRenderer,
+    //     cellStyle: FLEX_CELL,
+    //     ...NO_FILTER,
+    // },
+    tokensCol,
+    durationCol,
+    idCol("Session ID", "sessionIdentifier", 300),
+];
+
+// Argus unified table — one row per conversation, plus one row per invocation that never
+// carried a session. The two halves partition the data server-side, so nothing is listed
+// twice. Sorting is deliberately absent: the rows come from two merged streams and time is
+// the only key both are ordered by, so a click-to-sort on any other column would silently
+// reorder one half against the other.
+export const ARGUS_UNIFIED_COL_DEFS = [
+    {
+        headerName: "Session / Span",
+        field: "sessionIdentifier",
+        width: 320,
+        minWidth: 260,
+        cellRenderer: UnifiedIdCell,
+        cellStyle: FLEX_CELL,
+        ...NO_FILTER,
+    },
+    // The opening prompt of a conversation, or the only prompt of a lone invocation - the
+    // column people actually scan.
+    {
+        headerName: "Prompt",
+        field: "_promptText",
+        flex: 1,
+        minWidth: 300,
+        cellRenderer: UnifiedPromptCell,
+        cellStyle: FLEX_CELL,
+        ...NO_FILTER,
+    },
+    {
+        headerName: "Time",
+        field: "latestTimestamp",
+        width: 160,
+        sort: "desc",
+        cellStyle: FLEX_CELL,
+        valueFormatter: p => {
+            const ts = p.value;
+            if (!ts) return "-";
+            const ms = ts > 1e10 ? ts : ts * 1000;
+            return new Date(ms).toLocaleString("en-US", {
+                month: "numeric", day: "numeric", year: "2-digit",
+                hour: "numeric", minute: "2-digit", hour12: true,
+            });
         },
-        topicCol("Topics Queried"),
-        topicCol("SubTopic queried", false),
-        // {
-        //     headerName: "Model",
-        //     field: "_model",
-        //     width: 170,
-        //     cellRenderer: ModelChipCellRenderer,
-        //     cellStyle: FLEX_CELL,
-        //     ...NO_FILTER,
-        // },
-        tokensCol,
-        durationCol,
-        // SessionLinkCell renders a dash when the record carries no session, which is every record
-        // from before the session bridge and from any integration that sends none - so the column
-        // is simply blank for them rather than absent or filled with a placeholder.
-        onSessionClick
-            ? {
-                headerName: "Session ID",
-                field: "sessionIdentifier",
-                width: 300,
-                minWidth: 300,
-                cellRenderer: SessionLinkCell,
-                cellRendererParams: { onSessionClick },
-                cellStyle: FLEX_CELL,
-                ...NO_FILTER,
-            }
-            : idCol("Session ID", "sessionIdentifier", 300),
-        ];
-}
+        ...NO_FILTER,
+    },
+    {
+        headerName: "Application",
+        field: "serviceId",
+        width: 170,
+        cellRenderer: AppCell,
+        cellStyle: FLEX_CELL,
+        ...NO_FILTER,
+    },
+    {
+        headerName: "User",
+        field: "userName",
+        width: 160,
+        cellRenderer: UserCell,
+        cellStyle: FLEX_CELL,
+        ...NO_FILTER,
+    },
+    countCol("Traces", "messageCount", 85),
+    {
+        headerName: "Guardrail",
+        field: "hasActiveGuardrail",
+        width: 140,
+        cellRenderer: GuardrailStatusCell,
+        cellStyle: FLEX_CELL,
+        ...NO_FILTER,
+    },
+    {
+        headerName: "Policy Triggered",
+        field: "guardrailPolicies",
+        width: 200,
+        cellRenderer: GuardrailPolicyCell,
+        cellStyle: FLEX_CELL,
+        ...NO_FILTER,
+    },
+    topicCol("Topics Queried"),
+    topicCol("SubTopic queried", false),
+    tokensCol,
+    {
+        // A session's span can be hours - no alarming colour, plain text only.
+        headerName: "Duration",
+        field: "durationMs",
+        width: 110,
+        valueFormatter: p => formatDurationMs(p.value),
+        cellStyle: { ...FLEX_CELL, fontSize: 12, color: "#202223" },
+        ...NO_FILTER,
+    },
+];
 
 // Messages table — flat span-level rows.
 export const MESSAGE_FLAT_COLUMN_DEFS = [

@@ -5,9 +5,13 @@ import com.akto.utils.elasticsearch.AgentQueryRecord;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 /**
@@ -37,6 +41,31 @@ public abstract class SearchClient {
     protected static final String KEY_TIMESTAMP       = "timestamp";
     protected static final String KEY_HAS_ACTIVE_GUARDRAIL = "hasActiveGuardrail";
     protected static final String KEY_GUARDRAIL_POLICIES   = "guardrailPolicies";
+
+    // Which half of the unified view a row came from. Inferable from sessionIdentifier, but
+    // stated outright so the frontend branches on intent rather than on an absent field.
+    protected static final String KEY_ROW_KIND      = "_rowKind";
+    public    static final String ROW_KIND_SESSION  = "session";
+    public    static final String ROW_KIND_TRACE    = "trace";
+
+    /**
+     * Deepest merged page the unified view will serve. Interleaving two streams means
+     * over-fetching both to the requested depth, so depth has to be bounded somewhere;
+     * at the default page size this is fifty pages.
+     */
+    private static final int MERGE_WINDOW_MAX = 1000;
+
+    /**
+     * Runs the session half of the unified view while the calling thread runs the other half,
+     * so the request costs the slower of the two queries rather than their sum. Bounded and
+     * daemon: at most this many session queries are in flight at once (extra ones queue), and
+     * the pool never keeps the JVM alive.
+     */
+    private static final ExecutorService UNIFIED_FETCH_POOL = Executors.newFixedThreadPool(8, r -> {
+        Thread t = new Thread(r, "unified-traces-fetch");
+        t.setDaemon(true);
+        return t;
+    });
 
     public abstract boolean isConfigured();
 
@@ -115,6 +144,136 @@ public abstract class SearchClient {
         String sortKey, boolean sortAsc, String searchAfterJson,
         Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
         boolean includeTracesContent);
+
+    /**
+     * As above, but able to return only the records that carry no session.
+     *
+     * A session-grouped view can only show traffic that has a session identifier, so the flat
+     * list exists to surface the rest. Returning everything there would list the grouped records
+     * in both places; this lets the two views partition the data instead of overlapping.
+     *
+     * Defaults to ignoring the flag, so a backend that has not implemented it keeps behaving
+     * exactly as before rather than failing.
+     */
+    public SearchResult searchPrompts(
+            int accountId, long startMs, long endMs, int skip, int limit,
+            String sortKey, boolean sortAsc, String searchAfterJson,
+            Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
+            boolean includeTracesContent, boolean onlyWithoutSession) {
+        return searchPrompts(accountId, startMs, endMs, skip, limit, sortKey, sortAsc,
+                searchAfterJson, filters, atlasTrafficFilter, searchString, includeTracesContent);
+    }
+
+    // ── Unified view: conversations and lone invocations in one list ──────────
+
+    /**
+     * One time-ordered list in which a conversation is a single row and an invocation that
+     * carries no session is a row of its own.
+     *
+     * Built from the two queries that already exist rather than a third: {@link #fetchSessions}
+     * supplies the grouped half, {@link #searchPrompts} with onlyWithoutSession supplies the
+     * rest. Those halves partition the data by construction, so no record can appear twice.
+     *
+     * Both arrive sorted by time descending, and time is the only key they share - a session's
+     * latest activity and an invocation's own timestamp are comparable, its user or application
+     * is not aggregated the same way on both sides. Hence a straight merge here, and hence a
+     * view that can only be ordered by time.
+     */
+    public UnifiedResult fetchSessionsAndTraces(
+            int accountId, long startMs, long endMs, String searchString,
+            Map<String, List<String>> filters, Boolean atlasTrafficFilter,
+            int skip, int limit, boolean includeTracesContent) {
+
+        int from   = Math.max(skip, 0);
+        int size   = Math.max(limit, 1);
+        int window = Math.min(from + size, MERGE_WINDOW_MAX);
+
+        // The two halves are independent queries, so they run side by side.
+        Future<SessionsResult> groupedFuture = UNIFIED_FETCH_POOL.submit(() ->
+                fetchSessions(accountId, startMs, endMs, searchString,
+                        filters, atlasTrafficFilter, window, "0", includeTracesContent));
+
+        SearchResult loose = searchPrompts(accountId, startMs, endMs, 0, window,
+                AgentQueryRecord.F_TIMESTAMP, false, null,
+                filters, atlasTrafficFilter, searchString, includeTracesContent, true);
+
+        SessionsResult grouped;
+        try {
+            grouped = groupedFuture.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            grouped = null;
+        } catch (Exception e) {
+            // Same outcome as fetchSessions failing on its own: the list still shows the
+            // records without a session rather than failing the whole request.
+            grouped = null;
+        }
+
+        List<Map<String, Object>> sessions = (grouped != null && grouped.sessions != null)
+                ? grouped.sessions : new ArrayList<>();
+        // onlyWithoutSession is a request, not a guarantee: the base implementation ignores it,
+        // so a backend that has not implemented it answers with everything. Dropping sessioned
+        // records here makes the two halves disjoint whatever the backend did, rather than
+        // listing a conversation's records both inside its session row and beside it.
+        List<Map<String, Object>> traces = new ArrayList<>();
+        if (loose != null && loose.hits != null) {
+            for (Map<String, Object> row : loose.hits) {
+                if (!hasSession(row)) traces.add(row);
+            }
+        }
+
+        for (Map<String, Object> row : sessions) row.put(KEY_ROW_KIND, ROW_KIND_SESSION);
+        for (Map<String, Object> row : traces)   normalizeLooseRow(row);
+
+        List<Map<String, Object>> merged = mergeByTimeDesc(sessions, traces);
+        int sliceFrom = Math.min(from, merged.size());
+        int sliceTo   = Math.min(sliceFrom + size, merged.size());
+
+        long total = (grouped != null ? grouped.totalSessions : 0)
+                   + (loose != null ? loose.total : 0);
+        return new UnifiedResult(new ArrayList<>(merged.subList(sliceFrom, sliceTo)), total);
+    }
+
+    private static boolean hasSession(Map<String, Object> row) {
+        Object sid = row.get(AgentQueryRecord.F_SESSION_IDENTIFIER);
+        return sid instanceof String && !((String) sid).isEmpty();
+    }
+
+    /**
+     * Gives a lone invocation the few aggregate fields a session row gets, so one set of
+     * columns can render both. Each is the honest single-record answer rather than a blank:
+     * one invocation is one trace, and its own guardrail verdict is the only one it has.
+     */
+    private static void normalizeLooseRow(Map<String, Object> row) {
+        row.put(KEY_ROW_KIND, ROW_KIND_TRACE);
+        row.put(KEY_MSG_COUNT, 1L);
+        row.put(KEY_HAS_ACTIVE_GUARDRAIL,
+                Boolean.TRUE.equals(row.get(AgentQueryRecord.F_GUARDRAIL_VIOLATED)));
+        Object policy = row.get(AgentQueryRecord.F_GUARDRAIL_POLICY);
+        List<Object> policies = new ArrayList<>();
+        if (policy instanceof String && !((String) policy).isEmpty()) policies.add(policy);
+        row.put(KEY_GUARDRAIL_POLICIES, policies);
+    }
+
+    /** Two-way merge on the only key both halves are ordered by. */
+    private static List<Map<String, Object>> mergeByTimeDesc(
+            List<Map<String, Object>> a, List<Map<String, Object>> b) {
+        List<Map<String, Object>> merged = new ArrayList<>(a.size() + b.size());
+        int i = 0, j = 0;
+        while (i < a.size() && j < b.size()) {
+            merged.add(rowTimeMs(a.get(i)) >= rowTimeMs(b.get(j)) ? a.get(i++) : b.get(j++));
+        }
+        while (i < a.size()) merged.add(a.get(i++));
+        while (j < b.size()) merged.add(b.get(j++));
+        return merged;
+    }
+
+    /** A session row carries its bucket's latest activity; a flat row carries its own time. */
+    private static long rowTimeMs(Map<String, Object> row) {
+        Object v = row.get(KEY_LATEST_TS);
+        if (!(v instanceof Number)) v = row.get(AgentQueryRecord.F_TIMESTAMP);
+        return (v instanceof Number) ? ((Number) v).longValue() : 0L;
+    }
 
     /** Used by UserAnalysisCron to fetch not-yet-topic-classified records. */
     public abstract void scrollQueryData(int accountId, long startTsMs, long endTsMs,
@@ -200,6 +359,16 @@ public abstract class SearchClient {
             this.sessions = sessions;
             this.nextAfterKey = nextAfterKey;
             this.totalSessions = totalSessions;
+        }
+    }
+
+    /** Rows of both kinds in one time-ordered page, plus the combined count behind them. */
+    public static class UnifiedResult {
+        public final List<Map<String, Object>> rows;
+        public final long total;
+        public UnifiedResult(List<Map<String, Object>> rows, long total) {
+            this.rows  = rows;
+            this.total = total;
         }
     }
 

@@ -24,24 +24,6 @@ export default {
         }).then(r => r?.sessions ?? []);
     },
 
-    /**
-     * One session by id, with the aggregate fields the flyout header needs (message count,
-     * duration, token sums, models). Used where a session is opened from a context that only
-     * has the identifier — a trace row — rather than from the sessions table, which already
-     * holds the whole row.
-     */
-    fetchSessionById({ startTime, endTime, sessionId }) {
-        if (!sessionId) return Promise.resolve(null);
-        return request({
-            url: "/api/fetchLLMSessions",
-            method: "post",
-            data: { startTime, endTime, sessionsLimit: 1, sessionId },
-        }).then(r => {
-            const [session] = (r?.sessions ?? []).map(enrichRow);
-            return session || null;
-        });
-    },
-
     // Cursor-paginated sessions (composite agg) — used by the sessions table.
     // Returns { sessions, nextAfterKey, total }.
     fetchSessionsPaged({ startTime, endTime, limit, afterKey, filters, searchString }) {
@@ -110,6 +92,30 @@ export default {
             if (Array.isArray(r))  return { value: r.map(enrichRow), total: r.length };
             return { value: [], total: 0 };
         });
+    },
+
+    // Unified Argus list: conversations and lone invocations, already merged and
+    // time-ordered server-side. Row kind is readable from `_rowKind`.
+    fetchSessionsAndTraces({ startTime, endTime, skip, limit, filters, searchString }) {
+        return request({
+            url: "/api/fetchLLMSessionsAndTraces",
+            method: "post",
+            timeout: LLM_REQUEST_TIMEOUT_MS,
+            data: {
+                startTime,
+                endTime,
+                skip:            skip  || 0,
+                limit:           limit || 20,
+                userNames:       filters?.userName  || [],
+                serviceIds:      filters?.serviceId || [],
+                topicFilters:    filters?.topic     || [],
+                subTopicFilters: filters?.subTopic  || [],
+                searchString:    searchString || "",
+            },
+        }).then(r => ({
+            value: (r?.unifiedRows ?? []).map(enrichRow),
+            total: r?.unifiedTotal ?? 0,
+        }));
     },
 
     // Aggregated stats for summary cards — accurate cardinality, token sums, top users.

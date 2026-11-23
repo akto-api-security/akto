@@ -34,6 +34,13 @@ public class ElasticSearchClient extends SearchClient {
 
     private static final LoggerMaker logger = new LoggerMaker(ElasticSearchClient.class, LogDb.DASHBOARD);
 
+    /**
+     * Scopes a single searchPrompts call to records with no session. A thread-local rather than
+     * a parameter because buildQuery is shared by a dozen call sites, and threading a flag none
+     * of them care about through all of them would be worse than scoping it here.
+     */
+    private static final ThreadLocal<Boolean> NO_SESSION_ONLY = new ThreadLocal<>();
+
     private static final String ES_HOST  = System.getenv("ES_HOST");
     private static final String ES_API_KEY = System.getenv("ES_API_KEY");
     private static final String ES_INDEX = System.getenv("ES_INDEX_AGENT_QUERY");
@@ -69,6 +76,12 @@ public class ElasticSearchClient extends SearchClient {
     // index.max_result_window (10_000) as a defense-in-depth bound; a session/window with more
     // docs than this loses grouping accuracy for its oldest spans (see the truncation log).
     private static final int    RAW_FETCH_CAP            = 5_000;
+    /**
+     * Ceiling on a caller-requested page size, so a bad request cannot ask for an unbounded
+     * page. Not a semantic limit: the paged views ask for 20, and the unified view asks for
+     * as deep a window as it needs to interleave its two streams.
+     */
+    private static final int    MAX_PAGE_SIZE            = 1_000;
     // Cap on the spans returned for a single trace (rendered as waterfall bars + span cards).
     private static final int    TRACE_DETAIL_SIZE        = 500;
     // "model" lives inside the responsePayload JSON, not as an indexed field, so it cannot be a
@@ -191,7 +204,7 @@ public class ElasticSearchClient extends SearchClient {
                 // sub-agg metric, so cross-page sort is broken. Terms agg with
                 // order:{latestTimestamp:"desc"} gives a globally correct sort; we fetch
                 // enough buckets to cover the requested page and slice in application code.
-                int pageSize  = Math.min(sessionsLimit, 100);
+                int pageSize  = Math.min(sessionsLimit, MAX_PAGE_SIZE);
                 int pageOffset = 0;
                 if (sessionsAfterKey != null && !sessionsAfterKey.trim().isEmpty()) {
                     try { pageOffset = Integer.parseInt(sessionsAfterKey.trim()); }
@@ -1182,6 +1195,29 @@ public class ElasticSearchClient extends SearchClient {
 
     // ── Paginated flat prompt search ───────────────────────────────────────────
 
+    /**
+     * Only the records with no session, so the flat list and the session-grouped view partition
+     * the data between them instead of listing the grouped records in both.
+     */
+    @Override
+    public SearchResult searchPrompts(int accountId, long startMs, long endMs, int skip, int limit,
+                                       String sortKey, boolean sortAsc, String searchAfterJson,
+                                       Map<String, List<String>> filters, Boolean atlasTrafficFilter,
+                                       String searchString, boolean includeTracesContent,
+                                       boolean onlyWithoutSession) {
+        if (!onlyWithoutSession) {
+            return searchPrompts(accountId, startMs, endMs, skip, limit, sortKey, sortAsc,
+                    searchAfterJson, filters, atlasTrafficFilter, searchString, includeTracesContent);
+        }
+        NO_SESSION_ONLY.set(Boolean.TRUE);
+        try {
+            return searchPrompts(accountId, startMs, endMs, skip, limit, sortKey, sortAsc,
+                    searchAfterJson, filters, atlasTrafficFilter, searchString, includeTracesContent);
+        } finally {
+            NO_SESSION_ONLY.remove();
+        }
+    }
+
     @Override
     public SearchResult searchPrompts(int accountId, long startMs, long endMs, int skip, int limit,
                                        String sortKey, boolean sortAsc, String searchAfterJson,
@@ -1194,7 +1230,7 @@ public class ElasticSearchClient extends SearchClient {
                 try { searchAfter = new JSONArray(searchAfterJson); } catch (Exception ignored) {}
             }
             JSONObject query = buildQuery(accountId, startMs, endMs, filters, searchString, atlasTrafficFilter);
-            return executeSearch(query, skip, Math.min(limit, 100), toEsField(sortKey), sortAsc, searchAfter, includeTracesContent);
+            return executeSearch(query, skip, Math.min(limit, MAX_PAGE_SIZE), toEsField(sortKey), sortAsc, searchAfter, includeTracesContent);
         } catch (Exception e) {
             logger.error("searchPrompts error for accountId=" + accountId + ": " + e.getMessage());
             return new SearchResult(new ArrayList<>(), 0);
@@ -1364,6 +1400,11 @@ public class ElasticSearchClient extends SearchClient {
                 .put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("gte", startMs).put("lt", endMs))))
             .put(new JSONObject().put("term", new JSONObject().put(AgentQueryRecord.F_ACCOUNT_ID, accountId)));
         JSONArray mustNot = new JSONArray();
+        // Set only for the duration of a no-session searchPrompts call (see that overload).
+        if (Boolean.TRUE.equals(NO_SESSION_ONLY.get())) {
+            mustNot.put(new JSONObject().put("exists",
+                new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER)));
+        }
 
         if (filters != null) {
             for (Map.Entry<String, List<String>> e : filters.entrySet()) {

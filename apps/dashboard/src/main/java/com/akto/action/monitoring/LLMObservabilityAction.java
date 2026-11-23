@@ -92,6 +92,10 @@ public class LLMObservabilityAction extends UserAction {
     @Getter private List<Long>                 aggTokenSpark      = new ArrayList<>();
     @Getter private List<Long>                 aggTraceSparkTs    = new ArrayList<>();
 
+    // Unified Argus view — rows of both kinds in one time-ordered page.
+    @Getter private List<Map<String, Object>>  unifiedRows  = new ArrayList<>();
+    @Getter private long                       unifiedTotal = 0;
+
     private long startMs() { return (long) startTime * 1000L; }
     private long endMs()   { return (long) endTime   * 1000L; }
 
@@ -106,7 +110,9 @@ public class LLMObservabilityAction extends UserAction {
             SearchClient.SessionsResult result = client.fetchSessions(
                 accountId, startMs(), endMs(), searchString,
                 buildMultiFilters(true), resolveContextAtlasFilter(),
-                sessionsLimit, sessionsAfterKey, isUserRoleAdmin());
+                // The search client allows deeper pages for the unified view's internal merge;
+                // this public endpoint keeps the 100-row ceiling it always had.
+                Math.min(sessionsLimit, 100), sessionsAfterKey, isUserRoleAdmin());
 
             sessions      = result.sessions;
             nextAfterKey  = result.nextAfterKey;
@@ -252,6 +258,33 @@ public class LLMObservabilityAction extends UserAction {
             }
         } catch (Exception e) {
             filterChoices = new HashMap<>();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    // ── Unified view: conversations and lone invocations in one list ──────────
+
+    /**
+     * Backs the Argus traces table, where a conversation is one row and an invocation that
+     * carries no session is a row of its own. The merge itself is in {@link SearchClient},
+     * which owns the row shapes being merged.
+     */
+    public String fetchSessionsAndTraces() {
+        try {
+            SearchClient client = SearchClientFactory.instance();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
+
+            SearchClient.UnifiedResult result = client.fetchSessionsAndTraces(
+                Context.accountId.get(), startMs(), endMs(), searchString,
+                buildMultiFilters(true), resolveContextAtlasFilter(),
+                skip, limit, isUserRoleAdmin());
+
+            unifiedRows  = result.rows;
+            unifiedTotal = result.total;
+        } catch (Exception e) {
+            logger.error("fetchSessionsAndTraces error: " + e.getMessage());
+            unifiedRows  = new ArrayList<>();
+            unifiedTotal = 0;
         }
         return SUCCESS.toUpperCase();
     }

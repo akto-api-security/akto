@@ -186,6 +186,46 @@ export function GuardrailPolicyCell({ data }) {
     return <ShowListInBadge itemsArr={policies} maxItems={2} useTooltip={true} />;
 }
 
+// Lead cell of the unified Argus table, where a row is either a whole conversation or a
+// single span that never carried one. A conversation is named by its session; an
+// invocation by the id it does have - Bedrock's own request id once the bridge supplies
+// one, else the span id synthesised at ingest. One of those is always present, so no row
+// is left unidentifiable.
+//
+// Records ingested before the deterministic id carry a drawn "span_<uuid>"; the prefix is an
+// internal marker, so it is dropped for display. The stored value is untouched.
+export function unifiedRowId(data) {
+    if (!data) return "";
+    const id = data.sessionIdentifier || data.traceId || data.spanId || "";
+    return id.startsWith("span_") ? id.slice("span_".length) : id;
+}
+
+export function UnifiedIdCell({ data }) {
+    if (!data) return null;
+    const id = unifiedRowId(data);
+    return <Text variant="bodySm" color="interactive" truncate>{id || DASH}</Text>;
+}
+
+// Prompt preview for the unified table. Same admin gate as PreviewCell, but the locked
+// fallback names the row by whichever id it has rather than by a single fixed field, which
+// would be blank for one of the two row kinds.
+export function UnifiedPromptCell({ data }) {
+    if (!data) return null;
+    if (!func.isUserAdmin()) {
+        return (
+            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                <Icon source={LockMinor} color="subdued" />
+                <Text variant="bodySm" color="subdued" truncate>{unifiedRowId(data) || DASH}</Text>
+            </HorizontalStack>
+        );
+    }
+    return (
+        <Text variant="bodySm" color="interactive" truncate>
+            {data._promptText ? truncate(data._promptText, 90) : DASH}
+        </Text>
+    );
+}
+
 // Clickable session id (used in unscoped Traces table).
 export function SessionLinkCell({ data, onSessionClick }) {
     const sid = data?.sessionIdentifier;
