@@ -154,6 +154,9 @@ public class Constants {
      * prefer it over any single raw spelling.
      */
     public static final String AI_AGENT_TAG_SESSION_ID = "session-id";
+    /** The Bedrock model id the log processor puts on every record, as a tag and as a header. */
+    public static final String AI_AGENT_TAG_MODEL = "model";
+    public static final String AI_AGENT_HEADER_BEDROCK_MODEL_ID = "x-bedrock-model-id";
     /**
      * The header every installed agentic source sets to carry a session, and the only one
      * AgentQueryRecord reads. Sources that deliver the session as a tag have it injected
@@ -171,6 +174,11 @@ public class Constants {
      * Lower case because header names are normalised on ingest (OriginalHttpRequest.buildHeadersMap).
      */
     public static final String AI_AGENT_HEADER_BEDROCK_REQUEST_ID = "x-request-id";
+    /**
+     * What the Bedrock log processor sends as the record's ip when it cannot resolve a caller
+     * from the identity ARN (identityActor.js). Treated as "no actor" rather than an address.
+     */
+    public static final String AI_AGENT_UNRESOLVED_ACTOR_IP = "0.0.0.0";
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";
