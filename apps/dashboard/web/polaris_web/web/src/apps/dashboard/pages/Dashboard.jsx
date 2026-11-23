@@ -182,7 +182,7 @@ function Dashboard() {
     }
 
     const toastMarkup = toastConfig.isActive ? (
-        <Toast content={toastConfig.message} error={toastConfig.isError} action={toastConfig.action} onDismiss={disableToast} duration={toastConfig.action ? TOAST_WITH_ACTION_MS : 2000} />
+        <Toast content={toastConfig.message} error={toastConfig.isError} action={toastConfig.action} onDismiss={disableToast} duration={toastConfig.duration || (toastConfig.action ? TOAST_WITH_ACTION_MS : 2000)} />
     ) : null;
 
     const confirmationModalConfig = Store(state => state.confirmationModalConfig)
