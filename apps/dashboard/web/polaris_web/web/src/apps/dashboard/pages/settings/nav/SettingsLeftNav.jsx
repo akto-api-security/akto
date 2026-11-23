@@ -37,7 +37,7 @@ const SettingsLeftNav = () => {
     }] : []
 
     // Akto users and admins; the backend enforces the same rule on the log endpoints
-    const logsArr = (func.isAktoUser() || func.isUserAdmin()) ? [{
+    const logsArr = (func.currentProductBaseRole() === 'ADMIN' || func.isAktoUser()) ? [{
             label: 'Logs',
             icon: ListFilledMajor,
             selected: page === "logs",
