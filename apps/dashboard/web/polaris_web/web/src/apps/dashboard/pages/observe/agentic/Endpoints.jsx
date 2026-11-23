@@ -411,7 +411,7 @@ function Endpoints() {
     ), []);
 
     const layoutToggle = (
-        <NewLayoutTooltip checked={false} onChange={() => { setAgenticNewLayout(true); navigate("/dashboard/observe/agentic-assets"); }} />
+        <NewLayoutTooltip invert checked={false} onChange={() => { setAgenticNewLayout(true); navigate("/dashboard/observe/agentic-assets"); }} />
     );
 
     if (loading) {
