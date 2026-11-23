@@ -91,8 +91,8 @@ public class DbLogsAction extends UserAction {
     }
 
     /**
-     * Logs are admin-only. The interceptor (ADMIN_ACTIONS) skips role checks on non-metered dashboards, so the
-     * role is also checked here, which makes the page admin-only on every deployment.
+     * Customers need the ADMIN role for logs. The interceptor skips role checks on non-metered dashboards and only
+     * checks LOGS READ elsewhere, so the role is checked here, which makes the page admin-only on every deployment.
      */
     private boolean isAdmin() {
         Integer accountId = Context.accountId.get();
@@ -102,10 +102,11 @@ public class DbLogsAction extends UserAction {
     }
 
     private List<LogDb> computeAllowedLogGroups() {
-        if (!isAdmin()) {
+        boolean internal = isInternalUser();
+        // Akto users see logs irrespective of their role; everyone else must be an admin
+        if (!internal && !isAdmin()) {
             return Collections.emptyList();
         }
-        boolean internal = isInternalUser();
         return Arrays.stream(LogDb.values())
             .filter(db -> internal || isCustomerVisible(db, Context.accountId.get()))
             .collect(Collectors.toList());

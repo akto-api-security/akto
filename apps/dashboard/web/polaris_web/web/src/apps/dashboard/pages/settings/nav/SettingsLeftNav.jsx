@@ -2,11 +2,9 @@ import { Navigation, Box } from "@shopify/polaris"
 import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor, ProfileMajor} from "@shopify/polaris-icons"
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
 import { VariantMajor, VocabularyMajor, AdjustMinor, UndoMajor, CodeMajor, GlobeMajor } from "@shopify/polaris-icons"
-import { useEffect, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
 import { usePermissions } from "@/util/permissions"
-import settingRequests from "../api"
 import Store from "../../../store";
 import PersistStore from "../../../../main/PersistStore"
 import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
@@ -20,14 +18,6 @@ const SettingsLeftNav = () => {
     let rbacAccessAdvanced = func.checkForRbacFeature();
     const accounts = Store(state => state.accounts) || {};
     const activeAccount = Store(state => state.activeAccount);
-
-    // The backend decides who may read logs: the tab is shown only if at least one log group is allowed.
-    const [hasLogAccess, setHasLogAccess] = useState(false)
-    useEffect(() => {
-        settingRequests.fetchAllowedLogGroups()
-            .then((resp) => setHasLogAccess((resp?.allowedLogGroups ?? []).length > 0))
-            .catch(() => setHasLogAccess(false))
-    }, [])
 
     const usersArr = window.USER_ROLE !== 'GUEST' ? [{
         label: 'Users',
@@ -46,7 +36,8 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/roles")
     }] : []
 
-    const logsArr = hasLogAccess ? [{
+    // Akto users and admins; the backend enforces the same rule on the log endpoints
+    const logsArr = (func.isAktoUser() || func.isUserAdmin()) ? [{
             label: 'Logs',
             icon: ListFilledMajor,
             selected: page === "logs",
