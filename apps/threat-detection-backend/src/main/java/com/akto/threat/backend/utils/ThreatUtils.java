@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.TextFormat;
+import com.mongodb.client.AggregateIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.IndexOptions;
@@ -22,6 +23,7 @@ import org.bson.conversions.Bson;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -173,10 +175,99 @@ public class ThreatUtils {
         if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
             return new Document();
         }
+        if (USE_EVAL_TYPE_READS) {
+            return new Document(MaliciousEventDto.EVAL_TYPE, new Document("$ne", MaliciousEventDto.EVAL_TYPE_SKILL));
+        }
         return new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN));
     }
 
     public static final Pattern CONFIG_ENDPOINT_PATTERN = Pattern.compile("/config/");
+    public static final boolean USE_EVAL_TYPE_READS = Boolean.parseBoolean(
+        System.getenv().getOrDefault("USE_EVAL_TYPE_READS", "true"));
+    public static final String EVAL_TYPE_INDEX = "idx_context_evalType_detectedAt";
+    public static final String CONFIG_DEDUPE_KEY_INDEX = "idx_dedupeKey_unique";
+
+    public static String evalType(String contextSource, String latestApiEndpoint) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource) || latestApiEndpoint == null) {
+            return null;
+        }
+        if (SKILLS_ENDPOINT_PATTERN.matcher(latestApiEndpoint).find()) {
+            return MaliciousEventDto.EVAL_TYPE_SKILL;
+        }
+        if (CONFIG_ENDPOINT_PATTERN.matcher(latestApiEndpoint).find()) {
+            return MaliciousEventDto.EVAL_TYPE_CONFIG;
+        }
+        return null;
+    }
+
+    public static final String EVAL_TYPE_COVER_INDEX = "idx_ctx_status_detectedAt_evalType_cover";
+    private static final List<String> EVAL_TYPE_COVER_FIELDS = Arrays.asList(
+        "contextSource", "status", "detectedAt", MaliciousEventDto.EVAL_TYPE, "severity", "host", "category", "subCategory",
+        "actor", "successfulExploit", "latestApiEndpoint", "latestApiMethod", "filterId");
+    private static final Set<String> EVAL_TYPE_COVER_ACCOUNTS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> EVAL_TYPE_INDEX_ACCOUNTS = ConcurrentHashMap.newKeySet();
+
+    public static Document coverIndexHint(String accountId, Document match) {
+        if (!USE_EVAL_TYPE_READS || !"ENDPOINT".equals(fieldValue(match, "contextSource"))) {
+            return null;
+        }
+        if (fieldValue(match, MaliciousEventDto.EVAL_TYPE) instanceof String) {
+            return evalTypeIndexHint(accountId);
+        }
+        if (!EVAL_TYPE_COVER_ACCOUNTS.contains(accountId) || !filtersOnlyCoverFields(match)) {
+            return null;
+        }
+        Document keys = new Document();
+        EVAL_TYPE_COVER_FIELDS.forEach(field -> keys.append(field, "detectedAt".equals(field) ? -1 : 1));
+        return keys;
+    }
+
+    public static Document evalTypeIndexHint(String accountId) {
+        if (!USE_EVAL_TYPE_READS || !EVAL_TYPE_INDEX_ACCOUNTS.contains(accountId)) {
+            return null;
+        }
+        return new Document("contextSource", 1).append(MaliciousEventDto.EVAL_TYPE, 1).append("detectedAt", -1);
+    }
+
+    public static <T> AggregateIterable<T> withHint(AggregateIterable<T> iterable, Document hint) {
+        return hint == null ? iterable : iterable.hint(hint);
+    }
+
+    static Object fieldValue(Document match, String field) {
+        if (match.containsKey(field)) {
+            return match.get(field);
+        }
+        Object and = match.get("$and");
+        if (and instanceof List) {
+            for (Object clause : (List<?>) and) {
+                Object value = clause instanceof Document ? fieldValue((Document) clause, field) : null;
+                if (value != null) {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+
+    static boolean filtersOnlyCoverFields(Document match) {
+        for (Map.Entry<String, Object> condition : match.entrySet()) {
+            if ("$and".equals(condition.getKey())) {
+                for (Object clause : (List<?>) condition.getValue()) {
+                    if (!(clause instanceof Document) || !filtersOnlyCoverFields((Document) clause)) {
+                        return false;
+                    }
+                }
+            } else if (!EVAL_TYPE_COVER_FIELDS.contains(condition.getKey())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static String configDedupeKey(String host, String actor, String category, String latestApiEndpoint) {
+        return String.join("|", Objects.toString(host, ""), Objects.toString(actor, ""),
+            Objects.toString(category, ""), Objects.toString(latestApiEndpoint, ""));
+    }
 
     // Skills Evaluations / Misconfigured Settings partitions — Atlas (ENDPOINT) only. An event
     // belongs to Skills Evaluations iff latestApiEndpoint starts with "/skills/"; it belongs to
@@ -191,6 +282,9 @@ public class ThreatUtils {
         if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
             return conditions;
         }
+        if (USE_EVAL_TYPE_READS) {
+            return evalTypeConditions(skillEvalMode, configEvalMode);
+        }
         if ("only".equalsIgnoreCase(skillEvalMode)) {
             conditions.add(new Document("latestApiEndpoint", SKILLS_ENDPOINT_PATTERN));
         } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
@@ -200,6 +294,25 @@ public class ThreatUtils {
             conditions.add(new Document("latestApiEndpoint", CONFIG_ENDPOINT_PATTERN));
         } else if ("exclude".equalsIgnoreCase(configEvalMode)) {
             conditions.add(new Document("latestApiEndpoint", new Document("$not", CONFIG_ENDPOINT_PATTERN)));
+        }
+        return conditions;
+    }
+
+    static List<Document> evalTypeConditions(String skillEvalMode, String configEvalMode) {
+        List<Document> conditions = new ArrayList<>();
+        List<String> excluded = new ArrayList<>();
+        if ("only".equalsIgnoreCase(skillEvalMode)) {
+            conditions.add(new Document(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_SKILL));
+        } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
+            excluded.add(MaliciousEventDto.EVAL_TYPE_SKILL);
+        }
+        if ("only".equalsIgnoreCase(configEvalMode)) {
+            conditions.add(new Document(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_CONFIG));
+        } else if ("exclude".equalsIgnoreCase(configEvalMode)) {
+            excluded.add(MaliciousEventDto.EVAL_TYPE_CONFIG);
+        }
+        if (!excluded.isEmpty()) {
+            conditions.add(new Document(MaliciousEventDto.EVAL_TYPE, new Document("$nin", excluded)));
         }
         return conditions;
     }
@@ -224,7 +337,7 @@ public class ThreatUtils {
     // same shape and the deduped config events are unioned back in, so no group is built per event.
     // precedingStages are the caller's stages so far, replayed for the config branch.
     public static List<Document> configScanDedupeStages(List<Document> precedingStages, String contextSource) {
-        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+        if (USE_EVAL_TYPE_READS || !"ENDPOINT".equalsIgnoreCase(contextSource)) {
             return Collections.emptyList();
         }
 
@@ -578,18 +691,43 @@ public class ThreatUtils {
         requiredIndexes.put("idx_context_detectedAt_category_subCategory", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("category"), Indexes.ascending("subCategory")));
         // Lets the Active tab count and its skills/config exclusion count be answered from index keys alone.
         requiredIndexes.put("idx_ctx_status_detected_endpoint", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending("status"), Indexes.descending("detectedAt"), Indexes.ascending("latestApiEndpoint")));
+        requiredIndexes.put(EVAL_TYPE_COVER_INDEX, Indexes.compoundIndex(
+            Indexes.ascending("contextSource", "status"), Indexes.descending("detectedAt"),
+            Indexes.ascending(EVAL_TYPE_COVER_FIELDS.subList(3, EVAL_TYPE_COVER_FIELDS.size()))));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {
                 collection.createIndex(entry.getValue(), new IndexOptions().name(entry.getKey()));
             }
         }
+        EVAL_TYPE_COVER_ACCOUNTS.add(accountId);
 
         // Only accounts that group activities have keyed events; partial so it stays small.
         if (groupsActivities(accountId) && !existingIndexes.contains(ACTIVITY_GROUP_INDEX)) {
             collection.createIndex(ACTIVITY_GROUP_INDEX_KEYS, new IndexOptions().name(ACTIVITY_GROUP_INDEX)
                 .partialFilterExpression(new Document("groupKey", new Document("$type", "string"))));
         }
+
+        if (!existingIndexes.contains(EVAL_TYPE_INDEX)) {
+            collection.createIndex(Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending(MaliciousEventDto.EVAL_TYPE), Indexes.descending("detectedAt")),
+                new IndexOptions().name(EVAL_TYPE_INDEX)
+                    .partialFilterExpression(new Document(MaliciousEventDto.EVAL_TYPE, new Document("$exists", true))));
+        }
+        EVAL_TYPE_INDEX_ACCOUNTS.add(accountId);
+
+        if (!existingIndexes.contains(CONFIG_DEDUPE_KEY_INDEX)) {
+            createDedupeKeyIndex(collection);
+        }
+    }
+
+    public static Document utcDayStart() {
+        return new Document("$subtract", Arrays.asList("$detectedAt", new Document("$mod", Arrays.asList("$detectedAt", 86400))));
+    }
+
+    public static void createDedupeKeyIndex(MongoCollection<?> collection) {
+        collection.createIndex(Indexes.ascending(MaliciousEventDto.DEDUPE_KEY),
+            new IndexOptions().name(CONFIG_DEDUPE_KEY_INDEX).unique(true)
+                .partialFilterExpression(new Document(MaliciousEventDto.DEDUPE_KEY, new Document("$type", "string"))));
     }
 
 }

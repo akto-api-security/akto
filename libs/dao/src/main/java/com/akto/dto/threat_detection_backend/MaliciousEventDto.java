@@ -47,6 +47,14 @@ public class MaliciousEventDto {
   private Long firstTriagedAt;
   // Bedrock caller ARN + prompt hash: events with the same key close together in time are one activity.
   private String groupKey;
+  public static final String EVAL_TYPE = "evalType";
+  public static final String EVAL_TYPE_CONFIG = "CONFIG";
+  public static final String EVAL_TYPE_SKILL = "SKILL";
+  public static final String DEDUPE_KEY = "dedupeKey";
+  public static final String FIRST_DETECTED_AT = "firstDetectedAt";
+  private String evalType;
+  private String dedupeKey;
+  private Long firstDetectedAt;
   // Set only by the grouped activity list (never stored): how many events are behind this row, the first
   // one's time, their ids, and the policies they tripped.
   private Integer groupCount;
@@ -188,6 +196,8 @@ public class MaliciousEventDto {
     this.humanResponse = builder.humanResponse;
     this.evidenceLine = builder.evidenceLine;
     this.groupKey = builder.groupKey;
+    this.evalType = builder.evalType;
+    this.dedupeKey = builder.dedupeKey;
   }
 
   public static class Builder {
@@ -220,6 +230,8 @@ public class MaliciousEventDto {
     private String humanResponse;
     private String evidenceLine;
     private String groupKey;
+    private String evalType;
+    private String dedupeKey;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -348,6 +360,16 @@ public class MaliciousEventDto {
 
     public Builder setGroupKey(String groupKey) {
       this.groupKey = groupKey;
+      return this;
+    }
+
+    public Builder setEvalType(String evalType) {
+      this.evalType = evalType;
+      return this;
+    }
+
+    public Builder setDedupeKey(String dedupeKey) {
+      this.dedupeKey = dedupeKey;
       return this;
     }
 
@@ -629,6 +651,30 @@ public class MaliciousEventDto {
 
   public void setOwaspCategories(List<OwaspCategory> owaspCategories) {
     this.owaspCategories = owaspCategories;
+  }
+
+  public String getEvalType() {
+    return evalType;
+  }
+
+  public void setEvalType(String evalType) {
+    this.evalType = evalType;
+  }
+
+  public String getDedupeKey() {
+    return dedupeKey;
+  }
+
+  public void setDedupeKey(String dedupeKey) {
+    this.dedupeKey = dedupeKey;
+  }
+
+  public Long getFirstDetectedAt() {
+    return firstDetectedAt;
+  }
+
+  public void setFirstDetectedAt(Long firstDetectedAt) {
+    this.firstDetectedAt = firstDetectedAt;
   }
 
   public String getGroupKey() {

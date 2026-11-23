@@ -214,6 +214,14 @@ public class MaliciousEventService {
         builder.setContextSource(contextSource);
     }
 
+    String evalType = ThreatUtils.evalType(contextSource, evt.getLatestApiEndpoint());
+    if (evalType != null) {
+        builder.setEvalType(evalType);
+    }
+    if (MaliciousEventDto.EVAL_TYPE_CONFIG.equals(evalType)) {
+        builder.setDedupeKey(ThreatUtils.configDedupeKey(evt.getHost(), actor, evt.getCategory(), evt.getLatestApiEndpoint()));
+    }
+
     if (ThreatUtils.groupsActivities(accountId)) {
         builder.setGroupKey(ThreatUtils.activityGroupKey(evt.getLatestApiPayload()));
     }
@@ -259,7 +267,10 @@ public class MaliciousEventService {
     }
     Document rangeScope = new Document(scope);
     included.forEach(condition -> andDocument(rangeScope, condition));
-    long total = maliciousEventDao.countDocuments(accountId, rangeScope, maxTimeMs);
+    Document hint = ThreatUtils.coverIndexHint(accountId, rangeScope);
+    long total = hint == null
+        ? maliciousEventDao.countDocuments(accountId, rangeScope, maxTimeMs)
+        : maliciousEventDao.countDocuments(accountId, rangeScope, maxTimeMs, hint);
     if (excluded.isEmpty()) {
       return total;
     }
@@ -593,7 +604,8 @@ public class MaliciousEventService {
     // "agentic component + rule violated" — keeping only the latest occurrence. A different actor
     // (username) on the same host/setting still gets its own row.
     boolean dedupeLatestPerHostActorEndpoint = "only".equalsIgnoreCase(configEvalMode)
-        && "ENDPOINT".equalsIgnoreCase(contextSource);
+        && "ENDPOINT".equalsIgnoreCase(contextSource)
+        && !ThreatUtils.USE_EVAL_TYPE_READS;
 
     // Repeated Bedrock activities (same caller and prompt within the gap) are listed as one row.
     boolean groupActivities = ThreatUtils.groupsActivities(accountId) && "AGENTIC".equalsIgnoreCase(contextSource)
@@ -653,15 +665,9 @@ public class MaliciousEventService {
       cursor = activityRows.cursor;
     } else if (sortBySeverity) {
       total = countWithEvaluationModes(accountId, countScope, evaluationModeConditions, regexMaxTimeMs);
-      // Use aggregation pipeline for custom severity sorting
-      List<Document> pipeline = new ArrayList<>(matchStages);
-      pipeline.addAll(Arrays.asList(
-              new Document("$addFields", severityRankAddFields()),
-              new Document("$sort", new Document("severityRank", sort.getOrDefault("severity", 1))),
-              new Document("$skip", skip),
-              new Document("$limit", limit)
-          ));
-      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
+      cursor = maliciousEventDao.getCollection(accountId)
+          .aggregate(severitySortedPage(accountId, query, excludedFields, sort.getOrDefault("severity", 1), skip, limit, regexMaxTimeMs))
+          .maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
     } else if (sortByRiskScore) {
       total = countWithEvaluationModes(accountId, countScope, evaluationModeConditions, regexMaxTimeMs);
       List<Document> pipeline = new ArrayList<>(matchStages);
@@ -986,6 +992,67 @@ public class MaliciousEventService {
   }
 
   // severityRank: CRITICAL=1 .. LOW=4, anything else 5, for the custom severity sort.
+  private static final List<String> SEVERITY_ORDER = Arrays.asList("CRITICAL", "HIGH", "MEDIUM", "LOW");
+
+  private List<Document> severitySortedPage(String accountId, Document query, List<String> excludedFields, int direction, int skip, int limit, long maxTimeMs) {
+    Map<String, Long> counts = new HashMap<>();
+    List<Document> countPipeline = Arrays.asList(new Document("$match", query),
+        new Document("$group", new Document("_id", "$severity").append("count", new Document("$sum", 1))));
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, countPipeline), ThreatUtils.coverIndexHint(accountId, query))
+        .maxTime(maxTimeMs, TimeUnit.MILLISECONDS).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        String severity = doc.getString("_id");
+        String bucket = SEVERITY_ORDER.contains(severity) ? severity : "";
+        counts.merge(bucket, ((Number) doc.get("count")).longValue(), Long::sum);
+      }
+    }
+
+    List<String> buckets = new ArrayList<>(SEVERITY_ORDER);
+    buckets.add("");
+    if (direction < 0) {
+      Collections.reverse(buckets);
+    }
+
+    List<List<Document>> pages = new ArrayList<>();
+    long toSkip = skip;
+    long toTake = limit;
+    for (String bucket : buckets) {
+      long count = counts.getOrDefault(bucket, 0L);
+      if (toTake <= 0) {
+        break;
+      }
+      if (toSkip >= count) {
+        toSkip -= count;
+        continue;
+      }
+      long take = Math.min(toTake, count - toSkip);
+      Document severity = bucket.isEmpty()
+          ? new Document("severity", new Document("$nin", SEVERITY_ORDER))
+          : new Document("severity", bucket);
+      List<Document> page = new ArrayList<>(Arrays.asList(
+          new Document("$match", new Document("$and", Arrays.asList(query, severity))),
+          new Document("$sort", new Document("detectedAt", -1)),
+          new Document("$skip", toSkip),
+          new Document("$limit", take)));
+      if (!excludedFields.isEmpty()) {
+        page.add(new Document("$unset", excludedFields));
+      }
+      pages.add(page);
+      toSkip = 0;
+      toTake -= take;
+    }
+
+    if (pages.isEmpty()) {
+      return Collections.singletonList(new Document("$match", new Document("_id", new Document("$in", Collections.emptyList()))));
+    }
+    List<Document> pipeline = new ArrayList<>(pages.get(0));
+    for (List<Document> page : pages.subList(1, pages.size())) {
+      pipeline.add(new Document("$unionWith", new Document("coll", MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS).append("pipeline", page)));
+    }
+    return pipeline;
+  }
+
   private static Document severityRankAddFields() {
     return new Document("severityRank", new Document("$switch", new Document()
         .append("branches", Arrays.asList(

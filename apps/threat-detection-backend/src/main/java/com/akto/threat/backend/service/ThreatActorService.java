@@ -39,6 +39,7 @@ import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.mongodb.MongoExecutionTimeoutException;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.CountOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.Sorts;
@@ -653,27 +654,18 @@ public class ThreatActorService {
 
         pipeline.add(new Document("$match", matchConditions));
     
-        pipeline.add(new Document("$project", 
-        new Document("actor", 1)
-        .append("severity", 1)
-        .append("severityPriority", 
+        pipeline.add(new Document("$group", 
+            new Document("_id", 
+                new Document("dayStart", ThreatUtils.utcDayStart())
+                    .append("actor", "$actor"))
+            .append("severity", new Document("$max", 
             new Document("$switch", 
                 new Document("branches", Arrays.asList(
                     new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 4),
                     new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 3),
                     new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 2),
                     new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 1)))
-                .append("default", 0)))
-        .append("dayStart", 
-            new Document("$dateTrunc", 
-                new Document("date", new Document("$toDate", new Document("$multiply", Arrays.asList("$detectedAt", 1000))))
-                    .append("unit", "day")))));
-
-        pipeline.add(new Document("$group", 
-            new Document("_id", 
-                new Document("dayStart", "$dayStart")
-                    .append("actor", "$actor"))
-            .append("severity", new Document("$max", "$severityPriority"))));
+                .append("default", 0))))));
 
         pipeline.add(new Document("$project", 
             new Document("dayStart", "$_id.dayStart")
@@ -697,15 +689,14 @@ public class ThreatActorService {
                                 1,
                                 0))))));
 
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+        Document hint = ThreatUtils.coverIndexHint(accountId, matchConditions);
+        try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
-                // Convert dayStart from Date (ms) back to seconds
-                long dayStartEpochSeconds = doc.getDate("_id").getTime() / 1000;
+                long dayStartEpochSeconds = ((Number) doc.get("_id")).longValue();
                 int totalActors = doc.getInteger("totalActors");
                 int highSeverityActors = doc.getInteger("severityActors");
-                System.out.println(totalActors);
-                System.out.println(highSeverityActors);
+                loggerMaker.debug("Daily actors ts={} total={} critical={}", dayStartEpochSeconds, totalActors, highSeverityActors);
                 actors.add(
                     DailyActorsCountResponse.ActorsCount.newBuilder()
                         .setTs((int) dayStartEpochSeconds)
@@ -725,7 +716,7 @@ public class ThreatActorService {
         List<Document> totalAnalysedPipeline = new ArrayList<>(dedupedEventsPipeline);
         totalAnalysedPipeline.add(new Document("$count", "total"));
         long totalAnalysed = 0;
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, totalAnalysedPipeline).cursor()) {
+        try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, totalAnalysedPipeline), hint).cursor()) {
             if (cursor.hasNext()) {
                 totalAnalysed = cursor.next().getInteger("total", 0);
             }
@@ -736,7 +727,7 @@ public class ThreatActorService {
         totalAttacksPipeline.add(new Document("$match", new Document("successfulExploit", true)));
         totalAttacksPipeline.add(new Document("$count", "total"));
         long totalAttacks = 0;
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, totalAttacksPipeline).cursor()) {
+        try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, totalAttacksPipeline), hint).cursor()) {
             if (cursor.hasNext()) {
                 totalAttacks = cursor.next().getInteger("total", 0);
             }
@@ -754,7 +745,7 @@ public class ThreatActorService {
         int totalActive = 0;
         int totalIgnored = 0;
         int totalUnderReview = 0;
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, statusPipeline).cursor()) {
+        try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, statusPipeline), hint).cursor()) {
             while (cursor.hasNext()) {
                 Document d = cursor.next();
                 String status = d.getString("_id");
@@ -875,25 +866,17 @@ public class ThreatActorService {
     if (!eventsMatch.isEmpty()) {
       dailyPipeline.add(new Document("$match", eventsMatch));
     }
-    dailyPipeline.add(new Document("$project",
-        new Document("actor", 1)
-            .append("severity", 1)
-            .append("severityPriority",
+    dailyPipeline.add(new Document("$group",
+        new Document("_id",
+            new Document("dayStart", ThreatUtils.utcDayStart()).append("actor", "$actor"))
+            .append("severity", new Document("$max",
                 new Document("$switch",
                     new Document("branches", Arrays.asList(
                         new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 4),
                         new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 3),
                         new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 2),
                         new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 1)))
-                    .append("default", 0)))
-            .append("dayStart",
-                new Document("$dateTrunc",
-                    new Document("date", new Document("$toDate", new Document("$multiply", Arrays.asList("$detectedAt", 1000))))
-                        .append("unit", "day")))));
-    dailyPipeline.add(new Document("$group",
-        new Document("_id",
-            new Document("dayStart", "$dayStart").append("actor", "$actor"))
-            .append("severity", new Document("$max", "$severityPriority"))));
+                    .append("default", 0))))));
     dailyPipeline.add(new Document("$group",
         new Document("_id", "$_id.dayStart")
             .append("totalActors", new Document("$sum", 1))
@@ -903,10 +886,11 @@ public class ThreatActorService {
                         Arrays.asList(
                             new Document("$gte", Arrays.asList("$severity", 3)),
                             1, 0))))));
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, dailyPipeline).cursor()) {
+    Document hint = ThreatUtils.coverIndexHint(accountId, eventsMatch);
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, dailyPipeline), hint).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
-        long dayStartEpochSeconds = doc.getDate("_id").getTime() / 1000;
+        long dayStartEpochSeconds = ((Number) doc.get("_id")).longValue();
         dailyActors.add(
             DailyActorsCountResponse.ActorsCount.newBuilder()
                 .setTs((int) dayStartEpochSeconds)
@@ -917,12 +901,12 @@ public class ThreatActorService {
     }
 
     // Total analysed - all events in time range
-    long totalAnalysed = maliciousEventDao.getCollection(accountId).countDocuments(eventsMatch);
+    long totalAnalysed = maliciousEventDao.getCollection(accountId).countDocuments(eventsMatch, new CountOptions().hint(hint));
 
     // Total attacks - successful exploits in time range
     Document attackMatch = new Document(eventsMatch);
     attackMatch.append("successfulExploit", true);
-    long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(attackMatch);
+    long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(attackMatch, new CountOptions().hint(hint));
 
     // Status aggregation on malicious_events
     List<Document> statusPipeline = new ArrayList<>();
@@ -935,7 +919,7 @@ public class ThreatActorService {
     int totalActive = 0;
     int totalIgnored = 0;
     int totalUnderReview = 0;
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, statusPipeline).cursor()) {
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, statusPipeline), hint).cursor()) {
         while (cursor.hasNext()) {
             Document d = cursor.next();
             String status = d.getString("_id");
@@ -992,16 +976,9 @@ public class ThreatActorService {
       pipeline.addAll(ThreatUtils.configScanDedupeStages(pipeline, contextSource));
       pipeline.addAll(Arrays.asList(
 
-        // Stage 2: Project required fields and normalize timestamp to daily granularity
-        new Document("$project", new Document("dayStart",
-            new Document("$dateTrunc", new Document("date", 
-                new Document("$toDate", new Document("$multiply", Arrays.asList("$detectedAt", 1000L))))
-                    .append("unit", "day")))
-            .append("subCategory", "$subCategory")),
-
         // Stage 3: Group by dayStart and subCategory, count occurrences
-        new Document("$group", new Document("_id", 
-            new Document("dayStart", "$dayStart").append("subCategory", "$subCategory"))
+        new Document("$group", new Document("_id",
+            new Document("dayStart", ThreatUtils.utcDayStart()).append("subCategory", "$subCategory"))
             .append("count", new Document("$sum", 1))),
 
         // Stage 4: Reshape the output to group counts by day
@@ -1010,14 +987,14 @@ public class ThreatActorService {
                 new Document("$push", new Document("subCategory", "$_id.subCategory").append("count", "$count"))))
         ));
 
-        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+        try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), ThreatUtils.coverIndexHint(accountId, match)).cursor()) {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
-                System.out.print(doc);
+                loggerMaker.debug("Threat activity timeline bucket {}", doc);
                 
                 String subCategory;
                 int count;
-                long ts = doc.getDate("_id").getTime() / 1000;
+                long ts = ((Number) doc.get("_id")).longValue();
 
                 List<ThreatActivityTimelineResponse.SubCategoryData> subCategoryData = new ArrayList<>();
                 try {
@@ -1434,6 +1411,7 @@ public class ThreatActorService {
         }
         match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
         ThreatUtils.andHostScope(match, hostScopeMatch);
+        Document hint = ThreatUtils.coverIndexHint(accountId, match);
 
         if (!match.isEmpty()) {
             pipeline.add(new Document("$match", match));
@@ -1472,7 +1450,7 @@ public class ThreatActorService {
 
     List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         topApis.add(
@@ -1517,7 +1495,7 @@ public class ThreatActorService {
     hostPipeline.add(new Document("$limit", limit > 0 ? limit : 5));
 
     List<FetchTopNDataResponse.TopHostData> topHosts = new ArrayList<>();
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, hostPipeline)
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, hostPipeline), hint)
         .maxTime(evaluationModeConditions.isEmpty() ? 0 : ThreatUtils.REGEX_MAX_TIME_MS, java.util.concurrent.TimeUnit.MILLISECONDS).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
@@ -1672,7 +1650,12 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
-    match.append("latestApiEndpoint", ThreatUtils.SKILLS_ENDPOINT_PATTERN);
+    Document hint = "ENDPOINT".equalsIgnoreCase(contextSource) ? ThreatUtils.evalTypeIndexHint(accountId) : null;
+    if (hint != null) {
+      match.append(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_SKILL);
+    } else {
+      match.append("latestApiEndpoint", ThreatUtils.SKILLS_ENDPOINT_PATTERN);
+    }
     ThreatUtils.andHostScope(match, hostScopeMatch);
 
     List<Document> pipeline = new ArrayList<>();
@@ -1692,7 +1675,7 @@ public class ThreatActorService {
             .append("count", new Document("$sum", 1))));
 
     Map<String, FetchSkillSeverityCountsResponse.SkillSeverityCount.Builder> bySkill = new HashMap<>();
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         Document id = (Document) doc.get("_id");
