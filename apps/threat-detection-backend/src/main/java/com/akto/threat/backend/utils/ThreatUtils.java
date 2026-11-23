@@ -205,6 +205,7 @@ public class ThreatUtils {
         "contextSource", "status", "detectedAt", MaliciousEventDto.EVAL_TYPE, "severity", "host", "category", "subCategory",
         "actor", "successfulExploit", "latestApiEndpoint", "latestApiMethod", "filterId");
     private static final Set<String> EVAL_TYPE_COVER_ACCOUNTS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> EVAL_TYPE_INDEX_ACCOUNTS = ConcurrentHashMap.newKeySet();
 
     public static Document coverIndexHint(String accountId, Document match) {
         if (!USE_EVAL_TYPE_READS || !EVAL_TYPE_COVER_ACCOUNTS.contains(accountId)
@@ -214,6 +215,13 @@ public class ThreatUtils {
         Document keys = new Document();
         EVAL_TYPE_COVER_FIELDS.forEach(field -> keys.append(field, "detectedAt".equals(field) ? -1 : 1));
         return keys;
+    }
+
+    public static Document evalTypeIndexHint(String accountId) {
+        if (!USE_EVAL_TYPE_READS || !EVAL_TYPE_INDEX_ACCOUNTS.contains(accountId)) {
+            return null;
+        }
+        return new Document("contextSource", 1).append(MaliciousEventDto.EVAL_TYPE, 1).append("detectedAt", -1);
     }
 
     public static <T> AggregateIterable<T> withHint(AggregateIterable<T> iterable, Document hint) {
@@ -684,12 +692,21 @@ public class ThreatUtils {
                 new IndexOptions().name(EVAL_TYPE_INDEX)
                     .partialFilterExpression(new Document(MaliciousEventDto.EVAL_TYPE, new Document("$exists", true))));
         }
+        EVAL_TYPE_INDEX_ACCOUNTS.add(accountId);
 
         if (!existingIndexes.contains(CONFIG_DEDUPE_KEY_INDEX)) {
-            collection.createIndex(Indexes.ascending(MaliciousEventDto.DEDUPE_KEY),
-                new IndexOptions().name(CONFIG_DEDUPE_KEY_INDEX).unique(true)
-                    .partialFilterExpression(new Document(MaliciousEventDto.DEDUPE_KEY, new Document("$type", "string"))));
+            createDedupeKeyIndex(collection);
         }
+    }
+
+    public static Document utcDayStart() {
+        return new Document("$subtract", Arrays.asList("$detectedAt", new Document("$mod", Arrays.asList("$detectedAt", 86400))));
+    }
+
+    public static void createDedupeKeyIndex(MongoCollection<?> collection) {
+        collection.createIndex(Indexes.ascending(MaliciousEventDto.DEDUPE_KEY),
+            new IndexOptions().name(CONFIG_DEDUPE_KEY_INDEX).unique(true)
+                .partialFilterExpression(new Document(MaliciousEventDto.DEDUPE_KEY, new Document("$type", "string"))));
     }
 
 }

@@ -656,7 +656,7 @@ public class ThreatActorService {
     
         pipeline.add(new Document("$group", 
             new Document("_id", 
-                new Document("dayStart", new Document("$subtract", Arrays.asList("$detectedAt", new Document("$mod", Arrays.asList("$detectedAt", 86400)))))
+                new Document("dayStart", ThreatUtils.utcDayStart())
                     .append("actor", "$actor"))
             .append("severity", new Document("$max", 
             new Document("$switch", 
@@ -868,7 +868,7 @@ public class ThreatActorService {
     }
     dailyPipeline.add(new Document("$group",
         new Document("_id",
-            new Document("dayStart", new Document("$subtract", Arrays.asList("$detectedAt", new Document("$mod", Arrays.asList("$detectedAt", 86400))))).append("actor", "$actor"))
+            new Document("dayStart", ThreatUtils.utcDayStart()).append("actor", "$actor"))
             .append("severity", new Document("$max",
                 new Document("$switch",
                     new Document("branches", Arrays.asList(
@@ -978,7 +978,7 @@ public class ThreatActorService {
 
         // Stage 3: Group by dayStart and subCategory, count occurrences
         new Document("$group", new Document("_id",
-            new Document("dayStart", new Document("$subtract", Arrays.asList("$detectedAt", new Document("$mod", Arrays.asList("$detectedAt", 86400))))).append("subCategory", "$subCategory"))
+            new Document("dayStart", ThreatUtils.utcDayStart()).append("subCategory", "$subCategory"))
             .append("count", new Document("$sum", 1))),
 
         // Stage 4: Reshape the output to group counts by day
@@ -1650,7 +1650,12 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
-    match.append("latestApiEndpoint", ThreatUtils.SKILLS_ENDPOINT_PATTERN);
+    Document hint = "ENDPOINT".equalsIgnoreCase(contextSource) ? ThreatUtils.evalTypeIndexHint(accountId) : null;
+    if (hint != null) {
+      match.append(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_SKILL);
+    } else {
+      match.append("latestApiEndpoint", ThreatUtils.SKILLS_ENDPOINT_PATTERN);
+    }
     ThreatUtils.andHostScope(match, hostScopeMatch);
 
     List<Document> pipeline = new ArrayList<>();
@@ -1670,7 +1675,7 @@ public class ThreatActorService {
             .append("count", new Document("$sum", 1))));
 
     Map<String, FetchSkillSeverityCountsResponse.SkillSeverityCount.Builder> bySkill = new HashMap<>();
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         Document id = (Document) doc.get("_id");
