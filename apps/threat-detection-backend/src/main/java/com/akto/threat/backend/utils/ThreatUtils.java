@@ -183,7 +183,7 @@ public class ThreatUtils {
 
     public static final Pattern CONFIG_ENDPOINT_PATTERN = Pattern.compile("/config/");
     public static final boolean USE_EVAL_TYPE_READS = Boolean.parseBoolean(
-        System.getenv().getOrDefault("USE_EVAL_TYPE_READS", "false"));
+        System.getenv().getOrDefault("USE_EVAL_TYPE_READS", "true"));
     public static final String EVAL_TYPE_INDEX = "idx_context_evalType_detectedAt";
     public static final String CONFIG_DEDUPE_KEY_INDEX = "idx_dedupeKey_unique";
 

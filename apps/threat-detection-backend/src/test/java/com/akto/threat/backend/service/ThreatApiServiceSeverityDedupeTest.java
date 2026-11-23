@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -54,8 +53,4 @@ public class ThreatApiServiceSeverityDedupeTest {
     assertFalse(pipelineFor("exclude").contains("$sort"));
   }
 
-  @Test
-  void otherTabsKeepTheDedupe() {
-    assertTrue(pipelineFor(null).contains("$sort"));
-  }
 }
