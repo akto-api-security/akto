@@ -8,6 +8,8 @@ import Store from "../../../store";
 import TestEditorStore from "../testEditorStore";
 
 import testEditorRequests from "../api";
+import learningsApi from "../../testing/redteam_learnings/api";
+import { clearStashedDraft } from "../../testing/redteam_learnings/draftHandoff";
 
 import func from "@/util/func";
 import { usePermissions, NO_PERMISSION_REASON } from "@/util/permissions";
@@ -58,8 +60,28 @@ const YamlEditor = ({ fetchAllTests }) => {
         const Editor = editorInstanceRef.current
         const currentYaml = Editor.getValue()
         setCurrentContent(currentYaml)
-        const existingYaml = testsObj.mapTestToData[selectedTest.label].content 
-        setIsEdited(currentYaml !== existingYaml)
+        const existingYaml = testsObj.mapTestToData[selectedTest.label].content
+        // A red-team learning draft is not saved anywhere yet, so it can always be saved.
+        setIsEdited(Boolean(selectedTest.redteamDraftId) || currentYaml !== existingYaml)
+    }
+
+    // The template is saved first; marking its draft saved is a second call whose failure is reported on its own.
+    // The call is idempotent (the same template id), so one retry covers a blip without a second prompt.
+    const markRedteamDraftSaved = async (draftId, finalTestId) => {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                await learningsApi.updateRedteamDraftStatus(draftId, "SAVED", finalTestId)
+                clearStashedDraft()
+                return
+            } catch (error) {
+                // the second failure is reported below
+            }
+        }
+        setToastConfig({
+            isActive: true,
+            isError: true,
+            message: "The test was saved, but its suggested draft could not be marked as saved. Dismiss it from the Learnings tab; saving it again would create a second test."
+        })
     }
 
     const handleSave = async () => {
@@ -72,12 +94,15 @@ const YamlEditor = ({ fetchAllTests }) => {
                 isError: false,
                 message: "Test saved successfully!"
             })
-            navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
+            if (selectedTest.redteamDraftId && addTestTemplateResponse?.finalTestId) {
+                await markRedteamDraftSaved(selectedTest.redteamDraftId, addTestTemplateResponse.finalTestId)
+            }
+            navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`)
             fetchAllTests()
         } catch(error) {
-            
+
         }
-        
+
     }
     
     useEffect(()=>{        
@@ -110,7 +135,7 @@ const YamlEditor = ({ fetchAllTests }) => {
         if (selectedTest) {
             const value = testsObj.mapTestToData[selectedTest.label].content
             Editor.setValue(value)
-            setIsEdited(false)
+            setIsEdited(Boolean(selectedTest.redteamDraftId))
         }    
       }, [selectedTest])
 
@@ -158,7 +183,7 @@ const YamlEditor = ({ fetchAllTests }) => {
                         <Button icon={ClipboardMinor} plain onClick={copyTestName} />
                     </Tooltip>  
                     <Tooltip content={canCall('api/setTestInactive') ? `Set as ${selectedTest.inactive ? "active" : "inactive" }` : NO_PERMISSION_REASON} dismissOnMouseOut preferredPosition="below">
-                        <Button icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} disabled={!canCall('api/setTestInactive')} />
+                        <Button icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} disabled={!canCall('api/setTestInactive') || Boolean(selectedTest.redteamDraftId)} />
                     </Tooltip>  
                 </HorizontalStack>
         

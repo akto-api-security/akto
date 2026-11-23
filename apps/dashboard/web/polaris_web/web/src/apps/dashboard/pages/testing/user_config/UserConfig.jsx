@@ -1,4 +1,4 @@
-import { Button, Collapsible, Divider, LegacyCard, LegacyStack, Text, Box } from "@shopify/polaris"
+import { Button, Checkbox, Collapsible, Divider, LegacyCard, LegacyStack, Text, Box } from "@shopify/polaris"
 import { ChevronRightMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import { useState, useEffect } from "react";
 import api from "../api"
@@ -28,6 +28,9 @@ function UserConfig() {
     const [commonTestTemplate, setCommonTestTemplate] = useState({message: ""});
     const [commonTestTemplate2, setCommonTestTemplate2] = useState("");
     const [initialDeltaTime, setInitialDeltaTime] = useState(120) ;
+    // undefined until the admin settings load; null when never set, which counts as off
+    const [redteamLearningsEnabled, setRedteamLearningsEnabled] = useState(undefined);
+    const [savingRedteamLearnings, setSavingRedteamLearnings] = useState(false);
     const { canCall } = usePermissions()
     // rate limit and ignore time are admin settings
     const canSeeAdminSettings = canCall('api/fetchAdminSettings')
@@ -50,6 +53,7 @@ function UserConfig() {
             await settingRequests.fetchAdminSettings().then((resp)=> {
                 setInitialLimit(resp.accountSettings.globalRateLimit);
                 setInitialLimitAgentic(resp.accountSettings.globalRateLimitAgentic);
+                setRedteamLearningsEnabled(resp?.accountSettings?.redteamLearningsEnabled ?? null);
                 const val = resp?.accountSettings?.timeForScheduledSummaries === undefined || resp?.accountSettings?.timeForScheduledSummaries === 0 ? (120*60) : resp?.accountSettings?.timeForScheduledSummaries
                 setInitialDeltaTime(val/60)
                 LocalStore.getState().setDefaultIgnoreSummaryTime(val)
@@ -113,6 +117,21 @@ function UserConfig() {
     const getRateLimitHelperTextAgentic = (limit) => limit === 0
         ? "No limit is applied"
         : `This limit allows ${limit.toLocaleString()} probes per day`
+
+    const handleToggleRedteamLearnings = async(enabled) => {
+        const previous = redteamLearningsEnabled
+        setRedteamLearningsEnabled(enabled)
+        setSavingRedteamLearnings(true)
+        try {
+            await api.updateRedteamLearningsEnabled(enabled)
+            setToastConfig({ isActive: true, isError: false, message: `Red-team learnings turned ${enabled ? "on" : "off"}` })
+        } catch (e) {
+            setRedteamLearningsEnabled(previous)
+            setToastConfig({ isActive: true, isError: true, message: "Could not update red-team learnings" })
+        } finally {
+            setSavingRedteamLearnings(false)
+        }
+    }
 
     const handleUpdateDeltaTime = async(limit) => {
         setInitialDeltaTime(limit);
@@ -229,6 +248,28 @@ function UserConfig() {
         />
     )
 
+    const redteamLearningsCard = (
+        <InfoCard
+            key={"redteamLearnings"}
+            title={"Red-team learnings"}
+            titleToolTip={"Agentic tests remember what earlier conversations and runs showed about each agent, use it to craft attacks, and suggest new test templates for you to review"}
+            component={
+                <LegacyStack vertical spacing="tight">
+                    <Checkbox
+                        label="Learn from earlier conversations and runs"
+                        checked={redteamLearningsEnabled === true}
+                        disabled={savingRedteamLearnings || !canCall('api/updateRedteamLearningsEnabled')}
+                        onChange={(checked) => handleToggleRedteamLearnings(checked)}
+                    />
+                    <Text variant="bodySm" color="subdued">
+                        {redteamLearningsEnabled === null ? "Off by default. " : ""}
+                        It also needs REDTEAM_LEARNINGS_ENABLED=true on the agentic testing service; without it nothing is learned.
+                    </Text>
+                </LegacyStack>
+            }
+        />
+    )
+
     async function saveCommonTemplate() {
         await api.saveCommonTestTemplate(commonTestTemplate2)
         setToastConfig({ isActive: true, isError: false, message: "Test template saved successfully!" })
@@ -252,7 +293,10 @@ function UserConfig() {
         </LegacyCard>
     )
 
-    let components = canSeeAdminSettings ? [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime, commonTemplateComponent] : [<TestCollectionConfiguration/>, commonTemplateComponent]
+    const showRedteamLearnings = isAgenticSecurityCategory() && redteamLearningsEnabled !== undefined
+    let components = canSeeAdminSettings
+        ? [<TestCollectionConfiguration/>, rateLimit, ...(showRedteamLearnings ? [redteamLearningsCard] : []), updateDeltaPeriodTime, commonTemplateComponent]
+        : [<TestCollectionConfiguration/>, commonTemplateComponent]
 
     return (
         isLoading ? <SpinnerCentered /> 
