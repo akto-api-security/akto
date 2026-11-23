@@ -341,7 +341,7 @@ export default function AgenticAssetsPage() {
 
   const headerActions = (
     <HorizontalStack gap="3" blockAlign="center">
-      <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />
+      <NewLayoutTooltip invert checked={newLayout} onChange={handleLayoutToggle} />
       <DateRangeFilter
         initialDispatch={currDateRange}
         dispatch={(dateObj) =>

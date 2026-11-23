@@ -203,7 +203,7 @@ function DevicesEmployeesPage() {
             isFirstPage
             secondaryActions={
                 <>
-                    <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />
+                    <NewLayoutTooltip invert checked={newLayout} onChange={handleLayoutToggle} />
                     <Button icon={ExportMinor} onClick={exportTable} loading={exporting}>Export</Button>
                 </>
             }

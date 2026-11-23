@@ -316,7 +316,7 @@ function UsersAndDevices() {
     ), []);
 
     const layoutToggle = (
-        <NewLayoutTooltip checked={false} onChange={() => { setAgenticNewLayout(true); navigate("/dashboard/observe/endpoints"); }} />
+        <NewLayoutTooltip invert checked={false} onChange={() => { setAgenticNewLayout(true); navigate("/dashboard/observe/endpoints"); }} />
     );
 
     if (loading) {

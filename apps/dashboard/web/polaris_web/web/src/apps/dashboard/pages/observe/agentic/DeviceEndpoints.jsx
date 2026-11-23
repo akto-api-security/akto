@@ -571,7 +571,7 @@ export default function DeviceEndpoints() {
 
     const headerActions = (
         <HorizontalStack gap="3" blockAlign="center">
-            <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />
+            <NewLayoutTooltip invert checked={newLayout} onChange={handleLayoutToggle} />
             <DateRangeFilter
                 initialDispatch={currDateRange}
                 dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })}
