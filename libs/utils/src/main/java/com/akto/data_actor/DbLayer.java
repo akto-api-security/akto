@@ -636,8 +636,12 @@ public class DbLayer {
             return new ArrayList<>();
         }
 
+        // Threat detection also picks up "delete topic and reboot" here; other modules handle it elsewhere
+        boolean withDeleteTopic = moduleType == ModuleInfo.ModuleType.THREAT_DETECTION;
         List<Bson> filterConditions = new ArrayList<>();
-        filterConditions.add(Filters.eq(ModuleInfo._REBOOT, true));
+        filterConditions.add(withDeleteTopic
+                ? Filters.or(Filters.eq(ModuleInfo._REBOOT, true), Filters.eq(ModuleInfo.DELETE_TOPIC_AND_REBOOT, true))
+                : Filters.eq(ModuleInfo._REBOOT, true));
         filterConditions.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
 
         if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
@@ -659,7 +663,9 @@ public class DbLayer {
             }
 
             Bson updateFilter = Filters.in("_id", ids);
-            Bson updates = Updates.set(ModuleInfo._REBOOT, false);
+            Bson updates = withDeleteTopic
+                    ? Updates.combine(Updates.set(ModuleInfo._REBOOT, false), Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false))
+                    : Updates.set(ModuleInfo._REBOOT, false);
             ModuleInfoDao.instance.updateMany(updateFilter, updates);
         }
 
