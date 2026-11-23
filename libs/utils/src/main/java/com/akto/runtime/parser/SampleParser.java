@@ -54,9 +54,7 @@ public class SampleParser {
                 return tagsJson;
             }
             String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
-            boolean isBedrock = Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(source)
-                    || Constants.AI_AGENT_SOURCE_AWS_QUICK.equals(source);
-            if (!isBedrock) {
+            if (!Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(source)) {
                 return tagsJson;
             }
             String agentName = tagsMap.get(Constants.AI_AGENT_TAG_REQUEST_METADATA_AGENT_NAME);

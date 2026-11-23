@@ -893,7 +893,8 @@ public class HttpCallParser {
     }
 
     private boolean isAgenticTraffic(Map<String, String> tagsMap) {
-        return isArgusTraffic(tagsMap) || isAtlasTraffic(tagsMap) || isBedrockAgentTraffic(tagsMap);
+        return isArgusTraffic(tagsMap) || isAtlasTraffic(tagsMap)
+                || (tagsMap != null && Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE)));
     }
 
     /**
@@ -1656,8 +1657,7 @@ public class HttpCallParser {
             String contextSource = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
             String contextBotName = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_BOT_NAME);
             boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(contextSource);
-            boolean isBedrockSource = Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(contextSource)
-                    || Constants.AI_AGENT_SOURCE_AWS_QUICK.equals(contextSource);
+            boolean isBedrockSource = Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(contextSource);
             boolean isDedicatedBotCollection = isEndpointSource
                     || (isBedrockSource && contextBotName != null && !contextBotName.isEmpty());
 

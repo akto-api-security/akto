@@ -76,6 +76,16 @@ public class SampleParserAgenticTagsTest {
     }
 
     @Test
+    public void testAwsQuickIsNotRewritten() throws Exception {
+        String tags = "{\"source\":\"AWS_QUICK\",\"bot-name\":\"quick-bot\","
+            + "\"request-metadata-agent_name\":\"deeplink_agent\"}";
+        HttpResponseParams p = SampleParser.parseSampleMessage(message(tags));
+
+        assertEquals("quick-bot", tagsOf(p).get(Constants.AI_AGENT_TAG_BOT_NAME),
+            "AWS Quick keeps its existing collection naming");
+    }
+
+    @Test
     public void testBlankAgentNameIsIgnored() {
         String tags = bedrockTags("\"request-metadata-agent_name\":\"   \"");
         assertEquals(tags, SampleParser.normalizeAgenticTags(tags),
