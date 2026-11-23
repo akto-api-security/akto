@@ -2,17 +2,30 @@ package com.akto.threat.detection.tasks;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.ListOffsetsResult;
+import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.RecordsToDelete;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.TopicPartitionInfo;
 
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.kafka.KafkaConfig;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.threat.detection.constants.KafkaTopic;
 
 public class ConfigPoller implements Runnable {
 
@@ -23,11 +36,14 @@ public class ConfigPoller implements Runnable {
     private static final Random RANDOM = new Random();
     private static final int JITTER_MIN_SECONDS = 1;
     private static final int JITTER_MAX_SECONDS = 5;
+    private static final long KAFKA_ADMIN_TIMEOUT_SECONDS = 30;
 
     private final DataActor dataActor;
+    private final String internalKafkaBootstrapServers;
 
-    public ConfigPoller() {
+    public ConfigPoller(String internalKafkaBootstrapServers) {
         this.dataActor = DataActorFactory.fetchInstance();
+        this.internalKafkaBootstrapServers = internalKafkaBootstrapServers;
         logger.infoAndAddToDb("ConfigPoller initialized");
     }
 
@@ -55,6 +71,10 @@ public class ConfigPoller implements Runnable {
             }
 
             logger.infoAndAddToDb("Reboot flag detected, processing restart request");
+
+            if (moduleInfoList.stream().anyMatch(ModuleInfo::isDeleteTopicAndReboot)) {
+                clearAlertsTopic();
+            }
 
             Map<String, String> envVars = extractEnvVars(moduleInfoList);
             if (!envVars.isEmpty()) {
@@ -103,6 +123,30 @@ public class ConfigPoller implements Runnable {
             }
         }
         logger.infoAndAddToDb("Updated .env file with " + envVars.size() + " variables");
+    }
+
+    // Drops every queued alert; the alerts consumer then resumes from the end. The traffic topic is never touched.
+    private void clearAlertsTopic() {
+        String topic = KafkaTopic.ThreatDetection.ALERTS;
+        Properties properties = new Properties();
+        properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, internalKafkaBootstrapServers);
+        KafkaConfig.addAuthenticationFromEnv(properties);
+        try (AdminClient admin = AdminClient.create(properties)) {
+            Map<TopicPartition, OffsetSpec> latest = new HashMap<>();
+            for (TopicPartitionInfo partition : admin.describeTopics(Collections.singletonList(topic)).allTopicNames()
+                    .get(KAFKA_ADMIN_TIMEOUT_SECONDS, TimeUnit.SECONDS).get(topic).partitions()) {
+                latest.put(new TopicPartition(topic, partition.partition()), OffsetSpec.latest());
+            }
+            Map<TopicPartition, RecordsToDelete> toDelete = new HashMap<>();
+            for (Map.Entry<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> end : admin.listOffsets(latest).all()
+                    .get(KAFKA_ADMIN_TIMEOUT_SECONDS, TimeUnit.SECONDS).entrySet()) {
+                toDelete.put(end.getKey(), RecordsToDelete.beforeOffset(end.getValue().offset()));
+            }
+            admin.deleteRecords(toDelete).all().get(KAFKA_ADMIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            logger.warnAndAddToDb("Cleared " + topic + " (" + toDelete.size() + " partitions)");
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error clearing " + topic);
+        }
     }
 
     private void restartSelf() {
