@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Divider, LegacyCard, Text, VerticalStack } from "@shopify/polaris"
 import learningsApi from "./api"
-import { AccountSettingBanner, DraftList, LOAD_STATE, LoadStateBanner, ProfileSummary, loadStateFromError } from "./LearningsView"
+import { DraftList, LOAD_STATE, LoadStateBanner, ProfileSummary, loadStateFromError } from "./LearningsView"
 
 /**
  * What one run learned about the agents it tested. Renders nothing for a run that learned nothing (most runs are
@@ -31,6 +31,8 @@ function RunLearningsCard({ summaryHexId }) {
     // Most runs are not agentic and learned nothing: no card while loading, and none when the read says there is nothing.
     if (loadState === LOAD_STATE.LOADING) return null
     if (loadState === LOAD_STATE.LOADED && runLearnings?.state !== "READY") return null
+    // Account setting off (or unreadable): no card and no banner. A failed learnings read is still shown below.
+    if (loadState === LOAD_STATE.LOADED && learningsEnabled !== true) return null
 
     const removeDraft = (draftId) => setRunLearnings((prev) => ({ ...prev, drafts: (prev?.drafts || []).filter((d) => d.id !== draftId) }))
 
@@ -39,7 +41,6 @@ function RunLearningsCard({ summaryHexId }) {
             <LoadStateBanner loadState={loadState} onRetry={load} subject="This run's learnings" />
             {loadState === LOAD_STATE.LOADED ? (
                 <VerticalStack gap="4">
-                    <AccountSettingBanner learningsEnabled={learningsEnabled} />
                     {runLearnings.versionsTruncated ? (
                         <Text color="subdued">This run wrote more versions than are read; only the newest are used below.</Text>
                     ) : null}
