@@ -635,7 +635,7 @@ export default function LeftNav() {
                     url: "#",
                     key: "7",
                     subNavigationItems: [
-                        ...(dashboardCategory === "Endpoint Security" && func.isAktoUser() ? [{
+                        ...(dashboardCategory === "Endpoint Security" ? [{
                             label: "Overview",
                             requires: pageRequires("/dashboard/guardrails/atlas-overview"),
                             badge: <Badge status="info">Beta</Badge>,
@@ -657,7 +657,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_overview",
                         }] : []),
-                        ...((dashboardCategory === "API Security" || (dashboardCategory === "Endpoint Security" && !func.isAktoUser())) ? [{
+                        ...(dashboardCategory === "API Security" ? [{
                             label: "Dashboard",
                             requires: pageRequires("/dashboard/protection/threat-dashboard"),
                             onClick: () => {
