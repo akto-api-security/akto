@@ -269,8 +269,10 @@ public class HttpCallParser {
     private static int lastSyncLimitFetch = 0;
     private static final int REFRESH_INTERVAL = 60 * 10; // 10 minutes.
     private static SyncLimit syncLimit = FeatureAccess.fullAccess.fetchSyncLimit();
-    private static SyncLimit mcpAssetSyncLimit = FeatureAccess.noAccess.fetchSyncLimit();
-    private static SyncLimit aiAssetSyncLimit = FeatureAccess.noAccess.fetchSyncLimit();
+    // Asset limits gate new collections (see SyncLimitPolicy); nothing is blocked before the first fetch.
+    private static FeatureAccess aiAssetAccess = FeatureAccess.fullAccess;
+    // null: ENDPOINT_ASSET_COUNT not configured for the org, endpoint collections are not limited.
+    private static FeatureAccess endpointAssetAccess = null;
 
     private void fetchSyncLimit() {
         try {
@@ -285,8 +287,8 @@ public class HttpCallParser {
             loggerMaker.infoAndAddToDb("Fetching api sync limit for accountId: " + accountId + " with usageLimit: "
                 + featureAccess.getUsageLimit() + " and usage: " + featureAccess.getUsage());
             syncLimit = featureAccess.fetchSyncLimit();
-            mcpAssetSyncLimit = fetchSyncLimit(organization, MetricTypes.MCP_ASSET_COUNT);
-            aiAssetSyncLimit = fetchSyncLimit(organization, MetricTypes.AI_ASSET_COUNT);
+            aiAssetAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.AI_ASSET_COUNT);
+            endpointAssetAccess = fetchEndpointAssetAccess(organization, accountId);
             lastSyncLimitFetch = Context.now();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetching sync limit from feature access " + e);
@@ -603,7 +605,7 @@ public class HttpCallParser {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
             fetchSyncLimit();
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, mcpAssetSyncLimit, aiAssetSyncLimit);
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, aiAssetAccess, endpointAssetAccess, apiCollectionsMap);
             if (Context.getActualAccountId() == 1745303931 || Context.getActualAccountId() == 1741069294 || Context.getActualAccountId() == 1749515934 || Context.getActualAccountId() == 1753864648) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
@@ -2469,11 +2471,17 @@ public class HttpCallParser {
                 + callerService + ") as calling AI agent host: " + calleeHost);
     }
 
-    private SyncLimit fetchSyncLimit(Organization organization, MetricTypes metricType) {
-        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, metricType);
-        if (featureAccess.equals(FeatureAccess.noAccess)) {
-            featureAccess.setUsageLimit(0);
+    /**
+     * ENDPOINT_ASSET_COUNT is a new entitlement: an org whose plan does not list it yet is not
+     * limited (null), unlike AI_ASSET_COUNT where a missing entitlement blocks.
+     */
+    static FeatureAccess fetchEndpointAssetAccess(Organization organization, int accountId) {
+        Map<String, FeatureAccess> features = organization != null ? organization.getFeatureWiseAllowed() : null;
+        if (features != null && !features.isEmpty() && !features.containsKey(MetricTypes.ENDPOINT_ASSET_COUNT.name())) {
+            loggerMaker.warnAndAddToDb("ENDPOINT_ASSET_COUNT not configured for account " + accountId
+                + ", endpoint collections are not limited");
+            return null;
         }
-        return featureAccess.fetchSyncLimit();
+        return UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ENDPOINT_ASSET_COUNT);
     }
 }

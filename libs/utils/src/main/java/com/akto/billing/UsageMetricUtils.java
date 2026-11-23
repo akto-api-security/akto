@@ -19,6 +19,7 @@ import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.Config;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
@@ -243,6 +244,31 @@ public class UsageMetricUtils {
             loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
         }
         return featureAccess;
+    }
+
+    /**
+     * Whether endpoints of a collection must not be ingested because its asset metric
+     * (AI_ASSET_COUNT counts collections, ENDPOINT_ASSET_COUNT counts devices) is over its limit.
+     *
+     * Only assets created after the overage was first detected are blocked, and only once the
+     * overage has outlasted the grace period: collections that already existed (and are already
+     * counted) keep being ingested. An unknown overage time never blocks. An org without the
+     * entitlement is blocked, as before.
+     */
+    public static boolean shouldSkipNewAsset(FeatureAccess featureAccess, ApiCollection apiCollection) {
+        if (apiCollection == null) {
+            return false;
+        }
+        if (!featureAccess.getIsGranted()) {
+            return true;
+        }
+        if (featureAccess.checkBooleanOrUnlimited() || featureAccess.getUsage() < featureAccess.getUsageLimit()) {
+            return false;
+        }
+        if (!featureAccess.overageOutlastedGrace()) {
+            return false;
+        }
+        return apiCollection.getStartTs() > featureAccess.getOverageFirstDetected();
     }
 
     public static FeatureAccess getFeatureAccess(Organization organization, MetricTypes metricType) {

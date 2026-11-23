@@ -190,6 +190,7 @@ public class Constants {
 
 
     public static final String AKTO_ENDPOINT_SOURCE_TAG = "source";
+    public static final String AKTO_ENDPOINT_SOURCE_VALUE = "ENDPOINT";
     public static final String AKTO_COPILOT_SOURCE_VALUE = "COPILOT_STUDIO";
     public static final String AKTO_COPILOT_BOT_NAME_TAG = "bot-name";
     public static final String AKTO_COPILOT_BOT_SCHEMA_TAG = "bot-schemaname";

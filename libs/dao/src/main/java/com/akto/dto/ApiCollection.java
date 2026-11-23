@@ -502,6 +502,32 @@ public class ApiCollection {
      * Named for the tag rather than shortened to isRagCollection, which would read as the unrelated
      * AKTO_RAG_COLLECTION_TAG ("rag-collection").
      */
+    public boolean isEndpointCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t ->
+                Constants.AKTO_ENDPOINT_SOURCE_TAG.equals(t.getKeyName()) &&
+                Constants.AKTO_ENDPOINT_SOURCE_VALUE.equals(t.getValue())
+            );
+        }
+        return false;
+    }
+
+    public boolean isAiAgentCallerCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_AI_AGENT_CALLER_TAG.equals(t.getKeyName()));
+        }
+        return false;
+    }
+
+    /**
+     * In-memory twin of UsersCollectionsList.agenticCollectionsFilter() on master: MCP, GenAI or
+     * ai-agent-caller collections that are not endpoint-source collections. These are counted by
+     * AI_ASSET_COUNT.
+     */
+    public boolean isAgenticCollection() {
+        return (isMcpCollection() || isGenAICollection() || isAiAgentCallerCollection()) && !isEndpointCollection();
+    }
+
     public boolean isRagDatabaseCollection() {
         if (!CollectionUtils.isEmpty(this.getTagsList())) {
             return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_RAG_DATABASE_TAG.equals(t.getKeyName()));

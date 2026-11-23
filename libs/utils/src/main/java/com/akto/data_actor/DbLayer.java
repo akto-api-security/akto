@@ -978,8 +978,24 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
         return new ArrayList<>(UsageMetricCalculator.getDeactivatedLatest());
     }
 
+    /**
+     * Asset metrics count collections or devices and are measured only by the hourly usage cron.
+     * Older mini-runtimes still send endpoint deltas for them, which would push the usage past its
+     * real value and block new assets early.
+     */
+    public static boolean acceptsDeltaUsage(MetricTypes metricType) {
+        return metricType != MetricTypes.AI_ASSET_COUNT
+                && metricType != MetricTypes.MCP_ASSET_COUNT
+                && metricType != MetricTypes.ENDPOINT_ASSET_COUNT;
+    }
+
     public static void updateUsage(MetricTypes metricType, int deltaUsage){
         int accountId = Context.accountId.get();
+        if (!acceptsDeltaUsage(metricType)) {
+            loggerMaker.infoAndAddToDb("Ignored delta usage " + deltaUsage + " for " + metricType + " from account " + accountId
+                    + ": asset metrics are measured by the usage cron");
+            return;
+        }
         UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(metricType, accountId, deltaUsage);
         return;
     }
