@@ -46,6 +46,9 @@ public class DbLogsAction extends UserAction {
 
     private static final String INTERNAL_EMAIL_DOMAIN = "@akto.io";
 
+    /** Longest log range served per call, so one request cannot scan a huge range of the shared logs collections. */
+    private static final int MAX_LOG_RANGE_SECONDS = 15 * 60;
+
     private List<LogDb> allowedLogGroups;
     private List<Log> logs;
     private int startTime;
@@ -134,7 +137,9 @@ public class DbLogsAction extends UserAction {
             addActionError("You do not have access to these logs");
             return "FORBIDDEN";
         }
-        logs = loggerMaker.fetchLogRecords(startTime, endTime, logDb, logKeys);
+        // keep the most recent part of the requested range
+        int clampedStartTime = Math.max(startTime, endTime - MAX_LOG_RANGE_SECONDS);
+        logs = loggerMaker.fetchLogRecords(clampedStartTime, endTime, logDb, logKeys);
 
         return SUCCESS.toUpperCase();
     }
