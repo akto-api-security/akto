@@ -45,23 +45,6 @@ export function LoadStateBanner({ loadState, onRetry, subject }) {
     return null
 }
 
-// true: on; false: switched off; null: the setting could not be read, which is not the same as on.
-export function AccountSettingBanner({ learningsEnabled }) {
-    if (learningsEnabled === true) return null
-    if (learningsEnabled === null || learningsEnabled === undefined) {
-        return (
-            <Banner status="warning">
-                Whether red-team learnings are turned on for this account could not be read. What is shown was learned before.
-            </Banner>
-        )
-    }
-    return (
-        <Banner status="info">
-            Red-team learnings are turned off for this account (Testing → User config). What is shown was learned before.
-        </Banner>
-    )
-}
-
 function Totals({ profile }) {
     const totals = profile?.totals || {}
     const judged = totals.judged || 0

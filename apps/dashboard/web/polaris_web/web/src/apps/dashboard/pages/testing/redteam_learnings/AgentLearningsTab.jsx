@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Box, DataTable, Divider, Spinner, Text, VerticalStack } from "@shopify/polaris"
 import func from "@/util/func"
 import learningsApi from "./api"
-import { AccountSettingBanner, DraftList, LOAD_STATE, LoadStateBanner, ProfileSummary, loadStateFromError } from "./LearningsView"
+import { DraftList, LOAD_STATE, LoadStateBanner, ProfileSummary, loadStateFromError } from "./LearningsView"
 
 function historyRows(versions) {
     return (versions || []).map((v) => {
@@ -39,13 +39,15 @@ function AgentLearningsTab({ apiCollectionId, url, method }) {
 
     const removeDraft = (draftId) => setAgentLearnings((prev) => ({ ...prev, openDrafts: (prev?.openDrafts || []).filter((d) => d.id !== draftId) }))
 
+    // Shown only while the account setting is on; off (or unreadable) shows nothing, not even a banner.
+    const showLearnings = loadState === LOAD_STATE.LOADED && learningsEnabled === true
+
     return (
         <Box paddingBlockStart="4">
             {loadState === LOAD_STATE.LOADING ? <Spinner size="small" /> : null}
             <LoadStateBanner loadState={loadState} onRetry={load} subject="This agent's learnings" />
-            {loadState === LOAD_STATE.LOADED ? (
+            {showLearnings ? (
                 <VerticalStack gap="4">
-                    <AccountSettingBanner learningsEnabled={learningsEnabled} />
                     {agentLearnings.state !== "READY" ? (
                         <Text color="subdued">Nothing has been learned about this agent yet. Learnings are written when an agentic run against it finishes, once red-team learnings are running for this account.</Text>
                     ) : (
