@@ -38,6 +38,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 
 public class Crons {
@@ -139,7 +140,10 @@ public class Crons {
     public static void insertHistoricalData(){
         int currentTime = Context.now();
         Map<Integer, HistoricalData> historicalDataMap = new HashMap<>();
-        MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find().cursor();
+        Bson projection = Projections.fields(
+            Projections.include(ApiInfo.COLLECTION_IDS, ApiInfo.RISK_SCORE, ApiInfo.LAST_TESTED),
+            Projections.excludeId());
+        MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find().projection(projection).cursor();
 
         while (cursor.hasNext()) {
             ApiInfo apiInfo = cursor.next();
