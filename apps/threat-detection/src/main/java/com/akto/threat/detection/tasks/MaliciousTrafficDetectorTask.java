@@ -281,7 +281,12 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
       }
     }
 
-    if (apiDistributionEnabled && apiCollectionId != 0) {
+    // The IpApiRateLimited policy is skipped in the filter loop below, so its ignore is applied here, before counting
+    FilterConfig ipApiRateLimitPolicy = filters != null ? filters.get(ipApiRateLimitFilter.getId()) : null;
+    boolean rateLimitIgnored = ipApiRateLimitPolicy != null && rawApi != null
+        && threatDetector.shouldIgnoreApi(ipApiRateLimitPolicy, rawApi, apiInfoKey, actor);
+
+    if (apiDistributionEnabled && apiCollectionId != 0 && !rateLimitIgnored) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
 
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, urlForAggregation, method.toString());
