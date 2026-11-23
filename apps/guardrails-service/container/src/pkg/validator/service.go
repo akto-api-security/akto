@@ -1135,8 +1135,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.logger.Info("Policy cache refreshed with ALL policies",
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
-		zap.Time("lastFetched", s.cache.lastFetched),
-		zap.Any("policies", policies))
+		zap.Time("lastFetched", s.cache.lastFetched))
 	// A 0 here means no Rejected AGENT_SKILL rows came back, so no Skill call can be blocked.
 	s.logger.Info("[SkillCheck] rejected skills loaded from audit data",
 		zap.Int("rejectedSkillNamesCount", len(decisions.skills)),
@@ -1985,10 +1984,6 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil, nil, nil, false, nil, nil, nil, auditDecisions{}, err
 	}
 
-	s.logger.Debug("Raw guardrail policies response",
-		zap.Int("size", len(rawGuardrailPolicies)),
-		zap.String("raw", string(rawGuardrailPolicies)))
-
 	// Parse the wrapper object containing guardrailPolicies array
 	var response struct {
 		GuardrailPolicies []*mcp.GuardrailsPolicy `json:"guardrailPolicies"`
@@ -1996,7 +1991,8 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	if err := json.Unmarshal(rawGuardrailPolicies, &response); err != nil {
 		s.logger.Error("Failed to parse guardrail policies",
 			zap.Error(err),
-			zap.String("rawResponse", string(rawGuardrailPolicies)))
+			zap.Int("size", len(rawGuardrailPolicies)),
+			zap.String("rawResponsePreview", string(rawGuardrailPolicies[:min(len(rawGuardrailPolicies), 500)])))
 		return nil, nil, nil, false, nil, nil, nil, auditDecisions{}, fmt.Errorf("failed to parse guardrail policies: %w", err)
 	}
 
@@ -2055,10 +2051,6 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.Int("ruleCount", len(blockedHostRules)),
 		zap.Strings("patterns", mcp.BlockedHostPatterns(blockedHostRules)))
 
-	s.logger.Debug("Raw audit policies response",
-		zap.Int("size", len(rawAuditPolicies)),
-		zap.String("raw", string(rawAuditPolicies)))
-
 	// Parse the wrapper object containing mcpAuditInfoList array
 	var auditResponse struct {
 		McpAuditInfoList []*types.AuditPolicy `json:"mcpAuditInfoList"`
@@ -2066,7 +2058,8 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	if err := json.Unmarshal(rawAuditPolicies, &auditResponse); err != nil {
 		s.logger.Warn("Failed to parse MCP audit info",
 			zap.Error(err),
-			zap.String("rawResponse", string(rawAuditPolicies)))
+			zap.Int("size", len(rawAuditPolicies)),
+			zap.String("rawResponsePreview", string(rawAuditPolicies[:min(len(rawAuditPolicies), 500)])))
 		auditResponse.McpAuditInfoList = []*types.AuditPolicy{}
 	}
 
@@ -2475,7 +2468,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("contextSource", contextSource),
 		zap.Int("policiesCount", len(policies)),
 		zap.Strings("policyNames", policyNames(policies)),
-		zap.Any("policies", policies),
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Create validation context with full request metadata (matching batch flow)
