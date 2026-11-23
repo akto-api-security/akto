@@ -696,8 +696,7 @@ public class ThreatActorService {
                 long dayStartEpochSeconds = ((Number) doc.get("_id")).longValue();
                 int totalActors = doc.getInteger("totalActors");
                 int highSeverityActors = doc.getInteger("severityActors");
-                System.out.println(totalActors);
-                System.out.println(highSeverityActors);
+                loggerMaker.debug("Daily actors ts={} total={} critical={}", dayStartEpochSeconds, totalActors, highSeverityActors);
                 actors.add(
                     DailyActorsCountResponse.ActorsCount.newBuilder()
                         .setTs((int) dayStartEpochSeconds)
@@ -991,7 +990,7 @@ public class ThreatActorService {
         try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), ThreatUtils.coverIndexHint(accountId, match)).cursor()) {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
-                System.out.print(doc);
+                loggerMaker.debug("Threat activity timeline bucket {}", doc);
                 
                 String subCategory;
                 int count;
