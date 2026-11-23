@@ -6,6 +6,8 @@ import (
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/guardrails-service/models"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestSkillNameFromPayload(t *testing.T) {
@@ -160,5 +162,77 @@ func TestCheckRejectedSkill(t *testing.T) {
 	svc.cache.rejectedSkills = nil
 	if call(`{"body":{"skill":"aws-credential-helper"},"toolName":"Skill"}`, "") != nil {
 		t.Error("empty rejected-skill cache must never block")
+	}
+}
+
+func TestToolCallFromPayload(t *testing.T) {
+	for name, c := range map[string]struct{ payload, tool, skill string }{
+		"skill":        {`{"body":{"skill":"docx"},"toolName":"Skill"}`, "Skill", "docx"},
+		"bash":         {`{"body":{"command":"ls"},"toolName":"Bash"}`, "Bash", ""},
+		"mcp tool":     {`{"body":{"q":"x"},"toolName":"mcp__srv__tool"}`, "mcp__srv__tool", ""},
+		"no tool name": {`{"prompt":"hi"}`, "", ""},
+		"bad json":     {`nope`, "", ""},
+		"empty":        {``, "", ""},
+	} {
+		tool, skill := toolCallFromPayload(c.payload)
+		if tool != c.tool || skill != c.skill {
+			t.Errorf("%s: toolCallFromPayload = (%q, %q), want (%q, %q)", name, tool, skill, c.tool, c.skill)
+		}
+	}
+}
+
+// TestCheckRejectedSkillLogs asserts the log lines that explain each decision.
+func TestCheckRejectedSkillLogs(t *testing.T) {
+	core, logs := observer.New(zapcore.InfoLevel)
+	skipThreat := true
+	svc := &Service{
+		logger: zap.New(core),
+		cache: &policyCache{rejectedSkills: rejectedAuditDecisions([]byte(`{"mcpAuditInfoList":[
+			{"type":"AGENT_SKILL","resourceName":"aws-credential-helper","mcpHost":"claude","remarks":"Rejected"}
+		]}`)).skills},
+	}
+	const host = "dev.ai-agent.claudecli"
+	run := func(tool, body string) {
+		payload := `{"body":` + body + `,"toolName":"` + tool + `"}`
+		params := &models.ValidateRequestParams{Path: "/tool/" + tool, Method: "POST", RequestPayload: payload, SkipThreat: &skipThreat}
+		svc.checkRejectedSkill(params, &mcp.ValidationContext{McpServerName: host, RequestHeaders: map[string]string{"host": host}}, payload, "sess", "req")
+	}
+	msgs := func() []string {
+		var out []string
+		for _, e := range logs.TakeAll() {
+			out = append(out, e.Message)
+		}
+		return out
+	}
+	has := func(got []string, want string) bool {
+		for _, m := range got {
+			if m == want {
+				return true
+			}
+		}
+		return false
+	}
+
+	run("Bash", `{"command":"ls"}`) // any tool call is logged, but only Skill is evaluated
+	got := msgs()
+	if !has(got, "[SkillCheck] tool call received") || has(got, "[SkillCheck] skill evaluated") {
+		t.Errorf("Bash call: unexpected logs %v", got)
+	}
+
+	run("Skill", `{"skill":"docx"}`) // evaluated, allowed
+	got = msgs()
+	if !has(got, "[SkillCheck] skill evaluated") || has(got, "ValidateRequest - blocking skill rejected in audit data") {
+		t.Errorf("allowed skill: unexpected logs %v", got)
+	}
+
+	run("Skill", `{"skill":"aws-credential-helper"}`) // evaluated, blocked
+	got = msgs()
+	if !has(got, "[SkillCheck] skill evaluated") || !has(got, "ValidateRequest - blocking skill rejected in audit data") {
+		t.Errorf("blocked skill: unexpected logs %v", got)
+	}
+
+	svc.checkRejectedSkill(&models.ValidateRequestParams{RequestPayload: `{"prompt":"hi"}`}, &mcp.ValidationContext{}, "", "s", "r") // not a tool call
+	if got = msgs(); len(got) != 0 {
+		t.Errorf("non-tool payload must log nothing, got %v", got)
 	}
 }

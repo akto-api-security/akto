@@ -2,6 +2,7 @@ package validator
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
@@ -46,11 +47,12 @@ func agentFromHost(host string) string {
 	return parts[1]
 }
 
-// skillNameFromPayload returns the skill name when the hook payload is a Skill tool call, else "".
-// The hook sends {"body":{"skill":"<name>"},"toolName":"Skill"}.
-func skillNameFromPayload(requestPayload string) string {
+// toolCallFromPayload returns the tool name of a hook tool-call payload and, for a Skill call, the skill name.
+// The hook sends {"body":{"skill":"<name>"},"toolName":"Skill"}; both are "" for a payload with no toolName
+// (prompts, MCP JSON-RPC, anything that is not a hook tool call).
+func toolCallFromPayload(requestPayload string) (toolName, skill string) {
 	if requestPayload == "" {
-		return ""
+		return "", ""
 	}
 	var p struct {
 		ToolName string `json:"toolName"`
@@ -59,12 +61,35 @@ func skillNameFromPayload(requestPayload string) string {
 		} `json:"body"`
 	}
 	if err := json.Unmarshal([]byte(requestPayload), &p); err != nil {
-		return ""
+		return "", ""
 	}
-	if !strings.EqualFold(strings.TrimSpace(p.ToolName), skillToolName) {
-		return ""
+	toolName = strings.TrimSpace(p.ToolName)
+	if strings.EqualFold(toolName, skillToolName) {
+		skill = strings.TrimSpace(p.Body.Skill)
 	}
-	return strings.TrimSpace(p.Body.Skill)
+	return toolName, skill
+}
+
+// skillNameFromPayload returns the skill name when the hook payload is a Skill tool call, else "".
+func skillNameFromPayload(requestPayload string) string {
+	_, skill := toolCallFromPayload(requestPayload)
+	return skill
+}
+
+// maxLoggedSkillNames caps how many rejected skill names a log line lists.
+const maxLoggedSkillNames = 20
+
+// rejectedSkillNames lists the rejected skill names for logging, sorted and capped.
+func rejectedSkillNames(skills map[string][]rejectedSkill) []string {
+	names := make([]string, 0, len(skills))
+	for name := range skills {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if len(names) > maxLoggedSkillNames {
+		names = names[:maxLoggedSkillNames]
+	}
+	return names
 }
 
 // skillLookupKeys are the names to try for a skill: the full name, and the part after a "plugin:" prefix.
@@ -98,19 +123,49 @@ func matchRejectedSkill(skills map[string][]rejectedSkill, name, agent, deviceLa
 
 // checkRejectedSkill blocks a Skill tool call for a skill rejected in Audit Data.
 func (s *Service) checkRejectedSkill(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID string) *mcp.ValidationResult {
-	name := skillNameFromPayload(params.RequestPayload)
-	if name == "" {
-		return nil
-	}
-	s.cache.mu.RLock()
-	skills := s.cache.rejectedSkills
-	s.cache.mu.RUnlock()
-	if len(skills) == 0 {
-		return nil
+	toolName, name := toolCallFromPayload(params.RequestPayload)
+	if toolName == "" {
+		return nil // not a hook tool call (prompt, MCP JSON-RPC, ...)
 	}
 
 	host := valCtx.McpServerName
-	if _, rejected := matchRejectedSkill(skills, name, agentFromHost(host), deviceLabelFromMcpServerName(host), requestUserEmail(valCtx)); !rejected {
+	agent := agentFromHost(host)
+	s.logger.Info("[SkillCheck] tool call received",
+		zap.String("tool", toolName),
+		zap.String("path", params.Path),
+		zap.String("host", host),
+		zap.String("agent", agent),
+		zap.Bool("isSkill", name != ""),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
+	if !strings.EqualFold(toolName, skillToolName) {
+		return nil
+	}
+	if name == "" {
+		s.logger.Warn("[SkillCheck] Skill tool call without a skill name, allowing",
+			zap.String("host", host), zap.String("sessionID", sessionID), zap.String("requestID", requestID))
+		return nil
+	}
+
+	s.cache.mu.RLock()
+	skills := s.cache.rejectedSkills
+	s.cache.mu.RUnlock()
+
+	device, email := deviceLabelFromMcpServerName(host), requestUserEmail(valCtx)
+	_, rejected := matchRejectedSkill(skills, name, agent, device, email)
+	s.logger.Info("[SkillCheck] skill evaluated",
+		zap.String("skill", name),
+		zap.String("agent", agent),
+		zap.String("agentKey", skillAgentKey(agent)),
+		zap.String("device", device),
+		zap.Bool("hasUserEmail", email != ""),
+		zap.Int("rejectedSkillNamesLoaded", len(skills)),
+		zap.Strings("rejectedSkillNames", rejectedSkillNames(skills)),
+		zap.Bool("rejected", rejected),
+		zap.String("decision", map[bool]string{true: "block", false: "allow"}[rejected]),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
+	if !rejected {
 		return nil
 	}
 

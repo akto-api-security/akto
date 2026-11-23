@@ -1137,6 +1137,10 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Time("lastFetched", s.cache.lastFetched),
 		zap.Any("policies", policies))
+	// A 0 here means no Rejected AGENT_SKILL rows came back, so no Skill call can be blocked.
+	s.logger.Info("[SkillCheck] rejected skills loaded from audit data",
+		zap.Int("rejectedSkillNamesCount", len(decisions.skills)),
+		zap.Strings("rejectedSkillNames", rejectedSkillNames(decisions.skills)))
 
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
