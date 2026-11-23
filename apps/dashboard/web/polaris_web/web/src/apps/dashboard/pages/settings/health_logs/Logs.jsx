@@ -20,10 +20,6 @@ import { saveAs } from 'file-saver'
 import { ALL_STORED_LOG_KEYS, STORED_LOG_KEY_OPTIONS } from "./logKeysConstants"
 import { isDastCategory } from "@/apps/main/labelHelper"
 
-// These log groups are shown only on this customer account (Akto users see them everywhere).
-const ACCOUNT_RESTRICTED_LOG_GROUPS = ['DATA_INGESTION', 'GUARDRAILS_SERVICE']
-const ACCOUNT_RESTRICTED_LOG_GROUPS_ACCOUNT_ID = '1789954857'
-
 const LOG_GROUP_LABELS = {
     DASHBOARD: "Dashboard",
     RUNTIME: "Runtime",
@@ -74,13 +70,9 @@ const Logs = () => {
     useEffect(() => {
         if (!hasAccess) return
         settingRequests.fetchAllowedLogGroups().then((resp) => {
-            // Which groups a user may see is decided by the backend; the filters below only narrow it down.
-            const restrictedGroupsAllowed = func.isAktoUser() || String(window.ACTIVE_ACCOUNT) === ACCOUNT_RESTRICTED_LOG_GROUPS_ACCOUNT_ID
-            const groups = (resp?.allowedLogGroups ?? []).filter((value) =>
-                // dast_logs is only populated for DAST deployments, so hide that option elsewhere.
-                (value !== 'DAST' || isDastCategory()) &&
-                (restrictedGroupsAllowed || !ACCOUNT_RESTRICTED_LOG_GROUPS.includes(value))
-            )
+            // Which groups a user may see is decided by the backend. dast_logs is only
+            // populated for DAST deployments, so hide that option elsewhere.
+            const groups = (resp?.allowedLogGroups ?? []).filter((value) => value !== 'DAST' || isDastCategory())
             setAllowedLogGroups(groups)
             setLogs(previousState => ({ ...previousState, logGroup: groups[0] ?? '' }))
         }).catch(() => {})

@@ -2,8 +2,10 @@ package com.akto.action;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -27,10 +29,20 @@ public class DbLogsAction extends UserAction {
      * (see ModuleInfo.ModuleType). Everything else (DASHBOARD, BILLING, ANALYSER, ...) is internal.
      */
     private static final Set<LogDb> CUSTOMER_VISIBLE_LOG_DBS = Collections.unmodifiableSet(EnumSet.of(
-        LogDb.RUNTIME, LogDb.TESTING, LogDb.THREAT_DETECTION, LogDb.DATA_INGESTION,
-        LogDb.AGENTIC_TESTING, LogDb.GUARDRAILS_SERVICE, LogDb.SMART_TESTING,
+        LogDb.RUNTIME, LogDb.TESTING, LogDb.THREAT_DETECTION,
+        LogDb.AGENTIC_TESTING, LogDb.SMART_TESTING,
         LogDb.MINI_TESTING_ORCHESTRATOR, LogDb.DAST, LogDb.PUPPETEER
     ));
+
+    /** Log groups customers may see only on specific accounts, on top of CUSTOMER_VISIBLE_LOG_DBS. */
+    private static final Map<LogDb, Set<Integer>> ACCOUNT_RESTRICTED_LOG_DBS;
+    static {
+        Set<Integer> dataIngestionAndGuardrailsAccounts = Collections.singleton(1789954857);
+        Map<LogDb, Set<Integer>> restricted = new EnumMap<>(LogDb.class);
+        restricted.put(LogDb.DATA_INGESTION, dataIngestionAndGuardrailsAccounts);
+        restricted.put(LogDb.GUARDRAILS_SERVICE, dataIngestionAndGuardrailsAccounts);
+        ACCOUNT_RESTRICTED_LOG_DBS = Collections.unmodifiableMap(restricted);
+    }
 
     private static final String INTERNAL_EMAIL_DOMAIN = "@akto.io";
 
@@ -95,8 +107,16 @@ public class DbLogsAction extends UserAction {
         }
         boolean internal = isInternalUser();
         return Arrays.stream(LogDb.values())
-            .filter(db -> internal || CUSTOMER_VISIBLE_LOG_DBS.contains(db))
+            .filter(db -> internal || isCustomerVisible(db, Context.accountId.get()))
             .collect(Collectors.toList());
+    }
+
+    private static boolean isCustomerVisible(LogDb db, Integer accountId) {
+        Set<Integer> restrictedToAccounts = ACCOUNT_RESTRICTED_LOG_DBS.get(db);
+        if (restrictedToAccounts != null) {
+            return accountId != null && restrictedToAccounts.contains(accountId);
+        }
+        return CUSTOMER_VISIBLE_LOG_DBS.contains(db);
     }
 
     public String fetchAllowedLogGroups() {
