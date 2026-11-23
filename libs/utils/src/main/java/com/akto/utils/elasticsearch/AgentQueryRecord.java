@@ -13,6 +13,7 @@ import com.akto.util.JSONUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -284,18 +285,12 @@ public class AgentQueryRecord {
         } else if (tagsMap != null && tagsMap.containsKey(Constants.AKTO_GEN_AI_TAG)) {
             deviceId  = null;
             serviceId = getFirstHeader(headers, "host");
-            Organization org = OrgUtils.getOrganizationCached(Context.getActualAccountId());
-            userName  = org != null ? org.getAdminEmail() : null;
+            userName  = resolveGenAiUser(p, tagsMap);
 
         } else {
             serviceId = getFirstHeader(headers, "host");
             deviceId  = getFirstHeader(headers, HEADER_PREFIX + HEADER_DEVICE_ID);
         }
-
-        String messageIdHeader   = getFirstHeader(headers, Constants.AKTO_MESSAGE_ID_HEADER);
-        String spanId = (messageIdHeader != null && !messageIdHeader.isEmpty())
-                ? messageIdHeader
-                : "span_" + UUID.randomUUID().toString();
 
         String requestPayload  = p.getRequestParams().getPayload();
         // awsMetadata duplicates what's already captured as structured Trace/Span data by
@@ -305,8 +300,26 @@ public class AgentQueryRecord {
         // The same holds for the Alibaba connector's alibabaMetadata (AlibabaCloudTraceParser).
         String responsePayload = JSONUtils.removeKey(
             JSONUtils.removeKey(p.getPayload() != null ? p.getPayload() : "", "awsMetadata"), "alibabaMetadata");
+        if (Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(source)) {
+            responsePayload = withBedrockModel(responsePayload, tagsMap, headers);
+        }
         int inputTokens  = resolveTokenCount(responsePayload, requestPayload, true);
         int outputTokens = resolveTokenCount(responsePayload, responsePayload, false);
+
+        String messageIdHeader = getFirstHeader(headers, Constants.AKTO_MESSAGE_ID_HEADER);
+        String spanId;
+        if (messageIdHeader != null && !messageIdHeader.isEmpty()) {
+            spanId = messageIdHeader;
+        } else if (isAtlasTraffic || isBrowserExtensionTraffic) {
+            // Atlas keeps a drawn id. One Atlas turn is several spans of the same trace, and the
+            // flyout renders them keyed on this value - two spans that happened to agree on time
+            // and both payloads would collide and render as one. Atlas also gains nothing from a
+            // reproducible id: its traceId comes from the installer, so its rows are already
+            // addressable.
+            spanId = "span_" + UUID.randomUUID();
+        } else {
+            spanId = syntheticSpanId(p.getTime(), serviceId, requestPayload, responsePayload);
+        }
 
         AgentQueryRecord record = new AgentQueryRecord(
                 null,
@@ -367,6 +380,93 @@ public class AgentQueryRecord {
             if (local.equalsIgnoreCase(prefix)) return email;
         }
         return null;
+    }
+
+    /**
+     * Who to show as the user on gen-AI traffic.
+     *
+     * The fallback is the organisation's admin email, which is not a user at all - it is whoever
+     * administers the account, and it reads as though that person made the call. Bedrock can do
+     * better: the log processor already resolves a caller from the invocation's identity ARN
+     * (identityActor.js) and sends it as the record's ip - an SSO email where the ARN carries
+     * one, otherwise the assumed role's name. That is a real answer to "who called this".
+     *
+     * Scoped to AWS_BEDROCK deliberately. Every other gen-AI source puts an actual IP address
+     * in that field, and showing 10.0.1.15 as the user would be worse than the admin email.
+     */
+    private static String resolveGenAiUser(HttpResponseParams p, Map<String, String> tagsMap) {
+        if (Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))) {
+            String actor = p.getSourceIP();
+            if (actor != null && !actor.trim().isEmpty()
+                    && !Constants.AI_AGENT_UNRESOLVED_ACTOR_IP.equals(actor.trim())) {
+                return actor.trim();
+            }
+        }
+        Organization org = OrgUtils.getOrganizationCached(Context.getActualAccountId());
+        return org != null ? org.getAdminEmail() : null;
+    }
+
+    /**
+     * Puts Bedrock's model id where every reader of a record looks for the model.
+     *
+     * The Traces UI (model column, session flyout) and the top-models aggregation all read a
+     * "model" key from responsePayload. Provider responses carry it - Anthropic and OpenAI both
+     * echo the model - but a Bedrock record is built by the log processor, which sends the model
+     * id as a tag and as X-Bedrock-Model-Id instead, so these records showed as "Unknown".
+     *
+     * Only added when the payload has no model of its own, so a real value is never replaced.
+     * A payload that is not a JSON object is returned unchanged.
+     */
+    static String withBedrockModel(String responsePayload, Map<String, String> tagsMap,
+                                   Map<String, List<String>> headers) {
+        String model = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_MODEL) : null;
+        if (isBlankModel(model)) {
+            model = getFirstHeader(headers, Constants.AI_AGENT_HEADER_BEDROCK_MODEL_ID);
+        }
+        if (isBlankModel(model) || responsePayload == null || responsePayload.trim().isEmpty()) {
+            return responsePayload;
+        }
+        try {
+            JSONObject obj = new JSONObject(responsePayload);
+            if (obj.has("model") && !obj.optString("model", "").isEmpty()) {
+                return responsePayload;
+            }
+            obj.put("model", model.trim());
+            return obj.toString();
+        } catch (JSONException e) {
+            return responsePayload;
+        }
+    }
+
+    /** The log processor's placeholder when it could not resolve a model is not a model. */
+    private static boolean isBlankModel(String model) {
+        return model == null || model.trim().isEmpty() || "unknown-model".equals(model.trim());
+    }
+
+    /**
+     * The id for a non-Atlas record whose source sent none of its own.
+     *
+     * Derived from the event rather than drawn at random, so re-ingesting the same source line
+     * produces the same id instead of a second, differently-named copy of one invocation. That
+     * matters because the record is written with a null docId, leaving Elasticsearch to assign
+     * one - nothing else about the write is idempotent.
+     *
+     * The basis is the event's own time (p.getTime(), what the source reported) rather than the
+     * record's timeStampMs, which is ingest time and would differ on every replay. Two events
+     * that agree on account, second, service and both payloads are taken to be the same event.
+     *
+     * Same approach as SnowflakeTraceParser.deterministicSpanId - a name-based UUID, used for
+     * identity rather than secrecy. Unprefixed: this id is shown as-is in the Argus table, and
+     * nothing matches on the "span_" prefix that the Atlas branch still draws.
+     */
+    private static String syntheticSpanId(int eventTime, String serviceId,
+                                          String requestPayload, String responsePayload) {
+        String basis = Context.getActualAccountId()
+                + "|" + eventTime
+                + "|" + (serviceId       == null ? "" : serviceId)
+                + "|" + (requestPayload  == null ? "" : requestPayload)
+                + "|" + (responsePayload == null ? "" : responsePayload);
+        return UUID.nameUUIDFromBytes(basis.getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     private static String getFirstHeader(Map<String, List<String>> headers, String name) {

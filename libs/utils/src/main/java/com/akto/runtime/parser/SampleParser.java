@@ -17,6 +17,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.TrafficProducerLog;
 import com.akto.runtime.utils.Utils;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.utils.GzipUtils;
@@ -26,6 +27,67 @@ import com.google.gson.Gson;
 public class SampleParser {
     
     private static final Gson gson = new Gson();
+
+    /**
+     * Carries Bedrock's conversation and turn identifiers into the x-akto-installer-* headers
+     * that AgentQueryRecord reads, so Traces groups this traffic like every other agentic source.
+     *
+     * Sources installed on a machine (Claude CLI hooks, Copilot, the MCP shields) set those
+     * headers on the request themselves. A pipeline that builds records from logs has no request
+     * to attach headers to, so it delivers the same facts as a tag and a response id; this
+     * bridges them without teaching AgentQueryRecord a second, source-specific lookup.
+     *
+     * Scoped to AWS_BEDROCK. Nothing else writes these values today, so the gate changes no
+     * behaviour - it is there so a source that starts writing them later opts in deliberately
+     * rather than by accident.
+     */
+    private static void injectAgenticIdentityHeaders(HttpRequestParams httpRequestParams, String tagsJson) {
+        if (httpRequestParams == null || tagsJson == null || tagsJson.isEmpty()) {
+            return;
+        }
+        try {
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null || !Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(
+                    tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))) {
+                return;
+            }
+            Map<String, List<String>> headers = httpRequestParams.getHeaders();
+            if (headers == null) {
+                return;
+            }
+
+            // The conversation: already normalised by the producer from whichever spelling the
+            // caller used (session_id, sessionId, conversationId, ...).
+            setHeaderIfAbsent(headers, Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID,
+                    tagsMap.get(Constants.AI_AGENT_TAG_SESSION_ID));
+
+            // The turn: Bedrock emits one record per invocation, so its request id identifies
+            // this exchange and nothing else.
+            setHeaderIfAbsent(headers, Constants.AI_AGENT_HEADER_INSTALLER_MESSAGE_ID,
+                    firstHeaderValue(headers, Constants.AI_AGENT_HEADER_BEDROCK_REQUEST_ID));
+        } catch (Exception e) {
+            // An identifier we cannot read is not worth failing an otherwise good record for.
+        }
+    }
+
+    /**
+     * Sets a header only when there is a real value and nothing has claimed the name already,
+     * so a source that sets its own always wins over anything derived here.
+     */
+    private static void setHeaderIfAbsent(Map<String, List<String>> headers, String name, String value) {
+        if (value == null || value.trim().isEmpty() || headers.containsKey(name)) {
+            return;
+        }
+        List<String> values = new ArrayList<>();
+        values.add(value.trim());
+        headers.put(name, values);
+    }
+
+    /** First value of a header, or null when it is absent or empty. */
+    private static String firstHeaderValue(Map<String, List<String>> headers, String name) {
+        List<String> values = headers.get(name);
+        return (values == null || values.isEmpty()) ? null : values.get(0);
+    }
 
     private static void injectTagsInHeaders(HttpRequestParams httpRequestParams, String tagsJson){
         if(tagsJson == null || tagsJson.isEmpty()){
@@ -142,6 +204,7 @@ public class SampleParser {
                 printUrlDebugLog(tagLog);
             }
             injectTagsInHeaders(requestParams, tags);
+            injectAgenticIdentityHeaders(requestParams, tags);
         }
 
         return httpResponseParams;

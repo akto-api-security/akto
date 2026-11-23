@@ -147,6 +147,38 @@ public class Constants {
     // sub-fields (services, actions, resources, etc). Of those, "-resources" is the one
     // that actually identifies what the gateway's role can act on.
     public static final String AI_AGENT_TAG_GATEWAY_ROLE = "gateway-role-resources";
+    /**
+     * The conversation identifier, as delivered by a log-processing pipeline that has no
+     * request of its own to attach headers to. Already normalised by the producer from
+     * whichever spelling the caller used (session_id, sessionId, conversationId, ...), so
+     * prefer it over any single raw spelling.
+     */
+    public static final String AI_AGENT_TAG_SESSION_ID = "session-id";
+    /** The Bedrock model id the log processor puts on every record, as a tag and as a header. */
+    public static final String AI_AGENT_TAG_MODEL = "model";
+    public static final String AI_AGENT_HEADER_BEDROCK_MODEL_ID = "x-bedrock-model-id";
+    /**
+     * The header every installed agentic source sets to carry a session, and the only one
+     * AgentQueryRecord reads. Sources that deliver the session as a tag have it injected
+     * under this name so the Traces UI groups their traffic like everyone else's.
+     */
+    public static final String AI_AGENT_HEADER_INSTALLER_SESSION_ID = "x-akto-installer-akto_session_id";
+    /**
+     * The per-turn identifier, read by AgentQueryRecord as traceId. It is what folds the spans
+     * of one exchange into a single trace, and what every per-trace lookup is keyed on, so a
+     * record without it cannot be expanded or re-fetched.
+     */
+    public static final String AI_AGENT_HEADER_INSTALLER_MESSAGE_ID = "x-akto-installer-akto_message_id";
+    /**
+     * Bedrock's own per-invocation id, which the log processor already puts on every record.
+     * Lower case because header names are normalised on ingest (OriginalHttpRequest.buildHeadersMap).
+     */
+    public static final String AI_AGENT_HEADER_BEDROCK_REQUEST_ID = "x-request-id";
+    /**
+     * What the Bedrock log processor sends as the record's ip when it cannot resolve a caller
+     * from the identity ARN (identityActor.js). Treated as "no actor" rather than an address.
+     */
+    public static final String AI_AGENT_UNRESOLVED_ACTOR_IP = "0.0.0.0";
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";
