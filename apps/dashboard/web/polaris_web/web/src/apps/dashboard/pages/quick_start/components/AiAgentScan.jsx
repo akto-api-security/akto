@@ -13,6 +13,9 @@ const METHODS = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'].map(m => ({ label: m, 
 const toWebSocketUrl = (value) => (value || '').trim().replace(/^http(s?):\/\//i, 'ws$1://')
 const IMPORT_POLL_INTERVAL_MS = 2000
 const IMPORT_MAX_POLLS = 300
+// import errors (e.g. a refused WebSocket handshake) are long, so they stay up long enough to read
+const ERROR_TOAST_MS = 10000
+const showError = (message) => func.setToast(true, true, message, undefined, ERROR_TOAST_MS)
 
 const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.", defaultRequestBody = { "model": "llama3.2", "prompt": "Why is the sky blue?" }, docsLink = "https://docs.akto.io/ai-security" }) => {
     const [loading, setLoading] = useState(false)
@@ -73,22 +76,22 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                 return true
             }
             if (res.uploadStatus === 'FAILED') {
-                func.setToast(true, true, res.errorMessage || "AI agent import failed.")
+                showError(res.errorMessage || "AI agent import failed.")
                 return false
             }
         }
-        func.setToast(true, true, "AI agent import is taking longer than expected. Please check again in a while.")
+        showError("AI agent import is taking longer than expected. Please check again in a while.")
         return false
     }
 
     const handleImport = async () => {
         if (!canImport) {
-            func.setToast(true, true, "Please enter a valid URL.")
+            showError("Please enter a valid URL.")
             return
         }
         const urlToSend = isWebSocket && url ? toWebSocketUrl(url) : url
         if (isWebSocket && !useCustomResponse && !(useMiniTesting && miniTestingName)) {
-            func.setToast(true, true, "WebSocket agents are reached via a mini-testing module, select one.")
+            showError("WebSocket agents are reached via a mini-testing module, select one.")
             return
         }
 
@@ -141,6 +144,12 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
             setMiniTestingName('')
             setAgentType('HTTP')
             setMethod('POST')
+        } catch (err) {
+            // the request handler already toasted the server's reason for 2s; show it again for longer
+            const serverError = err?.response?.data?.actionErrors?.[0]
+            if (serverError) {
+                showError(serverError)
+            }
         } finally {
             setLoading(false)
         }

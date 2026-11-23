@@ -111,12 +111,14 @@ const func = {
   categoryMapping: categoryMapping,
   agenticCategoryMapping: agenticCategoryMapping,
   // `action` is optional: { content, onAction } adds a button to the toast (e.g. Undo).
-  setToast (isActive, isError, message, action) {
+  // duration (ms) is optional; without it the toast uses the dashboard's default
+  setToast (isActive, isError, message, action, duration) {
     Store.getState().setToastConfig({
           isActive: isActive,
           isError: isError,
           message: message,
-          action: action
+          action: action,
+          duration: duration
       })
   },
   formatJsonForEditor(data){
