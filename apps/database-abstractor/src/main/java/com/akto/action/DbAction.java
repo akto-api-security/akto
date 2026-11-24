@@ -53,6 +53,7 @@ import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.settings.ApiGatewayRoleRegions;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -581,11 +582,20 @@ public class DbAction extends ActionSupport {
     @Setter
     private List<Map<String, Object>> accountMappings;
 
+    // Per-role regions for the API Gateway connector. Returned next to
+    // awsAccountIds, which older connectors still read on its own.
+    @Getter
+    @Setter
+    private List<ApiGatewayRoleRegions> awsApiGConnectorRoleRegions;
+
     public String fetchAwsAccountIdsForApiGatewayLogging() {
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         if (accountSettings != null && accountSettings.getAwsAccountIdsForApiGatewayLogging() != null) {
             awsAccountIds = accountSettings.getAwsAccountIdsForApiGatewayLogging();
+        }
+        if (accountSettings != null && accountSettings.getAwsApiGConnectorRoleRegions() != null) {
+            awsApiGConnectorRoleRegions = accountSettings.getAwsApiGConnectorRoleRegions();
         }
 
         return Action.SUCCESS.toUpperCase();
