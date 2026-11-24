@@ -2,6 +2,7 @@ package com.akto.dao;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.Key;
@@ -12,6 +13,8 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.AggregateIterable;
+import com.mongodb.client.FindIterable;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.DeleteManyModel;
@@ -97,6 +100,19 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
     public List<T> findAll(Bson q, int skip, int limit, Bson sort, Bson projection) {
         Bson filteredQuery = addRbacFilter(q);
         return super.findAll(filteredQuery, skip, limit, sort, projection);
+    }
+
+    /** What findAll(q, projection) returns, with the same scoping and limits, but streamed: one query whose
+     *  documents arrive batchSize at a time, so the caller need not hold every match in memory. Close it. */
+    public MongoCursor<T> findCursor(Bson q, Bson projection, int batchSize) {
+        FindIterable<T> find = getMCollection().find(addRbacFilter(q))
+                .limit(1_000_000)
+                .batchSize(batchSize)
+                .maxTime(30, TimeUnit.SECONDS);
+        if (projection != null) {
+            find = find.projection(projection);
+        }
+        return find.cursor();
     }
 
     public List<T> findAllNoRbacFilter(Bson q, Bson projection) {
