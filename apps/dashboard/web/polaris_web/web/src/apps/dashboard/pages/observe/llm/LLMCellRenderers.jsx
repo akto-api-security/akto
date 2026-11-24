@@ -47,14 +47,16 @@ export function ModelIcon({ model, size = 16 }) {
 
 // ── cells ─────────────────────────────────────────────────────────────────────
 
-// Prompt preview for admins; everyone else identifies the row by the id in `idField`.
-export function PreviewCell({ data, idField }) {
+// Prompt preview for admins; everyone else identifies the row by its id - the `idField`
+// field, or `idOf(data)` for a table whose rows are not all keyed by the same field.
+export function PreviewCell({ data, idField, idOf }) {
     if (!data) return null;
     if (!func.isUserAdmin()) {
+        const id = idOf ? idOf(data) : data[idField];
         return (
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                 <Icon source={LockMinor} color="subdued" />
-                <Text variant="bodySm" color="subdued" truncate>{data[idField] || DASH}</Text>
+                <Text variant="bodySm" color="subdued" truncate>{id || DASH}</Text>
             </HorizontalStack>
         );
     }
@@ -204,26 +206,6 @@ export function UnifiedIdCell({ data }) {
     if (!data) return null;
     const id = unifiedRowId(data);
     return <Text variant="bodySm" color="interactive" truncate>{id || DASH}</Text>;
-}
-
-// Prompt preview for the unified table. Same admin gate as PreviewCell, but the locked
-// fallback names the row by whichever id it has rather than by a single fixed field, which
-// would be blank for one of the two row kinds.
-export function UnifiedPromptCell({ data }) {
-    if (!data) return null;
-    if (!func.isUserAdmin()) {
-        return (
-            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                <Icon source={LockMinor} color="subdued" />
-                <Text variant="bodySm" color="subdued" truncate>{unifiedRowId(data) || DASH}</Text>
-            </HorizontalStack>
-        );
-    }
-    return (
-        <Text variant="bodySm" color="interactive" truncate>
-            {data._promptText ? truncate(data._promptText, 90) : DASH}
-        </Text>
-    );
 }
 
 // Clickable session id (used in unscoped Traces table).

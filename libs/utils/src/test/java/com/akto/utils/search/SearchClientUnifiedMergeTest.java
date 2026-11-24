@@ -39,6 +39,8 @@ public class SearchClientUnifiedMergeTest {
     private static Map<String, Object> trace(String spanId, long tsMs, boolean guardrailHit) {
         Map<String, Object> row = new HashMap<>();
         row.put("spanId", spanId);
+        row.put("id", spanId);
+        row.put(AgentQueryRecord.F_QUERY_PAYLOAD, "{\"prompt\":\"" + spanId + "\"}");
         row.put(AgentQueryRecord.F_TIMESTAMP, tsMs);
         row.put(AgentQueryRecord.F_GUARDRAIL_VIOLATED, guardrailHit);
         return row;
@@ -163,6 +165,123 @@ public class SearchClientUnifiedMergeTest {
         assertEquals(Arrays.asList("s1", "t-loose"), idsOf(page(client, 0, 10).rows));
     }
 
+    /** Past the merge window the page would be missing rows, so it is served empty - as Atlas does past its cap. */
+    @Test
+    public void pagesPastTheWindowAreEmptyButKeepTheRealTotal() {
+        List<Map<String, Object>> sessions = new ArrayList<>();
+        for (int i = 0; i < 10_500; i++) sessions.add(session("s" + i, 100_000 - i, 1));
+        SearchClient client = clientWith(sessions, 10_500, new ArrayList<>(), 0);
+
+        SearchClient.UnifiedResult result = page(client, 10_000, 20);
+        assertTrue(result.rows.isEmpty());
+        assertEquals(10_500, result.total, "the count is the real one, like the Atlas sessions table");
+    }
+
+    /** A page that straddles the window keeps only the rows the merge can vouch for. */
+    @Test
+    public void aPageStraddlingTheWindowStopsAtIt() {
+        List<Map<String, Object>> sessions = new ArrayList<>();
+        for (int i = 0; i < 10_500; i++) sessions.add(session("s" + i, 100_000 - i, 1));
+        SearchClient client = clientWith(sessions, 10_500, new ArrayList<>(), 0);
+
+        SearchClient.UnifiedResult result = page(client, 9_990, 20);
+        assertEquals(10, result.rows.size());
+        assertEquals("s9990", idsOf(result.rows).get(0));
+    }
+
+    /** Deep pages work the same as Atlas does up to its cap, with both kinds interleaved. */
+    @Test
+    public void deepPagesInterleaveCorrectly() {
+        List<Map<String, Object>> sessions = new ArrayList<>();
+        List<Map<String, Object>> traces = new ArrayList<>();
+        // Alternating timestamps: even = session, odd = lone record.
+        for (int i = 0; i < 6000; i++) {
+            long ts = 1_000_000 - i;
+            if (i % 2 == 0) sessions.add(session("s" + i, ts, 2));
+            else traces.add(trace("t" + i, ts, false));
+        }
+        SearchClient client = clientWith(sessions, 3000, traces, 3000);
+
+        assertEquals(Arrays.asList("s5000", "t5001", "s5002", "t5003"),
+            idsOf(page(client, 5000, 4).rows));
+    }
+
+    /**
+     * The window of lone records is fetched without payloads; only the page's own rows get theirs,
+     * in one follow-up query sized to the page.
+     */
+    @Test
+    public void onlyThePagesLoneRecordsCarryPayloads() {
+        List<Map<String, Object>> sessions = new ArrayList<>();
+        List<Map<String, Object>> traces = new ArrayList<>();
+        for (int i = 0; i < 400; i++) {
+            long ts = 1_000_000 - i;
+            if (i % 2 == 0) sessions.add(session("s" + i, ts, 2));
+            else traces.add(trace("t" + i, ts, false));
+        }
+        StubSearchClient client = new StubSearchClient(sessions, 200, traces, 200);
+
+        SearchClient.UnifiedResult result = page(client, 100, 10);
+
+        assertEquals(2, client.promptCalls.size());
+        assertFalse(client.promptCalls.get(0)[0] == 1, "the window is fetched without payloads");
+        assertEquals(0, client.promptCalls.get(0)[1]);
+        assertEquals(1, client.promptCalls.get(1)[0], "the page's rows are re-fetched with payloads");
+        assertEquals(5, client.promptCalls.get(1)[2], "sized to the page's 5 lone records, not the window");
+
+        for (Map<String, Object> row : result.rows) {
+            assertFalse(row.containsKey("_loosePos"), "internal position must not leak");
+            if (row.get(AgentQueryRecord.F_SESSION_IDENTIFIER) == null) {
+                assertEquals("{\"prompt\":\"" + row.get("spanId") + "\"}",
+                    row.get(AgentQueryRecord.F_QUERY_PAYLOAD));
+            }
+        }
+    }
+
+    /** No payloads for a viewer who may not see them, so no follow-up query either. */
+    @Test
+    public void nonAdminPagesSkipTheFollowUp() {
+        StubSearchClient client = new StubSearchClient(
+            Arrays.asList(session("s1", 500, 2)), 1, Arrays.asList(trace("t1", 400, false)), 1);
+
+        SearchClient.UnifiedResult result = client.fetchSessionsAndTraces(1, 0L, 9_000_000L, null,
+                new HashMap<>(), Boolean.FALSE, 0, 20, false);
+
+        assertEquals(1, client.promptCalls.size());
+        assertNull(result.rows.get(1).get(AgentQueryRecord.F_QUERY_PAYLOAD));
+    }
+
+    /** The session half runs on the pool; if it throws, the no-session rows are still served. */
+    @Test
+    public void aThrowingSessionQueryStillServesTheOtherHalf() {
+        StubSearchClient client = new StubSearchClient(
+            new ArrayList<>(), 0, Arrays.asList(trace("t1", 400, false)), 1);
+        client.sessionsThrow = true;
+
+        assertEquals(Arrays.asList("t1"), idsOf(page(client, 0, 20).rows));
+    }
+
+    /** More concurrent requests than threads plus queue must all complete, not block or reject. */
+    @Test
+    public void saturatingThePoolFallsBackToTheCallerThread() throws Exception {
+        java.util.concurrent.ExecutorService callers = java.util.concurrent.Executors.newFixedThreadPool(40);
+        try {
+            List<java.util.concurrent.Future<SearchClient.UnifiedResult>> results = new ArrayList<>();
+            for (int i = 0; i < 40; i++) {
+                StubSearchClient client = new StubSearchClient(
+                    Arrays.asList(session("s1", 500, 2)), 1, Arrays.asList(trace("t1", 400, false)), 1);
+                client.sessionsDelayMs = 200;
+                results.add(callers.submit(() -> page(client, 0, 20)));
+            }
+            for (java.util.concurrent.Future<SearchClient.UnifiedResult> f : results) {
+                SearchClient.UnifiedResult r = f.get(30, java.util.concurrent.TimeUnit.SECONDS);
+                assertEquals(Arrays.asList("s1", "t1"), idsOf(r.rows));
+            }
+        } finally {
+            callers.shutdownNow();
+        }
+    }
+
     /** The loose half must be requested with onlyWithoutSession, or rows would be listed twice. */
     @Test
     public void looseHalfIsRequestedWithoutSessionsOnly() {
@@ -182,6 +301,10 @@ public class SearchClientUnifiedMergeTest {
         private final List<Map<String, Object>> traces;
         private final long totalTraces;
         boolean lastOnlyWithoutSession;
+        boolean sessionsThrow;
+        // One entry per searchPrompts call: {includeTracesContent ? 1 : 0, skip, limit}.
+        final List<int[]> promptCalls = java.util.Collections.synchronizedList(new ArrayList<>());
+        long sessionsDelayMs;
 
         StubSearchClient(List<Map<String, Object>> sessions, long totalSessions,
                          List<Map<String, Object>> traces, long totalTraces) {
@@ -197,7 +320,12 @@ public class SearchClientUnifiedMergeTest {
         public SessionsResult fetchSessions(int accountId, long startMs, long endMs, String searchString,
                 Map<String, List<String>> filters, Boolean atlasTrafficFilter,
                 int sessionsLimit, String sessionsAfterKey, boolean includeTracesContent) {
-            return new SessionsResult(new ArrayList<>(sessions), null, totalSessions);
+            if (sessionsThrow) throw new IllegalStateException("boom");
+            if (sessionsDelayMs > 0) {
+                try { Thread.sleep(sessionsDelayMs); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            }
+            int n = Math.min(sessionsLimit, sessions.size());
+            return new SessionsResult(new ArrayList<>(sessions.subList(0, n)), null, totalSessions);
         }
 
         @Override
@@ -206,8 +334,19 @@ public class SearchClientUnifiedMergeTest {
                 Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
                 boolean includeTracesContent, boolean onlyWithoutSession) {
             lastOnlyWithoutSession = onlyWithoutSession;
-            return searchPrompts(accountId, startMs, endMs, skip, limit, sortKey, sortAsc,
-                    searchAfterJson, filters, atlasTrafficFilter, searchString, includeTracesContent);
+            promptCalls.add(new int[]{ includeTracesContent ? 1 : 0, skip, limit });
+            int from = Math.min(skip, traces.size());
+            int to   = Math.min(from + limit, traces.size());
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Map<String, Object> t : traces.subList(from, to)) {
+                Map<String, Object> copy = new HashMap<>(t);
+                if (!includeTracesContent) {
+                    copy.remove(AgentQueryRecord.F_QUERY_PAYLOAD);
+                    copy.remove(AgentQueryRecord.F_RESPONSE_PAYLOAD);
+                }
+                out.add(copy);
+            }
+            return new SearchResult(out, totalTraces);
         }
 
         @Override
@@ -215,7 +354,8 @@ public class SearchClientUnifiedMergeTest {
                 String sortKey, boolean sortAsc, String searchAfterJson,
                 Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
                 boolean includeTracesContent) {
-            return new SearchResult(new ArrayList<>(traces), totalTraces);
+            return searchPrompts(accountId, startMs, endMs, skip, limit, sortKey, sortAsc,
+                    searchAfterJson, filters, atlasTrafficFilter, searchString, includeTracesContent, false);
         }
 
         @Override public List<Map<String, Object>> fetchMessages(int a, long s, long e,

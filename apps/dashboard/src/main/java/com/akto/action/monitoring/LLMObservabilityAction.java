@@ -277,7 +277,7 @@ public class LLMObservabilityAction extends UserAction {
             SearchClient.UnifiedResult result = client.fetchSessionsAndTraces(
                 Context.accountId.get(), startMs(), endMs(), searchString,
                 buildMultiFilters(true), resolveContextAtlasFilter(),
-                skip, limit, isUserRoleAdmin());
+                skip, Math.min(limit, 100), isUserRoleAdmin());
 
             unifiedRows  = result.rows;
             unifiedTotal = result.total;

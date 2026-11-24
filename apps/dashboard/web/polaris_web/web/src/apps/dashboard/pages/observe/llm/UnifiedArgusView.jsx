@@ -15,6 +15,9 @@ import { ARGUS_UNIFIED_COL_DEFS } from "./columns";
  * Clicking dispatches on what the row actually is, which is why onOpenSession and onOpenTrace
  * are separate props rather than one handler that has to re-derive the kind.
  */
+// Mirrors SearchClient.ROW_KIND_SESSION on the backend.
+const ROW_KIND_SESSION = "session";
+
 export default function UnifiedArgusView({ currDateRange, onOpenSession, onOpenTrace }) {
     const [rows, setRows] = useState([]);
 
@@ -32,7 +35,7 @@ export default function UnifiedArgusView({ currDateRange, onOpenSession, onOpenT
 
     const handleRowClick = useCallback(p => {
         if (!p?.data) return;
-        if (p.data.sessionIdentifier) onOpenSession?.(p.data);
+        if (p.data._rowKind === ROW_KIND_SESSION) onOpenSession?.(p.data);
         else onOpenTrace?.(p.data);
     }, [onOpenSession, onOpenTrace]);
 
