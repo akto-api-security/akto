@@ -389,7 +389,7 @@ public class Main {
 
         return ret;
     }
-    private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
+    private static final int LAST_TEST_RUN_EXECUTION_DELTA = Constants.TRRS_RECLAIM_AFTER_SECONDS;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
     private static BasicDBObject checkIfAlreadyTestIsRunningOnMachine(){
