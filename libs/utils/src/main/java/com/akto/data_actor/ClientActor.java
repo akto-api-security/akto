@@ -1927,6 +1927,7 @@ public class ClientActor extends DataActor {
         obj.put("now", now);
         obj.put("delta", delta);
         obj.put("miniTestingName", miniTestingName);
+        obj.put("reclaimAfterSeconds", Constants.TRRS_RECLAIM_AFTER_SECONDS);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);

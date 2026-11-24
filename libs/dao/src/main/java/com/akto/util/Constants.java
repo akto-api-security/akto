@@ -67,6 +67,18 @@ public class Constants {
     public static final String TESTING_STATE_FOLDER_PATH = System.getenv("TESTING_STATE_FOLDER_PATH") != null ? System.getenv("TESTING_STATE_FOLDER_PATH") : "testing-info";
     public static final String TESTING_STATE_FILE_NAME = "testing-state.json";
     public static final boolean IS_NEW_TESTING_ENABLED = (StringUtils.hasLength(System.getenv("NEW_TESTING_ENABLED")) && System.getenv("NEW_TESTING_ENABLED").equals("true"));
+    // How long a RUNNING test run may go without progress before another module reclaims and restarts it
+    public static final int DEFAULT_TRRS_RECLAIM_AFTER_SECONDS = 5 * 60;
+    public static final int TRRS_RECLAIM_AFTER_SECONDS = resolveTrrsReclaimAfterSeconds(System.getenv("TRRS_RECLAIM_AFTER_SECONDS"));
+
+    static int resolveTrrsReclaimAfterSeconds(String raw) {
+        try {
+            int value = Integer.parseInt(raw.trim());
+            return value > 0 ? value : DEFAULT_TRRS_RECLAIM_AFTER_SECONDS;
+        } catch (Exception e) {
+            return DEFAULT_TRRS_RECLAIM_AFTER_SECONDS;
+        }
+    }
     public static final boolean KAFKA_DEBUG_MODE = (StringUtils.hasLength(System.getenv("KAFKA_DEBUG_MODE")) && System.getenv("KAFKA_DEBUG_MODE").equals("true"));
     // RCA flag: when true, mini-testing skips the insertResultsAndMakeIssues() DB write entirely (result + issue
     // creation are not persisted) so the per-test cost/throughput of everything BUT that I/O can be isolated.
