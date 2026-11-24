@@ -23,13 +23,29 @@ type rejectedSkill struct {
 	scope auditScope
 }
 
-// skillAgentKey maps an agent name to the key shared by skill rows and request hosts. Skill rows carry the
-// endpoint agent's name ("claude") while the hook's host carries the client type ("claudecli",
-// "claude-cli-user"), so every claude* spelling collapses to "claude".
+// skillAgentAliases maps every spelling of a known agent to one key, so a skill row and a request host agree.
+// Skill rows carry the endpoint agent's directory label ("claude", "codex", "cursor", ...) while the hook's
+// host carries the client type ("claudecli", "codexcli", ...). Keys are canonicalServerToken form.
+// To support a new agent or hook host, add its spellings here.
+var skillAgentAliases = map[string]string{
+	// Claude: skill rows say "claude" / "claude-desktop"; hooks say "claudecli" / "claude-agent-sdk".
+	"claude": "claude", "claudecli": "claude", "claude-cli": "claude", "claude-cli-user": "claude",
+	"claude-desktop": "claude", "claude-agent-sdk": "claude",
+	// Codex: skill rows say "codex"; the hook says "codexcli".
+	"codex": "codex", "codexcli": "codex", "codex-cli": "codex",
+	// Agents whose row label and hook host are the same word.
+	"cursor": "cursor", "opencode": "opencode", "amp": "amp",
+	// Skill-row labels from the endpoint scanner; add their hook spellings here once confirmed.
+	"vscode": "vscode", "copilot": "copilot", "kiro": "kiro", "windsurf": "windsurf", "antigravity": "antigravity",
+	"geminicli": "gemini", "gemini": "gemini",
+}
+
+// skillAgentKey returns the canonical key of a known agent; any other name is returned as is
+// (lowercased), so it only matches an identical name.
 func skillAgentKey(agent string) string {
 	agent = canonicalServerToken(strings.TrimSpace(agent))
-	if strings.HasPrefix(agent, "claude") {
-		return "claude"
+	if key, ok := skillAgentAliases[agent]; ok {
+		return key
 	}
 	return agent
 }

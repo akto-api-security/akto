@@ -38,7 +38,10 @@ func TestSkillNameFromPayload(t *testing.T) {
 func TestSkillAgentKeyAndHost(t *testing.T) {
 	for in, want := range map[string]string{
 		"claude": "claude", "claudecli": "claude", "claude-cli-user": "claude", "CLAUDE_DESKTOP": "claude",
-		"cursor": "cursor", "github_cli": "github-cli", "": "",
+		"claude_agent_sdk": "claude", "codex": "codex", "codexcli": "codex", "CODEX_CLI": "codex",
+		"cursor": "cursor", "vscode": "vscode",
+		// unknown names are kept as they are
+		"not-attached": "not-attached", "claudette": "claudette", "github_cli": "github-cli", "": "",
 	} {
 		if got := skillAgentKey(in); got != want {
 			t.Errorf("skillAgentKey(%q) = %q, want %q", in, got, want)
@@ -65,13 +68,14 @@ func TestRejectedSkills(t *testing.T) {
 		{"type":"AGENT_SKILL","resourceName":"scoped","mcpHost":"claude","remarks":"Rejected","applyToDeviceIds":["dev-1"]},
 		{"type":"AGENT_SKILL","resourceName":"by-email","mcpHost":"claude","remarks":"Rejected","applyToUserEmails":["a@x.io"]},
 		{"type":"AGENT_SKILL","resourceName":"any-agent","mcpHost":"","remarks":"Rejected"},
+		{"type":"AGENT_SKILL","resourceName":"for-codex","mcpHost":"codex","remarks":"Rejected"},
 		{"type":"AGENT_SKILL","resourceName":"pdf","mcpHost":"claude","remarks":"Conditionally Approved"},
 		{"type":"ai-agent","resourceName":"claude2","remarks":"Rejected","rawValues":["claude"]},
 		{"type":"browser-llm","resourceName":"chatgpt.com","remarks":"Rejected"}
 	]}`)
 	skills := rejectedAuditDecisions(raw).skills
-	if len(skills) != 5 {
-		t.Fatalf("expected 5 rejected skill names, got %v", skills)
+	if len(skills) != 6 {
+		t.Fatalf("expected 6 rejected skill names, got %v", skills)
 	}
 
 	cases := []struct {
@@ -91,6 +95,8 @@ func TestRejectedSkills(t *testing.T) {
 		{"row recorded for another agent", "only-cursor", "claudecli", "d", "", false},
 		{"same skill on its own agent", "only-cursor", "cursor", "d", "", true},
 		{"row with no agent applies to all", "any-agent", "claudecli", "d", "", true},
+		{"codex row blocks the codexcli host", "for-codex", "codexcli", "d", "", true},
+		{"codex row does not block claude", "for-codex", "claudecli", "d", "", false},
 		{"plugin prefix falls back to bare name", "anthropic-skills:aws-credential-helper", "claudecli", "d", "", true},
 		{"device-scoped, matching device", "scoped", "claudecli", "dev-1", "", true},
 		{"device-scoped, other device", "scoped", "claudecli", "dev-2", "", false},
