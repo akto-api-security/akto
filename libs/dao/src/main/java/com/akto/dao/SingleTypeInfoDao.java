@@ -74,9 +74,6 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-            new String[] { SingleTypeInfo.LAST_SEEN, SingleTypeInfo._API_COLLECTION_ID }, false);
-
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
             
         fieldNames =  new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP};
