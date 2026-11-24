@@ -69,6 +69,14 @@ public class ElasticSearchClient extends SearchClient {
     // index.max_result_window (10_000) as a defense-in-depth bound; a session/window with more
     // docs than this loses grouping accuracy for its oldest spans (see the truncation log).
     private static final int    RAW_FETCH_CAP            = 5_000;
+    /**
+     * Ceiling on a caller-requested page size, so a bad request cannot ask for an unbounded
+     * page. Not a semantic limit: the paged views ask for 20 (and the HTTP actions cap callers
+     * at 100), while the unified view asks for as deep a window as it needs to interleave its
+     * two streams - up to the same 10,000 the Atlas sessions table pages to, which is also ES's
+     * default index.max_result_window for from + size.
+     */
+    private static final int    MAX_PAGE_SIZE            = 10_000;
     // Cap on the spans returned for a single trace (rendered as waterfall bars + span cards).
     private static final int    TRACE_DETAIL_SIZE        = 500;
     // "model" lives inside the responsePayload JSON, not as an indexed field, so it cannot be a
@@ -191,7 +199,7 @@ public class ElasticSearchClient extends SearchClient {
                 // sub-agg metric, so cross-page sort is broken. Terms agg with
                 // order:{latestTimestamp:"desc"} gives a globally correct sort; we fetch
                 // enough buckets to cover the requested page and slice in application code.
-                int pageSize  = Math.min(sessionsLimit, 100);
+                int pageSize  = Math.min(sessionsLimit, MAX_PAGE_SIZE);
                 int pageOffset = 0;
                 if (sessionsAfterKey != null && !sessionsAfterKey.trim().isEmpty()) {
                     try { pageOffset = Integer.parseInt(sessionsAfterKey.trim()); }
@@ -1187,6 +1195,21 @@ public class ElasticSearchClient extends SearchClient {
                                        String sortKey, boolean sortAsc, String searchAfterJson,
                                        Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
                                        boolean includeTracesContent) {
+        return searchPrompts(accountId, startMs, endMs, skip, limit, sortKey, sortAsc, searchAfterJson,
+                filters, atlasTrafficFilter, searchString, includeTracesContent, false);
+    }
+
+    /**
+     * onlyWithoutSession: only the records with no session, so the flat list and the
+     * session-grouped view partition the data between them instead of listing the grouped
+     * records in both.
+     */
+    @Override
+    public SearchResult searchPrompts(int accountId, long startMs, long endMs, int skip, int limit,
+                                       String sortKey, boolean sortAsc, String searchAfterJson,
+                                       Map<String, List<String>> filters, Boolean atlasTrafficFilter,
+                                       String searchString, boolean includeTracesContent,
+                                       boolean onlyWithoutSession) {
         if (!isConfigured()) return new SearchResult(new ArrayList<>(), 0);
         try {
             JSONArray searchAfter = null;
@@ -1194,11 +1217,25 @@ public class ElasticSearchClient extends SearchClient {
                 try { searchAfter = new JSONArray(searchAfterJson); } catch (Exception ignored) {}
             }
             JSONObject query = buildQuery(accountId, startMs, endMs, filters, searchString, atlasTrafficFilter);
-            return executeSearch(query, skip, Math.min(limit, 100), toEsField(sortKey), sortAsc, searchAfter, includeTracesContent);
+            if (onlyWithoutSession) excludeSessioned(query);
+            return executeSearch(query, skip, Math.min(limit, MAX_PAGE_SIZE), toEsField(sortKey), sortAsc, searchAfter, includeTracesContent);
         } catch (Exception e) {
             logger.error("searchPrompts error for accountId=" + accountId + ": " + e.getMessage());
             return new SearchResult(new ArrayList<>(), 0);
         }
+    }
+
+    /**
+     * Narrows a buildQuery result to records with no session. Same shape as fetchSessions'
+     * "exists" tweak, inverted, and applied to the returned bool rather than inside buildQuery,
+     * so none of buildQuery's other callers see it.
+     */
+    static JSONObject excludeSessioned(JSONObject query) throws JSONException {
+        JSONObject bool = query.getJSONObject("bool");
+        if (!bool.has("must_not")) bool.put("must_not", new JSONArray());
+        bool.getJSONArray("must_not").put(new JSONObject().put("exists",
+            new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER)));
+        return query;
     }
 
     private SearchResult executeSearch(JSONObject query, int skip, int limit, String sortField, boolean sortAsc,

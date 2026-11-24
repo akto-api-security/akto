@@ -15,11 +15,10 @@ import "../../../components/layouts/style.css";
 import api from "./api";
 import { formatSparklineLabels } from "./utils";
 import { formatCompact, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
-import { ARGUS_TRACE_COL_DEFS } from "./columns";
 import SessionsView from "./SessionsView";
+import UnifiedArgusView from "./UnifiedArgusView";
 import SessionFlyout from "./SessionFlyout";
 import ArgusTraceFlyout from "./ArgusTraceFlyout";
-import MessagesView from "./MessagesView";
 import { NO_ACCESS_MESSAGE } from "./LLMCellRenderers";
 import { fetchGuardrailPolicyNamesCached } from "../../guardrails/topicGuardrailUtils";
 import { CATEGORY_ENDPOINT_SECURITY, CATEGORY_AGENTIC_SECURITY } from "../../../../main/labelHelper";
@@ -363,24 +362,33 @@ export default function LLMObservability() {
                         </Box>
                     ) : topCards,
                     isArgus ? (
-                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && openTrace(p.data)} />
+                        // One table: a conversation is a row, and so is an invocation that
+                        // never carried a session. The click target follows the row's kind.
+                        <UnifiedArgusView
+                            key="unified-table"
+                            currDateRange={currDateRange}
+                            onOpenSession={openSession}
+                            onOpenTrace={openTrace}
+                        />
                     ) : (
                         <SessionsView key="sessions-table" currDateRange={currDateRange} onOpenSession={openSession} initialFilters={urlFilters} />
                     ),
                 ]}
             />
-            {isArgus ? (
+            {isArgus && (
                 <ArgusTraceFlyout
                     trace={selectedTrace}
                     onClose={() => setSelectedTrace(null)}
                 />
-            ) : (
-                <SessionFlyout
-                    session={selectedSession}
-                    currDateRange={currDateRange}
-                    onClose={() => setSelectedSession(null)}
-                />
             )}
+            {/* Both categories can open a session now - Atlas from its sessions table, Argus from
+                the session cell on a trace row - and the flyout renders nothing until one is
+                selected, so it is mounted for both rather than branched on. */}
+            <SessionFlyout
+                session={selectedSession}
+                currDateRange={currDateRange}
+                onClose={() => setSelectedSession(null)}
+            />
             <Modal
                 open={!!pendingReveal}
                 onClose={() => setPendingReveal(null)}
