@@ -248,11 +248,11 @@ const api = {
         })
     },
 
-    addAwsAccountIdsForApiGatewayLogging(awsAccountIds) {
+    addAwsAccountIdsForApiGatewayLogging(awsApiGConnectorRoleRegions) {
         return request({
             url: '/api/addAwsAccountIdsForApiGatewayLogging',
             method: 'post',
-            data: { awsAccountIds }
+            data: { awsApiGConnectorRoleRegions }
         })
     },
 
