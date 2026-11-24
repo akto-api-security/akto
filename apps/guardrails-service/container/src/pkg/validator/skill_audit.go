@@ -137,57 +137,29 @@ func matchRejectedSkill(skills map[string][]rejectedSkill, name, agent, deviceLa
 	return rejectedSkill{}, false
 }
 
-// checkRejectedSkill blocks a Skill tool call for a skill rejected in Audit Data.
+// checkRejectedSkill blocks a Skill tool call for a skill rejected in Audit Data. It logs only when it blocks.
 func (s *Service) checkRejectedSkill(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID string) *mcp.ValidationResult {
 	toolName, name := toolCallFromPayload(params.RequestPayload)
-	if toolName == "" {
-		return nil // not a hook tool call (prompt, MCP JSON-RPC, ...)
-	}
-
-	host := valCtx.McpServerName
-	agent := agentFromHost(host)
-	s.logger.Info("[SkillCheck] tool call received",
-		zap.String("tool", toolName),
-		zap.String("path", params.Path),
-		zap.String("host", host),
-		zap.String("agent", agent),
-		zap.Bool("isSkill", name != ""),
-		zap.String("sessionID", sessionID),
-		zap.String("requestID", requestID))
-	if !strings.EqualFold(toolName, skillToolName) {
-		return nil
-	}
-	if name == "" {
-		s.logger.Warn("[SkillCheck] Skill tool call without a skill name, allowing",
-			zap.String("host", host), zap.String("sessionID", sessionID), zap.String("requestID", requestID))
-		return nil
+	if !strings.EqualFold(toolName, skillToolName) || name == "" {
+		return nil // not a Skill tool call (prompt, MCP JSON-RPC, other tool, ...)
 	}
 
 	s.cache.mu.RLock()
 	skills := s.cache.rejectedSkills
 	s.cache.mu.RUnlock()
 
-	device, email := deviceLabelFromMcpServerName(host), requestUserEmail(valCtx)
-	_, rejected := matchRejectedSkill(skills, name, agent, device, email)
-	s.logger.Info("[SkillCheck] skill evaluated",
-		zap.String("skill", name),
-		zap.String("agent", agent),
-		zap.String("agentKey", skillAgentKey(agent)),
-		zap.String("device", device),
-		zap.Bool("hasUserEmail", email != ""),
-		zap.Int("rejectedSkillNamesLoaded", len(skills)),
-		zap.Strings("rejectedSkillNames", rejectedSkillNames(skills)),
-		zap.Bool("rejected", rejected),
-		zap.String("decision", map[bool]string{true: "block", false: "allow"}[rejected]),
-		zap.String("sessionID", sessionID),
-		zap.String("requestID", requestID))
+	host := valCtx.McpServerName
+	agent := agentFromHost(host)
+	row, rejected := matchRejectedSkill(skills, name, agent, deviceLabelFromMcpServerName(host), requestUserEmail(valCtx))
 	if !rejected {
 		return nil
 	}
 
 	s.logger.Warn("ValidateRequest - blocking skill rejected in audit data",
-		zap.String("host", host),
 		zap.String("skill", name),
+		zap.String("host", host),
+		zap.String("agent", agent),
+		zap.String("rowAgent", row.agent),
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID))
 	metadata := types.ThreatMetadata{
