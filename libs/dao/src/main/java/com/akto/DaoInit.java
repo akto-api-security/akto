@@ -498,11 +498,6 @@ public class DaoInit {
     public static void createIndices() {
         logger.info("[initCheck] DaoInit.createIndices() ENTER for account={} dbType={} allowCappedCollections={} setupType={}",
                 Context.accountId.get(), DbMode.dbType, DbMode.allowCappedCollections(), DbMode.setupType);
-        try {
-            TestingRunResultDao.instance.convertToCappedCollection();
-        } catch (Exception e) {
-                logger.error("Error while converting TestingRunResults to capped collection: " + e.getMessage());
-        }
 
         OrganizationsDao.createIndexIfAbsent();
         UsageMetricsDao.createIndexIfAbsent();
@@ -608,5 +603,11 @@ public class DaoInit {
         UserAnalysisDataDao.instance.createIndicesIfAbsent();
         logger.info("[initCheck] calling EndpointShieldLogsDao.createIndicesIfAbsent() for account={}", Context.accountId.get());
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
+
+        try {
+                TestingRunResultDao.instance.convertToCappedCollection();
+            } catch (Exception e) {
+                    logger.error("Error while converting TestingRunResults to capped collection: " + e.getMessage());
+            }
     }
 }

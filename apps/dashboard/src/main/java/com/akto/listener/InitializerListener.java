@@ -2724,6 +2724,7 @@ public class InitializerListener implements ServletContextListener {
 
                     logger.warn("Started Okta user sync scheduler", LogDb.DASHBOARD);
                     oktaUserSyncCron.setUpOktaUserSyncScheduler();
+                    setUpIndexSyncScheduler();
 
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                     setUpWebhookScheduler();
@@ -2771,7 +2772,6 @@ public class InitializerListener implements ServletContextListener {
                         crons.deleteTestRunsScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
-                        setUpIndexSyncScheduler();
 
                         // CleanInventory.cleanInventoryJobRunner();
 
@@ -2864,22 +2864,10 @@ public class InitializerListener implements ServletContextListener {
             } catch (Exception e) {
                 logger.errorAndAddToDb(e, "[indexSync] run aborted: " + e, LogDb.DASHBOARD);
             }
-        }, INDEX_SYNC_INITIAL_DELAY_MINUTES, INDEX_SYNC_INTERVAL_SECONDS / 60, TimeUnit.MINUTES);
+        }, 5, 4*60, TimeUnit.MINUTES);
     }
 
     private static void runIndexSync() {
-        if (!isIndexSyncEnabled()) {
-            logger.debug("[indexSync] SKIPPED, " + INDEX_SYNC_ENABLED_ENV + " is not true");
-            return;
-        }
-
-        // dibs live in the common db, same as setupAutomatedApiGroupsScheduler
-        Context.accountId.set(1000_000);
-        if (!callDibs(Cluster.INDEX_SYNC_CRON, INDEX_SYNC_INTERVAL_SECONDS, 60)) {
-            logger.debugAndAddToDb("[indexSync] SKIPPED, lease held by another instance", LogDb.DASHBOARD);
-            return;
-        }
-
         long startMs = System.currentTimeMillis();
         AtomicInteger succeeded = new AtomicInteger();
         AtomicInteger failed = new AtomicInteger();
@@ -3957,7 +3945,7 @@ public class InitializerListener implements ServletContextListener {
 
     public void runInitializerFunctions() {
         logger.infoAndAddToDb("[initCheck] runInitializerFunctions START for account=" + Context.accountId.get(), LogDb.DASHBOARD);
-        DaoInit.createIndices();
+        // DaoInit.createIndices();
         logger.infoAndAddToDb("[initCheck] DaoInit.createIndices() returned for account=" + Context.accountId.get(), LogDb.DASHBOARD);
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
