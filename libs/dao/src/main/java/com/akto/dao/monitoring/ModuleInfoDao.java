@@ -25,13 +25,12 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
     }
 
     public void createIndicesIfAbsent() {
-        // moduleType is the most common single-field filter
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-            new String[]{ ModuleInfo.MODULE_TYPE }, false);
-
-        // moduleType + lastHeartbeatReceived — used in heartbeat threshold queries
+            new String[]{ ModuleInfo._REBOOT, ModuleInfo.MODULE_TYPE, ModuleInfo.MINI_RUNTIME_NAME }, true);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-            new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo.LAST_HEARTBEAT_RECEIVED }, false);
+            new String[]{ ModuleInfo.LAST_HEARTBEAT_RECEIVED }, true);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo.NAME }, true);
     }
 
     private static final int HEARTBEAT_THRESHOLD_SECONDS = 5 * 60;

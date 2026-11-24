@@ -7,6 +7,7 @@ import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -492,6 +493,7 @@ public class DaoInit {
         McpAuditInfoDao.instance.createIndicesIfAbsent();
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
+        ModuleInfoDao.instance.createIndicesIfAbsent();
         logger.info("[initCheck] calling EndpointShieldLogsDao.createIndicesIfAbsent() for account={}", Context.accountId.get());
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
     }
