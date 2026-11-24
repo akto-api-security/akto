@@ -270,12 +270,8 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
     // this is flawed. Because we were in a hurry we allowed this
     // traffic collection with internal api... do not have hosts and will also be included
     public List<ApiCollection> fetchNonTrafficApiCollections() {
-        return instance.findAll(
-            Filters.or(
-                Filters.eq(ApiCollection.HOST_NAME, null),
-                Filters.exists(ApiCollection.HOST_NAME, false)
-            )       
-        );
+        // eq null also matches a missing hostName; callers only read the id
+        return instance.findAll(Filters.eq(ApiCollection.HOST_NAME, null), Projections.include(ApiCollection.ID));
     }
 
     public List<Integer> fetchNonTrafficApiCollectionsIds() {
