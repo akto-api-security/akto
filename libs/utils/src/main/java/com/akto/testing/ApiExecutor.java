@@ -739,6 +739,15 @@ public class ApiExecutor {
         return "file"; // Default filename
     }
 
+    /** The run's advanced settings (add/modify/delete header, body and URL params), for a request that is not sent
+     * through this class - e.g. one handed to smart testing. A no-op when the run has none. */
+    public static void applyAdvancedSettings(OriginalHttpRequest request, TestingRunConfig testingRunConfig) {
+        if (request != null && testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null
+                && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()) {
+            calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
+        }
+    }
+
     private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
         Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
         Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
