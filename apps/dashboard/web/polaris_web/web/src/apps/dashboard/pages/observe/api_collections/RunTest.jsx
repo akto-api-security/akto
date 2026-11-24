@@ -75,6 +75,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     })
     const [scriptsState, setScriptsState] = useState({ enabled: false, failed: false, scripts: [] })
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const allCollections = PersistStore(state => state.allCollections)
     const [loading, setLoading] = useState(true)
     const [testRolesArr, setTestRolesArr] = useState([])
     const [active, setActive] = useState(runTestFromOutside || false);
@@ -145,6 +146,12 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         ? `${apiCollectionIds.length} collections`
         : collectionsMap[apiCollectionId]
 
+    // MCP tests only apply to collections tagged "mcp-server" (api_selection_filters skip them elsewhere)
+    function hasMcpCollection() {
+        const targetIds = (isMultiCollection ? apiCollectionIds : [apiCollectionId]).map(Number)
+        return (allCollections || []).some(c => targetIds.includes(Number(c.id)) && c.envType?.some(t => t.keyName === 'mcp-server'))
+    }
+
     async function fetchData() {
         setLoading(true)
 
@@ -203,7 +210,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                 });
             }
         }
-        let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMapForFiltering);
+        let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMapForFiltering, hasMcpCollection());
         metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
         let categories = metaDataObj.categories
         categories = func.sortByCategoryPriority(categories, 'name')
