@@ -74,6 +74,9 @@ public class Main {
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
     private static final String TEST_RUNS_OVERAGE_ERROR = "Test runs overage detected";
     private static final String OUT_OF_TESTING_SCOPE_ERROR = "All target collections are marked as out of testing scope";
+    // Main polling loop: poll every 1s while there is work, back off up to 10s when idle.
+    private static final long MIN_POLL_SLEEP_MS = 1000;
+    private static final long MAX_POLL_SLEEP_MS = 10_000;
     private static final String customMiniTestingServiceName;
     static {
         customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
@@ -668,6 +671,7 @@ public class Main {
 
         singleTypeInfoInit(accountId);
 
+        long pollSleepMs = MIN_POLL_SLEEP_MS;
         while (true) {
             if (!OrchestratorControl.tryStartPolling()) {
                 // drained by mini-testing-orchestrator ahead of a scale-down: claim nothing
@@ -706,7 +710,8 @@ public class Main {
 
             if (testingRun == null) {
                 OrchestratorControl.markPollIdle();
-                Thread.sleep(1000);
+                pollSleepMs = Math.min(pollSleepMs * 2, MAX_POLL_SLEEP_MS);
+                Thread.sleep(pollSleepMs);
                 continue;
             }
 
@@ -718,16 +723,19 @@ public class Main {
                         .anyMatch(name -> name.equalsIgnoreCase(customMiniTestingServiceName));
                 if (!eligible) {
                     OrchestratorControl.markPollIdle();
-                    Thread.sleep(1000);
+                    pollSleepMs = Math.min(pollSleepMs * 2, MAX_POLL_SLEEP_MS);
+                    Thread.sleep(pollSleepMs);
                     continue;
                 }
             } else if (testingRun.getMiniTestingServiceName() != null
                     && !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName)) {
                 OrchestratorControl.markPollIdle();
-                Thread.sleep(1000);
+                pollSleepMs = Math.min(pollSleepMs * 2, MAX_POLL_SLEEP_MS);
+                Thread.sleep(pollSleepMs);
                 continue;
             }
             OrchestratorControl.markRunClaimed();
+            pollSleepMs = MIN_POLL_SLEEP_MS;
 
             if (handleRerunTestingRunResult(trrs)) {
                 continue;
