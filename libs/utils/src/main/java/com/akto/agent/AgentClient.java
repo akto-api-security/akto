@@ -1,5 +1,6 @@
 package com.akto.agent;
 
+import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
@@ -12,6 +13,7 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import okhttp3.*;
@@ -25,9 +27,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import static com.akto.agent.AgenticUtils.getTestModeFromRole;
 import static com.akto.agent.AgenticUtils.isCopilotBotCollection;
@@ -44,6 +52,26 @@ public class AgentClient {
     private static final String JSON_KEY_IS_LAST_REQUEST = "isLastRequest";
     private static final String JSON_KEY_TESTING_RUN_RESULT_SUMMARY_ID = "testingRunResultSummaryId";
     private static final String JSON_KEY_FETCH_QUERY_RECORDS = "shouldFetchRecords";
+
+    /** Runs this worker sent agentic tests for, so only those runs ask the agent server to consolidate learnings. */
+    private static final int MAX_TRACKED_AGENTIC_SUMMARIES = 1000;
+    private static final Set<String> agenticSummaryIds = Collections.synchronizedSet(Collections.newSetFromMap(
+            new LinkedHashMap<String, Boolean>() {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+                    return size() > MAX_TRACKED_AGENTIC_SUMMARIES;
+                }
+            }));
+    static final int CONSOLIDATE_MAX_ATTEMPTS = 3;
+    private static final long CONSOLIDATE_BACKOFF_MILLIS = 2000;
+    /** The agent server answers 202 before it starts consolidating, so the call itself is short. */
+    private static final OkHttpClient consolidateHttpClient = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(10, TimeUnit.SECONDS)
+            .build();
+    /** One dedicated thread; at most one call per finished run, so a small queue is plenty. */
+    private static final ExecutorService consolidateExecutor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(50), new ThreadPoolExecutor.AbortPolicy());
 
     private static final OkHttpClient agentHttpClient = CoreHTTPClient.client.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -64,8 +92,20 @@ public class AgentClient {
         this.agentBaseUrl = agentBaseUrl == null || agentBaseUrl.isEmpty() ? "" : agentBaseUrl.endsWith("/") ? agentBaseUrl.substring(0, agentBaseUrl.length() - 1) : agentBaseUrl;
     }
 
-    public List<TestResult> executeAgenticTest(RawApi rawApi, int apiCollectionId, String testingRunResultSummaryId) throws Exception {
+    public List<TestResult> executeAgenticTest(RawApi rawApi, int apiCollectionId, String testingRunResultSummaryId, AgentLearningContext learningContext) throws Exception {
+        return executeAgenticTest(rawApi, apiCollectionId, testingRunResultSummaryId, learningContext, null);
+    }
+
+    /**
+     * @param testingRunConfig the run's config; its pre/post request script selection is registered for this
+     *                         conversation so the utility server's /utility/execute replays through the same
+     *                         scripts. Null registers nothing, and those replays use the default scripts.
+     */
+    public List<TestResult> executeAgenticTest(RawApi rawApi, int apiCollectionId, String testingRunResultSummaryId, AgentLearningContext learningContext, TestingRunConfig testingRunConfig) throws Exception {
         String conversationId = UUID.randomUUID().toString();
+        if (testingRunResultSummaryId != null && !testingRunResultSummaryId.isEmpty()) {
+            agenticSummaryIds.add(testingRunResultSummaryId);
+        }
         List<String> promptsList = rawApi.getConversationsList();
         String testMode = getTestModeFromRole();
 
@@ -83,6 +123,12 @@ public class AgentClient {
             }
         }
         loggerMaker.infoAndAddToDb("executeAgenticTest: starting conversationId=" + conversationId + " apiCollectionId=" + apiCollectionId + " prompts=" + promptsList.size() + " copilot=" + isCopilot);
+
+        // from here every exit unregisters (the init-failure return and the finally below)
+        ApiExecutionJobStore scriptStore = testingRunConfig != null ? ApiExecutionJobStoreRegistry.get() : null;
+        if (scriptStore != null) {
+            scriptStore.registerConversationScripts(conversationId, testingRunConfig.getPreRequestScriptId(), testingRunConfig.getPostRequestScriptId());
+        }
 
         try {
             if (isCopilot) {
@@ -104,6 +150,9 @@ public class AgentClient {
             }
         } catch(Exception e){
             loggerMaker.errorAndAddToDb("executeAgenticTest: init failed conversationId=" + conversationId + " err=" + e.getMessage());
+            if (scriptStore != null) {
+                scriptStore.unregisterConversationScripts(conversationId);
+            }
             TestResult errorResult = new TestResult();
             errorResult.setMessage("Agentic test execution failed: " + e.getMessage());
             setAgenticResultFields(errorResult, conversationId, false, Arrays.asList(e.getMessage()), 0.0, TestResult.Confidence.LOW);
@@ -111,7 +160,7 @@ public class AgentClient {
         }
 
         try {
-            List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode, testingRunResultSummaryId, shouldFetchRecords);
+            List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode, testingRunResultSummaryId, shouldFetchRecords, learningContext);
             boolean isVulnerable = conversationResults.get(conversationResults.size() - 1).isValidation();
             List<String> errors = new ArrayList<>();
 
@@ -138,17 +187,20 @@ public class AgentClient {
         } finally {
             // a WebSocket target kept one connection open for this conversation's turns
             WebSocketSessionStore.closeConversation(conversationId);
+            if (scriptStore != null) {
+                scriptStore.unregisterConversationScripts(conversationId);
+            }
         }
     }
-
-    private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode, String testingRunResultSummaryId, boolean shouldFetchRecords) throws Exception {
+    
+    private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode, String testingRunResultSummaryId, boolean shouldFetchRecords, AgentLearningContext learningContext) throws Exception {
         List<AgentConversationResult> results = new ArrayList<>();
         int index = 0;
         int totalRequests = prompts.size();
         for (String prompt : prompts) {
             index++;
             try {
-                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode, index == totalRequests, testingRunResultSummaryId, shouldFetchRecords);
+                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode, index == totalRequests, testingRunResultSummaryId, shouldFetchRecords, learningContext);
                 results.add(result);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error processing prompt: " + prompt + ", error: " + e.getMessage());
@@ -159,8 +211,8 @@ public class AgentClient {
         return results;
     }
     
-    private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, testingRunResultSummaryId, shouldFetchRecords);
+    private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords, AgentLearningContext learningContext) throws Exception {
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, testingRunResultSummaryId, shouldFetchRecords, learningContext);
 
         Call call = clientWithLongTimeout.newCall(request);
 
@@ -175,14 +227,22 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords) {
+    static Map<String, Object> buildChatRequestBody(String prompt, String conversationId, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords, AgentLearningContext learningContext) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put(JSON_KEY_PROMPT, prompt);
         requestBody.put(JSON_KEY_CONVERSATION_ID, conversationId);
         requestBody.put(JSON_KEY_IS_LAST_REQUEST, isLastRequest);
         requestBody.put(JSON_KEY_TESTING_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId != null ? testingRunResultSummaryId : "");
         requestBody.put(JSON_KEY_FETCH_QUERY_RECORDS, shouldFetchRecords);
-        
+        if (learningContext != null) {
+            learningContext.addTo(requestBody);
+        }
+        return requestBody;
+    }
+
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords, AgentLearningContext learningContext) {
+        Map<String, Object> requestBody = buildChatRequestBody(prompt, conversationId, isLastRequest, testingRunResultSummaryId, shouldFetchRecords, learningContext);
+
         String body;
         try {
             body = objectMapper.writeValueAsString(requestBody);
@@ -224,8 +284,9 @@ public class AgentClient {
             String validationMessage = null;
             String remediationMessage = null;
             if(validation) {
-                validationMessage = jsonNode.get("validationMessage").asText();
-                remediationMessage = jsonNode.get("remediationMessage").asText();
+                // asText() on a JSON null returns the string "null"; an absent message stays null.
+                validationMessage = jsonNode.hasNonNull("validationMessage") ? jsonNode.get("validationMessage").asText() : null;
+                remediationMessage = jsonNode.hasNonNull("remediationMessage") ? jsonNode.get("remediationMessage").asText() : null;
             }
 
             String finalSentPrompt = null;
@@ -390,6 +451,86 @@ public class AgentClient {
         requestBody.put("requestMethod", requestMethod != null && !requestMethod.isEmpty() ? requestMethod : "POST");
         requestBody.put("conversationId", conversationId);
         initializeAgent(requestBody);
+    }
+
+    /**
+     * Asks the agent server, off the caller's thread, to write the final learnings of a finished run. Only runs this
+     * worker sent agentic tests for are sent; the agent server's version ids make a repeated call a no-op.
+     */
+    public boolean consolidateLearningsInBackground(String testingRunResultSummaryId) {
+        if (testingRunResultSummaryId == null || !agenticSummaryIds.remove(testingRunResultSummaryId)) {
+            return false;
+        }
+        Integer accountId = Context.accountId.get();
+        try {
+            consolidateExecutor.execute(() -> {
+                Context.accountId.set(accountId);
+                consolidateLearnings(testingRunResultSummaryId, CONSOLIDATE_BACKOFF_MILLIS);
+            });
+        } catch (RejectedExecutionException e) {
+            loggerMaker.errorAndAddToDb("consolidateLearnings: queue full, learnings of summaryId=" + testingRunResultSummaryId + " will not be consolidated");
+            return false;
+        }
+        return true;
+    }
+
+    /** True once the agent server accepted the call. Retries, with backoff, only an unreachable server, 429 and 5xx. */
+    boolean consolidateLearnings(String testingRunResultSummaryId, long backoffMillis) {
+        String failure = null;
+        for (int attempt = 1; attempt <= CONSOLIDATE_MAX_ATTEMPTS; attempt++) {
+            try (Response response = consolidateHttpClient.newCall(buildConsolidateRequest(testingRunResultSummaryId)).execute()) {
+                if (response.isSuccessful()) {
+                    String body = response.body() != null ? response.body().string() : "";
+                    if (isDeclined(body)) {
+                        // 202 with accepted:false is how the agent server says learnings are switched off; nothing was queued.
+                        loggerMaker.infoAndAddToDb("consolidateLearnings: declined for summaryId=" + testingRunResultSummaryId + ": " + body);
+                        return false;
+                    }
+                    loggerMaker.infoAndAddToDb("consolidateLearnings: accepted for summaryId=" + testingRunResultSummaryId);
+                    return true;
+                }
+                failure = "status " + response.code();
+                if (response.code() != 429 && response.code() < 500) {
+                    break;
+                }
+            } catch (Exception e) {
+                failure = e.getMessage();
+            }
+            if (attempt < CONSOLIDATE_MAX_ATTEMPTS && !sleepQuietly(backoffMillis * attempt)) {
+                break;
+            }
+        }
+        loggerMaker.errorAndAddToDb("consolidateLearnings: not accepted for summaryId=" + testingRunResultSummaryId + ": " + failure);
+        return false;
+    }
+
+    private static boolean isDeclined(String body) {
+        try {
+            JsonNode accepted = objectMapper.readTree(body).get("accepted");
+            return accepted != null && accepted.isBoolean() && !accepted.asBoolean();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static boolean sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private Request buildConsolidateRequest(String testingRunResultSummaryId) throws Exception {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put(JSON_KEY_TESTING_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId);
+        return new Request.Builder()
+                .url(agentBaseUrl + "/consolidateLearnings")
+                .post(RequestBody.create(objectMapper.writeValueAsString(requestBody), MediaType.parse("application/json")))
+                .addHeader("Accept", "application/json")
+                .build();
     }
 
     public void initializeAgent(Map<String, Object> requestBody) {

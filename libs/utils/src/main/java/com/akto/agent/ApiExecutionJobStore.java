@@ -7,6 +7,8 @@ import com.akto.dto.OriginalHttpResponse;
 import lombok.Getter;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -60,10 +62,42 @@ public class ApiExecutionJobStore {
         }
     }
 
+    /**
+     * The pre/post request script selection of the testing run a conversation belongs to. The two values
+     * are the raw TestingRunConfig ids and must stay raw: null means "default script", "" means "no script"
+     * (see ScriptSelection), so nothing here may normalise, trim or default them.
+     */
+    public static final class ConversationScripts {
+        @Getter
+        private final String preRequestScriptId;
+        @Getter
+        private final String postRequestScriptId;
+        private final long registeredAtMs;
+
+        public ConversationScripts(String preRequestScriptId, String postRequestScriptId) {
+            this.preRequestScriptId = preRequestScriptId;
+            this.postRequestScriptId = postRequestScriptId;
+            this.registeredAtMs = Context.epochInMillis();
+        }
+    }
+
     private static final int DEFAULT_MAX_SIZE = 10_000;
     private static final long DEFAULT_TTL_MS = 60 * 60 * 1000;
+    /**
+     * Backstop only: the owner unregisters when its conversation ends. Longer than any conversation
+     * (AGENT_CHAT_READ_TIMEOUT_SECONDS per turn), so a live one is not dropped back to the default script.
+     */
+    private static final int MAX_TRACKED_CONVERSATION_SCRIPTS = 10_000;
+    private static final long CONVERSATION_SCRIPTS_TTL_MS = 24L * 60 * 60 * 1000;
 
     private final Map<String, JobEntry> store = new ConcurrentHashMap<>();
+    private final Map<String, ConversationScripts> conversationScripts = Collections.synchronizedMap(
+            new LinkedHashMap<String, ConversationScripts>() {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, ConversationScripts> eldest) {
+                    return size() > MAX_TRACKED_CONVERSATION_SCRIPTS;
+                }
+            });
     private final Map<String, List<String>> conversationToJobIds = new ConcurrentHashMap<>();
     private final Set<String> liteLLMConversationIds = ConcurrentHashMap.newKeySet();
     private final Map<String, String> jobIdToConversationResultDocId = new ConcurrentHashMap<>();
@@ -124,6 +158,33 @@ public class ApiExecutionJobStore {
     public boolean isLiteLLMConversation(String conversationId) {
         return conversationId != null && liteLLMConversationIds.contains(conversationId);
     }
+    /** Idempotent: registering the same conversation again replaces its selection. */
+    public void registerConversationScripts(String conversationId, String preRequestScriptId, String postRequestScriptId) {
+        if (conversationId == null || conversationId.isEmpty()) {
+            return;
+        }
+        conversationScripts.put(conversationId, new ConversationScripts(preRequestScriptId, postRequestScriptId));
+    }
+
+    /** Null when nothing is registered (never registered, already unregistered, or expired); that is not "no script". */
+    public ConversationScripts getConversationScripts(String conversationId) {
+        if (conversationId == null) {
+            return null;
+        }
+        ConversationScripts scripts = conversationScripts.get(conversationId);
+        if (scripts != null && Context.epochInMillis() - scripts.registeredAtMs > CONVERSATION_SCRIPTS_TTL_MS) {
+            conversationScripts.remove(conversationId);
+            return null;
+        }
+        return scripts;
+    }
+
+    public void unregisterConversationScripts(String conversationId) {
+        if (conversationId != null) {
+            conversationScripts.remove(conversationId);
+        }
+    }
+
     public void putConversationResultDocId(String jobId, String docId) {
         if (jobId != null && !jobId.isEmpty() && docId != null && !docId.isEmpty()) {
             jobIdToConversationResultDocId.put(jobId, docId);

@@ -70,6 +70,28 @@ public class BedrockCollectionNamingTest {
         assertFalse(name.contains("deeplink_agent"), "the rewrite is Bedrock-only");
     }
 
+    /** AWS Quick is keyed by bot-name too, but the agent_name rewrite is scoped to Bedrock. */
+    @Test
+    public void testAwsQuickKeepsItsOwnBotName() throws Exception {
+        assertEquals("quick-bot", HttpCallParser.getHostnameForCollection(parse(
+            "{\"source\":\"AWS_QUICK\",\"bot-name\":\"quick-bot\","
+            + "\"request-metadata-agent_name\":\"deeplink_agent\"}")));
+    }
+
+    /** Callers pad values; the padding must not become part of a collection name. */
+    @Test
+    public void testAgentNameIsTrimmed() throws Exception {
+        assertEquals("deeplink_agent", HttpCallParser.getHostnameForCollection(
+            parse("{" + BASE + ",\"request-metadata-agent_name\":\"  deeplink_agent \"}")));
+    }
+
+    /** A blank agent_name is no identity: the record stays with its role, not an empty name. */
+    @Test
+    public void testBlankAgentNameFallsBackToBotName() throws Exception {
+        assertEquals("sm-role-acorns-agents", HttpCallParser.getHostnameForCollection(
+            parse("{" + BASE + ",\"request-metadata-agent_name\":\"   \"}")));
+    }
+
     /** No tags at all: the raw Host header still wins, as for any non-agentic traffic. */
     @Test
     public void testPlainTrafficKeepsItsHost() throws Exception {

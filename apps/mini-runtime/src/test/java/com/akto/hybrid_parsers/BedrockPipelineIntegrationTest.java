@@ -3,6 +3,7 @@ package com.akto.hybrid_parsers;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -18,6 +19,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollection.ServiceGraphEdgeInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.runtime.parser.SampleParser;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 
@@ -64,20 +66,22 @@ public class BedrockPipelineIntegrationTest {
     private static final String ROLE  = "sm-role-acorns-agents";
     private static final String ORCH  = "chatbot_orchestrator_agent";
     private static final String MODEL = "anthropic.claude-sonnet-5";
+    private static final String SESSION = "8ef2a7f2-4e53-42ec-b368-6c051c763a5d";
 
     /** An ingest record shaped exactly as the Bedrock log processor sends them. */
     private String message(String agentName) {
         String tag = "{\\\"source\\\":\\\"AWS_BEDROCK\\\",\\\"gen-ai\\\":\\\"Gen AI\\\","
             + "\\\"bot-name\\\":\\\"" + ROLE + "\\\",\\\"agent-id\\\":\\\"" + ROLE + "\\\","
             + "\\\"agentType\\\":\\\"BEDROCK_AGENT\\\",\\\"model\\\":\\\"" + MODEL + "\\\","
-            + "\\\"session-id\\\":\\\"8ef2a7f2-4e53-42ec-b368-6c051c763a5d\\\","
+            + "\\\"session-id\\\":\\\"" + SESSION + "\\\","
             + "\\\"request-metadata-agent_name\\\":\\\"" + agentName + "\\\","
             + "\\\"request-metadata-orchestrator_name\\\":\\\"" + ORCH + "\\\"}";
         String awsMetadata = "{\\\"model\\\":\\\"" + MODEL + "\\\","
             + "\\\"bedrock-execution-role\\\":\\\"" + ROLE + "\\\",\\\"traceData\\\":{}}";
         return "{"
             + "\"path\":\"/model/" + MODEL + "/converse-stream\",\"method\":\"POST\","
-            + "\"requestHeaders\":\"{\\\"host\\\":\\\"bedrock-runtime.us-east-1.amazonaws.com\\\"}\","
+            + "\"requestHeaders\":\"{\\\"host\\\":\\\"bedrock-runtime.us-east-1.amazonaws.com\\\","
+            + "\\\"x-request-id\\\":\\\"req-" + agentName + "\\\"}\","
             + "\"responseHeaders\":\"{}\","
             + "\"requestPayload\":\"{\\\"messages\\\":[]}\","
             + "\"responsePayload\":\"{\\\"awsMetadata\\\":" + awsMetadata + "}\","
@@ -131,5 +135,43 @@ public class BedrockPipelineIntegrationTest {
         assertNotEquals(a.getId(), b.getId());
         assertEquals("agent_alpha", a.getHostName());
         assertEquals("agent_beta", b.getHostName());
+    }
+
+    /**
+     * The agent split and the Traces identifiers come from the same tag string; a record filed
+     * under its agent must still group into its conversation and turn in Traces.
+     */
+    @Test
+    public void testAgentRecordKeepsItsConversationAndTurn() throws Exception {
+        HttpResponseParams p = SampleParser.parseSampleMessage(message("deeplink_agent"));
+        AgentQueryRecord r = AgentQueryRecord.fromHttpResponseParams(
+            p, HttpCallParser.parseTagsMap(p.getTags()), new HashMap<>());
+
+        assertNotNull(r);
+        assertEquals(SESSION, r.getSessionIdentifier(), "the conversation survives the rewrite");
+        assertEquals("req-deeplink_agent", r.getTraceId(), "and so does the turn");
+    }
+
+    /** Two agents in one conversation: separate collections, one session in Traces. */
+    @Test
+    public void testSiblingAgentsStayInOneConversation() throws Exception {
+        HttpResponseParams a = SampleParser.parseSampleMessage(message("agent_gamma"));
+        HttpResponseParams b = SampleParser.parseSampleMessage(message("agent_delta"));
+        AgentQueryRecord ra = AgentQueryRecord.fromHttpResponseParams(
+            a, HttpCallParser.parseTagsMap(a.getTags()), new HashMap<>());
+        AgentQueryRecord rb = AgentQueryRecord.fromHttpResponseParams(
+            b, HttpCallParser.parseTagsMap(b.getTags()), new HashMap<>());
+
+        assertEquals(ra.getSessionIdentifier(), rb.getSessionIdentifier());
+        assertNotEquals(ra.getTraceId(), rb.getTraceId(), "each call is its own turn");
+        assertNotEquals(ingest("agent_gamma").getId(), ingest("agent_delta").getId());
+    }
+
+    /** Bedrock bot collections are dedicated, so they never get a "-agentic" sibling. */
+    @Test
+    public void testAgentCollectionIsNotForked() throws Exception {
+        ApiCollection collection = ingest("fork_check_agent");
+        assertFalse(collection.getHostName().endsWith("-agentic"));
+        assertNull(ApiCollectionsDao.instance.findOne(Filters.eq("hostName", "fork_check_agent-agentic")));
     }
 }

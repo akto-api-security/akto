@@ -13,8 +13,7 @@ import com.google.gson.Gson;
 
 /**
  * Bedrock records name their caller by IAM role, which every agent in an application shares.
- * When the caller tells us which agent actually made the call, that becomes the identity, and
- * the conversation id it sends as a tag is carried into the header Traces reads.
+ * When the caller tells us which agent actually made the call, that becomes the identity.
  */
 public class SampleParserAgenticTagsTest {
 
@@ -99,48 +98,60 @@ public class SampleParserAgenticTagsTest {
         assertEquals("", SampleParser.normalizeAgenticTags(""));
     }
 
-    // ---------------- session header ----------------
+    // ---------------- alongside the identity bridge ----------------
+    // The session and turn bridging itself is covered by SampleParserAgenticIdentityTest.
+    // These pin that the rewrite and the bridge, which both read the same tag string, do not
+    // step on each other on one record.
+
+    private String messageWithRequestId(String tagsJson, String requestId) {
+        return message(tagsJson).replace(
+            "\\\"host\\\":\\\"bedrock-runtime.us-east-1.amazonaws.com\\\"",
+            "\\\"host\\\":\\\"bedrock-runtime.us-east-1.amazonaws.com\\\","
+          + "\\\"x-request-id\\\":\\\"" + requestId + "\\\"");
+    }
+
+    private String header(HttpResponseParams p, String name) {
+        List<String> values = p.getRequestParams().getHeaders().get(name);
+        return values == null || values.isEmpty() ? null : values.get(0);
+    }
 
     @Test
-    public void testSessionTagIsCarriedIntoTheHeaderTracesReads() throws Exception {
+    public void testRewriteKeepsTheSessionAndTurn() throws Exception {
+        HttpResponseParams p = SampleParser.parseSampleMessage(messageWithRequestId(bedrockTags(
+            "\"request-metadata-agent_name\":\"deeplink_agent\","
+          + "\"session-id\":\"8ef2a7f2-4e53-42ec-b368-6c051c763a5d\""), "req-1"));
+
+        assertEquals("deeplink_agent", tagsOf(p).get(Constants.AI_AGENT_TAG_BOT_NAME));
+        assertEquals("8ef2a7f2-4e53-42ec-b368-6c051c763a5d",
+            header(p, Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID),
+            "rewriting bot-name must not drop the session tag the bridge reads");
+        assertEquals("req-1", header(p, Constants.AI_AGENT_HEADER_INSTALLER_MESSAGE_ID),
+            "nor the turn identifier");
+    }
+
+    /** Tags become headers too; both must carry the rewritten name so readers cannot disagree. */
+    @Test
+    public void testInjectedBotNameHeaderMatchesTheRewrittenTag() throws Exception {
         HttpResponseParams p = SampleParser.parseSampleMessage(
-            message(bedrockTags("\"session-id\":\"8ef2a7f2-4e53-42ec-b368-6c051c763a5d\"")));
+            message(bedrockTags("\"request-metadata-agent_name\":\"deeplink_agent\"")));
 
-        List<String> header = p.getRequestParams().getHeaders()
-            .get(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID);
-        assertNotNull(header, "AgentQueryRecord reads only this header, so it has to be set");
-        assertEquals("8ef2a7f2-4e53-42ec-b368-6c051c763a5d", header.get(0));
+        assertEquals("deeplink_agent", header(p, "x-akto-k8s-" + Constants.AI_AGENT_TAG_BOT_NAME));
     }
 
+    /** Two agents in one conversation keep their own identity and share the session. */
     @Test
-    public void testNoSessionTagLeavesNoHeader() throws Exception {
-        HttpResponseParams p = SampleParser.parseSampleMessage(message(bedrockTags(null)));
+    public void testSiblingAgentsShareTheConversation() throws Exception {
+        String session = "\"session-id\":\"conv-1\"";
+        HttpResponseParams a = SampleParser.parseSampleMessage(messageWithRequestId(bedrockTags(
+            "\"request-metadata-agent_name\":\"invest_agent\"," + session), "req-a"));
+        HttpResponseParams b = SampleParser.parseSampleMessage(messageWithRequestId(bedrockTags(
+            "\"request-metadata-agent_name\":\"deeplink_agent\"," + session), "req-b"));
 
-        assertFalse(p.getRequestParams().getHeaders()
-            .containsKey(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID),
-            "nothing to carry means no header invented");
-    }
-
-    /** A source that sets the header itself must keep its own value. */
-    @Test
-    public void testExistingSessionHeaderWins() throws Exception {
-        String msg = message(bedrockTags("\"session-id\":\"from-tag\""))
-            .replace("\\\"host\\\":\\\"bedrock-runtime.us-east-1.amazonaws.com\\\"",
-                     "\\\"host\\\":\\\"bedrock-runtime.us-east-1.amazonaws.com\\\","
-                   + "\\\"x-akto-installer-akto_session_id\\\":\\\"from-header\\\"");
-        HttpResponseParams p = SampleParser.parseSampleMessage(msg);
-
-        assertEquals("from-header", p.getRequestParams().getHeaders()
-            .get(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID).get(0));
-    }
-
-    /** The session tag is normalised upstream, so a renamed caller field still lands here. */
-    @Test
-    public void testSessionComesFromTheNormalisedTagNotARawSpelling() throws Exception {
-        HttpResponseParams p = SampleParser.parseSampleMessage(message(bedrockTags(
-            "\"session-id\":\"abc-123\",\"request-metadata-conversationId\":\"abc-123\"")));
-
-        assertEquals("abc-123", p.getRequestParams().getHeaders()
-            .get(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID).get(0));
+        assertNotEquals(tagsOf(a).get(Constants.AI_AGENT_TAG_BOT_NAME),
+                        tagsOf(b).get(Constants.AI_AGENT_TAG_BOT_NAME));
+        assertEquals("conv-1", header(a, Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID));
+        assertEquals("conv-1", header(b, Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID));
+        assertNotEquals(header(a, Constants.AI_AGENT_HEADER_INSTALLER_MESSAGE_ID),
+                        header(b, Constants.AI_AGENT_HEADER_INSTALLER_MESSAGE_ID));
     }
 }

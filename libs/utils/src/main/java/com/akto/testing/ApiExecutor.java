@@ -32,7 +32,7 @@ import okio.BufferedSink;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.UUID;
-
+import java.util.function.IntPredicate;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -46,7 +46,7 @@ public class ApiExecutor {
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     // Load only first 1 MiB of response body into memory.
-    private static final int MAX_RESPONSE_SIZE = 1024*1024;
+    public static final int MAX_RESPONSE_SIZE = 1024*1024;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
 
@@ -549,9 +549,19 @@ public class ApiExecutor {
     private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(1, 2, 5));
 
     public static OriginalHttpResponse sendRequestBackOff(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
+        return sendRequestBackOff(request, followRedirects, testingRunConfig, debug, testLogs, status -> status != 200);
+    }
+
+    /**
+     * Sends the request up to three times, sleeping 1, 2 and 5 seconds between attempts (not after the last one). A
+     * response whose status {@code retryOnStatus} rejects ends the loop and is returned, so a caller can stop
+     * retrying a refusal that would be refused again. A null response or an exception is always retried.
+     */
+    public static OriginalHttpResponse sendRequestBackOff(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, IntPredicate retryOnStatus) throws Exception {
         OriginalHttpResponse response = null;
 
-        for (int limit : BACK_OFF_LIMITS) {
+        for (int attempt = 0; attempt < BACK_OFF_LIMITS.size(); attempt++) {
+            int limit = BACK_OFF_LIMITS.get(attempt);
             if (InterruptAwareWait.shouldAbortRetries()) {
                 loggerMaker.error("Request retries aborted because thread is interrupted: " + request.getUrl());
                 break;
@@ -561,11 +571,16 @@ public class ApiExecutor {
                 if (response == null) {
                     throw new NullPointerException(String.format("Response is null"));
                 }
-                if (response.getStatusCode() != 200) {
+                if (retryOnStatus.test(response.getStatusCode())) {
                     throw new Exception(String.format("Invalid response code %d", response.getStatusCode()));
                 }
                 break;
             } catch (Exception e) {
+                if (attempt == BACK_OFF_LIMITS.size() - 1) {
+                    loggerMaker.error(String.format("Error in sending request for api : %s , giving up after %d attempts : %s", request.getUrl(),
+                            BACK_OFF_LIMITS.size(), e.toString()));
+                    break;
+                }
                 String message = String.format("Error in sending request for api : %s , will retry after %d seconds : %s", request.getUrl(),
                         limit, e.toString());
                 loggerMaker.error(message);
@@ -722,6 +737,15 @@ public class ApiExecutor {
             // Ignore
         }
         return "file"; // Default filename
+    }
+
+    /** The run's advanced settings (add/modify/delete header, body and URL params), for a request that is not sent
+     * through this class - e.g. one handed to smart testing. A no-op when the run has none. */
+    public static void applyAdvancedSettings(OriginalHttpRequest request, TestingRunConfig testingRunConfig) {
+        if (request != null && testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null
+                && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()) {
+            calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
+        }
     }
 
     private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){

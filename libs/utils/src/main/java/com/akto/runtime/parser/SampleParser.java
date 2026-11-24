@@ -69,39 +69,64 @@ public class SampleParser {
     }
 
     /**
-     * Carries a tag-delivered session into the header AgentQueryRecord reads, so Traces groups
-     * this traffic by conversation like every other agentic source.
+     * Carries Bedrock's conversation and turn identifiers into the x-akto-installer-* headers
+     * that AgentQueryRecord reads, so Traces groups this traffic like every other agentic source.
      *
-     * Sources installed on a machine (Claude CLI hooks, Copilot, the MCP shields) set
-     * x-akto-installer-akto_session_id themselves. A log-processing pipeline has no request to
-     * attach headers to, so it delivers the session as a tag instead; this bridges the two
-     * without teaching AgentQueryRecord a second source-specific lookup.
+     * Sources installed on a machine (Claude CLI hooks, Copilot, the MCP shields) set those
+     * headers on the request themselves. A pipeline that builds records from logs has no request
+     * to attach headers to, so it delivers the same facts as a tag and a response id; this
+     * bridges them without teaching AgentQueryRecord a second, source-specific lookup.
      *
-     * Never overwrites a header that is already present - a real one always wins.
+     * Scoped to AWS_BEDROCK. Nothing else writes these values today, so the gate changes no
+     * behaviour - it is there so a source that starts writing them later opts in deliberately
+     * rather than by accident.
      */
-    private static void injectSessionHeader(HttpRequestParams httpRequestParams, String tagsJson) {
-        if (tagsJson == null || tagsJson.isEmpty() || httpRequestParams == null) {
+    private static void injectAgenticIdentityHeaders(HttpRequestParams httpRequestParams, String tagsJson) {
+        if (httpRequestParams == null || tagsJson == null || tagsJson.isEmpty()) {
             return;
         }
         try {
             Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
-            if (tagsMap == null) {
-                return;
-            }
-            String sessionId = tagsMap.get(Constants.AI_AGENT_TAG_SESSION_ID);
-            if (sessionId == null || sessionId.trim().isEmpty()) {
+            if (tagsMap == null || !Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(
+                    tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))) {
                 return;
             }
             Map<String, List<String>> headers = httpRequestParams.getHeaders();
-            if (headers == null || headers.containsKey(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID)) {
+            if (headers == null) {
                 return;
             }
-            List<String> values = new ArrayList<>();
-            values.add(sessionId.trim());
-            headers.put(Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID, values);
+
+            // The conversation: already normalised by the producer from whichever spelling the
+            // caller used (session_id, sessionId, conversationId, ...).
+            setHeaderIfAbsent(headers, Constants.AI_AGENT_HEADER_INSTALLER_SESSION_ID,
+                    tagsMap.get(Constants.AI_AGENT_TAG_SESSION_ID));
+
+            // The turn: Bedrock emits one record per invocation, so its request id identifies
+            // this exchange and nothing else.
+            setHeaderIfAbsent(headers, Constants.AI_AGENT_HEADER_INSTALLER_MESSAGE_ID,
+                    firstHeaderValue(headers, Constants.AI_AGENT_HEADER_BEDROCK_REQUEST_ID));
         } catch (Exception e) {
-            // A session we cannot read is not worth failing an otherwise good record for.
+            // An identifier we cannot read is not worth failing an otherwise good record for.
         }
+    }
+
+    /**
+     * Sets a header only when there is a real value and nothing has claimed the name already,
+     * so a source that sets its own always wins over anything derived here.
+     */
+    private static void setHeaderIfAbsent(Map<String, List<String>> headers, String name, String value) {
+        if (value == null || value.trim().isEmpty() || headers.containsKey(name)) {
+            return;
+        }
+        List<String> values = new ArrayList<>();
+        values.add(value.trim());
+        headers.put(name, values);
+    }
+
+    /** First value of a header, or null when it is absent or empty. */
+    private static String firstHeaderValue(Map<String, List<String>> headers, String name) {
+        List<String> values = headers.get(name);
+        return (values == null || values.isEmpty()) ? null : values.get(0);
     }
 
     private static void injectTagsInHeaders(HttpRequestParams httpRequestParams, String tagsJson){
@@ -221,7 +246,7 @@ public class SampleParser {
                 printUrlDebugLog(tagLog);
             }
             injectTagsInHeaders(requestParams, tags);
-            injectSessionHeader(requestParams, tags);
+            injectAgenticIdentityHeaders(requestParams, tags);
         }
 
         return httpResponseParams;

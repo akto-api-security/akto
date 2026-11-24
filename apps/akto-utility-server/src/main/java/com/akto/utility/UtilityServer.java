@@ -7,6 +7,7 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
+import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
@@ -60,23 +61,36 @@ public class UtilityServer {
             // Bind IPv4 explicitly. On macOS a wildcard bind is IPv6-only, so
             // Docker's host.docker.internal (IPv4) gets connection refused.
             server = HttpServer.create(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), port), 0);
-            server.createContext("/utility/execute", new ExecuteApiHandler(jobStore, executorService));
-            server.createContext("/utility/result", new GetResultHandler(jobStore));
-            server.createContext("/utility/agentQueryRecords", new FetchAgentQueryRecordsHandler(dataActor));
-            server.createContext("/utility/agentQueryValidationResult", new AgentQueryValidationResultHandler(jobStore, dataActor));
-            server.createContext("/utility/sendHealthCheck", new SendHealthCheckHandler(dataActor));
-            server.createContext("/utility/sendLogs", new SendLogsHandler(dataActor));
-            server.createContext("/utility/fetchAgentModels", new FetchAgentModelsHandler(dataActor));
-            server.createContext("/utility/ingestTraffic", new TrafficIngestHandler());
+            UtilityAuthFilter auth = new UtilityAuthFilter(UtilityAuthFilter.tokenFromEnv());
+            register("/utility/execute", new ExecuteApiHandler(jobStore, executorService), auth);
+            register("/utility/result", new GetResultHandler(jobStore), auth);
+            register("/utility/agentQueryRecords", new FetchAgentQueryRecordsHandler(dataActor), auth);
+            register("/utility/agentQueryValidationResult", new AgentQueryValidationResultHandler(jobStore, dataActor), auth);
+            register("/utility/sendHealthCheck", new SendHealthCheckHandler(dataActor), auth);
+            register("/utility/sendLogs", new SendLogsHandler(dataActor), auth);
+            register("/utility/fetchAgentModels", new FetchAgentModelsHandler(dataActor), auth);
+            register("/utility/ingestTraffic", new TrafficIngestHandler(), auth);
+            for (String apiName : DataActor.REDTEAM_LEARNING_APIS) {
+                register("/utility/" + apiName, new RedteamLearningsHandler(dataActor, apiName), auth);
+            }
             // A null executor runs every handler on the accept thread. One slow
             // insertAgenticTestingLog then stops the server from accepting connections.
             server.setExecutor(httpExecutor);
             server.start();
             started = true;
             logger.info("akto-utility-server started on port " + port);
+            if (!auth.isEnforced()) {
+                logger.warn(UtilityAuthFilter.ENV_TOKEN + " is not set: /utility/* accepts unauthenticated calls. Set it here and"
+                        + " give the same value to test-editor-services to require it in the Authorization header.");
+            }
         } catch (IOException e) {
             logger.error("Failed to start akto-utility-server: " + e.getMessage(), e);
         }
+    }
+
+    /** Every /utility/* context goes through the token check; there is no way to add one that skips it. */
+    private static void register(String path, HttpHandler handler, UtilityAuthFilter auth) {
+        server.createContext(path, handler).getFilters().add(auth);
     }
 
     /**

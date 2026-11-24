@@ -1,6 +1,7 @@
 package com.akto.test_editor.execution;
 
 import com.akto.agent.AgentClient;
+import com.akto.agent.AgentLearningContext;
 import com.akto.agent.AutomatedAgenticTestExecutor;
 import com.akto.agent.PentestExecutionResult;
 import com.akto.billing.UsageMetricUtils;
@@ -284,7 +285,8 @@ public class Executor {
                         if (testingRunConfig != null && testingRunConfig.getTestRunResultSummaryId() != null) {
                             testingRunResultSummaryIdHex = testingRunConfig.getTestRunResultSummaryId().toHexString();
                         }
-                        agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId(), testingRunResultSummaryIdHex);
+                        agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId(), testingRunResultSummaryIdHex,
+                                AgentLearningContext.from(apiInfoKey, varMap), testingRunConfig);
                         if (agenticResults != null && !agenticResults.isEmpty()) {
                             result.addAll(agenticResults);
                             // needed to check for vulnerable 
@@ -414,7 +416,9 @@ public class Executor {
             List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
             // agentic samples are often absolute URLs without a host header, so allow override in that case too
             boolean absoluteUrl = rawApi.getRequest().getUrl() != null && rawApi.getRequest().getUrl().startsWith("http");
-            if ((!originalHostHeaders.isEmpty() || absoluteUrl) && testingRunConfig != null
+            // imported (e.g. OpenAPI) samples can be a bare path with no host header: the override is the only host
+            boolean pathOnlyUrl = rawApi.getRequest().getUrl() != null && rawApi.getRequest().getUrl().startsWith("/");
+            if ((!originalHostHeaders.isEmpty() || absoluteUrl || pathOnlyUrl) && testingRunConfig != null
                 && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
 
                 Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
@@ -773,6 +777,8 @@ public class Executor {
             return rawApi;
         }
         ApiExecutorUtil.calculateHashAndAddAuth(prepared.getRequest(), true, testingRunConfig);
+        // smart testing sends its requests itself, so the run's advanced settings (e.g. an added header) go on here
+        ApiExecutor.applyAdvancedSettings(prepared.getRequest(), testingRunConfig);
         return prepared;
     }
 
