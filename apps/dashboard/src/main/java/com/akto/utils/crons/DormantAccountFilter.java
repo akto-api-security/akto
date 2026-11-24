@@ -23,12 +23,16 @@ import com.mongodb.client.model.Sorts;
 
 /**
  * Lets per-account crons skip accounts that are effectively dormant: no recent traffic AND no recent login by a
- * non-Akto user. Keeps heavy crons from running for every account ever created.
+ * non-Akto user (except Ironheart, which is staff-only and counts @akto.io logins). Keeps heavy crons from
+ * running for every account ever created.
  */
 public class DormantAccountFilter {
 
     public static final int TRAFFIC_STALE_SECONDS = 15 * Constants.ONE_DAY_TIMESTAMP;
     public static final int LOGIN_STALE_SECONDS = 7 * Constants.ONE_DAY_TIMESTAMP;
+
+    /** Ironheart demo: only @akto.io users, so those logins count as recent activity for dormant checks. */
+    public static final int IRONHEART_ACCOUNT_ID = 1669322524;
 
     private static final Pattern AKTO_USER_LOGIN = Pattern.compile("@" + Pattern.quote(InviteUserAction.AKTO_DOMAIN) + "$", Pattern.CASE_INSENSITIVE);
 
@@ -37,8 +41,9 @@ public class DormantAccountFilter {
     private DormantAccountFilter() {}
 
     /**
-     * Account ids that have at least one non-Akto user who logged in within {@link #LOGIN_STALE_SECONDS}.
-     * One query on the common users collection; call once per cron run, outside the per-account loop.
+     * Account ids with a recent login that should keep the account non-dormant: any non-Akto user within
+     * {@link #LOGIN_STALE_SECONDS}, plus Ironheart when an @akto.io user on that account logged in in the same window.
+     * One (or two) queries on the common users collection; call once per cron run, outside the per-account loop.
      * On failure returns an empty set, which falls back to the per-account traffic check alone.
      */
     public static Set<Integer> fetchAccountsWithRecentUserLogin() {
@@ -64,10 +69,25 @@ public class DormantAccountFilter {
                     }
                 }
             }
+
+            // Ironheart is staff-only; count recent @akto.io logins for that account only.
+            if (!accountIds.contains(IRONHEART_ACCOUNT_ID)) {
+                Bson ironheartFilter = Filters.and(
+                        Filters.gte(User.LAST_LOGIN_TS, Context.now() - LOGIN_STALE_SECONDS),
+                        Filters.regex(User.LOGIN, AKTO_USER_LOGIN),
+                        Filters.exists(User.ACCOUNTS + "." + IRONHEART_ACCOUNT_ID, true)
+                );
+                if (UsersDao.instance.getMCollection().find(ironheartFilter)
+                        .projection(Projections.include(User.LOGIN))
+                        .limit(1)
+                        .first() != null) {
+                    accountIds.add(IRONHEART_ACCOUNT_ID);
+                }
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error fetching accounts with recent user login: " + e.getMessage());
         }
-        loggerMaker.info("Accounts with a non-Akto user login in the last " + LOGIN_STALE_SECONDS / (24 * 60 * 60) + " days: "
+        loggerMaker.info("Accounts with a recent user login in the last " + LOGIN_STALE_SECONDS / (24 * 60 * 60) + " days: "
             + accountIds.size() + ", fetched in " + (System.currentTimeMillis() - startMs) + " ms");
         return accountIds;
     }
