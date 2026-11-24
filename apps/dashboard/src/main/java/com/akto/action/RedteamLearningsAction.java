@@ -34,7 +34,8 @@ public class RedteamLearningsAction extends UserAction {
     static final int MAX_ID_CHARS = 128;
     static final int MAX_TEMPLATE_ID_CHARS = 256;
     private static final Pattern SUMMARY_ID = Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"));
+    // WS: a WebSocket agent's endpoints are stored as "WS /<event type>"
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "WS"));
 
     private final RedteamLearningsService service = new RedteamLearningsService();
 
