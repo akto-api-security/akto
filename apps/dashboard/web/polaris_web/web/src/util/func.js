@@ -2420,6 +2420,10 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
     return (scopeRole || window.USER_ROLE) === 'ADMIN'
   },
+  // Logs are for admins and Akto users; the backend enforces the same rule on the log endpoints
+  canViewLogs(){
+    return this.currentProductBaseRole() === 'ADMIN' || this.isAktoUser()
+  },
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){

@@ -1,8 +1,19 @@
 package com.akto.action;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
+import com.akto.dao.RBACDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.Log;
+import com.akto.dto.RBAC.Role;
+import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
@@ -13,6 +24,32 @@ public class DbLogsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbLogsAction.class, LogDb.DASHBOARD);;
 
+    /**
+     * Log groups of modules that can be self-hosted in the customer environment
+     * (see ModuleInfo.ModuleType). Everything else (DASHBOARD, BILLING, ANALYSER, ...) is internal.
+     */
+    private static final Set<LogDb> CUSTOMER_VISIBLE_LOG_DBS = Collections.unmodifiableSet(EnumSet.of(
+        LogDb.RUNTIME, LogDb.TESTING, LogDb.THREAT_DETECTION,
+        LogDb.AGENTIC_TESTING, LogDb.SMART_TESTING,
+        LogDb.MINI_TESTING_ORCHESTRATOR, LogDb.DAST, LogDb.PUPPETEER
+    ));
+
+    /** Log groups customers may see only on specific accounts, on top of CUSTOMER_VISIBLE_LOG_DBS. */
+    private static final Map<LogDb, Set<Integer>> ACCOUNT_RESTRICTED_LOG_DBS;
+    static {
+        Set<Integer> dataIngestionAndGuardrailsAccounts = Collections.singleton(1789954857);
+        Map<LogDb, Set<Integer>> restricted = new EnumMap<>(LogDb.class);
+        restricted.put(LogDb.DATA_INGESTION, dataIngestionAndGuardrailsAccounts);
+        restricted.put(LogDb.GUARDRAILS_SERVICE, dataIngestionAndGuardrailsAccounts);
+        ACCOUNT_RESTRICTED_LOG_DBS = Collections.unmodifiableMap(restricted);
+    }
+
+    private static final String INTERNAL_EMAIL_DOMAIN = "@akto.io";
+
+    /** Longest log range served per call, so one request cannot scan a huge range of the shared logs collections. */
+    private static final int MAX_LOG_RANGE_SECONDS = 15 * 60;
+
+    private List<LogDb> allowedLogGroups;
     private List<Log> logs;
     private int startTime;
 
@@ -50,12 +87,59 @@ public class DbLogsAction extends UserAction {
     @Setter
     private String testingRunResultSummaryId;
 
+    private boolean isInternalUser() {
+        User user = getSUser();
+        return user != null && user.getLogin() != null
+            && user.getLogin().toLowerCase().endsWith(INTERNAL_EMAIL_DOMAIN);
+    }
+
+    /**
+     * Customers need the ADMIN role for logs. The interceptor skips role checks on non-metered dashboards and only
+     * checks LOGS READ elsewhere, so the role is checked here, which makes the page admin-only on every deployment.
+     */
+    private boolean isAdmin() {
+        Integer accountId = Context.accountId.get();
+        User user = getSUser();
+        return accountId != null && user != null
+            && RBACDao.getCurrentRoleForUser(user.getId(), accountId) == Role.ADMIN;
+    }
+
+    private List<LogDb> computeAllowedLogGroups() {
+        boolean internal = isInternalUser();
+        // Akto users see logs irrespective of their role; everyone else must be an admin
+        if (!internal && !isAdmin()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(LogDb.values())
+            .filter(db -> internal || isCustomerVisible(db, Context.accountId.get()))
+            .collect(Collectors.toList());
+    }
+
+    private static boolean isCustomerVisible(LogDb db, Integer accountId) {
+        Set<Integer> restrictedToAccounts = ACCOUNT_RESTRICTED_LOG_DBS.get(db);
+        if (restrictedToAccounts != null) {
+            return accountId != null && restrictedToAccounts.contains(accountId);
+        }
+        return CUSTOMER_VISIBLE_LOG_DBS.contains(db);
+    }
+
+    public String fetchAllowedLogGroups() {
+        allowedLogGroups = computeAllowedLogGroups();
+        return SUCCESS.toUpperCase();
+    }
+
     public String fetchLogsFromDb() {
         if(logDb==null){
             addActionError("Invalid log collection");
             return ERROR.toUpperCase();
         }
-        logs = loggerMaker.fetchLogRecords(startTime, endTime, logDb, logKeys);
+        if (!computeAllowedLogGroups().contains(logDb)) {
+            addActionError("You do not have access to these logs");
+            return "FORBIDDEN";
+        }
+        // keep the most recent part of the requested range
+        int clampedStartTime = Math.max(startTime, endTime - MAX_LOG_RANGE_SECONDS);
+        logs = loggerMaker.fetchLogRecords(clampedStartTime, endTime, logDb, logKeys);
 
         return SUCCESS.toUpperCase();
     }
@@ -68,6 +152,9 @@ public class DbLogsAction extends UserAction {
         logs = loggerMaker.fetchTestingLogRecordsByActivity(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY, testingRunResultSummaryId, logKeys);
 
         return SUCCESS.toUpperCase();
+    }
+    public List<LogDb> getAllowedLogGroups() {
+        return allowedLogGroups;
     }
     public List<Log> getLogs() {
         return logs;
