@@ -682,6 +682,7 @@ public class MaliciousEventService {
       total = countWithEvaluationModes(accountId, countScope, evaluationModeConditions, regexMaxTimeMs);
       cursor = maliciousEventDao.getCollection(accountId)
           .find(query)
+          .hint(ThreatUtils.detectedAtOrderedHint(accountId, query))
           .maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS)
           .projection(Projections.exclude(excludedFields))
           .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
