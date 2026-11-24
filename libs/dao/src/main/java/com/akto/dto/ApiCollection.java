@@ -34,6 +34,9 @@ public class ApiCollection {
     String hostName;
     public static final String HOST_NAME = "hostName";
 
+    String accessType;
+    public static final String ACCESS_TYPE = "accessType";
+
     String serviceTag;
     public static final String SERVICE_TAG = "serviceTag";
     int vxlanId;
@@ -499,5 +502,13 @@ public class ApiCollection {
 
     public void setMcpMaliciousnessLastCheck(int mcpMaliciousnessLastCheck) {
         this.mcpMaliciousnessLastCheck = mcpMaliciousnessLastCheck;
+    }
+
+    public String getAccessType() {
+        return accessType;
+    }
+
+    public void setAccessType(String accessType) {
+        this.accessType = accessType;
     }
 }
