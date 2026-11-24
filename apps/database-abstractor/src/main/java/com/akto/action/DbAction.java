@@ -473,6 +473,7 @@ public class DbAction extends ActionSupport {
     int testResultsCount;
     String leaseToken;
     int leaseSeconds;
+    int reclaimAfterSeconds;
     // Domain outcome (APPLIED/REJECTED) named directly by the server, not a boolean the client has
     // to re-derive. No leaseHeld predecessor to stay compatible with - this contract and its only
     // client (feat/stateless-mini-testing) ship together, unreleased. Named leaseStatus, not
@@ -2565,7 +2566,7 @@ public class DbAction extends ActionSupport {
 
     public String findPendingTestingRunResultSummary() {
         try {
-            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingName, leaseToken, leaseSeconds);
+            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingName, leaseToken, leaseSeconds, reclaimAfterSeconds);
             if (trrs != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
             }
@@ -6064,6 +6065,14 @@ public class DbAction extends ActionSupport {
 
     public void setLeaseSeconds(int leaseSeconds) {
         this.leaseSeconds = leaseSeconds;
+    }
+
+    public int getReclaimAfterSeconds() {
+        return reclaimAfterSeconds;
+    }
+
+    public void setReclaimAfterSeconds(int reclaimAfterSeconds) {
+        this.reclaimAfterSeconds = reclaimAfterSeconds;
     }
 
     public String getLeaseStatus() {

@@ -2256,6 +2256,15 @@ public class DbLayer {
 
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName,
             String leaseToken, int leaseSeconds) {
+        return findPendingTestingRunResultSummary(now, delta, miniTestingName, leaseToken, leaseSeconds, 0);
+    }
+
+    static final int DEFAULT_RECLAIM_AFTER_SECONDS = 5 * 60;
+
+    /** reclaimAfterSeconds: how old a RUNNING summary must be before it is reclaimed; non-positive means the default. */
+    public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName,
+            String leaseToken, int leaseSeconds, int reclaimAfterSeconds) {
+        int reclaimAfter = reclaimAfterSeconds > 0 ? reclaimAfterSeconds : DEFAULT_RECLAIM_AFTER_SECONDS;
         try {
 
             Bson filter = Filters.or(
@@ -2293,9 +2302,12 @@ public class DbLayer {
                         Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
                         Filters.or(
                                 Filters.and(
-                                        Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5 * 60),
+                                        Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - reclaimAfter),
                                         Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)),
-                                Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now))
+                                // gt 0: summaries inserted by lease-unaware modules carry leaseExpiryTs=0 (int default), not a real lease
+                                Filters.and(
+                                        Filters.gt(TestingRunResultSummary.LEASE_EXPIRY_TS, 0),
+                                        Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now)))
                 );
 
                 trrs = findPendingTestingRunResultSummaryBasedOnPriority(filterRunning, miniTestingName);
