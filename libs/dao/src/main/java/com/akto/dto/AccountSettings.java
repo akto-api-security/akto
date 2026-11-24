@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.dto.settings.ApiGatewayRoleRegions;
 import com.akto.dto.settings.DefaultPayload;
 
 import java.util.Arrays;
@@ -173,6 +174,14 @@ public class AccountSettings {
     @Setter
     private String awsAccountIdsForApiGatewayLogging;
     public static final String AWS_ACCOUNT_IDS_FOR_API_GATEWAY_LOGGING = "awsAccountIdsForApiGatewayLogging";
+
+    // Per-role regions for the API Gateway connector. Kept alongside
+    // awsAccountIdsForApiGatewayLogging (which still holds the plain role ARN
+    // list) so connectors that predate regions keep working unchanged.
+    @Getter
+    @Setter
+    private List<ApiGatewayRoleRegions> awsApiGConnectorRoleRegions;
+    public static final String AWS_API_G_CONNECTOR_ROLE_REGIONS = "awsApiGConnectorRoleRegions";
 
     @Getter
     @Setter
