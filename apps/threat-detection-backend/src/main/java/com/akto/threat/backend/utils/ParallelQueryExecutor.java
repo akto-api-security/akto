@@ -67,7 +67,7 @@ public class ParallelQueryExecutor {
 
     /**
      * Submit named tasks in parallel and collect results into a Map keyed by the same names.
-     * Failed/timed-out tasks return an empty collection for their key (never null).
+     * Failed/timed-out tasks are left out of the map, so callers read their keys with getOrDefault.
      * Preserves insertion order of the input map.
      */
     public static <T> Map<String, T> submitAndCollect(Map<String, Callable<T>> namedTasks, long timeoutMs) {
@@ -79,7 +79,10 @@ public class ParallelQueryExecutor {
 
         Map<String, T> resultMap = new LinkedHashMap<>();
         for (int i = 0; i < keys.size(); i++) {
-            resultMap.put(keys.get(i), results.get(i));
+            // a null slot is a task that failed or timed out; a present null key would make getOrDefault return null
+            if (results.get(i) != null) {
+                resultMap.put(keys.get(i), results.get(i));
+            }
         }
         return Collections.unmodifiableMap(resultMap);
     }

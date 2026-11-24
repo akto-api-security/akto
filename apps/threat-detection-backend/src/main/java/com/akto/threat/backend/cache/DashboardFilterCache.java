@@ -34,12 +34,20 @@ public class DashboardFilterCache<V> {
 
     private static final long ONE_DAY_S = 86_400L;
 
+    private long ttlMs = TTL_MS;
+
+    // own lifetime for this cache; the env var set to 0 still turns caching off for every cache
+    public DashboardFilterCache<V> withTtl(long ttlMs) {
+        if (TTL_MS != 0) this.ttlMs = ttlMs;
+        return this;
+    }
+
     private static class Entry<V> {
         final V value;
         final long expiresAt;
-        Entry(V value) {
+        Entry(V value, long ttlMs) {
             this.value = value;
-            this.expiresAt = System.currentTimeMillis() + TTL_MS;
+            this.expiresAt = System.currentTimeMillis() + ttlMs;
         }
         boolean isExpired() { return System.currentTimeMillis() > expiresAt; }
     }
@@ -68,7 +76,7 @@ public class DashboardFilterCache<V> {
      * computation happens regardless of concurrency.
      */
     public V get(String cacheKey, Callable<V> loader) {
-        if (TTL_MS == 0) {
+        if (ttlMs == 0) {
             try { return loader.call(); } catch (Exception e) {
                 logger.error("Cache loader failed: " + e.getMessage(), e);
                 return null;
@@ -91,9 +99,13 @@ public class DashboardFilterCache<V> {
                     return null;
                 } catch (ExecutionException e) {
                     store.remove(key, existing);
+                    // a failing loader fails the request; looping back re-ran it for as long as it kept failing
+                    Throwable cause = e.getCause();
+                    if (cause instanceof RuntimeException) throw (RuntimeException) cause;
+                    throw new IllegalStateException("Cache loader failed for key " + key, cause);
                 }
             } else {
-                FutureTask<Entry<V>> task = new FutureTask<>(() -> new Entry<>(loader.call()));
+                FutureTask<Entry<V>> task = new FutureTask<>(() -> new Entry<>(loader.call(), ttlMs));
                 if (store.putIfAbsent(key, task) == null) {
                     logger.info("DashboardFilterCache MISS key=" + key);
                     task.run();
@@ -103,5 +115,10 @@ public class DashboardFilterCache<V> {
                 // loop back to read result (ours or a concurrent winner's)
             }
         }
+    }
+
+    /** Forget a key, so the next get loads it again. */
+    public void remove(String cacheKey) {
+        store.remove(cacheKey);
     }
 }

@@ -71,7 +71,10 @@ public class MaliciousEventService {
       System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
   );
 
-  private static final DashboardFilterCache<FetchAlertFiltersResponse> alertFiltersCache = new DashboardFilterCache<>();
+  // one entry per filter list, so a slow list does not hold back the others; 15 minutes, set apart from the shared default
+  private static final DashboardFilterCache<Set<String>> alertFilterListCache = new DashboardFilterCache<Set<String>>().withTtl(15 * 60_000L);
+  // the same 30s the request waits for a list, so mongo stops a scan when nobody is waiting for it any more
+  private static final long FILTER_DISTINCT_MAX_TIME_SECONDS = 30;
   private static final DashboardFilterCache<Long> countCache = new DashboardFilterCache<>();
 
   public MaliciousEventService(
@@ -458,6 +461,7 @@ public class MaliciousEventService {
     try {
       maliciousEventDao.getCollection(accountId)
           .distinct(fieldName, filter, tClass)
+          .maxTime(FILTER_DISTINCT_MAX_TIME_SECONDS, TimeUnit.SECONDS)
           .forEach(value -> {
             if (value != null && isNotEmpty(value)) {
               result.add(value);
@@ -480,6 +484,7 @@ public class MaliciousEventService {
     Set<T> result = new HashSet<>();
     try {
       collection.distinct(fieldName, filter, tClass)
+          .maxTime(FILTER_DISTINCT_MAX_TIME_SECONDS, TimeUnit.SECONDS)
           .forEach(value -> {
             if (value != null && isNotEmpty(value) && result.size() < limit) {
               result.add(value);
@@ -502,11 +507,11 @@ public class MaliciousEventService {
         + "|" + DashboardFilterCache.bucketDay(startTs)
         + "|" + DashboardFilterCache.bucketDay(endTs);
 
-    return alertFiltersCache.get(cacheKey, () -> computeAlertFilters(accountId, request, contextSource));
+    return computeAlertFilters(accountId, request, contextSource, cacheKey);
   }
 
   private FetchAlertFiltersResponse computeAlertFilters(
-      String accountId, FetchAlertFiltersRequest request, String contextSource) {
+      String accountId, FetchAlertFiltersRequest request, String contextSource, String cacheKey) {
 
     Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
     Bson eventsFilter = Filters.and(
@@ -526,7 +531,15 @@ public class MaliciousEventService {
     tasks.put("hosts",         () -> fetchDistinctFieldValues(accountId, "host",              eventsFilter, String.class));
     tasks.put("urls",          () -> fetchDistinctFieldValues(maliciousEventDao.getCollection(accountId), "latestApiEndpoint", eventsFilter, String.class, 1000));
 
+    // each list is read through its own cache entry
+    tasks.replaceAll((name, scan) -> () -> alertFilterListCache.get(cacheKey + "|" + name, scan));
+
     Map<String, Set<String>> results = ParallelQueryExecutor.submitAndCollect(tasks, 30_000);
+
+    // no list has values (mongo down or no data): do not keep the empty lists, so the next request asks again
+    if (results.values().stream().allMatch(Set::isEmpty)) {
+      tasks.keySet().forEach(name -> alertFilterListCache.remove(cacheKey + "|" + name));
+    }
 
     Set<String> empty = Collections.emptySet();
     return FetchAlertFiltersResponse.newBuilder()
