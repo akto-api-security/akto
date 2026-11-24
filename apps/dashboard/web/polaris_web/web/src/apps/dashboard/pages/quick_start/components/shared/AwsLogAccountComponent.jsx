@@ -1,4 +1,4 @@
-import { Box, Button, HorizontalStack, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { Box, Button, HorizontalGrid, HorizontalStack, Text, TextField, VerticalStack } from "@shopify/polaris";
 import { DeleteMajor, CirclePlusMajor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useEffect, useState } from "react";
@@ -55,34 +55,30 @@ function AwsLogAccountComponent() {
             <VerticalStack gap={4}>
                 <Text >Input the AWS Role ARNs, for which the API gateway logging service will be scraping the logs, and the regions to read with each. Leave regions empty to use the connector's own region.</Text>
                 {rows.map((row, index) => (
-                    <HorizontalStack key={index} gap={2} wrap={false} blockAlign="end">
-                        <div style={{ flex: 2 }}>
-                            <TextField
-                                label={index === 0 ? "AWS Role ARN" : ""}
-                                placeholder="arn:aws:iam::111111111111:role/akto/example"
-                                value={row.roleArn}
-                                onChange={(value) => handleUpdate(index, "roleArn", value)}
-                                autoComplete="off"
-                            />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                            <TextField
-                                label={index === 0 ? "Regions" : ""}
-                                placeholder="us-east-1,eu-west-1"
-                                value={row.regions}
-                                onChange={(value) => handleUpdate(index, "regions", value)}
-                                autoComplete="off"
-                            />
-                        </div>
+                    <HorizontalGrid key={index} columns="2fr 1fr auto" gap="2" alignItems="end">
+                        <TextField
+                            label={index === 0 ? "AWS Role ARN" : ""}
+                            placeholder="arn:aws:iam::111111111111:role/akto/example"
+                            value={row.roleArn}
+                            onChange={(value) => handleUpdate(index, "roleArn", value)}
+                            autoComplete="off"
+                        />
+                        <TextField
+                            label={index === 0 ? "Regions" : ""}
+                            placeholder="us-east-1,eu-west-1"
+                            value={row.regions}
+                            onChange={(value) => handleUpdate(index, "regions", value)}
+                            autoComplete="off"
+                        />
                         <Button icon={DeleteMajor} onClick={() => handleRemove(index)} plain />
-                    </HorizontalStack>
+                    </HorizontalGrid>
                 ))}
-                <div>
+                <HorizontalStack>
                     <Button icon={CirclePlusMajor} onClick={handleAdd} plain>Add role</Button>
-                </div>
-                <div>
+                </HorizontalStack>
+                <HorizontalStack>
                     <Button primary onClick={() => saveFunction()}>Save</Button>
-                </div>
+                </HorizontalStack>
             </VerticalStack>
         </Box>
     )
