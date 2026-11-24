@@ -32,6 +32,10 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[]{AgenticUsers.DEVICE_TAGS + "." + DeviceTag.KEY,
                     AgenticUsers.DEVICE_TAGS + "." + DeviceTag.VALUE}, false);
+    
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{AgenticUsers.USER_EMAIL}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{AgenticUsers.USER_ID}, false);
     }
 
     /**

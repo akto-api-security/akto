@@ -4,6 +4,8 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 public class TestingRun {
+    public static final String DASHBOARD_CONTEXT = "dashboardContext";
+
 
     private ObjectId id;
     public static final String SCHEDULE_TIMESTAMP = "scheduleTimestamp";

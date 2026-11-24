@@ -1,5 +1,7 @@
 package com.akto.dao;
 
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
@@ -44,6 +46,9 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
     public static final ApiInfoDao instance = new ApiInfoDao();
 
     public static final String ID = "_id.";
+    public static final String ID_COLLECTION_RISK_SCORE_INDEX = "_id.apiCollectionId_1_riskScore_-1";
+    public static final String COLLECTION_IDS_RISK_SCORE_INDEX = "collectionIds_1_riskScore_-1";
+    public static final String COLLECTION_IDS_LAST_SEEN_INDEX = "collectionIds_1_lastSeen_-1";
     public static final int AKTO_DISCOVERED_APIS_COLLECTION_ID = 1333333333;
 
     public void createIndicesIfAbsent() {
@@ -95,6 +100,30 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] {ApiInfo.PARENT_MCP_TOOL_NAMES }, false);
+    
+
+        // union of the agent-proxy guardrail indexes defined by every build
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{ApiInfo.AGENT_PROXY_GUARDRAIL_ENABLED, ApiInfo.LAST_SEEN}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{ApiInfo.ID_API_COLLECTION_ID, ApiInfo.AGENT_PROXY_GUARDRAIL_ENABLED}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{ApiInfo.ID_API_COLLECTION_ID, ApiInfo.AGENT_PROXY_GUARDRAIL_ENABLED, ApiInfo.LAST_SEEN}, false);
+        // sparse index for rate limits pagination
+        createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending("rateLimits", "rateLimitConfidence", "_id"),
+                new IndexOptions().sparse(true).name("rateLimits_confidence_id_sparse"));
+        // per collection max riskScore / lastSeen, and the same lookups for api groups (reachable through collectionIds)
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.compoundIndex(Indexes.ascending(ApiInfo.ID_API_COLLECTION_ID), Indexes.descending(ApiInfo.RISK_SCORE)),
+            new IndexOptions().name(ID_COLLECTION_RISK_SCORE_INDEX));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.compoundIndex(Indexes.ascending(SingleTypeInfo._COLLECTION_IDS), Indexes.descending(ApiInfo.RISK_SCORE)),
+            new IndexOptions().name(COLLECTION_IDS_RISK_SCORE_INDEX));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.compoundIndex(Indexes.ascending(SingleTypeInfo._COLLECTION_IDS), Indexes.descending(ApiInfo.LAST_SEEN)),
+            new IndexOptions().name(COLLECTION_IDS_LAST_SEEN_INDEX));
+        // partial: only classified tool rows are indexed
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending(ApiInfo.TOOL_INFO_CAPABILITY),
+            new IndexOptions().name("capability_1_partial_exists")
+                .partialFilterExpression(Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY, true)));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] {ApiInfo.TOOL_INFO_CALCULATED_AT }, true);
     }
     
 

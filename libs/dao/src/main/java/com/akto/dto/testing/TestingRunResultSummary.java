@@ -6,6 +6,8 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 public class TestingRunResultSummary {
+    public static final String LEASE_EXPIRY_TS = "leaseExpiryTs";
+
     
     public static final String ID = "_id";
     public static final String START_TIMESTAMP = "startTimestamp";    

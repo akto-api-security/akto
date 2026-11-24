@@ -1,6 +1,8 @@
 package com.akto.dao.monitoring;
 
 
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
@@ -31,6 +33,16 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
             new String[]{ ModuleInfo.LAST_HEARTBEAT_RECEIVED }, true);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo.NAME }, true);
+    
+
+        // union of the module_info indexes defined by every build; the existing ones above are kept as-is
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{ ModuleInfo.MODULE_TYPE }, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo.LAST_HEARTBEAT_RECEIVED }, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo._REBOOT, ModuleInfo.MINI_RUNTIME_NAME }, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending(ModuleInfo.TOKEN_ID),
+            new IndexOptions().name("tokenId_1").sparse(true));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending(ModuleInfo.EXPIRES_AT),
+            new IndexOptions().name("expiresAt_ttl").expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS));
     }
 
     private static final int HEARTBEAT_THRESHOLD_SECONDS = 5 * 60;

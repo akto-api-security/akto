@@ -15,4 +15,8 @@ public class HistoricalDataDao extends AccountsContextDao<HistoricalData> {
     public Class<HistoricalData> getClassT() {
         return HistoricalData.class;
     }
+
+    public void createIndicesIfAbsent() {
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { HistoricalData.TIME, HistoricalData.API_COLLECTION_ID }, true);
+    }
 }

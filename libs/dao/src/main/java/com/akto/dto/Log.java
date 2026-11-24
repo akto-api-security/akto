@@ -27,6 +27,10 @@ public class Log {
     private String key;
 
     public static final String TIMESTAMP = "timestamp";
+    public static final String KEY = "key";
+    public static final String ACTIVITY_ID = "activityId";
+    public static final String ACTIVITY_TYPE = "activityType";
+
     private int timestamp;
 
     public Log() {

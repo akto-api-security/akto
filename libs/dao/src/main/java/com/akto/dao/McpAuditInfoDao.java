@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.akto.util.Constants;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dao.context.Context;
 import com.mongodb.BasicDBObject;
@@ -49,6 +50,11 @@ public class McpAuditInfoDao extends AccountsContextDao<McpAuditInfo> {
         
         fieldNames = new String[]{"updatedTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+    
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpAuditInfo.TYPE, Constants.ID}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpAuditInfo.MCP_HOST, McpAuditInfo.TYPE, McpAuditInfo.RESOURCE_NAME}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpAuditInfo.CONTEXT_SOURCE}, false);
     }
 
     public List<McpAuditInfo> findMarkedByEmptySortedByLastDetected(int pageNumber, int pageSize) {

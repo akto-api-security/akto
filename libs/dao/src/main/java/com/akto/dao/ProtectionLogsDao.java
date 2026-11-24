@@ -34,6 +34,9 @@ public class ProtectionLogsDao extends AccountsContextDao<Log> {
 
         String[] fieldNames = {Log.TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+    
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{Log.TIMESTAMP, Log.KEY}, false);
     }
 
     @Override

@@ -154,6 +154,11 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
         Bson repositoryIndex = Indexes.ascending("metadata.repository");
         createIndexIfAbsent(dbName, getCollName(), repositoryIndex, sparseIndex.name("metadata.repository_1"));
 
+    
+
+        // sparse: only summaries currently owned by a module carry leaseExpiryTs
+        createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending(TestingRunResultSummary.LEASE_EXPIRY_TS),
+            new IndexOptions().sparse(true).name("leaseExpiryTs_1"));
     }
 
     // Constants for time filters

@@ -16,6 +16,10 @@ public class ApiInfo {
     private ApiInfoKey id;
     public static final String ID_API_COLLECTION_ID = "_id." + ApiInfoKey.API_COLLECTION_ID;
     public static final String ID_URL = "_id." + ApiInfoKey.URL;
+    public static final String AGENT_PROXY_GUARDRAIL_ENABLED = "agentProxyGuardrailEnabled";
+    public static final String TOOL_INFO_CAPABILITY = "toolInfo.capability";
+    public static final String TOOL_INFO_CALCULATED_AT = "toolInfo.calculatedAt";
+
     public static final String ID_METHOD = "_id." + ApiInfoKey.METHOD;
 
     public static final String ALL_AUTH_TYPES_FOUND = "allAuthTypesFound";

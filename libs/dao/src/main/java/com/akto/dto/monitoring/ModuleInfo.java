@@ -13,6 +13,9 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder(toBuilder = true)
 public class ModuleInfo {
+    public static final String TOKEN_ID = "tokenId";
+    public static final String EXPIRES_AT = "expiresAt";
+
 
     public static final String MODULE_TYPE = "moduleType";
     private ModuleType moduleType;

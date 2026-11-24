@@ -13,6 +13,9 @@ import java.util.Map;
 
 
 public class TestingRunConfig {
+    public static final String PRE_REQUEST_SCRIPT_ID = "preRequestScriptId";
+    public static final String POST_REQUEST_SCRIPT_ID = "postRequestScriptId";
+
 
     @BsonId
     private int id;

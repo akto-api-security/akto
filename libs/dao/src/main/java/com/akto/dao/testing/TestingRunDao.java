@@ -37,6 +37,9 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
 
         fieldNames = new String[]{TestingRun.NAME};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+    
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRun.DASHBOARD_CONTEXT}, false);
     }
     
     public List<Integer> getTestConfigIdsToDelete(List<ObjectId> testingRunIds){
