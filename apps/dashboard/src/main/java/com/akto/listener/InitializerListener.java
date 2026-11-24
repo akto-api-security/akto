@@ -38,6 +38,7 @@ import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -279,6 +280,11 @@ public class InitializerListener implements ServletContextListener {
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(InitializerListener.class);
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final ScheduledExecutorService usageScheduler = Executors.newScheduledThreadPool(1);
+    // Index builds can be slow, so they get their own thread instead of delaying the jobs on `scheduler`.
+    private static final ScheduledExecutorService indexSyncScheduler = Executors.newSingleThreadScheduledExecutor();
+    static final String INDEX_SYNC_ENABLED_ENV = "ENABLE_INDEX_SYNC_JOB";
+    static final int INDEX_SYNC_INTERVAL_SECONDS = 24 * 60 * 60;
+    static final int INDEX_SYNC_INITIAL_DELAY_MINUTES = 30;
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
 
     private static final int THREE_HOURS = 3*60*60;
@@ -2765,6 +2771,7 @@ public class InitializerListener implements ServletContextListener {
                         crons.deleteTestRunsScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
+                        setUpIndexSyncScheduler();
 
                         // CleanInventory.cleanInventoryJobRunner();
 
@@ -2842,6 +2849,62 @@ public class InitializerListener implements ServletContextListener {
         // 5-minute cron to check accounts
 //        testingAlertsCron.setUpTestingAlertsScheduler();
 //    }
+
+    static boolean isIndexSyncEnabled() {
+        return "true".equalsIgnoreCase(System.getenv(INDEX_SYNC_ENABLED_ENV));
+    }
+
+    // Re-runs DaoInit.createIndices() for every account so a build whose DaoInit gained collections or indexes
+    // converges without a restart-only code path. Off unless ENABLE_INDEX_SYNC_JOB=true (read on every run).
+    private void setUpIndexSyncScheduler() {
+        // fixed delay, not fixed rate: a slow run never overlaps the next one
+        indexSyncScheduler.scheduleWithFixedDelay(() -> {
+            try {
+                runIndexSync();
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "[indexSync] run aborted: " + e, LogDb.DASHBOARD);
+            }
+        }, INDEX_SYNC_INITIAL_DELAY_MINUTES, INDEX_SYNC_INTERVAL_SECONDS / 60, TimeUnit.MINUTES);
+    }
+
+    private static void runIndexSync() {
+        if (!isIndexSyncEnabled()) {
+            logger.debug("[indexSync] SKIPPED, " + INDEX_SYNC_ENABLED_ENV + " is not true");
+            return;
+        }
+
+        // dibs live in the common db, same as setupAutomatedApiGroupsScheduler
+        Context.accountId.set(1000_000);
+        if (!callDibs(Cluster.INDEX_SYNC_CRON, INDEX_SYNC_INTERVAL_SECONDS, 60)) {
+            logger.debugAndAddToDb("[indexSync] SKIPPED, lease held by another instance", LogDb.DASHBOARD);
+            return;
+        }
+
+        long startMs = System.currentTimeMillis();
+        AtomicInteger succeeded = new AtomicInteger();
+        AtomicInteger failed = new AtomicInteger();
+        logger.infoAndAddToDb("[indexSync] START", LogDb.DASHBOARD);
+        AccountTask.instance.executeTask(account ->
+                syncIndicesForAccount(account.getId(), DaoInit::createIndices, succeeded, failed), "index-sync");
+        logger.infoAndAddToDb(String.format("[indexSync] DONE accountsSucceeded=%d accountsFailed=%d durationMs=%d",
+                succeeded.get(), failed.get(), System.currentTimeMillis() - startMs), LogDb.DASHBOARD);
+    }
+
+    // DaoInit.createIndices() only throws for failures outside an index build (MCollection swallows per-index
+    // errors), so `failed` counts accounts whose run stopped early, not individual indexes.
+    static void syncIndicesForAccount(int accountId, Runnable createIndices, AtomicInteger succeeded, AtomicInteger failed) {
+        long startMs = System.currentTimeMillis();
+        try {
+            createIndices.run();
+            succeeded.incrementAndGet();
+            logger.infoAndAddToDb(String.format("[indexSync] account=%d OK durationMs=%d",
+                    accountId, System.currentTimeMillis() - startMs), LogDb.DASHBOARD);
+        } catch (Exception e) {
+            failed.incrementAndGet();
+            logger.errorAndAddToDb(e, String.format("[indexSync] account=%d FAILED durationMs=%d error=%s",
+                    accountId, System.currentTimeMillis() - startMs, e), LogDb.DASHBOARD);
+        }
+    }
 
     private void setUpDependencyFlowScheduler() {
         int minutes = DashboardMode.isOnPremDeployment() ? 60 : 24*60;
