@@ -86,7 +86,6 @@ import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.notifications.slack.TestingFailureSlackCopy;
-import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
 import com.akto.usage.UsageMetricCalculator;
@@ -3240,7 +3239,7 @@ public class DbAction extends ActionSupport {
                 summaryObjectId = new ObjectId(summaryId);
             }
             if((operator == null || operator.isEmpty()) && summaryId != null){
-                totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
+                totalCountIssues = DbLayer.calcTotalCountIssuesExcludingIgnored(summaryObjectId);
                 trrs = DbLayer.updateIssueCountInSummaryFenced(summaryId, totalCountIssues, leaseToken);
             }else{
                 trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues, operator);
@@ -3666,7 +3665,7 @@ public class DbAction extends ActionSupport {
         try {
             if (summaryId != null) {
                 ObjectId summaryObjectId = new ObjectId(summaryId);
-                totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
+                totalCountIssues = DbLayer.calcTotalCountIssuesExcludingIgnored(summaryObjectId);
             }
             trrs = DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
             if (trrs != null && trrs.getTestingRunId() != null) {

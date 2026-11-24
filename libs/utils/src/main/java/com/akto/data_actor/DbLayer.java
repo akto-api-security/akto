@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -2897,18 +2899,25 @@ public class DbLayer {
         Map<TestingIssuesId, TestingRunResult> map = new HashMap<>();
         Map<String, TestSourceConfig> sourceConfigCache = new HashMap<>();
         for (TestingRunResult runResult : testingRunResults) {
-            String subCategory = runResult.getTestSubType();
-            TestSourceConfig config = null;
-            if (subCategory != null && subCategory.startsWith("http")) {
-                config = sourceConfigCache.computeIfAbsent(subCategory, DbLayer::findTestSourceConfig);
-            }
-            TestingIssuesId issueId = new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
-                    subCategory, config != null ? config.getId() : null);
+            TestingIssuesId issueId = issueIdFor(runResult, sourceConfigCache, DbLayer::findTestSourceConfig);
             if (getIssuesIdFromMap(issueId, map) == null) {
                 map.put(issueId, runResult);
             }
         }
         return map;
+    }
+
+    /** The issue id a result is recorded under (AUTOMATED_TESTING source). Shared by issue writes and the
+     *  summary count so both resolve a result to the same TestingRunIssues document. */
+    private static TestingIssuesId issueIdFor(TestingRunResult runResult, Map<String, TestSourceConfig> sourceConfigCache,
+            Function<String, TestSourceConfig> sourceConfigLookup) {
+        String subCategory = runResult.getTestSubType();
+        TestSourceConfig config = null;
+        if (subCategory != null && subCategory.startsWith("http")) {
+            config = sourceConfigCache.computeIfAbsent(subCategory, sourceConfigLookup);
+        }
+        return new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
+                subCategory, config != null ? config.getId() : null);
     }
 
     /** Linear-scan lookup of the map's canonical key equal to issuesId - see
@@ -3162,6 +3171,105 @@ public class DbLayer {
                             Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap"));
         }
 
+    }
+
+    private static final int ISSUE_COUNT_PAGE_SIZE = 1000;
+
+    /** Counts and bookkeeping of one {@link #countIssuesExcludingIgnored} pass. */
+    static final class IssueCountResult {
+        final Map<String, Integer> countIssues;
+        final int resultsExamined;
+        final int ignoredExcluded;
+
+        IssueCountResult(Map<String, Integer> countIssues, int resultsExamined, int ignoredExcluded) {
+            this.countIssues = countIssues;
+            this.resultsExamined = resultsExamined;
+            this.ignoredExcluded = ignoredExcluded;
+        }
+    }
+
+    /**
+     * Final per-severity issue count for a summary: every vulnerable result of the summary, except those
+     * whose TestingRunIssues document is IGNORED. A vulnerable result with no issue document (or none that
+     * can be derived) is still counted - nothing says it was ignored.
+     *
+     * Throws if the issue lookup fails: the caller must not write a count it could not verify, so an
+     * ignored issue is never silently counted as open.
+     */
+    public static Map<String, Integer> calcTotalCountIssuesExcludingIgnored(ObjectId summaryId) {
+        long start = System.currentTimeMillis();
+        String summaryHex = summaryId.toHexString();
+        IssueCountResult result = countIssuesExcludingIgnored(
+                (limit, skip) -> fetchLatestTestingRunResultBySummaryId(summaryHex, limit, skip),
+                DbLayer::fetchIssuesByIds,
+                DbLayer::findTestSourceConfig);
+        loggerMaker.infoAndAddToDb(String.format(
+                "Recomputed countIssues for summary %s (account %s): %s, vulnerable results examined: %d, ignored excluded: %d, took %d ms",
+                summaryHex, Context.accountId.get(), result.countIssues, result.resultsExamined,
+                result.ignoredExcluded, System.currentTimeMillis() - start), LogDb.DB_ABS);
+        return result.countIssues;
+    }
+
+    /** Pure core of {@link #calcTotalCountIssuesExcludingIgnored}; fetchers are injected so it is testable
+     *  without Mongo. One issue lookup per page of results. */
+    static IssueCountResult countIssuesExcludingIgnored(BiFunction<Integer, Integer, List<TestingRunResult>> pageFetcher,
+            Function<Set<TestingIssuesId>, List<TestingRunIssues>> issueFetcher,
+            Function<String, TestSourceConfig> sourceConfigLookup) {
+        Map<String, Integer> countIssues = new HashMap<>();
+        countIssues.put(Severity.CRITICAL.toString(), 0);
+        countIssues.put(Severity.HIGH.toString(), 0);
+        countIssues.put(Severity.MEDIUM.toString(), 0);
+        countIssues.put(Severity.LOW.toString(), 0);
+        Map<String, TestSourceConfig> sourceConfigCache = new HashMap<>();
+        int examined = 0;
+        int ignoredExcluded = 0;
+
+        int skip = 0;
+        while (true) {
+            List<TestingRunResult> page = pageFetcher.apply(ISSUE_COUNT_PAGE_SIZE, skip);
+            if (page == null || page.isEmpty()) {
+                break;
+            }
+
+            List<TestingIssuesId> pageIds = new ArrayList<>(page.size());
+            Set<TestingIssuesId> idsToLookUp = new HashSet<>();
+            for (TestingRunResult runResult : page) {
+                TestingIssuesId issueId = null;
+                if (runResult.getApiInfoKey() != null && runResult.getTestSubType() != null) {
+                    issueId = issueIdFor(runResult, sourceConfigCache, sourceConfigLookup);
+                    idsToLookUp.add(issueId);
+                }
+                pageIds.add(issueId);
+            }
+
+            // Fetched ids come back with exactly the case we queried (Mongo $in is exact), so a plain map
+            // keyed on TestingIssuesId resolves them despite equals/hashCode not agreeing on case.
+            Set<TestingIssuesId> ignoredIds = new HashSet<>();
+            if (!idsToLookUp.isEmpty()) {
+                for (TestingRunIssues issue : issueFetcher.apply(idsToLookUp)) {
+                    if (issue.getTestRunIssueStatus() == TestRunIssueStatus.IGNORED) {
+                        ignoredIds.add(issue.getId());
+                    }
+                }
+            }
+
+            for (int i = 0; i < page.size(); i++) {
+                examined++;
+                TestingIssuesId issueId = pageIds.get(i);
+                if (issueId != null && ignoredIds.contains(issueId)) {
+                    ignoredExcluded++;
+                    continue;
+                }
+                String severity = getSeverityFromTestingRunResult(page.get(i)).toString();
+                countIssues.merge(severity, 1, Integer::sum);
+            }
+
+            if (page.size() < ISSUE_COUNT_PAGE_SIZE) {
+                break;
+            }
+            skip += ISSUE_COUNT_PAGE_SIZE;
+        }
+        return new IssueCountResult(countIssues, examined, ignoredExcluded);
     }
 
     public static List<TestRoles> fetchTestRoles() {
