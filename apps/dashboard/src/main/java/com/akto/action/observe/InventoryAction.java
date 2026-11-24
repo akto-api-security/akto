@@ -221,7 +221,8 @@ public class InventoryAction extends UserAction {
         response.put("data", new BasicDBObject("endpoints", list).append("apiInfoList", apiInfoList));
 
         if(apiCollectionId != -1){
-            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
+            // only the redact flag is read, so skip the collection's urls and conditions
+            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId), Projections.include(ApiCollection.REDACT));
             response.put("redacted", apiCollection.getRedact());
         }
     }
@@ -457,7 +458,8 @@ public class InventoryAction extends UserAction {
         response = new BasicDBObject();
         response.put("apiInfoList", apiInfos);
         if(apiCollectionId != -1){
-            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
+            // only the redact flag is read, so skip the collection's urls and conditions
+            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId), Projections.include(ApiCollection.REDACT));
             if (apiCollection != null) {
                 response.put("redacted", apiCollection.getRedact());
             }
@@ -841,7 +843,8 @@ public class InventoryAction extends UserAction {
     public List<SingleTypeInfo> fetchAllNewParams(int startTimestamp,int endTimestamp){
         Bson filterNewParams = SingleTypeInfoDao.instance.filterForAllNewParams(startTimestamp,endTimestamp);
 
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterNewParams);
+        // the only caller counts the rows, so skip the values and other fields of each parameter
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterNewParams, Projections.include(Constants.ID));
 
         return list;
     }

@@ -28,6 +28,8 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.util.Constants;
+import com.akto.util.Pair;
+import java.util.concurrent.ConcurrentHashMap;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.MongoDBEnums;
@@ -372,7 +374,41 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
      * Returns Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, matchingSummaryIds) or Filters.empty() if no matches
      */
 
-    private Bson getSummaryIdsFilterForTestRuns(String filterKey, Bson testRunFilter) {
+    // the id lookups behind this filter run several times per issues request and grow with run history, so keep them per account for a short while
+    private static final int SUMMARY_IDS_TTL_SECONDS = 30;
+    private static final ConcurrentHashMap<String, Pair<List<ObjectId>, Integer>> summaryIdsCache = new ConcurrentHashMap<>();
+
+    private Bson getSummaryIdsFilterForTestRuns(String filterKey, Bson testRunFilter, String cacheKey) {
+        List<ObjectId> matchingSummaryIds = getCachedSummaryIdsForTestRuns(cacheKey, testRunFilter);
+
+        if (matchingSummaryIds.isEmpty()) {
+            return Filters.empty();
+        }
+
+        return Filters.in(filterKey, matchingSummaryIds);
+    }
+
+    private List<ObjectId> getCachedSummaryIdsForTestRuns(String cacheKey, Bson testRunFilter) {
+        Integer accountId = Context.accountId.get();
+        if (accountId == null) {
+            return loadSummaryIdsForTestRuns(testRunFilter);
+        }
+        String key = accountId + "|" + cacheKey;
+        int now = Context.now();
+        Pair<List<ObjectId>, Integer> cached = summaryIdsCache.get(key);
+        if (cached != null && now - cached.getSecond() <= SUMMARY_IDS_TTL_SECONDS) {
+            return cached.getFirst();
+        }
+        List<ObjectId> ids = Collections.unmodifiableList(loadSummaryIdsForTestRuns(testRunFilter));
+        // one entry per account and context, so only drop expired ones once the map has grown
+        if (summaryIdsCache.size() > 200) {
+            summaryIdsCache.entrySet().removeIf(e -> now - e.getValue().getSecond() > SUMMARY_IDS_TTL_SECONDS);
+        }
+        summaryIdsCache.put(key, new Pair<>(ids, now));
+        return ids;
+    }
+
+    private List<ObjectId> loadSummaryIdsForTestRuns(Bson testRunFilter) {
         List<ObjectId> matchingTestRunIds = TestingRunDao.instance.getMCollection().find(testRunFilter)
             .projection(Projections.include(Constants.ID))
             .into(new ArrayList<>())
@@ -381,7 +417,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
             .collect(Collectors.toList());
 
         if (matchingTestRunIds.isEmpty()) {
-            return Filters.empty();
+            return new ArrayList<>();
         }
 
         List<ObjectId> matchingSummaryIds = TestingRunResultSummariesDao.instance.getMCollection().find(
@@ -392,11 +428,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
             .map(TestingRunResultSummary::getId)
             .collect(Collectors.toList());
 
-        if (matchingSummaryIds.isEmpty()) {
-            return Filters.empty();
-        }
-
-        return Filters.in(filterKey, matchingSummaryIds);
+        return matchingSummaryIds;
     }
 
     private Bson getDashboardContextFilterForIssues(CONTEXT_SOURCE contextSource) {
@@ -407,7 +439,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         if (contextSource == null) {
             return Filters.empty();
         }
-        return getSummaryIdsFilterForTestRuns(filterKey, Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource));
+        return getSummaryIdsFilterForTestRuns(filterKey, Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource), "same|" + contextSource);
     }
 
     /** Issues linked to test runs with an explicit dashboardContext different from the current dashboard. */
@@ -419,7 +451,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
             Filters.exists(TestingRun.DASHBOARD_CONTEXT, true),
             Filters.ne(TestingRun.DASHBOARD_CONTEXT, contextSource)
         );
-        return getSummaryIdsFilterForTestRuns(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, otherContextTestRuns);
+        return getSummaryIdsFilterForTestRuns(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, otherContextTestRuns, "other|" + contextSource);
     }
 
     /**
