@@ -1778,10 +1778,11 @@ public class DbLayer {
         );
     }
 
+    // Log inserts are high-volume and non-critical: w:1 so they don't block on majority acks during replication lag.
     public static void insertRuntimeLog(Log log) {
         RuntimeLogsDao runtimeLogsDao = RuntimeLogsDao.instance;
         cleanupCollectionIfNeeded(runtimeLogsDao.getCollName(), runtimeLogsDao);
-        runtimeLogsDao.insertOne(log);
+        runtimeLogsDao.insertOne(log, WriteConcern.W1);
     }
 
     private static void cleanupCollectionIfNeeded(String collectionName, AccountsContextDao<?> dao) {
@@ -1839,35 +1840,35 @@ public class DbLayer {
     }
 
     public static void insertPersistentRuntimeLog(Log log) {
-        RuntimePersistentLogsDao.instance.insertOne(log);
+        RuntimePersistentLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertAnalyserLog(Log log) {
-        AnalyserLogsDao.instance.insertOne(log);
+        AnalyserLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertTestingLog(Log log) {
-        LogsDao.instance.insertOne(log);
+        LogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertAgenticTestingLog(Log log) {
-        AgenticTestingLogsDao.instance.insertOne(log);
+        AgenticTestingLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertProtectionLog(Log log) {
-        ProtectionLogsDao.instance.insertOne(log);
+        ProtectionLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertCyborgLog(Log log) {
-        CyborgLogsDao.instance.insertOne(log);
+        CyborgLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertAwsApiGatewayLog(Log log) {
-        AwsApiGatewayLogsDao.instance.insertOne(log);
+        AwsApiGatewayLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertGuardrailsServiceLog(Log log) {
-        GuardrailsServiceLogsDao.instance.insertOne(log);
+        GuardrailsServiceLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertEndpointShieldLog(LogsEndpointShield log) {
@@ -3403,7 +3404,7 @@ public class DbLayer {
             long deletedCount = MetricDataDao.instance.deleteOldMetrics();
             loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
         }
-        MetricDataDao.instance.insertMany(metricData);
+        MetricDataDao.instance.insertMany(metricData, WriteConcern.W1);
 
         int accountId = Context.accountId.get();
         boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
@@ -3453,10 +3454,9 @@ public class DbLayer {
     }
 
 
+    // Read-only: the postgres command write-back is unused, and this is polled every minute per mini-runtime.
     public static DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
-        Integer accountId = Context.accountId.get();
-        Bson updates = Updates.combine(Updates.set("postgresResult", prevResult), Updates.set("oldPostgresCommand", prevCommand));
-        return DataControlSettingsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("_id", accountId), updates);
+        return DataControlSettingsDao.instance.findOne(Filters.eq("_id", Context.accountId.get()));
     }
 
     public static void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
@@ -3858,7 +3858,7 @@ public class DbLayer {
     }
 
     public static void insertDataIngestionLog(Log log) {
-        DataIngestionLogsDao.instance.insertOne(log);
+        DataIngestionLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertMCPAuditDataLog(McpAuditInfo auditInfo) {

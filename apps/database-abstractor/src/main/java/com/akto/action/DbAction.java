@@ -108,6 +108,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 import org.apache.struts2.action.Action;
 import org.apache.struts2.ActionSupport;
@@ -4442,7 +4443,7 @@ public class DbAction extends ActionSupport {
     public String insertPuppeteerLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            PupeteerLogsDao.instance.insertOne(dbLog);
+            PupeteerLogsDao.instance.insertOne(dbLog, WriteConcern.W1);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertPuppeteerLog " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -4453,7 +4454,7 @@ public class DbAction extends ActionSupport {
     public String insertSmartTestingLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            SmartTestingLogsDao.instance.insertOne(dbLog);
+            SmartTestingLogsDao.instance.insertOne(dbLog, WriteConcern.W1);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertSmartTestingLog " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -4634,7 +4635,7 @@ public class DbAction extends ActionSupport {
                 }
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            DastLogsDao.instance.insertOne(dbLog);
+            DastLogsDao.instance.insertOne(dbLog, WriteConcern.W1);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertDastLog " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -4657,7 +4658,7 @@ public class DbAction extends ActionSupport {
                 }
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            MiniTestingOrchestratorLogsDao.instance.insertOne(dbLog);
+            MiniTestingOrchestratorLogsDao.instance.insertOne(dbLog, WriteConcern.W1);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertMiniTestingOrchestratorLog " + e.toString());
             return Action.ERROR.toUpperCase();

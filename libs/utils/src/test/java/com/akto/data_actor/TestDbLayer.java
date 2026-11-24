@@ -5,10 +5,12 @@ import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.EndpointAgentOrganizationDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.EndpointAgentOrganization;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.settings.DataControlSettings;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 
@@ -497,5 +499,25 @@ public class TestDbLayer extends MongoBasedTest {
         assertEquals("\\q", DbLayer.decodeJsonEscapes("\\q"));
         assertEquals("plain", DbLayer.decodeJsonEscapes("plain"));
         assertNull(DbLayer.decodeJsonEscapes(null));
+    }
+
+    @Test
+    public void testFetchDataControlSettings_isReadOnly() {
+        int accountId = 1_000_000;
+        Context.accountId.set(accountId);
+        DataControlSettingsDao.instance.getMCollection().drop();
+        assertNull(DbLayer.fetchDataControlSettings("", ""));
+
+        DataControlSettings settings = new DataControlSettings(accountId, -1, true, false, "select 1");
+        DataControlSettingsDao.instance.insertOne(settings);
+
+        DataControlSettings fetched = DbLayer.fetchDataControlSettings("ok", "select 1");
+        assertTrue(fetched.isDiscardNewApi());
+        assertEquals("select 1", fetched.getPostgresCommand());
+
+        // prev values are no longer written back
+        DataControlSettings stored = DataControlSettingsDao.instance.findOne(Filters.eq("_id", accountId));
+        assertNull(stored.getPostgresResult());
+        assertNull(stored.getOldPostgresCommand());
     }
 }
