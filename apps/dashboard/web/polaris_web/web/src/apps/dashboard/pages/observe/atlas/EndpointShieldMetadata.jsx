@@ -24,7 +24,9 @@ const createHeading = (text, value = null, sortKey = null) => ({
 });
 
 const headings = [
-    { ...createHeading("Status", "statusComp"), sortActive: false },
+    // No CellType.TEXT: GithubRow wraps TEXT cells in TooltipText, which reuses the cell value as its
+    // tooltip. The value here is the icon, which carries its own tooltip, so the hover would double up.
+    { ...createHeading("Status", "statusComp"), type: undefined, sortActive: false },
     createHeading("Hostname", "hostname"),
     createHeading("Device ID", "deviceId"),
     createHeading("Agent Version", "agentVersion"),
