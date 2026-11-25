@@ -90,6 +90,7 @@ const PAGE_REQUIRES = {
     '/dashboard/observe/agentic-discovery': 'api/fetchAtlasDiscoveryOverview',
     '/dashboard/observe/agent-discovery': 'api/fetchArgusDiscoveryOverview',
     '/dashboard/observe/agent-inventory': 'api/fetchArgusInventory',
+    '/dashboard/observe/agent-inventory/agent': 'api/fetchArgusAgentDetail',
     '/dashboard/nhi/identities': 'api/fetchAllNhiIdentities',
     '/dashboard/nhi/violations': 'api/fetchAllNhiViolations',
     '/dashboard/nhi/policies': 'api/fetchNhiPolicies',

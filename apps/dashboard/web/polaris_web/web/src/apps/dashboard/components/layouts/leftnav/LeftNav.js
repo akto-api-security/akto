@@ -71,6 +71,8 @@ export default function LeftNav() {
     useEffect(() => {
         const observeId = currPathString.replace(/-/g, "_");
         if (LINKED_NAV_IDS.has(observeId)) setLeftNavSelected(observeId);
+        // An agent opened from Inventory keeps Inventory highlighted, also after a refresh.
+        else if (observeId.startsWith("dashboard_observe_agent_inventory_agent_")) setLeftNavSelected("dashboard_observe_agent_inventory");
     }, [currPathString]);
 
     const handleAccountChange = useCallback(async (selected) => {
@@ -317,7 +319,9 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_endpoints",
-                    }] : [{
+                    }] : dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [
+                    // Argus lists its assets under Inventory; Collections stays for the other products.
+                    ] : [{
                         label: "Collections",
                         onClick: () => {
                             navigate("/dashboard/observe/inventory");

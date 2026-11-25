@@ -238,6 +238,27 @@ public class TestArgusInventoryService {
     }
 
     @Test
+    public void thePostureFilterNarrowsAFlagSetOnThePage() {
+        // 1: high and active, 2: high but quiet, 3: low and covered, 4: low and created this week.
+        List<ApiCollection> all = Arrays.asList(agent(1, "high-active", 80, 90), agent(2, "high-quiet", 80, 90), agent(3, "low-ok", 10, 90), agent(4, "new-low", 10, 3));
+        ArgusInventoryService inv = inventory(all, true, seenToday(1, 3, 4), new HashMap<>());
+
+        ArgusInventoryService.Query attention = query();
+        attention.setPosture("attention");
+        assertEquals(Collections.singletonList("high-quiet"), names(inv.pageAgents(attention)));
+
+        ArgusInventoryService.Query newAndHealthy = query();
+        newAndHealthy.setFlag("new");
+        newAndHealthy.setPosture("healthy");
+        assertEquals("the flag and the posture both have to match", Collections.singletonList("new-low"), names(inv.pageAgents(newAndHealthy)));
+
+        ArgusInventoryService.Query newAndAtRisk = query();
+        newAndAtRisk.setFlag("new");
+        newAndAtRisk.setPosture("atRisk");
+        assertEquals(0, inv.pageAgents(newAndAtRisk).getInt("total"));
+    }
+
+    @Test
     public void anUnknownFlagOnThePageMatchesNothing() {
         ArgusInventoryService inv = inventory(Collections.singletonList(agent(1, "a", 50, 90)), true, seenToday(1), new HashMap<>());
         ArgusInventoryService.Query unknown = query();
