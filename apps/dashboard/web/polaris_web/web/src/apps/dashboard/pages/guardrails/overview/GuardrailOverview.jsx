@@ -41,7 +41,7 @@ function GuardrailOverview() {
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
         searchParams,
-        (sp) => dateRangeFromSearchParams(sp) || DEFAULT_DATE_RANGE
+        (sp) => dateRangeFromSearchParams(sp) || func.getAllTimeRangeForAccounts() || DEFAULT_DATE_RANGE
     )
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)

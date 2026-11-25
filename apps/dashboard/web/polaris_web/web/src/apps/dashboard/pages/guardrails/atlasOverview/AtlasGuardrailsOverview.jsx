@@ -25,7 +25,7 @@ function AtlasGuardrailsOverview() {
     const navigate = useNavigate();
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        func.getLast30DaysRange(),
+        func.getDefaultDateRange(func.getLast30DaysRange()),
     );
     const [kpis, setKpis] = useState(null);
     const [triage, setTriage] = useState(null);
