@@ -647,7 +647,6 @@ export default function LeftNav() {
                         ...(dashboardCategory === "Endpoint Security" ? [{
                             label: "Overview",
                             requires: pageRequires("/dashboard/guardrails/atlas-overview"),
-                            badge: <Badge status="info">Beta</Badge>,
                             onClick: () => {
                                 navigate("/dashboard/guardrails/atlas-overview");
                                 handleSelect("dashboard_atlas_guardrails_overview");

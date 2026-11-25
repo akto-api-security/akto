@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
-import { Badge, Button, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
+import { Button, HorizontalGrid, Text } from "@shopify/polaris";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import { ACTIVITY_TAB, THREAT_ACTIVITY_PATH, clearSavedActivityFilters, openThreatActivityPage } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
@@ -111,12 +111,7 @@ function AtlasGuardrailsOverview() {
 
     return (
         <PageWithMultipleCards
-            title={
-                <HorizontalStack gap="2" blockAlign="center">
-                    <Text as="h1" variant="headingLg">Guardrail overview</Text>
-                    <Badge status="info">Beta</Badge>
-                </HorizontalStack>
-            }
+            title={<Text as="h1" variant="headingLg">Guardrail overview</Text>}
             subtitle="Violations across all managed devices and discovered AI agents, apps and MCP servers"
             isFirstPage
             secondaryActions={
