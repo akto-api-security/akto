@@ -3728,35 +3728,6 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static void safeBackfillInferenceHookAgentUsers(BackwardCompatibility backwardCompatibility){
-        try {
-            if(backwardCompatibility.getBackfillInferenceHookAgentUsers() == 0){
-                int upserted = BackwardCompatibilityUtils.backfillInferenceHookAgentUsers();
-                BackwardCompatibilityDao.instance.updateOne(
-                    Filters.eq("_id", backwardCompatibility.getId()),
-                    Updates.set(BackwardCompatibility.BACKFILL_INFERENCE_HOOK_AGENT_USERS, Context.now())
-                );
-                logger.infoAndAddToDb("backfillInferenceHookAgentUsers upserted " + upserted + " identities", LogDb.DASHBOARD);
-            }
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "error in backfillInferenceHookAgentUsers: " + e.getMessage(), LogDb.DASHBOARD);
-        }
-    }
-
-    private static final Set<Integer> attemptedInferenceHookBackfillForAccount = Collections.synchronizedSet(new HashSet<>());
-
-    public static void ensureInferenceHookAgentUsersBackfilled(){
-        Integer accountId = Context.accountId.get();
-        if (accountId == null || !attemptedInferenceHookBackfillForAccount.add(accountId)) return;
-        try {
-            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
-            if (backwardCompatibility == null) return;
-            safeBackfillInferenceHookAgentUsers(backwardCompatibility);
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "error in ensureInferenceHookAgentUsersBackfilled: " + e.getMessage(), LogDb.DASHBOARD);
-        }
-    }
-
     private static void safeMigrateTeamRoleToDeviceTags(BackwardCompatibility backwardCompatibility){
         try {
             if(backwardCompatibility.getMigrateTeamRoleToDeviceTags() == 0){
@@ -3834,7 +3805,6 @@ public class InitializerListener implements ServletContextListener {
         safeMigrateTeamRoleToDeviceTags(backwardCompatibility);
         safeMigrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
         safeMigrateTestScriptsToLibrary(backwardCompatibility);
-        safeBackfillInferenceHookAgentUsers(backwardCompatibility);
 
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);

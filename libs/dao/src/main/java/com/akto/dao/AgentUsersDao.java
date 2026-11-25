@@ -153,7 +153,7 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         return instance.findAll(Filters.or(identityMatchers));
     }
 
-    public static String deriveUsernameFromEmail(String email) {
+    private static String deriveUsernameFromEmail(String email) {
         if (email == null || email.isEmpty() || !email.contains("@")) return null;
         String local = email.substring(0, email.indexOf('@')).trim();
         return local.isEmpty() ? null : local;
