@@ -452,6 +452,7 @@ public class AtlasPeopleService {
         shareDataAcrossSameNameDevices(snapshot.devicesByLowerName);
         snapshot.devices.addAll(snapshot.devicesByLowerName.values());
         snapshot.employees.addAll(buildEmployees(snapshot.devices, bundle));
+        if (bundle != null) addInferenceHookEmployees(snapshot, hookDevices, bundle);
         Set<String> unapprovedTeams = new HashSet<>();
         for (EmployeeRow employee : snapshot.employees) {
             if (employee.unapprovedTools == 0) continue;
@@ -459,7 +460,6 @@ public class AtlasPeopleService {
             if (employee.teams.isEmpty()) snapshot.unapprovedNoTeam++;
         }
         snapshot.unapprovedTeams = unapprovedTeams.size();
-        if (bundle != null) addInferenceHookEmployees(snapshot, hookDevices, bundle);
         return snapshot;
     }
 
@@ -494,10 +494,10 @@ public class AtlasPeopleService {
         return identityKey(localPart(username));
     }
 
-    // Adds hook-only people as employees; anyone whose normalised username already matches a managed employee keeps only the managed row.
+    // Every hook device with tools is counted; a hook user matching a managed employee by normalised username is folded into that employee, anyone else becomes a hook-only employee.
     private static void addInferenceHookEmployees(Snapshot snapshot, Map<String, DeviceRow> hookDevices, InsightDataBundle bundle) {
-        Set<String> managed = new HashSet<>();
-        for (EmployeeRow employee : snapshot.employees) managed.add(personKey(employee.username));
+        Map<String, EmployeeRow> managedByPerson = new HashMap<>();
+        for (EmployeeRow employee : snapshot.employees) managedByPerson.putIfAbsent(personKey(employee.username), employee);
         List<DeviceRow> withTools = new ArrayList<>();
         for (DeviceRow device : hookDevices.values()) {
             if (device.tools.isEmpty()) continue;
@@ -507,12 +507,32 @@ public class AtlasPeopleService {
             }
             withTools.add(device);
         }
-        for (EmployeeRow employee : buildEmployees(withTools, bundle)) {
-            if (managed.contains(personKey(employee.username))) continue;
-            employee.inferenceHooksOnly = true;
-            employee.deviceNames.clear();
-            snapshot.employees.add(employee);
-            for (String key : employee.deviceKeys) snapshot.hookDevicesByLowerName.put(key, hookDevices.get(key));
+        for (EmployeeRow hookEmployee : buildEmployees(withTools, bundle)) {
+            for (String key : hookEmployee.deviceKeys) snapshot.hookDevicesByLowerName.put(key, hookDevices.get(key));
+            EmployeeRow managedEmployee = managedByPerson.get(personKey(hookEmployee.username));
+            if (managedEmployee == null) {
+                hookEmployee.inferenceHooksOnly = true;
+                hookEmployee.deviceNames.clear();
+                snapshot.employees.add(hookEmployee);
+            } else {
+                mergeHookEmployee(managedEmployee, hookEmployee);
+            }
+        }
+    }
+
+    private static void mergeHookEmployee(EmployeeRow managedEmployee, EmployeeRow hookEmployee) {
+        managedEmployee.deviceKeys.addAll(hookEmployee.deviceKeys);
+        managedEmployee.skillNames.addAll(hookEmployee.skillNames);
+        managedEmployee.toolCount += hookEmployee.toolCount;
+        managedEmployee.unapprovedTools += hookEmployee.unapprovedTools;
+        managedEmployee.personalAccounts += hookEmployee.personalAccounts;
+        managedEmployee.lastActive = Math.max(managedEmployee.lastActive, hookEmployee.lastActive);
+        if (hookEmployee.riskScore > managedEmployee.riskScore) {
+            managedEmployee.riskScore = hookEmployee.riskScore;
+            managedEmployee.riskCollectionId = hookEmployee.riskCollectionId;
+        }
+        for (String severity : SEVERITIES) {
+            managedEmployee.violationsBySeverity.merge(severity, hookEmployee.violationsBySeverity.get(severity), Integer::sum);
         }
     }
 
