@@ -214,6 +214,11 @@ public class ProviderGuardrailAction extends ActionSupport {
         String email = extractEmail(frame.actor);
         if (email != null && !email.trim().isEmpty()) {
             tag.put(AGENT_EMAIL_TAG, email.trim());
+            loggerMaker.info("Provider guardrail: tagged {} with {}={} for agent_users sync - provider: {}, request: {}",
+                    host, AGENT_EMAIL_TAG, email.trim(), provider, frame.requestId);
+        } else {
+            loggerMaker.info("Provider guardrail: no actor email, {} not tagged and no agent_users row will be created - host: {}, provider: {}, request: {}",
+                    AGENT_EMAIL_TAG, host, provider, frame.requestId);
         }
 
         Map<String, Object> meta = new HashMap<>();
