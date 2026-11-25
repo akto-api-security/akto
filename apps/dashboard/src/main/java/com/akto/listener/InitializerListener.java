@@ -4880,7 +4880,14 @@ public class InitializerListener implements ServletContextListener {
             public void accept(Account a) {
                 int accountId = a.getId();
                 UsageMetric endpointUsage = UsageMetricHandler.calcAndSyncAccountUsage(accountId);
-                int endpointCountOnDashboard = (int)fetchEndpointCountOnDashboard();
+                if (endpointUsage == null) {
+                    // Not recorded this run (already logged by the handler); comparing would alert on a fake 0.
+                    logger.error("Account: " + accountId + " ACTIVE_ENDPOINTS not recorded, skipping endpoint count mismatch check");
+                    return;
+                }
+                // ACTIVE_ENDPOINTS bills API and DAST endpoints, so compare against both contexts.
+                int endpointCountOnDashboard = (int)(fetchEndpointCountOnDashboard(CONTEXT_SOURCE.API)
+                        + fetchEndpointCountOnDashboard(CONTEXT_SOURCE.DAST));
                 logger.info("Account: " + accountId + " endpoint count on billing: " + endpointUsage.getUsage() + " endpoint count on dashboard: " + endpointCountOnDashboard);
                 if (endpointCountOnDashboard != endpointUsage.getUsage()) {
                     Organization organization = OrganizationsDao.instance.findOne(Filters.eq(Constants.ID, endpointUsage.getOrganizationId()));
@@ -4894,8 +4901,8 @@ public class InitializerListener implements ServletContextListener {
         isCalcUsageRunning = false;
     }
 
-    public static long fetchEndpointCountOnDashboard() {
-        Context.contextSource.set(CONTEXT_SOURCE.API);
+    public static long fetchEndpointCountOnDashboard(CONTEXT_SOURCE contextSource) {
+        Context.contextSource.set(contextSource);
         Context.userId.set(-1);
         InventoryAction inventoryAction = new InventoryAction();
         inventoryAction.setStartTimestamp(0);
