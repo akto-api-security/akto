@@ -131,6 +131,9 @@ _FIELDS = (
     # own, so the URL must be internal only.
     "TRIPWIRE_ENABLED",
     "TRIPWIRE_BASE_URL",
+    # Milliseconds to wait for Tripwire's answer before dropping it (default 5000). The scan never waits for it:
+    # a later answer only delays storing that scan's results.
+    "TRIPWIRE_TIMEOUT_MS",
     # Azure Blob Storage container URL with a SAS token that can create blobs; each Tripwire answer is stored
     # there as one JSON file (alerts.store_tripwire_result), with the prompt text when Tripwire and the scan
     # disagree. Unset: not stored. A secret: never logged.
@@ -212,6 +215,7 @@ class Settings:
     GEMMA_VLLM_ARBITER_BASE_URL: str
     TRIPWIRE_ENABLED: str
     TRIPWIRE_BASE_URL: str
+    TRIPWIRE_TIMEOUT_MS: str
     TRIPWIRE_RESULTS_BLOB_URL: str
     QWEN_VLLM_KEY: str
     GEMMA_VLLM_KEY: str
