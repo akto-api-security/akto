@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { Badge, Box, Card, Divider, HorizontalGrid, HorizontalStack, Modal, Text } from "@shopify/polaris";
+import { Badge, Box, Card, Divider, HorizontalGrid, HorizontalStack, LegacyTabs, Modal, Text, VerticalStack } from "@shopify/polaris";
 import { produce } from "immer";
 
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
@@ -17,6 +17,8 @@ import { formatSparklineLabels } from "./utils";
 import { formatCompact, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 import SessionsView from "./SessionsView";
 import UnifiedArgusView from "./UnifiedArgusView";
+import MessagesView from "./MessagesView";
+import { ARGUS_SPAN_COL_DEFS } from "./columns";
 import SessionFlyout from "./SessionFlyout";
 import ArgusTraceFlyout from "./ArgusTraceFlyout";
 import { NO_ACCESS_MESSAGE } from "./LLMCellRenderers";
@@ -24,6 +26,15 @@ import { fetchGuardrailPolicyNamesCached } from "../../guardrails/topicGuardrail
 import { CATEGORY_ENDPOINT_SECURITY, CATEGORY_AGENTIC_SECURITY } from "../../../../main/labelHelper";
 
 const SERVICE_COLORS = ["#9642FC", "#4285F4", "#10A37F", "#EAB308", "#F97316", "#DC2626"];
+
+// Argus Traces tabs, always in this order. Spans is the flat list of every record, as the page
+// was before session grouping; Traces folds a conversation into one row beside the records
+// that carry no session.
+const ARGUS_TABS = [
+    { id: "spans",  content: "Spans",  panelID: "argus-spans-panel" },
+    { id: "traces", content: "Traces", panelID: "argus-traces-panel" },
+];
+const ARGUS_TAB_SPANS = 0;
 
 
 export default function LLMObservability() {
@@ -56,6 +67,7 @@ export default function LLMObservability() {
     );
     const [selectedSession, setSelectedSession] = useState(null);
     const [selectedTrace, setSelectedTrace]     = useState(null);
+    const [argusTabIdx, setArgusTabIdx] = useState(ARGUS_TAB_SPANS);
     // Prompt content is admin-only; admins confirm per row that opening it is recorded in audit data.
     const isAdmin = func.isUserAdmin();
     const [pendingReveal, setPendingReveal] = useState(null);
@@ -362,14 +374,27 @@ export default function LLMObservability() {
                         </Box>
                     ) : topCards,
                     isArgus ? (
-                        // One table: a conversation is a row, and so is an invocation that
-                        // never carried a session. The click target follows the row's kind.
-                        <UnifiedArgusView
-                            key="unified-table"
-                            currDateRange={currDateRange}
-                            onOpenSession={openSession}
-                            onOpenTrace={openTrace}
-                        />
+                        <VerticalStack key="argus-tabs" gap="2">
+                            {/* Fitted: each tab takes an equal share of the width, underlined rather than a pill. */}
+                            <LegacyTabs tabs={ARGUS_TABS} selected={argusTabIdx} onSelect={setArgusTabIdx} fitted />
+                            {argusTabIdx === ARGUS_TAB_SPANS ? (
+                                <MessagesView
+                                    key="argus-spans"
+                                    currDateRange={currDateRange}
+                                    columnDefs={ARGUS_SPAN_COL_DEFS}
+                                    onRowClicked={p => p.data && openTrace(p.data)}
+                                />
+                            ) : (
+                                // A conversation is a row, and so is an invocation that never
+                                // carried a session. The click target follows the row's kind.
+                                <UnifiedArgusView
+                                    key="unified-table"
+                                    currDateRange={currDateRange}
+                                    onOpenSession={openSession}
+                                    onOpenTrace={openTrace}
+                                />
+                            )}
+                        </VerticalStack>
                     ) : (
                         <SessionsView key="sessions-table" currDateRange={currDateRange} onOpenSession={openSession} initialFilters={urlFilters} />
                     ),
