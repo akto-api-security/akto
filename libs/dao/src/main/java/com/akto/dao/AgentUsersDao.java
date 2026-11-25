@@ -54,8 +54,7 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
      * Copilot Studio) in one Mongo round trip, each keyed on that source's own user id — a tenant
      * sync can mean tens of thousands of changed users, so this must never be a per-user call.
      * Generic and connector-agnostic — any future ai-agent connector with its own external user
-     * id can reuse this the same way ensureConnectorIdentity already serves the inference-hooks
-     * source. Rows with a blank userId/userName are skipped.
+     * id can reuse this. Rows with a blank userId/userName are skipped.
      */
     public void bulkUpsertExternalIdentities(List<AgenticUsers> updates) {
         if (updates == null || updates.isEmpty()) return;
@@ -215,35 +214,6 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
             instance.updateMany(Filters.eq(AgenticUsers.USER_NAME, trimmedName), Updates.combine(updates));
         }
         return trimmedName;
-    }
-
-    private static final Map<String, List<String>> INFERENCE_HOOKS_TAG = Collections.singletonMap("connector", Collections.singletonList("inference-hooks"));
-
-    // Registers a connector-only identity on first contact; on any existing-identity match, adds our label and tag instead of inserting a duplicate.
-    public void ensureConnectorIdentity(String email, String deviceLabel, String lastUpdatedBy) {
-        if (email == null || email.trim().isEmpty() || deviceLabel == null || deviceLabel.trim().isEmpty()) {
-            return;
-        }
-        String trimmedEmail = email.trim();
-
-        List<AgenticUsers> matches = findAllIdentityMatches(deviceLabel, trimmedEmail, trimmedEmail);
-        if (!matches.isEmpty()) {
-            List<String> matchedUsernames = matches.stream().map(AgenticUsers::getUserName).distinct().collect(Collectors.toList());
-            instance.updateMany(Filters.in(AgenticUsers.USER_NAME, matchedUsernames), Updates.addToSet("devices", deviceLabel));
-            for (String matchedUsername : matchedUsernames) {
-                mergeDeviceTags(matchedUsername, DeviceTag.SOURCE_INFERENCE_HOOKS, INFERENCE_HOOKS_TAG, lastUpdatedBy);
-            }
-            return;
-        }
-
-        AgenticUsers newUser = new AgenticUsers();
-        newUser.setUserName(deviceLabel);
-        newUser.setUserEmail(trimmedEmail);
-        newUser.setDevices(Collections.singletonList(deviceLabel));
-        newUser.setLastUpdatedAt(Context.now());
-        newUser.setLastUpdatedBy(lastUpdatedBy);
-        instance.insertOne(newUser);
-        mergeDeviceTags(deviceLabel, DeviceTag.SOURCE_INFERENCE_HOOKS, INFERENCE_HOOKS_TAG, lastUpdatedBy);
     }
 
     /**

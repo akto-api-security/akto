@@ -3,7 +3,6 @@ package com.akto.action;
 import com.akto.action.guardrail.ParsedRequest;
 import com.akto.action.guardrail.ProviderAdapter;
 import com.akto.action.guardrail.ProviderRegistry;
-import com.akto.dao.AgentUsersDao;
 import com.akto.dao.context.Context;
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
@@ -46,6 +45,7 @@ public class ProviderGuardrailAction extends ActionSupport {
     private static final Gateway gateway = Gateway.getInstance();
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final String INFERENCE_HOOKS_TAG = "inference-hooks";
+    private static final String AGENT_EMAIL_TAG = "ai-agent-email";
     private static final String TOOL_CALL_EVENT = "tool_call";
     private static final String ENDPOINT_PREFIX = "inference-hook-";
     private static final String INSTALLER_HEADER_PREFIX = "x-akto-installer-";
@@ -86,8 +86,6 @@ public class ProviderGuardrailAction extends ActionSupport {
                 response = adapter.verdict(true, null, frame.requestId);
                 return Action.SUCCESS.toUpperCase();
             }
-
-            registerConnectorIdentity(frame);
 
             List<ParsedRequest.ToolCall> calls = frame.toolCalls != null
                     ? frame.toolCalls
@@ -212,6 +210,10 @@ public class ProviderGuardrailAction extends ActionSupport {
         String usernameSlug = actorSlug(frame);
         if (!usernameSlug.isEmpty()) {
             tag.put("username", usernameSlug);
+        }
+        String email = extractEmail(frame.actor);
+        if (email != null && !email.trim().isEmpty()) {
+            tag.put(AGENT_EMAIL_TAG, email.trim());
         }
 
         Map<String, Object> meta = new HashMap<>();
@@ -348,18 +350,6 @@ public class ProviderGuardrailAction extends ActionSupport {
         return provider.toLowerCase();
     }
 
-    // Self-registers this actor's email-slug into agent_users on first contact, so it becomes
-    // pickable in the existing device dropdown; fail-open, never affects the guardrails verdict.
-    private static void registerConnectorIdentity(ParsedRequest frame) {
-        try {
-            String email = extractEmail(frame.actor);
-            if (!actorSlug(frame).isEmpty()) {
-                AgentUsersDao.instance.ensureConnectorIdentity(email, endpointId(frame), "inference-hooks");
-            }
-        } catch (Exception e) {
-            loggerMaker.error("Provider guardrail: failed to register connector identity", e);
-        }
-    }
 
     private static String extractEmail(Map<String, Object> actor) {
         if (actor == null) {
