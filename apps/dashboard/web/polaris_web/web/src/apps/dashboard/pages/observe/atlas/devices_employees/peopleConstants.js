@@ -9,7 +9,7 @@ export const STAT_CARDS = [
     { id: "managedDevices", label: "Managed devices" },
     { id: "agentActive", label: "Atlas agent active" },
     { id: "devicesWithAiTools", label: "Devices with AI tools" },
-    { id: "employeesUsingAi", label: "Employees using AI" },
+    { id: "employeesUsingAi", label: "Users using AI" },
     { id: "devicesWithUnapprovedTools", label: "Devices with unapproved tools" },
     { id: "monitorOnlyDevices", label: "Monitor-only devices" },
 ];
@@ -82,7 +82,7 @@ export const RISK_BUCKET_COUNT = 5;
 export const RISK_MAX = 5;
 export const RISK_BUCKET_WIDTH = RISK_MAX / RISK_BUCKET_COUNT;
 export const HIGH_RISK_THRESHOLD = 4;
-export const RISK_EXPLANATION = "The highest " + mapLabel('API', getDashboardCategory()) + " risk score (0 to 5, from the stored api_info risk score) across the AI tools on an employee's devices.";
+export const RISK_EXPLANATION = "The highest " + mapLabel('API', getDashboardCategory()) + " risk score (0 to 5, from the stored api_info risk score) across the AI tools on a user's devices.";
 
 export const INFERENCE_HOOKS_LABEL = "Claude inference hooks";
 export const INFERENCE_HOOKS_OPTION = "hook:inference-hooks";
@@ -103,7 +103,7 @@ export const DEVICE_CHIPS = [
 ];
 
 export const SEARCH_HINTS = {
-    employees: "Search employees, devices, teams or tools. Narrow with user:, device:, team:, tool:",
+    employees: "Search users, devices, teams or tools. Narrow with user:, device:, team:, tool:",
     devices: "Search devices, owners, OS or tools. Narrow with owner:, os:, health:, mode:, version:, tool:, tag:",
 };
 

@@ -58,12 +58,12 @@ function RiskHistogramCard({ overview, status, onSelectBucket, onSelectHighRisk 
                 />
             )}
             <Box>
-                <Button plain onClick={onSelectHighRisk}>{`${highRisk} employee${highRisk === 1 ? "" : "s"} score ${HIGH_RISK_THRESHOLD} or higher`}</Button>
+                <Button plain onClick={onSelectHighRisk}>{`${highRisk} user${highRisk === 1 ? "" : "s"} score ${HIGH_RISK_THRESHOLD} or higher`}</Button>
             </Box>
         </VerticalStack>
     );
 
-    return <InfoCard title="Employee risk scores" subtitle={`Highest ${mapLabel('API', getDashboardCategory())} risk score (0 to 5) across each employee's AI tools`} titleToolTip={transform.tooltip(RISK_EXPLANATION)} component={transform.cardBody(status, body)} />;
+    return <InfoCard title="User risk scores" subtitle={`Highest ${mapLabel('API', getDashboardCategory())} risk score (0 to 5) across each user's AI tools`} titleToolTip={transform.tooltip(RISK_EXPLANATION)} component={transform.cardBody(status, body)} />;
 }
 
 export default RiskHistogramCard;
