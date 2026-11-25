@@ -219,21 +219,21 @@ func TestCheckRejectedSkillLogs(t *testing.T) {
 		return false
 	}
 
-	run("Bash", `{"command":"ls"}`) // any tool call is logged, but only Skill is evaluated
+	run("Bash", `{"command":"ls"}`) // not a Skill call: logs nothing
 	got := msgs()
-	if !has(got, "[SkillCheck] tool call received") || has(got, "[SkillCheck] skill evaluated") {
+	if len(got) != 0 {
 		t.Errorf("Bash call: unexpected logs %v", got)
 	}
 
-	run("Skill", `{"skill":"docx"}`) // evaluated, allowed
+	run("Skill", `{"skill":"docx"}`) // evaluated, allowed: logs nothing
 	got = msgs()
-	if !has(got, "[SkillCheck] skill evaluated") || has(got, "ValidateRequest - blocking skill rejected in audit data") {
+	if len(got) != 0 {
 		t.Errorf("allowed skill: unexpected logs %v", got)
 	}
 
-	run("Skill", `{"skill":"aws-credential-helper"}`) // evaluated, blocked
+	run("Skill", `{"skill":"aws-credential-helper"}`) // blocked: logs the block
 	got = msgs()
-	if !has(got, "[SkillCheck] skill evaluated") || !has(got, "ValidateRequest - blocking skill rejected in audit data") {
+	if !has(got, "ValidateRequest - blocking skill rejected in audit data") {
 		t.Errorf("blocked skill: unexpected logs %v", got)
 	}
 
