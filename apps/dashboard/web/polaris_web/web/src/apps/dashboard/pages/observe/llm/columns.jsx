@@ -277,6 +277,21 @@ export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
     ];
 }
 
+// Argus Spans tab — one row per record, sessioned or not: the Argus traces table as it was
+// before session grouping, with its lead column named for what each row is.
+export const ARGUS_SPAN_COL_DEFS = [
+    shortTimeCol("latestTimestamp"),
+    // Each row is one span. Non-admins see its id instead of the prompt; records from before
+    // span ids were assigned at ingest have none, so they fall back to their trace id.
+    { ...previewCol("Span"), cellRendererParams: { idOf: d => d.spanId || d.traceId } },
+    appCol(170),
+    topicCol("Topics Queried"),
+    topicCol("SubTopic queried", false),
+    tokensCol,
+    durationCol,
+    idCol("Session ID", "sessionIdentifier", 300),
+];
+
 // Argus unified table — one row per conversation, plus one row per invocation that never
 // carried a session. The two halves partition the data server-side, so nothing is listed
 // twice. Sorting is deliberately absent: the rows come from two merged streams and time is
