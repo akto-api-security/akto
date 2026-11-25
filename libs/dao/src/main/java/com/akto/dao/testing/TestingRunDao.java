@@ -2,6 +2,7 @@ package com.akto.dao.testing;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -20,6 +21,18 @@ import com.mongodb.client.model.Projections;
 public class TestingRunDao extends AccountsContextDao<TestingRun> {
 
     public static final TestingRunDao instance = new TestingRunDao();
+
+    public List<ObjectId> findActiveRunIdsForModule(String miniTestingName) {
+        return findAll(
+                Filters.and(
+                        Filters.in(TestingRun.STATE, TestingRun.State.SCHEDULED, TestingRun.State.RUNNING),
+                        Filters.or(
+                            Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
+                            Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName))
+                ),
+                Projections.include(ID)
+        ).stream().map(TestingRun::getId).collect(Collectors.toList());
+    }
 
     public void createIndicesIfAbsent() {
         String dbName = Context.accountId.get()+"";
