@@ -59,7 +59,6 @@ export default function LeftNav() {
     const activeAccount = Store(state => state.activeAccount);
     const resetAll = PersistStore(state => state.resetAll);
     const resetStore = LocalStore(state => state.resetStore);
-    const agenticNewLayout = LocalStore(state => state.agenticNewLayout);
     const resetSession = SessionStore(state => state.resetStore);
     const resetFields = IssuesStore(state => state.resetStore);
 
@@ -310,7 +309,7 @@ export default function LeftNav() {
                     },
                     // { label: "Users and devices", onClick: () => { navigate("/dashboard/observe/users-and-devices"); handleSelect("dashboard_observe_users_and_devices"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_users_and_devices" },
                     {
-                        label: agenticNewLayout ? "Devices & Employees" : "Endpoints",
+                        label: "Users",
                         onClick: () => {
                             navigate("/dashboard/observe/endpoints");
                             handleSelect("dashboard_observe_endpoints");
@@ -627,8 +626,18 @@ export default function LeftNav() {
                     ),
                     icon: DiamondAlertMinor,
                     onClick: () => {
-                        handleSelect("dashboard_threat_actor");
-                        navigate("/dashboard/protection/threat-actor");
+                        // Atlas (Endpoint Security) and Argus (Agentic Security) land on their guardrails
+                        // Overview; other categories on Threat Actors.
+                        if (dashboardCategory === CATEGORY_ENDPOINT_SECURITY) {
+                            handleSelect("dashboard_atlas_guardrails_overview");
+                            navigate("/dashboard/guardrails/atlas-overview");
+                        } else if (dashboardCategory === CATEGORY_AGENTIC_SECURITY) {
+                            handleSelect("dashboard_guardrails_overview");
+                            navigate("/dashboard/guardrails/overview");
+                        } else {
+                            handleSelect("dashboard_threat_actor");
+                            navigate("/dashboard/protection/threat-actor");
+                        }
                         setActive("normal");
                     },
                     selected: (leftNavSelected.includes("_threat") && !leftNavSelected.includes("_reports")) || leftNavSelected.includes("_guardrails"),
@@ -869,7 +878,6 @@ export default function LeftNav() {
         if (!askAiExists) {
             items.splice(1, 0, {
                 label: "Ask Akto",
-                badge: <Badge status="info">Beta</Badge>,
                 icon: MagicMinor,
                 onClick: () => {
                     handleSelect("dashboard_ask_ai")

@@ -17,6 +17,7 @@ import TopAgenticAssetsCard from "./TopAgenticAssetsCard";
 import guardrailsApi from "../api";
 import { LOAD_FAILED } from "./atlasOverviewUtils";
 import { policyLink } from "../overview/GuardrailOverview";
+import ThreatWorldMap from "../../threat_detection/components/ThreatWorldMap";
 
 const LIST_PAGE_SIZE = 5;
 
@@ -95,6 +96,12 @@ function AtlasGuardrailsOverview() {
             <DecisionsTrendCard decisions={decisions} onOpenActivity={openActivity} />
             <PolicyViolationsCard data={policies} onOpenActivity={openActivity} onTune={openPolicy} />
         </HorizontalGrid>,
+        <ThreatWorldMap
+            key="world-map"
+            startTimestamp={startTimestamp}
+            endTimestamp={endTimestamp}
+            style={{ width: "100%" }}
+        />,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
             <ViolationsSourcesCard data={violationsSources} pageSize={listPageSize} onOpenActivity={openActivity} />
             <TopEmployeesCard data={topEmployees} pageSize={listPageSize} onOpenActivity={openActivity} />

@@ -198,7 +198,7 @@ function DevicesEmployeesPage() {
 
     return (
         <PageWithMultipleCards
-            title="Devices & Employees"
+            title="Users"
             subtitle="Who uses which AI tools, on which devices, and whether Atlas is protecting them"
             isFirstPage
             secondaryActions={

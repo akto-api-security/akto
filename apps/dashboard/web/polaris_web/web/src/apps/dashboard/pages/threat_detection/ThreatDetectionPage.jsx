@@ -1023,7 +1023,7 @@ function ThreatDetectionPage() {
                 components={components}
                 secondaryActions={
                     <HorizontalStack gap={2}>
-                        {showNewLayoutToggle && <NewLayoutTooltip checked={false} onChange={handleLayoutToggle} />}
+                        {showNewLayoutToggle && <NewLayoutTooltip invert checked={false} onChange={handleLayoutToggle} />}
                         {secondaryActionsComp}
                     </HorizontalStack>
                 }

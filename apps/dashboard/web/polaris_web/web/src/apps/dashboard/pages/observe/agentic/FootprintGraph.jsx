@@ -5,7 +5,7 @@ import { LegendDot } from "./AgenticStatsCard";
 import transform from "../atlas/devices_employees/transform";
 
 /*
- * Column graph laid out like the Devices & Employees AI footprint (transform.footprintLayout): hovering a "+N more" node lists the hidden
+ * Column graph laid out like the Users AI footprint (transform.footprintLayout): hovering a "+N more" node lists the hidden
  * items; selecting a node highlights what it's connected to, selecting the background clears it. In full screen, selecting a
  * "+N more" node the model lists in expandKeys grows that column; leaving full screen collapses it again.
  *
