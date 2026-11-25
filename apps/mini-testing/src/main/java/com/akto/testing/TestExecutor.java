@@ -94,7 +94,9 @@ public class TestExecutor {
     private static final boolean USE_BULK_RECORD_TESTING_RUN_RESULTS =
         Boolean.parseBoolean(System.getenv().getOrDefault(
                 "USE_BULK_RECORD_TESTING_RUN_RESULTS", "true"));
-    private static RSAPrivateKey privateKey = PayloadEncodeUtil.getPrivateKey();
+    // Only used to decrypt samples from the testing DB layer, so only load it when that layer is
+    // configured; otherwise every start logs a "could not load PRIVATE_KEY" error for an unused key.
+    private static RSAPrivateKey privateKey = shouldCallClientLayerForSampleData ? PayloadEncodeUtil.getPrivateKey() : null;
     
     // Current execution fallback flag - used when Kafka fails during current test run
     private volatile boolean currentExecutionFallback = false;

@@ -29,7 +29,12 @@ public class SampleMessageStore {
     private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final ClientLayer clientLayer = new ClientLayer();
-    private static RSAPrivateKey privateKey = PayloadEncodeUtil.getPrivateKey();
+    // Only used to decrypt samples from the testing DB layer (TESTING_DB_LAYER_SERVICE_URL), so only
+    // load it when that layer is configured; otherwise every start logs a "could not load PRIVATE_KEY"
+    // error for an unused key.
+    private static final String TESTING_DB_LAYER_SERVICE_URL = System.getenv("TESTING_DB_LAYER_SERVICE_URL");
+    private static RSAPrivateKey privateKey = TESTING_DB_LAYER_SERVICE_URL != null && !TESTING_DB_LAYER_SERVICE_URL.isEmpty()
+            ? PayloadEncodeUtil.getPrivateKey() : null;
     
     private SampleMessageStore() {}
 
