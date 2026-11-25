@@ -2063,7 +2063,7 @@ function Violations() {
             isFirstPage
             secondaryActions={
                 <HorizontalStack gap="2" blockAlign="center">
-                    <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />
+                    <NewLayoutTooltip invert checked={newLayout} onChange={handleLayoutToggle} />
                     <InsightsEntryButton granted={insights.granted} onClick={insights.handleOpen} label="Guardrail Insights" />
                     <Popover
                         active={moreActionsOpen}

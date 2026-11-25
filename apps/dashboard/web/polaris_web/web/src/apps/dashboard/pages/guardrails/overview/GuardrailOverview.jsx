@@ -23,6 +23,7 @@ import ViolationsTrendCard from './ViolationsTrendCard'
 import TopPoliciesCard from './TopPoliciesCard'
 import ViolationHeatmap from './ViolationHeatmap'
 import NeedsAttentionCard from './NeedsAttentionCard'
+import ThreatWorldMap from '../../threat_detection/components/ThreatWorldMap'
 
 const EXPORT_LIMIT = 2000
 
@@ -148,6 +149,7 @@ function GuardrailOverview() {
                         loadingMore={loadingMore === 'topPolicies'}
                     />
                 </HorizontalGrid>
+                <ThreatWorldMap startTimestamp={startTimestamp} endTimestamp={endTimestamp} style={{ width: '100%' }} />
                 <ViolationHeatmap
                     heatmap={heatmap}
                     policySeverity={policySeverity}

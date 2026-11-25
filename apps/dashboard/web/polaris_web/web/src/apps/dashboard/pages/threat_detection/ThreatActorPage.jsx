@@ -15,7 +15,7 @@ import { HorizontalGrid, VerticalStack, Button } from "@shopify/polaris";
 import { ThreatSummary } from "./components/ThreatSummary";
 import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
 import React from "react";
-import { getDashboardCategory, mapLabel, getReportCategoryShortName, shortNameToCategory } from "../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, getReportCategoryShortName, shortNameToCategory, isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../main/labelHelper";
 import PersistStore from "../../../main/PersistStore";
 import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 import { usePermissions } from "@/util/permissions";
@@ -28,24 +28,33 @@ if (categoryOverride) {
 }
 
 const ChartComponent = ({ onSubCategoryClick, currDateRange }) => {
+    const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000);
+    const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000);
+    // Argus and Atlas show the actor world map on the guardrails Overview page instead.
+    const showWorldMap = !isAgenticSecurityCategory() && !isEndpointSecurityCategory();
+    const timeline = (
+        <ThreatActivityTimeline
+            onSubCategoryClick={onSubCategoryClick}
+            startTimestamp={startTimestamp}
+            endTimestamp={endTimestamp}
+        />
+    );
     return (
         <VerticalStack gap={4} columns={2}>
-            <HorizontalGrid gap={4} columns={2}>
-                <ThreatActivityTimeline
-                    onSubCategoryClick={onSubCategoryClick}
-                    startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)}
-                    endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)}
-                />
-                <ThreatWorldMap
-                    startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)}
-                    endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)}
-                    style={{
-                        width: "100%",
-                        marginRight: "auto",
-                    }}
-                    key={"threat-actor-world-map"}
-                />
-            </HorizontalGrid>
+            {showWorldMap ? (
+                <HorizontalGrid gap={4} columns={2}>
+                    {timeline}
+                    <ThreatWorldMap
+                        startTimestamp={startTimestamp}
+                        endTimestamp={endTimestamp}
+                        style={{
+                            width: "100%",
+                            marginRight: "auto",
+                        }}
+                        key={"threat-actor-world-map"}
+                    />
+                </HorizontalGrid>
+            ) : timeline}
         </VerticalStack>
     );
 };

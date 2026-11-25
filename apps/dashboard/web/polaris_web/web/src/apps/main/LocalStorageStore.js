@@ -8,8 +8,6 @@ import { devtoolsOptions } from "./devtoolsConfig";
 // Custom Storage with Gzip Compression for localStorage
 const gzipLocalStorage = createGzipStorage(localStorage);
 
-const NEW_LAYOUT_DEFAULT_ACCOUNT = 1784850613;
-
 const initialState = {
     subCategoryMap: {},
     categoryMap: {},
@@ -17,7 +15,7 @@ const initialState = {
     defaultIgnoreSummaryTime: 2 * 60 * 60,
     lastEndpointEpoch: 0,
     agenticNewLayout: true,
-    guardrailViolationsNewLayout: false,
+    guardrailViolationsNewLayout: true,
     expandCollectionTags: false,
 };
 
@@ -105,14 +103,18 @@ localStore = devtools(localStore, devtoolsOptions("LocalStore", (state) => ({
 localStore = persist(localStore, {
     name: 'Akto-tests-store',
     storage: gzipLocalStorage,
-    // v1: agentic new layout became the default (guardrail violations is unchanged). Previously persisted `false` values were just the old default,
-    // so reset them once; later user choices (old-layout checkbox) persist normally.
-    version: 1,
-    migrate: (persisted) => ({ ...persisted, agenticNewLayout: true }),
+    // v1: agentic new layout became the default. v2: guardrail violations new layout became the default.
+    // Previously persisted `false` values were just the old defaults, so reset them once per version;
+    // later user choices (the "Old Layout" checkboxes) persist normally.
+    version: 2,
+    migrate: (persisted, version) => ({
+        ...persisted,
+        ...((version ?? 0) < 1 && { agenticNewLayout: true }),
+        ...((version ?? 0) < 2 && { guardrailViolationsNewLayout: true }),
+    }),
     merge: (persisted, current) => ({
         ...current,
         ...persisted,
-        ...(Number(window.ACTIVE_ACCOUNT) === NEW_LAYOUT_DEFAULT_ACCOUNT && { agenticNewLayout: true, guardrailViolationsNewLayout: true }),
     }),
 })
 

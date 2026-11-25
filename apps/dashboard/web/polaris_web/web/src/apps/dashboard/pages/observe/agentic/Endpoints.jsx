@@ -277,10 +277,7 @@ function Endpoints() {
             setTableSelectedTab({ ...tableSelectedTab, [window.location.pathname]: tabId });
         },
         selectedTab, tabsInfo,
-    // Polaris' Tab type has exactly one badge slot (string) — concatenating "Beta" into it would
-    // read as one pill mixing a status label with a count. Put "Beta" in the tab's own label text
-    // instead, so badge stays a clean, separate count pill.
-    ).map((tab) => (tab.id === 'plugins' ? { ...tab, content: `${tab.content} (Beta)` } : tab));
+    );
 
     async function fetchData(isMountedRef = { current: true }) {
         try {
