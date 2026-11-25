@@ -170,8 +170,8 @@
                 <!-- Jetty 12 EE8 maven plugin for local `jetty-ee8:run` of the javax webapp.
                      <descriptor> removed: it resolves relative to the CWD (not the module) and
                      breaks the run; web.xml is auto-discovered under webAppSourceDirectory/WEB-INF.
-                     12.1.10 matches this module's actual Docker runtime (jetty:12.1.10-jdk21). -->
-                <version>12.1.10</version>
+                     12.1.15 matches this module's actual Docker runtime (jetty:12.1.15-jdk21). -->
+                <version>12.1.15</version>
                 <configuration>
                     <webAppSourceDirectory>web</webAppSourceDirectory>
                     <webApp>

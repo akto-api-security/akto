@@ -1,6 +1,6 @@
 # Java 21 + Jetty 12 EE8 (javax.servlet) + virtual threads for blocking http-proxy/guardrails.
 # WAR is still compiled as Java 8 bytecode by the root Maven build; only the runtime changes here.
-FROM jetty:12.1.10-jdk21-eclipse-temurin
+FROM jetty:12.1.15-jdk21-eclipse-temurin
 USER root
 # Retry apt-get update: arm64 cross-builds can hit transient Ubuntu mirror sync errors.
 RUN set -eux; \
