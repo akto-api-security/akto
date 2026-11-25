@@ -678,6 +678,24 @@ public class ApiCollection {
         return false;
     }
 
+    public boolean isAiAgentCallerCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_AI_AGENT_CALLER_TAG.equals(t.getKeyName()));
+        }
+        return false;
+    }
+
+    /**
+     * In-memory twin of UsersCollectionsList.agenticCollectionsFilter(): MCP, GenAI or
+     * ai-agent-caller collections that are not endpoint-source collections. The filter also lists
+     * the unauthenticated MCP tools group for the dashboard; that group holds no endpoints of its
+     * own, so it is not an agentic collection for counting or limits. TestApiCollectionAgentic
+     * keeps the two in sync.
+     */
+    public boolean isAgenticCollection() {
+        return (isMcpCollection() || isGenAICollection() || isAiAgentCallerCollection()) && !isEndpointCollection();
+    }
+
     public boolean isCopilotBotCollection() {
         if (CollectionUtils.isEmpty(this.getTagsList())) return false;
         List<CollectionTags> tags = this.getTagsList();

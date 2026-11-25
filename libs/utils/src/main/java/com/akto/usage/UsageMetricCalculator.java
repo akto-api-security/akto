@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import com.akto.agentic.AgenticAssetGrouping;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.billing.OrganizationsDao;
@@ -17,6 +18,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.usage.MetricTypes;
@@ -202,33 +204,35 @@ public class UsageMetricCalculator {
 
     public static int calculateActiveEndpoints() {
         /*
-         * Count all endpoints.
-         * Same query being used on dashboard.
+         * Endpoints in API Security / DAST collections: everything except agentic collections
+         * (MCP, GenAI, ai-agent-caller) and endpoint-source collections.
+         * Demos and deactivated collections are discarded in calculateEndpoints.
          */
-        Set<Integer> collectionsToDiscard = getGenAiCollections();
-        collectionsToDiscard.addAll(getMcpCollections());
+        Set<Integer> collectionsToDiscard = getAgenticCollections();
         collectionsToDiscard.addAll(getEndpointCollections());
         return calculateEndpoints(collectionsToDiscard);
     }
 
-    private static int calculateMCPAssets() {
-        /*
-         * To count MCP endpoints, we need to filter out the collections that does not have
-         * MCP tag in tagsList.
-         */
-        Set<Integer> collectionsToDiscard = getGenAiCollections();
-        collectionsToDiscard.addAll(getApiCollections());
-        return calculateEndpoints(collectionsToDiscard);
+    /*
+     * AI_ASSET_COUNT counts collections, not endpoints: the collections that make up the AGENTIC
+     * context (same filter the dashboard uses), minus demos and deactivated collections, and minus
+     * the unauthenticated MCP tools group, which is a group with no endpoints of its own.
+     */
+    static int calculateAgenticAssets() {
+        Bson filter = Filters.and(
+            UsersCollectionsList.agenticCollectionsFilter(),
+            Filters.ne(Constants.ID, UnauthenticatedEndpoint.UNAUTHENTICATED_MCP_TOOLS_GROUP_ID),
+            excludeDemosAndDeactivated(Constants.ID)
+        );
+        return (int) ApiCollectionsDao.instance.getMCollection().countDocuments(filter);
     }
 
-    private static int calculateGenAiAssets() {
-        /*
-         * To count GenAI endpoints, we need to filter out the collections that does not have
-         * GenAI tag in tagsList.
-         */
-        Set<Integer> collectionsToDiscard = getMcpCollections();
-        collectionsToDiscard.addAll(getApiCollections());
-        return calculateEndpoints(collectionsToDiscard);
+    /*
+     * ENDPOINT_ASSET_COUNT: the largest number of endpoints (devices) running a single AI agent,
+     * i.e. the max endpointsCount of the "AI Agent" rows on the Agentic assets page.
+     */
+    static int calculateEndpointAssets() {
+        return AgenticAssetGrouping.computeMaxEndpointsPerAiAgent();
     }
 
 
@@ -343,44 +347,52 @@ public class UsageMetricCalculator {
         return 1;
     }
     
+    /**
+     * Measures the usage metric and sets its usage. Throws if the metric cannot be measured
+     * (a failed query, or a metric that is not measured at all, such as the retired
+     * MCP_ASSET_COUNT) rather than reporting 0; the caller decides to skip and log it.
+     */
     public static void calculateUsageMetric(UsageMetric usageMetric) {
         MetricTypes metricType = usageMetric.getMetricType();
         int usage = 0;
 
         usageMetric.setRecordedAt(Context.now());
         int now = Context.now();
+        long startMs = System.currentTimeMillis();
         loggerMaker.infoAndAddToDb("calculating as of measure-epoch: " + usageMetric.getMeasureEpoch() + " " + (now-usageMetric.getMeasureEpoch())/60 + " minutes ago", LoggerMaker.LogDb.DASHBOARD);
         loggerMaker.infoAndAddToDb("calculate "+metricType+" for account: "+ Context.accountId.get() +" org: " + usageMetric.getOrganizationId(), LoggerMaker.LogDb.DASHBOARD);
 
-        if (metricType != null) {
-            switch (metricType) {
-                case ACTIVE_ENDPOINTS:
-                    usage = calculateActiveEndpoints();
-                    break;
-                case MCP_ASSET_COUNT:
-                    usage = calculateMCPAssets();
-                    break;
-                case AI_ASSET_COUNT:
-                    usage = calculateGenAiAssets();
-                    break;
-                case CUSTOM_TESTS:
-                    usage = calculateCustomTests(usageMetric);
-                    break;
-                case TEST_RUNS:
-                    usage = calculateTestRuns(usageMetric);
-                    break;
-                case ACTIVE_ACCOUNTS:
-                    usage = calculateActiveAccounts(usageMetric);
-                    break;
-                default:
-                    usage = 0;
-                    break;
-            }
+        if (metricType == null) {
+            throw new IllegalArgumentException("usage metric has no metric type");
         }
 
-        loggerMaker.infoAndAddToDb("measured "+metricType+": " + usage +" for account: "+ Context.accountId.get() +" epoch: " + usageMetric.getMeasureEpoch(), LoggerMaker.LogDb.DASHBOARD);
+        switch (metricType) {
+            case ACTIVE_ENDPOINTS:
+                usage = calculateActiveEndpoints();
+                break;
+            case AI_ASSET_COUNT:
+                usage = calculateAgenticAssets();
+                break;
+            case ENDPOINT_ASSET_COUNT:
+                usage = calculateEndpointAssets();
+                break;
+            case CUSTOM_TESTS:
+                usage = calculateCustomTests(usageMetric);
+                break;
+            case TEST_RUNS:
+                usage = calculateTestRuns(usageMetric);
+                break;
+            case ACTIVE_ACCOUNTS:
+                usage = calculateActiveAccounts(usageMetric);
+                break;
+            default:
+                // includes the retired MCP_ASSET_COUNT
+                throw new IllegalArgumentException(metricType + " is not a measured metric");
+        }
+
+        loggerMaker.infoAndAddToDb("measured "+metricType+": " + usage +" for account: "+ Context.accountId.get() +" epoch: " + usageMetric.getMeasureEpoch() + " duration: " + (System.currentTimeMillis() - startMs) + "ms", LoggerMaker.LogDb.DASHBOARD);
 
         usageMetric.setUsage(usage);
-    }      
+    }
 
 }

@@ -10,6 +10,7 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.filter.MergedUrls;
@@ -1908,7 +1909,7 @@ public class APICatalogSync {
     int counter = 0;
     List<String> partnerIpsList = new ArrayList<>();
     
-    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit apiSyncLimit, SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit, HttpResponseParams.Source source) {
+    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit apiSyncLimit, FeatureAccess aiAssetAccess, HttpResponseParams.Source source) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
@@ -1937,15 +1938,15 @@ public class APICatalogSync {
 
             Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
 
-            Pair<SyncLimit, MetricTypes> syncLimitPair = getSyncLimitForApiCollection(
-                apiCollectionMap.get(apiCollectionId), apiSyncLimit,
-                mcpAssetsSyncLimit, aiAssetsSyncLimit);
+            Pair<SyncLimit, MetricTypes> syncLimitPair = SyncLimitPolicy.forCollection(
+                apiCollectionMap.get(apiCollectionId), apiSyncLimit, aiAssetAccess);
 
             SyncLimit syncLimit = syncLimitPair.getFirst();
 
             if (syncLimit.checkLimit && !demosAndDeactivatedCollections.contains(apiCollectionId)) {
 
                 int deltaUsage = 0;
+                int skippedEndpoints = 0;
                 Iterator<Entry<URLStatic, RequestTemplate>> staticUrlIterator = deltaCatalog.getStrictURLToMethods().entrySet().iterator();
                 while (staticUrlIterator.hasNext()) {
                     Entry<URLStatic, RequestTemplate> entry = staticUrlIterator.next();
@@ -1954,6 +1955,7 @@ public class APICatalogSync {
                     if (!existingAPIsInDb.mightContain(checkString)) {
                         if (syncLimit.updateUsageLeftAndCheckSkip()) {
                             staticUrlIterator.remove();
+                            skippedEndpoints++;
                         } else {
                             existingAPIsInDb.put(checkString);
                             deltaUsage++;
@@ -1970,6 +1972,7 @@ public class APICatalogSync {
                     if (!existingAPIsInDb.mightContain(checkString)) {
                         if (syncLimit.updateUsageLeftAndCheckSkip()) {
                             templateUrlIterator.remove();
+                            skippedEndpoints++;
                         } else {
                             existingAPIsInDb.put(checkString);
                             deltaUsage++;
@@ -1977,8 +1980,16 @@ public class APICatalogSync {
                     }
                 }
 
-                UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(syncLimitPair.getSecond(),
-                    Context.accountId.get(), deltaUsage);
+                if (skippedEndpoints > 0) {
+                    loggerMaker.infoAndAddToDb("Limit reached for account " + Context.accountId.get() + ", skipped "
+                        + skippedEndpoints + " new endpoints in collection " + apiCollectionId, LogDb.RUNTIME);
+                }
+
+                // Only endpoint-counted metrics report endpoint deltas; asset metrics are measured by the usage cron.
+                if (syncLimitPair.getSecond() != null) {
+                    UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(syncLimitPair.getSecond(),
+                        Context.accountId.get(), deltaUsage);
+                }
             }
 
             /*
@@ -2084,36 +2095,6 @@ public class APICatalogSync {
         }
         return allCollections;
     }
-
-    private Pair<SyncLimit, MetricTypes> getSyncLimitForApiCollection(ApiCollection apiCollection, SyncLimit apiSyncLimit,
-        SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit) {
-
-        if (apiCollection == null) {
-            return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
-        }
-
-        // For agentic billing: Use combined limit that respects both MCP and GenAI limits
-        if (apiCollection.isMcpCollection()) {
-            // Get combined limit that ensures both MCP and GenAI limits are respected
-            SyncLimit combinedLimit = com.akto.billing.UsageMetricUtils.getCombinedAgenticSyncLimit(Context.accountId.get());
-            if (combinedLimit.checkLimit) {
-                return new Pair<>(combinedLimit, MetricTypes.MCP_ASSET_COUNT);
-            }
-            return new Pair<>(mcpAssetsSyncLimit, MetricTypes.MCP_ASSET_COUNT);
-        }
-
-        if (apiCollection.isGenAICollection()) {
-            // Get combined limit that ensures both MCP and GenAI limits are respected
-            SyncLimit combinedLimit = com.akto.billing.UsageMetricUtils.getCombinedAgenticSyncLimit(Context.accountId.get());
-            if (combinedLimit.checkLimit) {
-                return new Pair<>(combinedLimit, MetricTypes.AI_ASSET_COUNT);
-            }
-            return new Pair<>(aiAssetsSyncLimit, MetricTypes.AI_ASSET_COUNT);
-        }
-
-        return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
-    }
-
 
     public APICatalog getDelta(int apiCollectionId) {
         return this.delta.get(apiCollectionId);
