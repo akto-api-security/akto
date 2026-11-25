@@ -414,11 +414,13 @@ function HomeDashboard() {
 
         // Only fetch MCP data if not in API Security category
         const loadMcp = !isApiSecurityCategory() && canCall('api/fetchMcpPostureCounts')
+        // the top applications card is commented out in the layout below, so skip its full-history query until the card is back
+        const showMcpTopApplications = false
         if (loadMcp) {
             apiPromises.push(
                 api.fetchMcpPostureCounts(),
                 canCall('api/fetchMcpPostureData') ? api.fetchMcpPostureData('RECENT_ALERTS', 0, 2) : Promise.reject(new Error('not allowed')),
-                canCall('api/fetchMcpPostureData') ? api.fetchMcpPostureData('TOP_APPLICATIONS', 0, 3) : Promise.reject(new Error('not allowed'))
+                showMcpTopApplications && canCall('api/fetchMcpPostureData') ? api.fetchMcpPostureData('TOP_APPLICATIONS', 0, 3) : Promise.reject(new Error('not shown'))
             );
         }
 

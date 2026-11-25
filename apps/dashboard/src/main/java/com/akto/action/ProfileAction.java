@@ -46,6 +46,100 @@ public class ProfileAction extends UserAction {
 
     private int accountId;
 
+    // the filter runs meta for page loads and /api calls, only page loads render its output
+    private static boolean isApiCall(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        return uri != null && uri.startsWith("/api/");
+    }
+
+    // integration and WAF flags only feed the page-load window vars, so they are loaded here and skipped for /api calls
+    private static BasicDBObject loadAccountFlags(int sessionAccId) {
+        boolean jiraIntegrated = false;
+        try {
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            if (jiraIntegration != null) {
+                jiraIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
+        boolean azureBoardsIntegrated = false;
+        try {
+            long documentCount = AzureBoardsIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                azureBoardsIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
+
+        boolean servicenowIntegrated = false;
+        try {
+            long documentCount = ServiceNowIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                servicenowIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
+        boolean devrevIntegrated = false;
+        try {
+            long documentCount = DevRevIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                devrevIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
+        boolean linearIntegrated = false;
+        try {
+            long documentCount = LinearIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                linearIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
+        boolean portIOIntegrated = false;
+        try {
+            long documentCount = PortIOIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                portIOIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
+        boolean wizIntegrated = false;
+        try {
+            long documentCount = WizIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                wizIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
+        long awsWafCount = ConfigsDao.instance.count(Filters.and(
+                Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, sessionAccId),
+                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.AWS_WAF.name())
+        ));
+
+        long cloudflareWafCount = ConfigsDao.instance.count(Filters.and(
+                Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, sessionAccId),
+                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
+        ));
+
+        return new BasicDBObject()
+                .append("jiraIntegrated", jiraIntegrated)
+                .append("azureBoardsIntegrated", azureBoardsIntegrated)
+                .append("servicenowIntegrated", servicenowIntegrated)
+                .append("devrevIntegrated", devrevIntegrated)
+                .append("linearIntegrated", linearIntegrated)
+                .append("portIOIntegrated", portIOIntegrated)
+                .append("wizIntegrated", wizIntegrated)
+                .append("isAwsWafIntegrated", awsWafCount != 0)
+                .append("isCloudflareWafIntegrated", cloudflareWafCount != 0);
+    }
+
     @Override
     public String execute() {
 
@@ -124,70 +218,6 @@ public class ProfileAction extends UserAction {
         RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
         RBAC userRbac = RBACDao.getCurrentRBACForUser(user.getId(), Context.accountId.get());
 
-        boolean jiraIntegrated = false;
-        try {
-            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-            if (jiraIntegration != null) {
-                jiraIntegrated = true;
-            }
-        } catch (Exception e) {
-        }
-
-        boolean azureBoardsIntegrated = false;
-        try {
-            long documentCount = AzureBoardsIntegrationDao.instance.estimatedDocumentCount();
-            if (documentCount > 0) {
-                azureBoardsIntegrated = true;
-            }
-        } catch (Exception e) {
-        }
-
-
-        boolean servicenowIntegrated = false;
-        try {
-            long documentCount = ServiceNowIntegrationDao.instance.estimatedDocumentCount();
-            if (documentCount > 0) {
-                servicenowIntegrated = true;
-            }
-        } catch (Exception e) {
-        }
-
-        boolean devrevIntegrated = false;
-        try {
-            long documentCount = DevRevIntegrationDao.instance.estimatedDocumentCount();
-            if (documentCount > 0) {
-                devrevIntegrated = true;
-            }
-        } catch (Exception e) {
-        }
-
-        boolean linearIntegrated = false;
-        try {
-            long documentCount = LinearIntegrationDao.instance.estimatedDocumentCount();
-            if (documentCount > 0) {
-                linearIntegrated = true;
-            }
-        } catch (Exception e) {
-        }
-
-        boolean portIOIntegrated = false;
-        try {
-            long documentCount = PortIOIntegrationDao.instance.estimatedDocumentCount();
-            if (documentCount > 0) {
-                portIOIntegrated = true;
-            }
-        } catch (Exception e) {
-        }
-
-        boolean wizIntegrated = false;
-        try {
-            long documentCount = WizIntegrationDao.instance.estimatedDocumentCount();
-            if (documentCount > 0) {
-                wizIntegrated = true;
-            }
-        } catch (Exception e) {
-        }
-
         InitializerListener.insertStateInAccountSettings(accountSettings);
 
         Organization organization = OrganizationsDao.instance.findOne(
@@ -203,16 +233,6 @@ public class ProfileAction extends UserAction {
         if(organization != null && organization.getNameLastUpdate() > 0) {
             orgName = organization.getName();
         }
-
-        long awsWafCount = ConfigsDao.instance.count(Filters.and(
-                Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, sessionAccId),
-                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.AWS_WAF.name())
-        ));
-
-        long cloudflareWafCount = ConfigsDao.instance.count(Filters.and(
-                Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, sessionAccId),
-                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
-        ));
 
         BasicDBObject scopeRoleMapping = new BasicDBObject();
         // base role per product (custom roles resolved), so the UI checks the role of the product it is in
@@ -240,25 +260,21 @@ public class ProfileAction extends UserAction {
                 .append("dashboardMode", DashboardMode.getDashboardMode())
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
                 .append("airgapped", "true".equalsIgnoreCase(System.getenv("AIRGAPPED")))
-                .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
-                .append("jiraIntegrated", jiraIntegrated)
-                .append("azureBoardsIntegrated", azureBoardsIntegrated)
-                .append("servicenowIntegrated", servicenowIntegrated)
-                .append("devrevIntegrated", devrevIntegrated)
-                .append("linearIntegrated", linearIntegrated)
-                .append("portIOIntegrated", portIOIntegrated)
-                .append("wizIntegrated", wizIntegrated)
                 .append("userRole", userRole!=null ?userRole.toString().toUpperCase(): "")
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName)
-                .append("isAwsWafIntegrated", awsWafCount != 0)
-                .append("isCloudflareWafIntegrated", cloudflareWafCount != 0)
                 .append("scopeRoleMapping", scopeRoleMapping)
                 .append("scopeBaseRoleMapping", scopeBaseRoleMapping)
                 .append("scopeThreatAccess", scopeThreatAccess);
+
+        // page loads render these into window vars and nothing reads them on /api calls, so skip 10 queries incl. a users scan there
+        if (!isApiCall(request)) {
+            userDetails.putAll((Map<String, Object>) loadAccountFlags(sessionAccId));
+            userDetails.append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()));
+        }
 
         boolean inviteDisabledForSSO = com.akto.utils.Utils.allowNewUserInviteViaDashboard(sessionAccId, user);
         userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);
