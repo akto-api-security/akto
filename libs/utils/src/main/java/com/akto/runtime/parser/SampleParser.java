@@ -29,6 +29,46 @@ public class SampleParser {
     private static final Gson gson = new Gson();
 
     /**
+     * Rewrites bot-name to the calling agent for Bedrock traffic that names one.
+     *
+     * Applications that invoke a model directly own no Bedrock Agent resource, so the pipeline
+     * falls back to naming them after the IAM role they assumed. A role is shared by every
+     * agent an application runs, which collapses all of them into one collection and one graph
+     * node. requestMetadata.agent_name is the application telling us which agent made this
+     * particular call, so it is the better identity whenever it is present.
+     *
+     * Done here rather than at each reader because bot-name has several consumers (collection
+     * naming, the service graph) and the tag string this returns is the same one that becomes
+     * both the record's tags and its injected headers - so they cannot disagree.
+     *
+     * Returns the original string unchanged for every other source, and whenever the tag is
+     * absent, empty, or the JSON cannot be parsed.
+     */
+    static String normalizeAgenticTags(String tagsJson) {
+        if (tagsJson == null || tagsJson.isEmpty()) {
+            return tagsJson;
+        }
+        try {
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return tagsJson;
+            }
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            if (!Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(source)) {
+                return tagsJson;
+            }
+            String agentName = tagsMap.get(Constants.AI_AGENT_TAG_REQUEST_METADATA_AGENT_NAME);
+            if (agentName == null || agentName.trim().isEmpty()) {
+                return tagsJson;
+            }
+            tagsMap.put(Constants.AI_AGENT_TAG_BOT_NAME, agentName.trim());
+            return gson.toJson(tagsMap);
+        } catch (Exception e) {
+            return tagsJson;
+        }
+    }
+
+    /**
      * Carries Bedrock's conversation and turn identifiers into the x-akto-installer-* headers
      * that AgentQueryRecord reads, so Traces groups this traffic like every other agentic source.
      *
@@ -176,7 +216,9 @@ public class SampleParser {
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
 
         // JSON string of K8 POD tags
-        String tags = (String) json.getOrDefault("tag", "");
+        // Before anything reads it: this one string becomes the record's tags AND the
+        // x-akto-k8s-* headers below, so normalising here keeps every consumer in agreement.
+        String tags = normalizeAgenticTags((String) json.getOrDefault("tag", ""));
         List<String> parentMcpToolNames;
         try {
             parentMcpToolNames = (List<String>) json.get("parentMcpToolNames");

@@ -160,6 +160,28 @@ public class Constants {
     // that actually identifies what the gateway's role can act on.
     public static final String AI_AGENT_TAG_GATEWAY_ROLE = "gateway-role-resources";
     /**
+     * The calling agent behind a gateway request, resolved from the request principal.
+     * A gateway fronts many agents, so this — not "gateway-name" — is what tells them
+     * apart, and it is the only source for the AI Agent node when an MCP target has
+     * already claimed "bot-name".
+     */
+    public static final String AI_AGENT_TAG_AGENT_NAME = "agent-name";
+    /** The gateway's own execution role, as an ARN; the role name is its last path segment. */
+    public static final String AI_AGENT_TAG_GATEWAY_EXECUTION_ROLE_ARN = "gateway-execution-role-arn";
+    // The gateway's policy names. Inline first: an AgentCore gateway service role typically
+    // carries no attached managed policies and keeps every grant inline, so the attached
+    // list is empty exactly when the inline one is worth showing.
+    public static final String AI_AGENT_TAG_GATEWAY_INLINE_POLICIES = "gateway-role-inline-policies";
+    public static final String AI_AGENT_TAG_GATEWAY_POLICIES = "gateway-role-policies";
+    /**
+     * Caller-supplied requestMetadata, forwarded by the Bedrock log processor under a fixed
+     * prefix so an application's own keys can never collide with a tag the pipeline sets.
+     * agent_name is the agent that made this particular call; orchestrator_name is the
+     * top-level agent that owns the conversation (often, but not always, the same one).
+     */
+    public static final String AI_AGENT_TAG_REQUEST_METADATA_AGENT_NAME = "request-metadata-agent_name";
+    public static final String AI_AGENT_TAG_REQUEST_METADATA_ORCHESTRATOR_NAME = "request-metadata-orchestrator_name";
+    /**
      * The conversation identifier, as delivered by a log-processing pipeline that has no
      * request of its own to attach headers to. Already normalised by the producer from
      * whichever spelling the caller used (session_id, sessionId, conversationId, ...), so
