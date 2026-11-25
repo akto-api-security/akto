@@ -146,6 +146,9 @@ public class BackwardCompatibility {
     public static final String MIGRATE_TEST_SCRIPTS_TO_LIBRARY = "migrateTestScriptsToLibrary";
     private int migrateTestScriptsToLibrary;
 
+    public static final String BACKFILL_INFERENCE_HOOK_AGENT_USERS = "backfillInferenceHookAgentUsers";
+    private int backfillInferenceHookAgentUsers;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,

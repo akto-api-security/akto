@@ -5,6 +5,7 @@ import com.akto.action.AgenticObserveAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.AuthTokensDao;
+import com.akto.listener.InitializerListener;
 import com.akto.dao.context.Context;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
@@ -1039,6 +1040,7 @@ public class ModuleInfoAction extends UserAction {
             agenticUsers = new ArrayList<>();
             return SUCCESS.toUpperCase();
         }
+        InitializerListener.ensureInferenceHookAgentUsersBackfilled();
         // The list is the plain union of both identity sources — every agent_users doc plus every
         // username reporting a device in module_info — deduped by username. A user with no device
         // in either source still belongs in the list: they are a real identity that can be tagged,

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -13,6 +14,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.MCollection;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.testing.config.TestScriptsDao;
@@ -23,6 +25,9 @@ import com.akto.dto.DeviceTag;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.traffic.SampleData;
+import com.akto.parsers.HttpCallParser;
+import com.akto.service.atlas.AtlasPeopleService;
 import com.akto.util.Constants;
 import com.akto.testing.scripts.LegacyTestScriptAdapter;
 import com.akto.util.Pair;
@@ -303,6 +308,53 @@ public class BackwardCompatibilityUtils {
             Filters.and(collFilter, Filters.elemMatch(ApiInfo.TAGS_LIST, Filters.eq(CollectionTags.KEY_NAME, "referer"))),
             Updates.pull(ApiInfo.TAGS_LIST, Filters.eq(CollectionTags.KEY_NAME, "referer"))
         );
+    }
+
+    private static final String INSTALLER_USER_EMAIL_HEADER = "x-akto-installer-user_email";
+    private static final String INFERENCE_HOOKS_BACKFILL_SOURCE = "inference-hooks-backfill";
+    private static final int HOOK_COLLECTION_BATCH_SIZE = 50;
+
+    public static int backfillInferenceHookAgentUsers() {
+        List<Integer> hookCollectionIds = ApiCollectionsDao.instance.findAll(
+            Filters.eq(ApiCollection.TAGS_STRING + "." + CollectionTags.KEY_NAME, AtlasPeopleService.INFERENCE_HOOKS_TAG_KEY),
+            Projections.include(Constants.ID)
+        ).stream().map(ApiCollection::getId).collect(Collectors.toList());
+
+        Set<String> emails = new LinkedHashSet<>();
+        for (int i = 0; i < hookCollectionIds.size(); i += HOOK_COLLECTION_BATCH_SIZE) {
+            List<Integer> batch = hookCollectionIds.subList(i, Math.min(i + HOOK_COLLECTION_BATCH_SIZE, hookCollectionIds.size()));
+            for (SampleData sampleData : SampleDataDao.instance.findAll(
+                    Filters.in("_id.apiCollectionId", batch), Projections.slice(SampleData.SAMPLES, 1))) {
+                String email = installerUserEmail(sampleData.getSamples());
+                if (email != null) emails.add(email);
+            }
+        }
+
+        List<AgenticUsers> users = new ArrayList<>();
+        for (String email : emails) {
+            String userName = AgentUsersDao.deriveUsernameFromEmail(email);
+            if (userName == null) continue;
+            AgenticUsers user = new AgenticUsers();
+            user.setUserId(email);
+            user.setUserEmail(email);
+            user.setUserName(userName);
+            user.setLastUpdatedBy(INFERENCE_HOOKS_BACKFILL_SOURCE);
+            users.add(user);
+        }
+        AgentUsersDao.instance.bulkUpsertExternalIdentities(users);
+        return users.size();
+    }
+
+    private static String installerUserEmail(List<String> samples) {
+        if (samples == null || samples.isEmpty()) return null;
+        try {
+            List<String> values = HttpCallParser.parseKafkaMessage(samples.get(0)).getRequestParams().getHeaders().get(INSTALLER_USER_EMAIL_HEADER);
+            if (values == null || values.isEmpty() || values.get(0) == null) return null;
+            String email = values.get(0).trim();
+            return email.isEmpty() ? null : email;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
 }
