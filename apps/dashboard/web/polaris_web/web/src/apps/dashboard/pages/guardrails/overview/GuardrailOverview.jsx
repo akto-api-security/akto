@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Badge, Banner, Box, Button, HorizontalGrid, HorizontalStack, VerticalStack } from '@shopify/polaris'
+import { Banner, Box, Button, HorizontalGrid, HorizontalStack, VerticalStack } from '@shopify/polaris'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
@@ -198,13 +198,10 @@ function GuardrailOverview() {
     return (
         <PageWithMultipleCards
             title={
-                <HorizontalStack gap="2" blockAlign="center">
-                    <TitleWithInfo
-                        titleText="Guardrail overview"
-                        tooltipContent="Violations caught by your guardrail policies across your agents, and what needs attention first."
-                    />
-                    <Badge status="info">Beta</Badge>
-                </HorizontalStack>
+                <TitleWithInfo
+                    titleText="Guardrail overview"
+                    tooltipContent="Violations caught by your guardrail policies across your agents, and what needs attention first."
+                />
             }
             isFirstPage
             secondaryActions={

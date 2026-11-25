@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, HorizontalGrid, VerticalStack } from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import { CustomersMajor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import AskBar from "@/apps/dashboard/components/shared/AskBar";
@@ -157,7 +157,6 @@ function AgenticDiscoveryOverview() {
     return (
         <PageWithMultipleCards
             title="Agentic discovery"
-            titleMetadata={<Badge status="info">Beta</Badge>}
             subtitle={`Every AI agent, MCP server, skill and browser AI app${fleet.managedDevices === null ? "" : ` on ${observeFunc.formatNumberWithCommas(fleet.managedDevices)} managed devices`}`}
             isFirstPage
             secondaryActions={<DiscoveryHeaderActions filters={filters} onExport={exportTools} exporting={exporting} />}
