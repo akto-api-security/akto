@@ -309,7 +309,7 @@ export default function LeftNav() {
                     },
                     // { label: "Users and devices", onClick: () => { navigate("/dashboard/observe/users-and-devices"); handleSelect("dashboard_observe_users_and_devices"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_users_and_devices" },
                     {
-                        label: "Devices & Employees",
+                        label: "Users",
                         onClick: () => {
                             navigate("/dashboard/observe/endpoints");
                             handleSelect("dashboard_observe_endpoints");
