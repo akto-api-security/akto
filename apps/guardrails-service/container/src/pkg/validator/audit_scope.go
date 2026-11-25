@@ -38,19 +38,25 @@ type rejectedAgent struct {
 	scope auditScope
 }
 
-// auditDecisions holds the browser LLM sites and AI agents blocked in Audit Data.
+// auditDecisions holds the browser LLM sites, AI agents and skills blocked in Audit Data.
 type auditDecisions struct {
-	llmSites map[string]auditScope    // site -> scope
-	agents   map[string]rejectedAgent // agent name (tag value / host segment) -> row
+	llmSites map[string]auditScope      // site -> scope
+	agents   map[string]rejectedAgent   // agent name (tag value / host segment) -> row
+	skills   map[string][]rejectedSkill // lowercase skill name -> rejected rows, one per agent
 }
 
-// rejectedAuditDecisions reads Rejected browser-llm / ai-agent rows, which types.AuditPolicy can't hold.
+// rejectedAuditDecisions reads Rejected browser-llm / ai-agent / skill rows, which types.AuditPolicy can't hold.
 func rejectedAuditDecisions(rawAuditPolicies []byte) auditDecisions {
-	decisions := auditDecisions{llmSites: make(map[string]auditScope), agents: make(map[string]rejectedAgent)}
+	decisions := auditDecisions{
+		llmSites: make(map[string]auditScope),
+		agents:   make(map[string]rejectedAgent),
+		skills:   make(map[string][]rejectedSkill),
+	}
 	var resp struct {
 		McpAuditInfoList []struct {
 			Type         string   `json:"type"`
 			ResourceName string   `json:"resourceName"`
+			McpHost      string   `json:"mcpHost"`
 			Remarks      string   `json:"remarks"`
 			RawValues    []string `json:"rawValues"`
 			auditScope
@@ -67,6 +73,11 @@ func rejectedAuditDecisions(rawAuditPolicies []byte) auditDecisions {
 		case strings.EqualFold(r.Type, auditTypeBrowserLLM):
 			if site := strings.ToLower(strings.TrimSpace(r.ResourceName)); site != "" {
 				decisions.llmSites[site] = r.auditScope
+			}
+		case strings.EqualFold(r.Type, auditTypeAgentSkill):
+			if skill := strings.ToLower(strings.TrimSpace(r.ResourceName)); skill != "" {
+				decisions.skills[skill] = append(decisions.skills[skill],
+					rejectedSkill{agent: skillAgentKey(r.McpHost), scope: r.auditScope})
 			}
 		case strings.EqualFold(r.Type, auditTypeAIAgent):
 			for _, v := range r.RawValues {
