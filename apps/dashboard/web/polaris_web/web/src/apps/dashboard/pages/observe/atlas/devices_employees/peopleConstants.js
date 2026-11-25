@@ -86,6 +86,8 @@ export const RISK_EXPLANATION = "The highest " + mapLabel('API', getDashboardCat
 
 export const INFERENCE_HOOKS_LABEL = "Claude inference hooks";
 export const INFERENCE_HOOKS_OPTION = "hook:inference-hooks";
+export const CLAUDE_COMPLIANCE_LABEL = "Claude Compliance";
+export const CLAUDE_COMPLIANCE_OPTION = "compliance:claude";
 
 export const EMPLOYEE_CHIPS = [
     { key: "usesAi", label: "Uses AI tools" },
@@ -172,6 +174,7 @@ export const EMPTY_PEOPLE_FILTERS = {
     agentIssues: false,
     usesAi: false,
     inferenceHooksOnly: false,
+    complianceOnly: false,
     agentActive: false,
     guardrailModes: [],
     riskMin: 0,

@@ -122,6 +122,7 @@ public class ModuleInfoAction extends UserAction {
     @Setter private boolean agentActive;
     @Setter private boolean usesAi;
     @Setter private boolean inferenceHooksOnly;
+    @Setter private boolean complianceOnly;
     @Setter private List<String> guardrailModes;
     @Setter private double riskMin;
     @Setter private double riskMax = AtlasPeopleService.RISK_MAX;
@@ -412,6 +413,7 @@ public class ModuleInfoAction extends UserAction {
                 .append("os", additionalData.get("os"))
                 .append("platform", additionalData.get("platform"))
                 .append("browserName", additionalData.get("browserName"))
+                .append("provider", additionalData.get("provider"))
                 .append(ModuleInfo.LAST_HEARTBEAT_RECEIVED, module.getLastHeartbeatReceived())
                 .append(ModuleInfo.CURRENT_VERSION, module.getCurrentVersion());
     }
@@ -481,6 +483,7 @@ public class ModuleInfoAction extends UserAction {
         query.agentActive = agentActive;
         query.usesAi = usesAi;
         query.inferenceHooksOnly = inferenceHooksOnly;
+        query.complianceOnly = complianceOnly;
         query.guardrailModes = guardrailModes;
         query.teams = teams == null ? null : teams.stream().map(team -> team.trim().toLowerCase()).collect(Collectors.toList());
         query.tagPairs = tagPairs;
