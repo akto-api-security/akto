@@ -905,7 +905,18 @@ function GuardrailPolicies() {
                         </Popover.Pane>
                     </Popover>
                     <AllowedAction allowed={canCall('api/createGuardrailPolicy')}>
-                        <Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>
+                        <Button
+                            primary
+                            onClick={() => {
+                                if (func.isDemoAccount()) {
+                                    navigate('/dashboard/guardrails/policies/new');
+                                    return;
+                                }
+                                setShowCreateModal(true);
+                            }}
+                        >
+                            Create Guardrail
+                        </Button>
                     </AllowedAction>
                 </HorizontalStack>
             }
