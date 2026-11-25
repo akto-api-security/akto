@@ -71,6 +71,8 @@ export default function LeftNav() {
     useEffect(() => {
         const observeId = currPathString.replace(/-/g, "_");
         if (LINKED_NAV_IDS.has(observeId)) setLeftNavSelected(observeId);
+        // An agent opened from Inventory keeps Inventory highlighted, also after a refresh.
+        else if (observeId.startsWith("dashboard_observe_agent_inventory_agent_")) setLeftNavSelected("dashboard_observe_agent_inventory");
     }, [currPathString]);
 
     const handleAccountChange = useCallback(async (selected) => {
@@ -317,7 +319,9 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_endpoints",
-                    }] : [{
+                    }] : dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [
+                    // Argus lists its assets under Inventory; Collections stays for the other products.
+                    ] : [{
                         label: "Collections",
                         onClick: () => {
                             navigate("/dashboard/observe/inventory");
@@ -635,7 +639,7 @@ export default function LeftNav() {
                     url: "#",
                     key: "7",
                     subNavigationItems: [
-                        ...(dashboardCategory === "Endpoint Security" && func.isAktoUser() ? [{
+                        ...(dashboardCategory === "Endpoint Security" ? [{
                             label: "Overview",
                             requires: pageRequires("/dashboard/guardrails/atlas-overview"),
                             badge: <Badge status="info">Beta</Badge>,
@@ -657,7 +661,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_overview",
                         }] : []),
-                        ...((dashboardCategory === "API Security" || (dashboardCategory === "Endpoint Security" && !func.isAktoUser())) ? [{
+                        ...(dashboardCategory === "API Security" ? [{
                             label: "Dashboard",
                             requires: pageRequires("/dashboard/protection/threat-dashboard"),
                             onClick: () => {

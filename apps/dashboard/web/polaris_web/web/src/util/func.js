@@ -111,12 +111,14 @@ const func = {
   categoryMapping: categoryMapping,
   agenticCategoryMapping: agenticCategoryMapping,
   // `action` is optional: { content, onAction } adds a button to the toast (e.g. Undo).
-  setToast (isActive, isError, message, action) {
+  // duration (ms) is optional; without it the toast uses the dashboard's default
+  setToast (isActive, isError, message, action, duration) {
     Store.getState().setToastConfig({
           isActive: isActive,
           isError: isError,
           message: message,
-          action: action
+          action: action,
+          duration: duration
       })
   },
   formatJsonForEditor(data){
@@ -2417,6 +2419,10 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   isUserAdmin(){
     const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
     return (scopeRole || window.USER_ROLE) === 'ADMIN'
+  },
+  // Logs are for admins and Akto users; the backend enforces the same rule on the log endpoints
+  canViewLogs(){
+    return this.currentProductBaseRole() === 'ADMIN' || this.isAktoUser()
   },
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();

@@ -76,12 +76,13 @@ export const apiAgenticCategories = [
     "INPUT_AGENTIC",
 ]
 
-export function getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap){
+// includeMcp=false (no MCP collection under test) drops the MCP categories
+export function getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap, includeMcp = true){
     let categoriesName = Object.keys(categoryMap);
     if(dashboardCategory === "MCP Security"){
         categoriesName = mcpCategories;
     } else if (dashboardCategory === "Agentic Security") {
-        categoriesName = [...llmCategories, ...mcpCategories, ...apiAgenticCategories];
+        categoriesName = [...llmCategories, ...(includeMcp ? mcpCategories : []), ...apiAgenticCategories];
     }
     return categoriesName;
 }

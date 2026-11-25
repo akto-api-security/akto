@@ -36,8 +36,8 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/roles")
     }] : []
 
-    const logsArr = window?.IS_SAAS !== 'true' ||
-        (window?.USER_NAME && (window?.USER_NAME.includes("akto") || window?.USER_NAME.includes("mongodb"))) ? [{
+    // Akto users and admins; the backend enforces the same rule on the log endpoints
+    const logsArr = func.canViewLogs() ? [{
             label: 'Logs',
             icon: ListFilledMajor,
             selected: page === "logs",

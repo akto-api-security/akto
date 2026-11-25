@@ -5,7 +5,7 @@ import lombok.Setter;
 import org.bson.types.ObjectId;
 
 /**
- * Per-account config for exporting Atlas traces (OTLP JSON) to the customer's own S3 bucket.
+ * Per-account config for exporting Atlas or Argus traces (OTLP JSON) to the customer's own S3 bucket.
  * Written by the dashboard quick-start connector, read by the ATLAS_S3_EXPORT recurring job.
  */
 @Getter
@@ -25,6 +25,7 @@ public class AtlasS3ExportIntegration {
     public static final String CREATED_TS = "createdTs";
     public static final String UPDATED_TS = "updatedTs";
     public static final String EXPORT_JOB_ID = "exportJobId";
+    public static final String SOURCE = "source";
 
     // How Akto authenticates to the customer's bucket.
     public static final String AUTH_TYPE_ROLE = "ROLE";
@@ -41,6 +42,8 @@ public class AtlasS3ExportIntegration {
     private String accessKeyId;
     private String secretAccessKey;
     private ObjectId exportJobId;
+    // Dashboard context the export belongs to: ENDPOINT (Atlas traces) or AGENTIC (Argus traces).
+    private String source;
 
     private int createdTs;
     private int updatedTs;

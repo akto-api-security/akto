@@ -19,6 +19,7 @@ import threatDetectionRequests from "./threat_detection/api";
 import SessionStore from "../../main/SessionStore";
 import { updateThreatFiltersStore } from "./threat_detection/utils/threatFilters";
 import { loadPermissions } from "@/util/permissions";
+import { isAgenticSecurityCategory } from "../../main/labelHelper";
 
 // A toast with a button stays up longer so there is time to use it.
 const TOAST_WITH_ACTION_MS = 10000;
@@ -124,7 +125,8 @@ function Dashboard() {
         // the pre-existing Inventory exclusion below. Landing here first (direct URL/refresh) would
         // otherwise fire this mount-once effect's full, unpaginated getAllCollections() (tens of MB
         // on large accounts) purely to populate maps this page never reads.
-        const skipsAllCollectionsFetch = location.pathname === "/dashboard/observe/inventory"
+        // Argus redirects the Collections URL to its inventory, which has no such fetch of its own, so it is not skipped there.
+        const skipsAllCollectionsFetch = (location.pathname === "/dashboard/observe/inventory" && !isAgenticSecurityCategory())
             || location.pathname === "/dashboard/observe/agentic-assets-legacy";
         if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && !skipsAllCollectionsFetch){
             fetchAllCollections()
@@ -182,7 +184,7 @@ function Dashboard() {
     }
 
     const toastMarkup = toastConfig.isActive ? (
-        <Toast content={toastConfig.message} error={toastConfig.isError} action={toastConfig.action} onDismiss={disableToast} duration={toastConfig.action ? TOAST_WITH_ACTION_MS : 2000} />
+        <Toast content={toastConfig.message} error={toastConfig.isError} action={toastConfig.action} onDismiss={disableToast} duration={toastConfig.duration || (toastConfig.action ? TOAST_WITH_ACTION_MS : 2000)} />
     ) : null;
 
     const confirmationModalConfig = Store(state => state.confirmationModalConfig)

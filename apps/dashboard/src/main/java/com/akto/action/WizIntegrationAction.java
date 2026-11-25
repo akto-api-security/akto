@@ -132,6 +132,35 @@ public class WizIntegrationAction extends UserAction {
 
     @Getter
     @Setter
+    private boolean statusSyncEnabled;
+
+    public String updateWizStatusSync() {
+        WizIntegration existingIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
+        if (existingIntegration == null) {
+            addActionError("Wiz is not integrated.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        try {
+            WizIntegrationDao.instance.getMCollection().updateOne(
+                new BasicDBObject(),
+                Updates.combine(
+                    Updates.set(WizIntegration.STATUS_SYNC_ENABLED, statusSyncEnabled),
+                    Updates.set(WizIntegration.UPDATED_TS, Context.now())
+                )
+            );
+            logger.infoAndAddToDb("Wiz status sync set to " + statusSyncEnabled + " for accountId: " + Context.accountId.get());
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error updating Wiz status sync: " + e.getMessage());
+            addActionError("Failed to update Wiz status sync. Please try again.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    @Getter
+    @Setter
     private WizIntegration wizIntegration;
 
     @Getter @Setter

@@ -73,7 +73,7 @@ function AtlasS3ExportConnector() {
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
-                Export Atlas traces (guardrail hits, models, token usage, prompts and responses) in OpenTelemetry (OTLP JSON, gzip) format to your own S3 bucket.
+                Export traces (guardrail hits, models, token usage, prompts and responses) in OpenTelemetry (OTLP JSON, gzip) format to your own S3 bucket.
             </Text>
             <VerticalStack gap="2">
                 <TextField label="S3 Bucket Name" value={bucketName} onChange={setBucketName} placeholder="my-atlas-traces" requiredIndicator autoComplete="off" />

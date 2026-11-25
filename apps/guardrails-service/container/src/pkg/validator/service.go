@@ -59,8 +59,10 @@ type policyCache struct {
 	rejectedLLMSites map[string]auditScope
 	// rejectedAIAgents maps names of AI agents marked Rejected in Audit Data to their row and scope.
 	rejectedAIAgents map[string]rejectedAgent
-	lastFetched      time.Time
-	mu               sync.RWMutex
+	// rejectedSkills maps skill names marked Rejected in Audit Data to their per-agent rows and scope.
+	rejectedSkills map[string][]rejectedSkill
+	lastFetched    time.Time
+	mu             sync.RWMutex
 }
 
 // collectionTag represents a single key-value tag on a collection
@@ -1127,13 +1129,17 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.ignorePhraseMatchersByPolicy = ignorePhraseMatchersByPolicy
 	s.cache.rejectedLLMSites = decisions.llmSites
 	s.cache.rejectedAIAgents = decisions.agents
+	s.cache.rejectedSkills = decisions.skills
 	s.cache.lastFetched = time.Now()
 
 	s.logger.Info("Policy cache refreshed with ALL policies",
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
-		zap.Time("lastFetched", s.cache.lastFetched),
-		zap.Any("policies", policies))
+		zap.Time("lastFetched", s.cache.lastFetched))
+	// A 0 here means no Rejected AGENT_SKILL rows came back, so no Skill call can be blocked.
+	s.logger.Info("[SkillCheck] rejected skills loaded from audit data",
+		zap.Int("rejectedSkillNamesCount", len(decisions.skills)),
+		zap.Strings("rejectedSkillNames", rejectedSkillNames(decisions.skills)))
 
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
@@ -1978,10 +1984,6 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil, nil, nil, false, nil, nil, nil, auditDecisions{}, err
 	}
 
-	s.logger.Debug("Raw guardrail policies response",
-		zap.Int("size", len(rawGuardrailPolicies)),
-		zap.String("raw", string(rawGuardrailPolicies)))
-
 	// Parse the wrapper object containing guardrailPolicies array
 	var response struct {
 		GuardrailPolicies []*mcp.GuardrailsPolicy `json:"guardrailPolicies"`
@@ -1989,7 +1991,8 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	if err := json.Unmarshal(rawGuardrailPolicies, &response); err != nil {
 		s.logger.Error("Failed to parse guardrail policies",
 			zap.Error(err),
-			zap.String("rawResponse", string(rawGuardrailPolicies)))
+			zap.Int("size", len(rawGuardrailPolicies)),
+			zap.String("rawResponsePreview", string(rawGuardrailPolicies[:min(len(rawGuardrailPolicies), 500)])))
 		return nil, nil, nil, false, nil, nil, nil, auditDecisions{}, fmt.Errorf("failed to parse guardrail policies: %w", err)
 	}
 
@@ -2048,10 +2051,6 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.Int("ruleCount", len(blockedHostRules)),
 		zap.Strings("patterns", mcp.BlockedHostPatterns(blockedHostRules)))
 
-	s.logger.Debug("Raw audit policies response",
-		zap.Int("size", len(rawAuditPolicies)),
-		zap.String("raw", string(rawAuditPolicies)))
-
 	// Parse the wrapper object containing mcpAuditInfoList array
 	var auditResponse struct {
 		McpAuditInfoList []*types.AuditPolicy `json:"mcpAuditInfoList"`
@@ -2059,7 +2058,8 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	if err := json.Unmarshal(rawAuditPolicies, &auditResponse); err != nil {
 		s.logger.Warn("Failed to parse MCP audit info",
 			zap.Error(err),
-			zap.String("rawResponse", string(rawAuditPolicies)))
+			zap.Int("size", len(rawAuditPolicies)),
+			zap.String("rawResponsePreview", string(rawAuditPolicies[:min(len(rawAuditPolicies), 500)])))
 		auditResponse.McpAuditInfoList = []*types.AuditPolicy{}
 	}
 
@@ -2468,7 +2468,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("contextSource", contextSource),
 		zap.Int("policiesCount", len(policies)),
 		zap.Strings("policyNames", policyNames(policies)),
-		zap.Any("policies", policies),
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Create validation context with full request metadata (matching batch flow)
@@ -2529,6 +2528,9 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return blockResult, "", nil
 	}
 	if blockResult := s.checkRejectedAgent(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
+		return blockResult, "", nil
+	}
+	if blockResult := s.checkRejectedSkill(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
 		return blockResult, "", nil
 	}
 

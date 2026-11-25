@@ -31,6 +31,7 @@ export { CLIENT_TAG_ALIASES, getClientTagVariants, resolveClientKey };
 export const PAGE_LIMIT = 100;
 
 export const NEW_LAYOUT_TOOLTIP = "Switch to the new layout for a faster, more focused experience.";
+export const OLD_LAYOUT_TOOLTIP = "Switch back to the old layout.";
 
 export const SKILL_RISK_CACHE_TTL_MS = 2 * 60 * 1000;
 export const AGENTIC_COLLECTIONS_CACHE_TTL_MS = 2 * 60 * 1000;

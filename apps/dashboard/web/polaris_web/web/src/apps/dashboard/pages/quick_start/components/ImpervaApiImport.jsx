@@ -8,6 +8,8 @@ function ImpervaApiImport() {
 
     const [apiId, setApiId] = useState('')
     const [apiKey, setApiKey] = useState('')
+    const [hostFilter, setHostFilter] = useState('')
+    const [pathFilter, setPathFilter] = useState('')
     const [integration, setIntegration] = useState(null)
     const [importJob, setImportJob] = useState(null)
 
@@ -19,7 +21,11 @@ function ImpervaApiImport() {
     }
 
     useEffect(() => {
-        fetchImpervaIntegration().then((response) => setApiId(response?.impervaIntegration?.apiId || ''))
+        fetchImpervaIntegration().then((response) => {
+            setApiId(response?.impervaIntegration?.apiId || '')
+            setHostFilter(response?.impervaIntegration?.hostFilter || '')
+            setPathFilter(response?.impervaIntegration?.pathFilter || '')
+        })
     }, [])
 
     const importActive = importJob?.jobStatus === 'SCHEDULED' || importJob?.jobStatus === 'RUNNING'
@@ -32,7 +38,7 @@ function ImpervaApiImport() {
     }, [importActive])
 
     async function saveImpervaIntegration() {
-        await settingRequests.addImpervaIntegration(apiId, apiKey)
+        await settingRequests.addImpervaIntegration(apiId, apiKey, hostFilter, pathFilter)
         func.setToast(true, false, "Imperva credentials saved. API import will start shortly.")
         setApiKey('')
         fetchImpervaIntegration()
@@ -66,6 +72,10 @@ function ImpervaApiImport() {
             <VerticalStack gap="3">
                 <TextField label="API ID" value={apiId} onChange={setApiId} requiredIndicator />
                 <PasswordTextField label="API Key" field={apiKey} setField={setApiKey} onFunc={true} requiredIndicator />
+                <TextField label="Hostname filter" value={hostFilter} onChange={setHostFilter} placeholder="api.example.com, *.internal.example.com"
+                    helpText="Optional. Only import APIs whose hostname matches one of these comma-separated patterns. Use * as a wildcard." />
+                <TextField label="Path filter" value={pathFilter} onChange={setPathFilter} placeholder="/v1/payments/*, /health"
+                    helpText="Optional. Only import APIs whose path matches one of these comma-separated patterns. Use * as a wildcard." />
                 {integration && <Text color="subdued">{importStatus}</Text>}
                 <ButtonGroup>
                     <Button primary onClick={saveImpervaIntegration} disabled={!apiId?.trim() || !apiKey?.trim()}>Save and import</Button>

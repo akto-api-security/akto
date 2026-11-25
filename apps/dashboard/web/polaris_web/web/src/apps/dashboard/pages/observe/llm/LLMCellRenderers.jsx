@@ -47,14 +47,16 @@ export function ModelIcon({ model, size = 16 }) {
 
 // ── cells ─────────────────────────────────────────────────────────────────────
 
-// Prompt preview for admins; everyone else identifies the row by the id in `idField`.
-export function PreviewCell({ data, idField }) {
+// Prompt preview for admins; everyone else identifies the row by its id - the `idField`
+// field, or `idOf(data)` for a table whose rows are not all keyed by the same field.
+export function PreviewCell({ data, idField, idOf }) {
     if (!data) return null;
     if (!func.isUserAdmin()) {
+        const id = idOf ? idOf(data) : data[idField];
         return (
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                 <Icon source={LockMinor} color="subdued" />
-                <Text variant="bodySm" color="subdued" truncate>{data[idField] || DASH}</Text>
+                <Text variant="bodySm" color="subdued" truncate>{id || DASH}</Text>
             </HorizontalStack>
         );
     }
@@ -184,6 +186,26 @@ export function GuardrailPolicyCell({ data }) {
     const policies = (data?.guardrailPolicies || []).filter(Boolean);
     if (!policies.length) return <Text variant="bodySm" color="subdued">{DASH}</Text>;
     return <ShowListInBadge itemsArr={policies} maxItems={2} useTooltip={true} />;
+}
+
+// Lead cell of the unified Argus table, where a row is either a whole conversation or a
+// single span that never carried one. A conversation is named by its session; an
+// invocation by the id it does have - Bedrock's own request id once the bridge supplies
+// one, else the span id synthesised at ingest. One of those is always present, so no row
+// is left unidentifiable.
+//
+// Records ingested before the deterministic id carry a drawn "span_<uuid>"; the prefix is an
+// internal marker, so it is dropped for display. The stored value is untouched.
+export function unifiedRowId(data) {
+    if (!data) return "";
+    const id = data.sessionIdentifier || data.traceId || data.spanId || "";
+    return id.startsWith("span_") ? id.slice("span_".length) : id;
+}
+
+export function UnifiedIdCell({ data }) {
+    if (!data) return null;
+    const id = unifiedRowId(data);
+    return <Text variant="bodySm" color="interactive" truncate>{id || DASH}</Text>;
 }
 
 // Clickable session id (used in unscoped Traces table).

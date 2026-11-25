@@ -21,6 +21,7 @@ import LocalStore from "../../../main/LocalStorageStore"
 import func from "../../../../util/func"
 import transform from "../testing/transform"
 import { getDashboardCategory, isAgenticSecurityCategory, mapLabel } from "../../../main/labelHelper"
+import { draftEditorEntries, isDraftTestId, stashedDraft } from "../testing/redteam_learnings/draftHandoff"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -79,14 +80,28 @@ const TestEditor = () => {
         if (subCategories && subCategories.length > 0) {
             try {
                 const obj = convertFunc.mapCategoryToSubcategory(subCategories)
+                let redteamDraftId
+                if (isDraftTestId(testId)) {
+                    const draft = stashedDraft(testId)
+                    if (!draft) {
+                        func.setToast(true, true, "This draft is no longer open in this tab. Open it again from Learnings.")
+                        handleExit()
+                        return
+                    }
+                    const { label, data } = draftEditorEntries(draft)
+                    obj.mapIdtoTest[testId] = label
+                    obj.mapTestToData[label] = data
+                    redteamDraftId = draft.draftId
+                }
                 setTestsObj(obj)
-    
+
                 const testName = obj.mapIdtoTest[testId]
                 const selectedTestObj = {
                     label: testName,
                     value: testId,
                     category: obj.mapTestToData[testName].category,
-                    inactive: obj.mapTestToData[testName].inactive
+                    inactive: obj.mapTestToData[testName].inactive,
+                    ...(redteamDraftId ? { redteamDraftId } : {})
                 }
                 setSelectedTest(selectedTestObj)
     

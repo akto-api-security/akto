@@ -3,9 +3,43 @@ const YEAR_SECONDS = 365 * DAY_SECONDS
 
 export const agentPath = (id) => `/dashboard/agentic-posture/agent/${id}`
 
+export const INVENTORY_PATH = '/dashboard/observe/agent-inventory'
+// The agent page as opened from Inventory; agentPath is the same page under Posture.
+export const inventoryAgentPath = (id) => `${INVENTORY_PATH}/agent/${id}`
+export const ALL_ASSETS_URL = `${INVENTORY_PATH}?tab=all`
+// Where the table keeps its own Source filter and sort between visits (its default key for this page).
+export const TABLE_STATE_KEY = `${INVENTORY_PATH}/`
+
+// The page's tab and filter live in the URL, so back from an agent lands on the same view.
+export const TAB_NAMES = ['summary', 'analytics', 'all']
+const FILTER_KEYS = ['flag', 'flagLabel', 'platform', 'team', 'type', 'quad', 'used', 'week', 'tool']
+
+// Only the All assets tab has a filter; a filter in the URL of another tab is ignored.
+export function viewOf(params) {
+    const tab = Math.max(TAB_NAMES.indexOf(params.get('tab')), 0)
+    const filter = {}
+    if (tab === TAB_NAMES.length - 1) {
+        for (const key of FILTER_KEYS) {
+            const value = key === 'week' ? Number(params.get(key) || NaN) : params.get(key)
+            if (value || value === 0) filter[key] = value
+        }
+    }
+    return { tab, filter }
+}
+
+export function paramsOf(tab, filter) {
+    const params = new URLSearchParams({ tab: TAB_NAMES[tab] })
+    for (const key of FILTER_KEYS) {
+        if (filter[key] !== undefined && filter[key] !== '') params.set(key, String(filter[key]))
+    }
+    return params
+}
+
 // Red, yellow and green for the three posture groups: the hex for the charts, the Badge tone for the labels beside them.
 export const POSTURE_COLORS = { atRisk: '#F24122', attention: '#F2B322', healthy: '#16A679' }
 export const POSTURE_TONES = { atRisk: 'critical', attention: 'attention', healthy: 'success' }
+// The three posture groups, as the flags the backend filters on.
+export const POSTURE_FLAGS = ['atRisk', 'attention', 'healthy']
 
 // One color per platform, shared by the plot, the bars and the table. "Other" is always grey.
 const PLATFORM_PALETTE = ['#6D3BEF', '#00A0AC', '#B98900', '#2C6ECB', '#C0267F', '#8A5A2B']
@@ -75,5 +109,7 @@ export function lastUsedText(ts, generatedAt) {
     return /^(Today|Yesterday|Never)/.test(text) || /days ago$/.test(text) ? text.toLowerCase() : text
 }
 
+// A host name has no break point at its dots, so a narrow column would split it mid-word.
+export const breakAtDots = (text) => text.replace(/\./g, '.\u200b')
 export const plural = (count, word) => `${count.toLocaleString()} ${word}${count === 1 ? '' : 's'}`
 export const percent = (part, total) => (total > 0 ? Math.round((part / total) * 100) : 0)

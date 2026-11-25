@@ -94,6 +94,30 @@ export default {
         });
     },
 
+    // Unified Argus list: conversations and lone invocations, already merged and
+    // time-ordered server-side. Row kind is readable from `_rowKind`.
+    fetchSessionsAndTraces({ startTime, endTime, skip, limit, filters, searchString }) {
+        return request({
+            url: "/api/fetchLLMSessionsAndTraces",
+            method: "post",
+            timeout: LLM_REQUEST_TIMEOUT_MS,
+            data: {
+                startTime,
+                endTime,
+                skip:            skip  || 0,
+                limit:           limit || 20,
+                userNames:       filters?.userName  || [],
+                serviceIds:      filters?.serviceId || [],
+                topicFilters:    filters?.topic     || [],
+                subTopicFilters: filters?.subTopic  || [],
+                searchString:    searchString || "",
+            },
+        }).then(r => ({
+            value: (r?.unifiedRows ?? []).map(enrichRow),
+            total: r?.unifiedTotal ?? 0,
+        }));
+    },
+
     // Aggregated stats for summary cards — accurate cardinality, token sums, top users.
     // Returns { totalSessions, totalInputTokens, totalOutputTokens, topUsers, userBreakdown }.
     fetchSessionStats(startTime, endTime) {

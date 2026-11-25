@@ -138,7 +138,7 @@ public class Main {
     KafkaConfig trafficKafka = createKafkaConfig("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER", 500, 100, 100 * 1024 * 1024);
     KafkaConfig internalKafka = createKafkaConfig("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER", 100, 100);
 
-    startModuleConfigPoller();
+    startModuleConfigPoller(internalKafka.getBootstrapServers());
 
     initCustomDataTypeScheduler();
 
@@ -207,12 +207,12 @@ public class Main {
     new SendGuardrailEventsToBackend(kafkaConfig, topic).run();
   }
 
-    private static void startModuleConfigPoller() {
+    private static void startModuleConfigPoller(String internalKafkaBootstrapServers) {
       // Start config poller (polls Cyborg for env updates and restarts on changes)
       logger.infoAndAddToDb("Starting ConfigPoller for threat-detection");
       new Thread(() -> {
           try {
-              ConfigPoller configPoller = new ConfigPoller();
+              ConfigPoller configPoller = new ConfigPoller(internalKafkaBootstrapServers);
               configPoller.run();
           } catch (Exception e) {
               logger.errorAndAddToDb(e, "Error in ConfigPoller");

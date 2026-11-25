@@ -97,10 +97,13 @@ public class RiskScoreSyncCron {
                         List<Bson> pipeline = new ArrayList<>();
                         pipeline.add(Aggregates.sort(Sorts.descending("detectedAt")));
                         pipeline.add(Aggregates.match(Filters.and(Filters.gte("detectedAt", deltaStarTime), Filters.lte("detectedAt", deltaEndTime), Filters.eq("successfulExploit", true))));
-                        pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severities", "$severity")));
+                        pipeline.add(Aggregates.group(groupedId,
+                                Accumulators.addToSet("severities", "$severity"),
+                                Accumulators.addToSet("filterIds", "$filterId")));
                         MongoCursor<BasicDBObject> cursor = MaliciousEventDao.instance.getCollection(String.valueOf(accountId)).aggregate(pipeline, BasicDBObject.class).cursor();
 
                         Map<String, List<String>> apiInfoKeyToSeverities = new HashMap<>();
+                        Map<String, List<String>> apiInfoKeyToFilterIds = new HashMap<>();
                         while(cursor.hasNext()){
                             BasicDBObject document = cursor.next();
                             BasicDBObject id = (BasicDBObject) document.get("_id");
@@ -108,20 +111,25 @@ public class RiskScoreSyncCron {
                             String method = id.getString("method");
                             String endpoint = id.getString("endpoint");
                             List<String> severities = (List<String>) document.get("severities");
+                            List<String> filterIds = (List<String>) document.get("filterIds");
                             String key = apiCollectionIdFromDoc + " " + endpoint + " " + method;
                             apiInfoKeyToSeverities.put(key, severities);
+                            apiInfoKeyToFilterIds.put(key, filterIds);
                         }
 
                         loggerMaker.warnAndAddToDb("Malicious events count: " + apiInfoKeyToSeverities.size());
 
-                        Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = resolveThreatScores(apiInfoKeyToSeverities, MaliciousEventDao::getThreatScoreFromSeverities);
+                        ResolvedThreatScores resolved = resolveThreatScores(apiInfoKeyToSeverities, apiInfoKeyToFilterIds, MaliciousEventDao::getThreatScoreFromSeverities);
                         List<WriteModel<ApiInfo>> updates = new ArrayList<>();
 
-                        if(apiInfoKeyToThreatScore.size() > 0){
-                            for(ApiInfoKey apiInfoKey : apiInfoKeyToThreatScore.keySet()){
-                                float threatScore = apiInfoKeyToThreatScore.get(apiInfoKey);
+                        if(resolved.getScores().size() > 0){
+                            for(ApiInfoKey apiInfoKey : resolved.getScores().keySet()){
+                                float threatScore = resolved.getScores().get(apiInfoKey);
+                                List<String> names = resolved.getActivityNames().getOrDefault(apiInfoKey, new ArrayList<>());
                                 Bson filter = ApiInfoDao.getFilter(apiInfoKey);
-                                updates.add(new UpdateManyModel<>(filter, Updates.set(ApiInfo.THREAT_SCORE, threatScore)));
+                                updates.add(new UpdateManyModel<>(filter, Updates.combine(
+                                        Updates.set(ApiInfo.THREAT_SCORE, threatScore),
+                                        Updates.set(ApiInfo.THREAT_ACTIVITY_NAMES, names))));
                             }
                         }
                         if(updates.size() > 0){
@@ -136,15 +144,35 @@ public class RiskScoreSyncCron {
         }, 0, 15, TimeUnit.MINUTES);
     }
 
-    // shared with SkillsRiskScoreSyncCron's non-skill endpoint events: resolves each event's literal
-    // (apiCollectionId, url, method) against ApiInfo's stored template/literal urls and scores it via
-    // the caller-supplied severity->score formula (each cron scores on its own scale).
-    // apiInfoKeyToSeverities keys are formatted as "apiCollectionId url method".
-    public static Map<ApiInfoKey, Float> resolveThreatScores(Map<String, List<String>> apiInfoKeyToSeverities,
-            Function<List<String>, Float> severityScorer) {
+    public static class ResolvedThreatScores {
+        private final Map<ApiInfoKey, Float> scores;
+        private final Map<ApiInfoKey, List<String>> activityNames;
+
+        public ResolvedThreatScores(Map<ApiInfoKey, Float> scores, Map<ApiInfoKey, List<String>> activityNames) {
+            this.scores = scores;
+            this.activityNames = activityNames;
+        }
+
+        public Map<ApiInfoKey, Float> getScores() {
+            return scores;
+        }
+
+        public Map<ApiInfoKey, List<String>> getActivityNames() {
+            return activityNames;
+        }
+    }
+
+    // shared with AtlasRiskScoreSyncCron: resolves each event's literal (apiCollectionId, url, method)
+    // against ApiInfo's stored template/literal urls and scores it via the caller-supplied
+    // severity->score formula (each cron scores on its own scale). Also unions filterIds onto the
+    // resolved ApiInfoKey so callers can write threatActivityNames with the score.
+    // apiInfoKeyToSeverities / apiInfoKeyToFilterIds keys are formatted as "apiCollectionId url method".
+    public static ResolvedThreatScores resolveThreatScores(Map<String, List<String>> apiInfoKeyToSeverities,
+            Map<String, List<String>> apiInfoKeyToFilterIds, Function<List<String>, Float> severityScorer) {
         Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = new HashMap<>();
+        Map<ApiInfoKey, Set<String>> apiInfoKeyToNames = new HashMap<>();
         if (apiInfoKeyToSeverities.isEmpty()) {
-            return apiInfoKeyToThreatScore;
+            return new ResolvedThreatScores(apiInfoKeyToThreatScore, new HashMap<>());
         }
 
         Set<Integer> apiCollectionIdsFromEvents = new HashSet<>();
@@ -176,9 +204,22 @@ public class RiskScoreSyncCron {
                     loggerMaker.warnAndAddToDb("Updating risk score for " + urlTemplate.getTemplateString() + " " + urlTemplate.getMethod().name() + " " + apiCollectionId + " to " + threatScore);
                 }
                 apiInfoKeyToThreatScore.put(apiInfoKeyObj, Math.max(apiInfoKeyToThreatScore.getOrDefault(apiInfoKeyObj, 0.0f), threatScore));
+                Set<String> names = apiInfoKeyToNames.computeIfAbsent(apiInfoKeyObj, k -> new HashSet<>());
+                List<String> filterIds = apiInfoKeyToFilterIds == null ? null : apiInfoKeyToFilterIds.get(apiInfoKey);
+                if (filterIds != null) {
+                    for (String filterId : filterIds) {
+                        if (filterId != null && !filterId.isEmpty()) {
+                            names.add(filterId);
+                        }
+                    }
+                }
             }
         }
 
-        return apiInfoKeyToThreatScore;
+        Map<ApiInfoKey, List<String>> activityNames = new HashMap<>();
+        for (Map.Entry<ApiInfoKey, Set<String>> entry : apiInfoKeyToNames.entrySet()) {
+            activityNames.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        return new ResolvedThreatScores(apiInfoKeyToThreatScore, activityNames);
     }
 }

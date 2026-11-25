@@ -16,7 +16,7 @@ const initialState = {
     sendEventOnLogin: false,
     defaultIgnoreSummaryTime: 2 * 60 * 60,
     lastEndpointEpoch: 0,
-    agenticNewLayout: false,
+    agenticNewLayout: true,
     guardrailViolationsNewLayout: false,
     expandCollectionTags: false,
 };
@@ -105,6 +105,10 @@ localStore = devtools(localStore, devtoolsOptions("LocalStore", (state) => ({
 localStore = persist(localStore, {
     name: 'Akto-tests-store',
     storage: gzipLocalStorage,
+    // v1: agentic new layout became the default (guardrail violations is unchanged). Previously persisted `false` values were just the old default,
+    // so reset them once; later user choices (old-layout checkbox) persist normally.
+    version: 1,
+    migrate: (persisted) => ({ ...persisted, agenticNewLayout: true }),
     merge: (persisted, current) => ({
         ...current,
         ...persisted,

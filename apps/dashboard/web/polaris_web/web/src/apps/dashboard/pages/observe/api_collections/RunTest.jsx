@@ -75,6 +75,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     })
     const [scriptsState, setScriptsState] = useState({ enabled: false, failed: false, scripts: [] })
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const allCollections = PersistStore(state => state.allCollections)
     const [loading, setLoading] = useState(true)
     const [testRolesArr, setTestRolesArr] = useState([])
     const [active, setActive] = useState(runTestFromOutside || false);
@@ -128,8 +129,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
     const [jiraProjectMap, setJiraProjectMap] = useState(null);
     const [linearTeamsMap, setLinearTeamsMap] = useState(null);
+    const wizIntegrated = window.WIZ_INTEGRATED === 'true'
     const portIOIntegrated = window.PORT_IO_INTEGRATED === 'true'
-    const ticketingAvailable = !!(jiraProjectMap || linearTeamsMap || portIOIntegrated)
+    const ticketingAvailable = !!(jiraProjectMap || linearTeamsMap || portIOIntegrated || wizIntegrated)
     const isAgenticCategory = getDashboardCategory() !== 'API Security'
     const [agenticMode, setAgenticMode] = useState(false)
 
@@ -143,6 +145,12 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     const apiCollectionName = isMultiCollection
         ? `${apiCollectionIds.length} collections`
         : collectionsMap[apiCollectionId]
+
+    // MCP tests only apply to collections tagged "mcp-server" (api_selection_filters skip them elsewhere)
+    function hasMcpCollection() {
+        const targetIds = (isMultiCollection ? apiCollectionIds : [apiCollectionId]).map(Number)
+        return (allCollections || []).some(c => targetIds.includes(Number(c.id)) && c.envType?.some(t => t.keyName === 'mcp-server'))
+    }
 
     async function fetchData() {
         setLoading(true)
@@ -202,7 +210,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                 });
             }
         }
-        let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMapForFiltering);
+        let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMapForFiltering, hasMcpCollection());
         metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
         let categories = metaDataObj.categories
         categories = func.sortByCategoryPriority(categories, 'name')
@@ -879,6 +887,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
             jiraProjectMap={jiraProjectMap}
             linearTeamsMap={linearTeamsMap}
             portIOIntegrated={portIOIntegrated}
+            wizIntegrated={wizIntegrated}
             generateLabelForJiraIntegration={generateLabelForJiraIntegration}
             miniTestingServiceNames={miniTestingServiceNames}
             slackChannels={slackChannels}

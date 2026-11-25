@@ -22,6 +22,8 @@ import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
+import AgentLearningsTab from "../../testing/redteam_learnings/AgentLearningsTab";
+import learningsApi from "../../testing/redteam_learnings/api";
 import ForbiddenRole from "../../../components/shared/ForbiddenRole";
 import SkillMarkdownViewer from "../agentic/SkillEvidenceView";
 import { parseSkillSample } from "../agentic/SkillComponentsView";
@@ -94,6 +96,8 @@ function ApiDetails(props) {
     const [selectedTabId, setSelectedTabId] = useState('values');
     const [showForbidden, setShowForbidden] = useState(false);
     const [detectedBasePrompt, setDetectedBasePrompt] = useState(null);
+    // The account's red-team learnings setting as the server reports it; null until read, or when it could not be read
+    const [learningsEnabled, setLearningsEnabled] = useState(null);
     const [endpointRiskScoreFactors, setEndpointRiskScoreFactors] = useState([]);
 
     const statusFunc = getStatus ? getStatus : (x) => {
@@ -480,6 +484,19 @@ function ApiDetails(props) {
         setDetectedBasePrompt(null);
     }, [apiDetail])
 
+    // The Learnings tab exists only for an AI agent whose account has red-team learnings turned on. The setting comes from
+    // the server, so a failed read hides the tab like an off account.
+    useEffect(() => {
+        setLearningsEnabled(null);
+        if (!apiDetail?.apiCollectionId || !apiDetail?.endpoint || !apiDetail?.method) return;
+        if (apiDetail.endpoint.includes('/skills/') || !hasGenAiTag()) return;
+        let cancelled = false;
+        learningsApi.fetchAgentRedteamLearnings(apiDetail.apiCollectionId, apiDetail.endpoint, apiDetail.method)
+            .then((resp) => { if (!cancelled) setLearningsEnabled(resp?.learningsEnabled ?? null); })
+            .catch(() => { if (!cancelled) setLearningsEnabled(null); });
+        return () => { cancelled = true; };
+    }, [apiDetail?.apiCollectionId, apiDetail?.endpoint, apiDetail?.method, allCollections]);
+
     useEffect(() => {
         if(showDetails){
             const { apiCollectionId, endpoint, method } = apiDetail;
@@ -762,6 +779,17 @@ function ApiDetails(props) {
         </Box>,
     }
 
+    const LearningsTab = {
+        id: 'redteam-learnings',
+        content: "Learnings",
+        component: <AgentLearningsTab
+            key={`${apiDetail.apiCollectionId}|${apiDetail.method}|${apiDetail.endpoint}`}
+            apiCollectionId={apiDetail.apiCollectionId}
+            url={apiDetail.endpoint}
+            method={apiDetail.method}
+        />
+    }
+
     const hasIssues = apiDetail?.severityObj && Object.values(apiDetail.severityObj).some(count => count > 0);
 
     const IssuesTab = {
@@ -985,6 +1013,7 @@ function ApiDetails(props) {
                     ValuesTab,
                     ...(!isSkillEndpoint ? [SchemaTab] : []),
                     ...(shouldShowBasePromptTab ? [BasePromptTab] : []),
+                    ...(!isSkillEndpoint && hasGenAiTag() && learningsEnabled === true ? [LearningsTab] : []),
                     ...(hasIssues ? [IssuesTab] : []),
                     ...(apiDetail?.isThreatEnabled ? [ThreatIssuesTab] : []),
                     ApiCallStatsTab,

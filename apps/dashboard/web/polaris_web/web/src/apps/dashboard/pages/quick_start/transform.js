@@ -668,9 +668,18 @@ const atlasS3ExportObj = {
     icon: '/public/aws.svg',
     label: "Atlas Log Export to S3",
     text: "Export Atlas traces (guardrail hits, models, token usage) in OpenTelemetry format to your S3 bucket.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/ai-agent-activity',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/ai-agent-activity/export-traces-to-s3',
     key: "ATLAS_S3_EXPORT",
     component: <AtlasS3ExportConnector/>
+}
+
+// Same connector in the Argus dashboard; the backend scopes the export to the dashboard it is saved from.
+const argusS3ExportObj = {
+    ...atlasS3ExportObj,
+    label: "Argus Log Export to S3",
+    text: "Export Argus traces (guardrail hits, models, token usage) in OpenTelemetry format to your S3 bucket.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/agentic-ai-discovery/how-to/export-traces-to-s3',
+    key: "ARGUS_S3_EXPORT",
 }
 
 const microsoftDefenderRunQueriesObj = {
@@ -2508,6 +2517,8 @@ const quickStartFunc = {
                 "MCP": mcpScan,
                 "Kubernetes": kubernetes,
                 "API Gateways": apiGateways,
+                // SaaS only, behind the ATLAS_S3_LOG_EXPORT feature flag.
+                ...((!func.checkOnPrem() && func.checkForFeatureSaas("ATLAS_S3_LOG_EXPORT")) ? { "Log Export": [argusS3ExportObj] } : {}),
             }
         } else if (isDastCategory()) {
             connectors["DAST"] = crawler

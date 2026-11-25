@@ -1,6 +1,7 @@
 import { HorizontalGrid } from '@shopify/polaris'
 import { CustomersMajor, DiamondAlertMajor, KeyMajor, NoteMajor, RiskMajor, SecureMajor } from '@shopify/polaris-icons'
 import { ComingSoonOverlay, KpiTile } from '../../agenticPostureShared'
+import { ALL_ASSETS_URL } from '../../../observe/agent_discovery/inventory/inventoryUtils'
 
 const ICONS = {
     assets: CustomersMajor,
@@ -25,7 +26,7 @@ const KPI_DRILL_ID = {
 // Assets has no drill of its own — the inventory page already lists every asset, so the tile
 // navigates there rather than duplicating it in a flyout.
 const KPI_ROUTE = {
-    assets: '/dashboard/observe/inventory',
+    assets: ALL_ASSETS_URL,
 }
 
 function KpiGrid({ kpis, onOpenLink, onOpenDrill, onOpenRoute }) {

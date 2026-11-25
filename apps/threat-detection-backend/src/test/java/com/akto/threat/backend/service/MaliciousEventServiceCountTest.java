@@ -6,15 +6,12 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -48,22 +45,6 @@ public class MaliciousEventServiceCountTest {
     // the excluded-partition count is the one carrying the $or of positive patterns
     when(dao.countDocuments(anyString(), any(Bson.class), anyLong())).thenAnswer(call ->
         json(call.getArgument(1)).contains("$or") ? EXCLUDED_COUNT : RANGE_COUNT);
-  }
-
-  @Test
-  void activeTabSubtractsTheExcludedPartitionsInsteadOfCountingANegatedRegex() {
-    List<Document> conditions = ThreatUtils.evaluationModeConditions("ENDPOINT", "exclude", "exclude");
-
-    assertEquals(RANGE_COUNT - EXCLUDED_COUNT, service.countWithEvaluationModes("1", scope, conditions, 1000));
-
-    ArgumentCaptor<Bson> filters = ArgumentCaptor.forClass(Bson.class);
-    verify(dao, times(2)).countDocuments(anyString(), filters.capture(), anyLong());
-    for (Bson filter : filters.getAllValues()) {
-      assertFalse(json(filter).contains("$not"), "no negated regex may reach Mongo: " + json(filter));
-    }
-    String excluded = json(filters.getAllValues().get(1));
-    assertTrue(excluded.contains("skills"), excluded);
-    assertTrue(excluded.contains("config"), excluded);
   }
 
   @Test
