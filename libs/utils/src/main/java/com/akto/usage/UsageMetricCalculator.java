@@ -237,7 +237,10 @@ public class UsageMetricCalculator {
 
 
     private static int calculateEndpoints(Set<Integer> collectionsIdsToDiscard) {
-        collectionsIdsToDiscard.addAll(getDemosAndDeactivated());
+        // Billed figure: read deactivated collections fresh, not through the 2-minute getDeactivated()
+        // cache, which would count a just-deactivated collection (same as calculateAgenticAssets).
+        collectionsIdsToDiscard.addAll(getDeactivatedLatest());
+        collectionsIdsToDiscard.addAll(getDemos());
         return (int) SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), collectionsIdsToDiscard, false);
     }
 
