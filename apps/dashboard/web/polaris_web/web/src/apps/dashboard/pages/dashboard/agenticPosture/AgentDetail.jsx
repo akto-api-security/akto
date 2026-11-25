@@ -4,6 +4,7 @@ import { Banner, Box, Text, VerticalStack } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
 import postureDataSource from './postureDataSource'
+import { ALL_ASSETS_URL, INVENTORY_PATH } from '../../observe/agent_discovery/inventory/inventoryUtils'
 import AgentHeaderCard from './agentDetail/AgentHeaderCard'
 import ToolsSection from './agentDetail/ToolsSection'
 import RedTeamSection from './agentDetail/RedTeamSection'
@@ -117,7 +118,7 @@ function AgentDetail() {
     return (
         <PageWithMultipleCards
             title={<Text variant="headingLg">{detail.header?.name}</Text>}
-            backUrl={location.state?.backUrl || '/dashboard/agentic-posture'}
+            backUrl={location.state?.backUrl || (location.pathname.startsWith(`${INVENTORY_PATH}/`) ? ALL_ASSETS_URL : '/dashboard/agentic-posture')}
             components={[<Box key="body">{pageBody}</Box>]}
         />
     )

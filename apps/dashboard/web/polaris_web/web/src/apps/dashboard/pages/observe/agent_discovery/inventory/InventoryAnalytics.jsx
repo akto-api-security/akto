@@ -60,10 +60,10 @@ function bubblesOf(points, generatedAt, colors, onOpen) {
 function Insight({ text, button, onClick }) {
     return (
         <Box background="bg-magic-subdued" padding="3" borderRadius="2">
-            <HorizontalStack align="space-between" blockAlign="center" gap="3">
-                <Box maxWidth="70%"><Text variant="bodyMd" as="p">{text}</Text></Box>
-                <Button onClick={onClick}>{button}</Button>
-            </HorizontalStack>
+            <VerticalStack gap="3">
+                <Text variant="bodyMd" as="p">{text}</Text>
+                <Box><Button onClick={onClick}>{button}</Button></Box>
+            </VerticalStack>
         </Box>
     )
 }
@@ -180,7 +180,7 @@ function Ownership({ teams, counts, onFilter }) {
                     </Box>
                 ))}
                 <Insight
-                    text={`${plural(counts.noTeam, 'agent')} ${counts.noTeam === 1 ? 'has' : 'have'} no owning team, ${counts.noTeamHigh} of them high risk. ${counts.sharedByThree} more ${counts.sharedByThree === 1 ? 'is' : 'are'} shared by 3 teams, with no single accountable owner.`}
+                    text={`${plural(counts.noTeam, 'agent')} ${counts.noTeam === 1 ? 'has' : 'have'} no owning team, ${counts.noTeamHigh} of them high risk.${counts.sharedByThree > 0 ? ` ${counts.sharedByThree} more ${counts.sharedByThree === 1 ? 'is' : 'are'} shared by 3 teams, with no single accountable owner.` : ''}`}
                     button="View unowned"
                     onClick={() => onFilter({ flag: 'noTeam' })}
                 />

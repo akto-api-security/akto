@@ -26,6 +26,7 @@ public class ArgusInventoryAction extends UserAction {
     private final ArgusInventorySource inventorySource = new ArgusInventorySource();
 
     @Getter @Setter private String flag;
+    @Getter @Setter private String posture;
     @Getter @Setter private String platform;
     @Getter @Setter private List<String> platforms;
     @Getter @Setter private String team;
@@ -82,6 +83,7 @@ public class ArgusInventoryAction extends UserAction {
     private ArgusInventoryService.Query query() {
         ArgusInventoryService.Query query = new ArgusInventoryService.Query();
         query.setFlag(flag);
+        query.setPosture(posture);
         query.setPlatform(platform);
         query.setPlatforms(platforms);
         query.setTeam(team);

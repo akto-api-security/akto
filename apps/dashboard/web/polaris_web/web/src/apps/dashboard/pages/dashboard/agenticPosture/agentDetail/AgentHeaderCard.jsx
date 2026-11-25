@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Badge, Box, Button, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Button, Card, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
 import { AutomationMajor } from '@shopify/polaris-icons'
 import func from '@/util/func'
 import { severityTone } from './tones'
@@ -8,6 +8,7 @@ import DetailGrid from '../../../observe/agentic/DetailGrid'
 import { NumberCardsRow } from '../../new_components/PostureShared'
 import { ctaHref } from './cta'
 import TooltipText from '../../../../components/shared/TooltipText'
+import { breakAtDots } from '../../../observe/agent_discovery/inventory/inventoryUtils'
 import './AgentDetail.css'
 
 function redTeamScanSummary(redTeam, hasMaliciousActivity) {
@@ -41,27 +42,30 @@ function AgentHeaderCard({ header, redTeam, guardrailActivity, tools }) {
     return (
         <Card padding="6">
             <VerticalStack gap="4">
-                <HorizontalStack align="space-between" blockAlign="start" gap="5">
+                {/* A long name takes the space the score and buttons leave and breaks at its dots; narrow screens stack them. */}
+                <HorizontalGrid columns={{ xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) auto' }} gap="5" alignItems="start">
                     <HorizontalStack align="start" gap="4" blockAlign="center" wrap={false}>
                         <Box background={tone.background} borderRadius="3" padding="4">
                             <Icon source={AutomationMajor} color={tone.icon} />
                         </Box>
-                        <VerticalStack gap="2">
-                            <HorizontalStack align="start" gap="2" blockAlign="center">
-                                <Text variant="headingLg" as="h1">{header.name}</Text>
-                                {header.severity && <SeverityBadge severity={header.severity} />}
-                                {header.environment && <Badge>{header.environment.toLowerCase()}</Badge>}
-                            </HorizontalStack>
-                            {header.description && (
-                                <Box maxWidth="540px">
-                                    <TooltipText
-                                        text={header.description}
-                                        tooltip={header.description}
-                                        textProps={{ variant: 'bodyMd', color: 'subdued' }}
-                                    />
-                                </Box>
-                            )}
-                        </VerticalStack>
+                        <Box minWidth="0">
+                            <VerticalStack gap="2">
+                                <HorizontalStack align="start" gap="2" blockAlign="center">
+                                    <Text variant="headingLg" as="h1" breakWord>{breakAtDots(header.name || '')}</Text>
+                                    {header.severity && <SeverityBadge severity={header.severity} />}
+                                    {header.environment && <Badge>{header.environment.toLowerCase()}</Badge>}
+                                </HorizontalStack>
+                                {header.description && (
+                                    <Box maxWidth="540px">
+                                        <TooltipText
+                                            text={header.description}
+                                            tooltip={header.description}
+                                            textProps={{ variant: 'bodyMd', color: 'subdued' }}
+                                        />
+                                    </Box>
+                                )}
+                            </VerticalStack>
+                        </Box>
                     </HorizontalStack>
                     <VerticalStack gap="3" inlineAlign="end">
                         <VerticalStack gap="0" inlineAlign="end">
@@ -81,7 +85,7 @@ function AgentHeaderCard({ header, redTeam, guardrailActivity, tools }) {
                             </HorizontalStack>
                         )}
                     </VerticalStack>
-                </HorizontalStack>
+                </HorizontalGrid>
 
                 <NumberCardsRow metrics={[
                     { key: 'openFindings', label: 'Open red-team findings', value: redTeam ? redTeam.openFindings || 0 : '-' },
