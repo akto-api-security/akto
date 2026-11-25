@@ -86,17 +86,23 @@ public class AgenticPostureScoreCron {
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpAgenticPostureScoreCronScheduler() {
+        loggerMaker.infoAndAddToDb("Agentic posture score cron: scheduling with fixed delay of 6 hours");
         scheduler.scheduleWithFixedDelay(this::run, 0, 6, TimeUnit.HOURS);
     }
 
     private void run() {
+        long startMillis = System.currentTimeMillis();
         try {
             Context.accountId.set(1_000_000);
+            loggerMaker.infoAndAddToDb("Agentic posture score cron: run triggered, attempting to call dibs");
             if (!callDibs(Cluster.AGENTIC_POSTURE_SCORE_CRON_INFO, 21300, 60)) {
-                loggerMaker.debugAndAddToDb("Agentic posture score cron dibs not acquired, thus skipping cron");
+                loggerMaker.infoAndAddToDb("Agentic posture score cron dibs not acquired, thus skipping cron");
                 return;
             }
+            loggerMaker.infoAndAddToDb("Agentic posture score cron: dibs acquired, starting account iteration");
             AccountTask.instance.executeTask(this::processAccount, "agentic-posture-score-cron");
+            loggerMaker.infoAndAddToDb("Agentic posture score cron: run finished in "
+                    + (System.currentTimeMillis() - startMillis) + " ms");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in agentic posture score cron: " + e.getMessage());
         }
@@ -104,9 +110,11 @@ public class AgenticPostureScoreCron {
 
     private void processAccount(Account account) {
         int accountId = account.getId();
+        long startMillis = System.currentTimeMillis();
         try {
+            loggerMaker.infoAndAddToDb("Agentic posture score cron: processing accountId=" + accountId);
             if (!UsageMetricUtils.isSecurityTypeAgenticGranted(accountId)) {
-                loggerMaker.debugAndAddToDb("Agentic posture score cron: skipping accountId=" + accountId
+                loggerMaker.infoAndAddToDb("Agentic posture score cron: skipping accountId=" + accountId
                         + " (SECURITY_TYPE_AGENTIC not granted)");
                 return;
             }
@@ -116,7 +124,11 @@ public class AgenticPostureScoreCron {
             Context.contextSource.set(CONTEXT_SOURCE.AGENTIC);
 
             List<ApiCollection> agentCollections = findAgentCollections();
+            loggerMaker.infoAndAddToDb("Agentic posture score cron: found " + agentCollections.size()
+                    + " agent collections for accountId=" + accountId);
             if (agentCollections.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Agentic posture score cron: skipping accountId=" + accountId
+                        + " (no agent collections)");
                 return;
             }
 
@@ -132,6 +144,10 @@ public class AgenticPostureScoreCron {
             // Only picks the wording of the "not scanned" gap message.
             boolean anyRedTeamScanEverRun = TestingRunDao.instance.findOne(
                     Filters.eq(TestingRun.DASHBOARD_CONTEXT, CONTEXT_SOURCE.AGENTIC)) != null;
+            loggerMaker.infoAndAddToDb("Agentic posture score cron: accountId=" + accountId
+                    + " guardrailPolicies=" + policies.size()
+                    + " collectionsWithRedTeamIssues=" + redTeamSeverities.size()
+                    + " anyRedTeamScanEverRun=" + anyRedTeamScanEverRun);
 
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.in(ApiInfo.ID_API_COLLECTION_ID, collectionIds),
                     Projections.include(ApiInfo.LAST_TESTED, ApiInfo.API_ACCESS_TYPES,
@@ -141,6 +157,8 @@ public class AgenticPostureScoreCron {
                 if (a == null || a.getId() == null) continue;
                 apiInfosByCollection.computeIfAbsent(a.getId().getApiCollectionId(), k -> new ArrayList<>()).add(a);
             }
+            loggerMaker.infoAndAddToDb("Agentic posture score cron: accountId=" + accountId
+                    + " fetched " + apiInfos.size() + " apiInfos across " + apiInfosByCollection.size() + " collections");
             int now = Context.now();
             // Attributed to agents by host, then actor (see HostCollectionResolver.resolveEvent).
             List<DashboardMaliciousEvent> hostCounts = new AbstractThreatDetectionAction().fetchAllMaliciousEvents(
@@ -149,6 +167,10 @@ public class AgenticPostureScoreCron {
             Map<Integer, Map<String, Integer>> maliciousSeverities = resolver.severityByCollection(hostCounts);
             // Agents with a PII or custom LLM (DLP) rule violation (see InsightUtil.isSensitiveDataEvent).
             Set<Integer> agentsWithSensitiveData = resolver.countByCollection(hostCounts, InsightUtil::sensitiveDataLabel).keySet();
+            loggerMaker.infoAndAddToDb("Agentic posture score cron: accountId=" + accountId
+                    + " maliciousEvents=" + (hostCounts == null ? "null" : hostCounts.size())
+                    + " collectionsWithMaliciousEvents=" + maliciousSeverities.size()
+                    + " collectionsWithSensitiveData=" + agentsWithSensitiveData.size());
             List<WriteModel<ApiCollection>> updates = new ArrayList<>();
             List<Double> composites = new ArrayList<>();
             int agentsWithNoSignal = 0;
@@ -205,11 +227,18 @@ public class AgenticPostureScoreCron {
                 ApiCollectionsDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
                 loggerMaker.infoAndAddToDb("Agentic posture score cron scored " + updates.size()
                         + " agent collections for accountId=" + accountId);
+            } else {
+                loggerMaker.infoAndAddToDb("Agentic posture score cron: no collection updates to write for accountId=" + accountId);
             }
 
+            double accountScore = worstSliceMean(composites);
             AgenticPostureScoreHistoryDao.instance.insertOne(
-                    new AgenticPostureScoreHistory(worstSliceMean(composites), agentCollections.size(),
+                    new AgenticPostureScoreHistory(accountScore, agentCollections.size(),
                             agentsWithNoSignal, now));
+            loggerMaker.infoAndAddToDb("Agentic posture score cron: completed accountId=" + accountId
+                    + " accountScore=" + accountScore + " agents=" + agentCollections.size()
+                    + " agentsWithNoSignal=" + agentsWithNoSignal
+                    + " in " + (System.currentTimeMillis() - startMillis) + " ms");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in agentic posture score cron for accountId=" + accountId + ": " + e.getMessage());
         }
@@ -374,6 +403,7 @@ public class AgenticPostureScoreCron {
             loggerMaker.errorAndAddToDb("forceRunForAccount: no account found for accountId=" + accountId);
             return;
         }
+        loggerMaker.infoAndAddToDb("Agentic posture score cron: forceRunForAccount accountId=" + accountId);
         processAccount(account);
     }
 }
