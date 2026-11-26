@@ -582,6 +582,32 @@ public class DbLayer {
         if (value != null) deviceTagUpdates.put(tagKey, Collections.singletonList(value));
     }
 
+    private static void addTrafficCollectorHeartbeat(List<WriteModel<ModuleInfo>> bulkUpdates, ModuleInfo moduleInfo) {
+        Bson podFilter = Filters.and(
+                Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
+                Filters.eq(ModuleInfo.NAME, moduleInfo.getName()));
+
+        bulkUpdates.add(new UpdateOneModel<>(podFilter, Updates.combine(
+                //putting class name because updates don't put class name by default
+                Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                Updates.setOnInsert(ModuleInfoDao.ID, moduleInfo.getId()),
+                Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                Updates.setOnInsert(ModuleInfo._REBOOT, false),
+                expiresAtUpdate(moduleInfo.getModuleType())
+        ), new UpdateOptions().upsert(true)));
+
+        bulkUpdates.add(new UpdateOneModel<>(
+                Filters.and(podFilter, Filters.ne(ModuleInfo._REBOOT, true)),
+                withTokenId(Updates.combine(
+                        // set on every heartbeat: the document now outlives the process that created it
+                        Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                        Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
+                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
+                        Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
+                ))));
+    }
+
     public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
         if (moduleInfoList == null || moduleInfoList.isEmpty()) {
             return;
@@ -591,6 +617,10 @@ public class DbLayer {
         UpdateOptions updateOptions = new UpdateOptions().upsert(true);
 
         for (ModuleInfo moduleInfo : moduleInfoList) {
+            if (moduleInfo.getModuleType() == ModuleInfo.ModuleType.TRAFFIC_COLLECTOR) {
+                addTrafficCollectorHeartbeat(bulkUpdates, moduleInfo);
+                continue;
+            }
             Bson filter = Filters.and(
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Filters.eq(ModuleInfo._REBOOT, false)
