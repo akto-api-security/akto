@@ -78,7 +78,7 @@ public class InsightDataLoader {
     // threat-backend calls, see below) — sized to fit that without queueing, since every one of
     // them is I/O-bound (waiting on Mongo/HTTP, not CPU), not the "one thread per CPU core" case.
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(16);
-    private static final int EXTERNAL_CALL_TIMEOUT_SECONDS = 8;
+    private static final int EXTERNAL_CALL_TIMEOUT_SECONDS = 15;
 
     // Row caps and other constants for the lazy API_POSTURE/TESTING_POSTURE reads now live on
     // InsightLazySources itself, next to the code that uses them.
