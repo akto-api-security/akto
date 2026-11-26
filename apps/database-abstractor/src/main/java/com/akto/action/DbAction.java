@@ -53,6 +53,7 @@ import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.settings.ApiGatewayRoleRegions;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -86,7 +87,6 @@ import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.notifications.slack.TestingFailureSlackCopy;
-import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
 import com.akto.usage.UsageMetricCalculator;
@@ -108,6 +108,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 import org.apache.struts2.action.Action;
 import org.apache.struts2.ActionSupport;
@@ -473,6 +474,7 @@ public class DbAction extends ActionSupport {
     int testResultsCount;
     String leaseToken;
     int leaseSeconds;
+    int reclaimAfterSeconds;
     // Domain outcome (APPLIED/REJECTED) named directly by the server, not a boolean the client has
     // to re-derive. No leaseHeld predecessor to stay compatible with - this contract and its only
     // client (feat/stateless-mini-testing) ship together, unreleased. Named leaseStatus, not
@@ -582,11 +584,20 @@ public class DbAction extends ActionSupport {
     @Setter
     private List<Map<String, Object>> accountMappings;
 
+    // Per-role regions for the API Gateway connector. Returned next to
+    // awsAccountIds, which older connectors still read on its own.
+    @Getter
+    @Setter
+    private List<ApiGatewayRoleRegions> awsApiGConnectorRoleRegions;
+
     public String fetchAwsAccountIdsForApiGatewayLogging() {
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         if (accountSettings != null && accountSettings.getAwsAccountIdsForApiGatewayLogging() != null) {
             awsAccountIds = accountSettings.getAwsAccountIdsForApiGatewayLogging();
+        }
+        if (accountSettings != null && accountSettings.getAwsApiGConnectorRoleRegions() != null) {
+            awsApiGConnectorRoleRegions = accountSettings.getAwsApiGConnectorRoleRegions();
         }
 
         return Action.SUCCESS.toUpperCase();
@@ -2567,7 +2578,7 @@ public class DbAction extends ActionSupport {
 
     public String findPendingTestingRunResultSummary() {
         try {
-            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingName, leaseToken, leaseSeconds);
+            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingName, leaseToken, leaseSeconds, reclaimAfterSeconds);
             if (trrs != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
             }
@@ -3251,7 +3262,7 @@ public class DbAction extends ActionSupport {
                 summaryObjectId = new ObjectId(summaryId);
             }
             if((operator == null || operator.isEmpty()) && summaryId != null){
-                totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
+                totalCountIssues = DbLayer.calcTotalCountIssuesExcludingIgnored(summaryObjectId);
                 trrs = DbLayer.updateIssueCountInSummaryFenced(summaryId, totalCountIssues, leaseToken);
             }else{
                 trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues, operator);
@@ -3683,7 +3694,7 @@ public class DbAction extends ActionSupport {
         try {
             if (summaryId != null) {
                 ObjectId summaryObjectId = new ObjectId(summaryId);
-                totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
+                totalCountIssues = DbLayer.calcTotalCountIssuesExcludingIgnored(summaryObjectId);
             }
             trrs = DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
             if (trrs != null && trrs.getTestingRunId() != null) {
@@ -4465,7 +4476,7 @@ public class DbAction extends ActionSupport {
         }
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            PupeteerLogsDao.instance.insertOne(dbLog);
+            PupeteerLogsDao.instance.insertOne(dbLog, WriteConcern.W1);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertPuppeteerLog " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -4479,7 +4490,7 @@ public class DbAction extends ActionSupport {
         }
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            SmartTestingLogsDao.instance.insertOne(dbLog);
+            SmartTestingLogsDao.instance.insertOne(dbLog, WriteConcern.W1);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertSmartTestingLog " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -4663,7 +4674,7 @@ public class DbAction extends ActionSupport {
                 }
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            DastLogsDao.instance.insertOne(dbLog);
+            DastLogsDao.instance.insertOne(dbLog, WriteConcern.W1);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertDastLog " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -4689,7 +4700,7 @@ public class DbAction extends ActionSupport {
                 }
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            MiniTestingOrchestratorLogsDao.instance.insertOne(dbLog);
+            MiniTestingOrchestratorLogsDao.instance.insertOne(dbLog, WriteConcern.W1);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertMiniTestingOrchestratorLog " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -6093,6 +6104,14 @@ public class DbAction extends ActionSupport {
 
     public void setLeaseSeconds(int leaseSeconds) {
         this.leaseSeconds = leaseSeconds;
+    }
+
+    public int getReclaimAfterSeconds() {
+        return reclaimAfterSeconds;
+    }
+
+    public void setReclaimAfterSeconds(int reclaimAfterSeconds) {
+        this.reclaimAfterSeconds = reclaimAfterSeconds;
     }
 
     public String getLeaseStatus() {

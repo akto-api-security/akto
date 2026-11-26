@@ -31,7 +31,7 @@ echo "Calculated -Xmx value: ${XMX_MEM} MB"
 
 # --add-opens (single-token "=" form): Java 17 strong-encapsulation opens needed by reflective
 # libs — OGNL (Struts) and the MongoDB POJO codec (java.util/java.time). Passed to `java` below.
-export JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED"
+export JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError -XX:-UseBASE64Intrinsics -Xmx${XMX_MEM}m --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED"
 
 # Log the final JAVA_OPTIONS value
 echo "JAVA_OPTIONS set to: $JAVA_OPTIONS"

@@ -30,7 +30,6 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 import com.akto.types.CappedSet;
-import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -518,7 +517,7 @@ public class APICatalogSync {
         int start = newUrl.getUrl().startsWith("http") ? 3 : 0;
         for(int i = start; i < tokens.length; i ++) {
             String tempToken = tokens[i];
-            if(DictionaryFilter.isEnglishWord(tempToken)) continue;
+            if(URLTemplate.isStaticWord(tempToken, i)) continue;
 
             if (NumberUtils.isParsable(tempToken)) {
                 newTypes[i] = isNumber(tempToken) ? SuperType.INTEGER : SuperType.FLOAT;
@@ -587,7 +586,7 @@ public class APICatalogSync {
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
-            if (DictionaryFilter.isEnglishWord(tempToken) || DictionaryFilter.isEnglishWord(dbToken)) continue;
+            if (URLTemplate.isStaticWord(tempToken, i) || URLTemplate.isStaticWord(dbToken, i)) continue;
 
             int minCount = dbUrl.getUrl().startsWith("http") && newUrl.getUrl().startsWith("http") ? 3 : 0;
             if (tempToken.equalsIgnoreCase(dbToken) || i < minCount) {

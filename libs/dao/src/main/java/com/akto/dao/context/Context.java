@@ -17,6 +17,7 @@ public class Context {
     public static ThreadLocal<Log.ActivityType> activityType = new ThreadLocal<Log.ActivityType>();
     public static ThreadLocal<List<String>> tokenScope = new ThreadLocal<List<String>>();
     public static ThreadLocal<Date> tokenExpiry = new ThreadLocal<Date>();
+    public static ThreadLocal<String> tokenId = new ThreadLocal<String>();
 
 
     public static void resetContextThreadLocals() {
@@ -26,6 +27,7 @@ public class Context {
         activityType.remove();
         tokenScope.remove();
         tokenExpiry.remove();
+        tokenId.remove();
     }
 
     public static int getId() {

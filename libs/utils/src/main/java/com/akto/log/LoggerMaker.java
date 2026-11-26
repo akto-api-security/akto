@@ -11,6 +11,7 @@ import com.akto.dto.Log;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
@@ -323,7 +324,7 @@ public class LoggerMaker  {
                     dataActor.insertRuntimeLog(log);
                     break;
                 case DASHBOARD: 
-                    DashboardLogsDao.instance.insertOne(log);
+                    DashboardLogsDao.instance.insertOne(log, WriteConcern.W1);
                     break;
                 case DATA_INGESTION:
                     dataActor.insertDataIngestionLog(log);
@@ -332,7 +333,7 @@ public class LoggerMaker  {
                     dataActor.insertAnalyserLog(log);
                     break;
                 case BILLING:
-                    BillingLogsDao.instance.insertOne(log);
+                    BillingLogsDao.instance.insertOne(log, WriteConcern.W1);
                     break;
                 // Add db for db-abs
                 case THREAT_DETECTION:

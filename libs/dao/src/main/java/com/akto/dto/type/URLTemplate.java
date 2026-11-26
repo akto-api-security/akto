@@ -3,6 +3,7 @@ package com.akto.dto.type;
 import java.util.UUID;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.CustomDataType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 
@@ -14,6 +15,9 @@ import org.bson.types.ObjectId;
 
 @BsonDiscriminator
 public class URLTemplate {
+
+    // Account whose custom data types override the English word check on URL segments
+    public static final int TEMPLATE_MERGING_ACCOUNT_ID = 1772780065;
 
     @BsonId
     String id;
@@ -72,7 +76,7 @@ public class URLTemplate {
             if (thisToken == null) {
                 SuperType type = types[i];
 
-                if (DictionaryFilter.isEnglishWord(thatToken)) return false;
+                if (isStaticWord(thatToken, i)) return false;
                 switch(type) {
                     case BOOLEAN:
                         if (!"true".equals(thatToken.toLowerCase()) && !"false".equals(thatToken.toLowerCase())) return false;
@@ -102,6 +106,24 @@ public class URLTemplate {
         }
 
         return true;
+    }
+
+    /**
+     * An English word in a URL is a static path segment and is never templatized. For TEMPLATE_MERGING_ACCOUNT_ID,
+     * a segment matching an active custom data type at that position (e.g. location code LAND for ^[A-Z0-9]{3,4}$)
+     * is a value instead, the same way the runtime detects custom data types in URLs.
+     */
+    public static boolean isStaticWord(String token, int position) {
+        return DictionaryFilter.isEnglishWord(token) && !isCustomDataType(token, position);
+    }
+
+    private static boolean isCustomDataType(String token, int position) {
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || accountId != TEMPLATE_MERGING_ACCOUNT_ID) return false;
+        for (CustomDataType customDataType : SingleTypeInfo.getCustomDataTypesSortedBySensitivity(accountId)) {
+            if (customDataType.isActive() && customDataType.validate(token, String.valueOf(position))) return true;
+        }
+        return false;
     }
 
     public String getTemplateString() {

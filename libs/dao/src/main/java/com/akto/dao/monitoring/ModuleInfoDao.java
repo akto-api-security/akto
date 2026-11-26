@@ -43,11 +43,20 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { ModuleInfo.MODULE_TYPE, ModuleInfo._REBOOT, ModuleInfo.MINI_RUNTIME_NAME }, false);
         
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ModuleInfo.LAST_HEARTBEAT_RECEIVED }, true);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ModuleInfo.MODULE_TYPE, ModuleInfo.NAME }, true);
+
         Bson ttlIndex = Indexes.ascending(ModuleInfo.EXPIRES_AT);
         IndexOptions ttlOptions = new IndexOptions()
                 .name("expiresAt_ttl")
                 .expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), ttlIndex, ttlOptions);
+
+        // the admin token list finds the modules of a token by tokenId; sparse since most rows have none
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending(ModuleInfo.TOKEN_ID),
+                new IndexOptions().name("tokenId_1").sparse(true));
     }
 
     @Override

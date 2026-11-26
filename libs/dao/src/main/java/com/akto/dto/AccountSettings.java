@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.dto.settings.ApiGatewayRoleRegions;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.settings.DetectionCorrectorSettings;
 
@@ -164,10 +165,27 @@ public class AccountSettings {
     @Setter
     private boolean allowMergingOnVersions;
 
+    /**
+     * Red-team learnings for this account's agentic tests. Null means never set, which counts as on; the agent
+     * server's REDTEAM_LEARNINGS_ENABLED must also be true for learnings to run. Keep in sync with the dashboard copy.
+     */
+    public static final String REDTEAM_LEARNINGS_ENABLED = "redteamLearningsEnabled";
+    @Getter
+    @Setter
+    private Boolean redteamLearningsEnabled;
+
     @Getter
     @Setter
     private String awsAccountIdsForApiGatewayLogging;
     public static final String AWS_ACCOUNT_IDS_FOR_API_GATEWAY_LOGGING = "awsAccountIdsForApiGatewayLogging";
+
+    // Per-role regions for the API Gateway connector. Kept alongside
+    // awsAccountIdsForApiGatewayLogging (which still holds the plain role ARN
+    // list) so connectors that predate regions keep working unchanged.
+    @Getter
+    @Setter
+    private List<ApiGatewayRoleRegions> awsApiGConnectorRoleRegions;
+    public static final String AWS_API_G_CONNECTOR_ROLE_REGIONS = "awsApiGConnectorRoleRegions";
 
     @Getter
     @Setter

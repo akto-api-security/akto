@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -290,7 +292,7 @@ public class DbLayer {
 
         ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
-                Updates.combine(updateList),
+                withTokenId(Updates.combine(updateList)),
                 updateOptions);
 
         syncAgentUserFromModuleInfo(moduleInfo);
@@ -334,6 +336,12 @@ public class DbLayer {
     private static final String ORGANIZATION_TYPE_KEY = "organizationType";
     // Agents that predate organizationType report the same plan string as accountType.
     private static final String ACCOUNT_TYPE_KEY = "accountType";
+
+    // Stamps the id of the verified token from Context only; a tokenId in the heartbeat payload is never trusted.
+    private static Bson withTokenId(Bson updates) {
+        String tokenId = Context.tokenId.get();
+        return tokenId == null ? updates : Updates.combine(updates, Updates.set(ModuleInfo.TOKEN_ID, tokenId));
+    }
 
     private static Bson expiresAtUpdate(ModuleInfo.ModuleType moduleType) {
         if (moduleType == ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD) {
@@ -576,6 +584,32 @@ public class DbLayer {
         if (value != null) deviceTagUpdates.put(tagKey, Collections.singletonList(value));
     }
 
+    private static void addTrafficCollectorHeartbeat(List<WriteModel<ModuleInfo>> bulkUpdates, ModuleInfo moduleInfo) {
+        Bson podFilter = Filters.and(
+                Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
+                Filters.eq(ModuleInfo.NAME, moduleInfo.getName()));
+
+        bulkUpdates.add(new UpdateOneModel<>(podFilter, Updates.combine(
+                //putting class name because updates don't put class name by default
+                Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                Updates.setOnInsert(ModuleInfoDao.ID, moduleInfo.getId()),
+                Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                Updates.setOnInsert(ModuleInfo._REBOOT, false),
+                expiresAtUpdate(moduleInfo.getModuleType())
+        ), new UpdateOptions().upsert(true)));
+
+        bulkUpdates.add(new UpdateOneModel<>(
+                Filters.and(podFilter, Filters.ne(ModuleInfo._REBOOT, true)),
+                withTokenId(Updates.combine(
+                        // set on every heartbeat: the document now outlives the process that created it
+                        Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                        Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
+                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
+                        Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
+                ))));
+    }
+
     public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
         if (moduleInfoList == null || moduleInfoList.isEmpty()) {
             return;
@@ -585,11 +619,15 @@ public class DbLayer {
         UpdateOptions updateOptions = new UpdateOptions().upsert(true);
 
         for (ModuleInfo moduleInfo : moduleInfoList) {
+            if (moduleInfo.getModuleType() == ModuleInfo.ModuleType.TRAFFIC_COLLECTOR) {
+                addTrafficCollectorHeartbeat(bulkUpdates, moduleInfo);
+                continue;
+            }
             Bson filter = Filters.and(
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Filters.eq(ModuleInfo._REBOOT, false)
             );
-            Bson updates = Updates.combine(
+            Bson updates = withTokenId(Updates.combine(
                     //putting class name because findOneAndUpdate doesn't put class name by default
                     Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
                     Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
@@ -601,7 +639,7 @@ public class DbLayer {
                     Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
                     Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
-            );
+            ));
             bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
         }
 
@@ -630,8 +668,12 @@ public class DbLayer {
             return new ArrayList<>();
         }
 
+        // Threat detection also picks up "delete topic and reboot" here; other modules handle it elsewhere
+        boolean withDeleteTopic = moduleType == ModuleInfo.ModuleType.THREAT_DETECTION;
         List<Bson> filterConditions = new ArrayList<>();
-        filterConditions.add(Filters.eq(ModuleInfo._REBOOT, true));
+        filterConditions.add(withDeleteTopic
+                ? Filters.or(Filters.eq(ModuleInfo._REBOOT, true), Filters.eq(ModuleInfo.DELETE_TOPIC_AND_REBOOT, true))
+                : Filters.eq(ModuleInfo._REBOOT, true));
         filterConditions.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
 
         if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
@@ -653,7 +695,9 @@ public class DbLayer {
             }
 
             Bson updateFilter = Filters.in("_id", ids);
-            Bson updates = Updates.set(ModuleInfo._REBOOT, false);
+            Bson updates = withDeleteTopic
+                    ? Updates.combine(Updates.set(ModuleInfo._REBOOT, false), Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false))
+                    : Updates.set(ModuleInfo._REBOOT, false);
             ModuleInfoDao.instance.updateMany(updateFilter, updates);
         }
 
@@ -681,7 +725,7 @@ public class DbLayer {
         );
 
         ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(filter,
-                Updates.combine(
+                withTokenId(Updates.combine(
                         //putting class name because findOneAndUpdate doesn't put class name by default
                         Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
                         Updates.setOnInsert(ID, moduleInfo.getId()),
@@ -691,7 +735,7 @@ public class DbLayer {
                         Updates.set(ModuleInfo.NAME, moduleInfo.getName()),
                         Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
-                ), updateOptions);
+                )), updateOptions);
 
         // Same agent user sync updateModuleInfo/bulkUpdateModuleInfo do — a device heartbeating
         // through V2 reports the same agentLogins and must produce the same identities.
@@ -1766,10 +1810,11 @@ public class DbLayer {
         );
     }
 
+    // Log inserts are high-volume and non-critical: w:1 so they don't block on majority acks during replication lag.
     public static void insertRuntimeLog(Log log) {
         RuntimeLogsDao runtimeLogsDao = RuntimeLogsDao.instance;
         cleanupCollectionIfNeeded(runtimeLogsDao.getCollName(), runtimeLogsDao);
-        runtimeLogsDao.insertOne(log);
+        runtimeLogsDao.insertOne(log, WriteConcern.W1);
     }
 
     private static void cleanupCollectionIfNeeded(String collectionName, AccountsContextDao<?> dao) {
@@ -1827,35 +1872,35 @@ public class DbLayer {
     }
 
     public static void insertPersistentRuntimeLog(Log log) {
-        RuntimePersistentLogsDao.instance.insertOne(log);
+        RuntimePersistentLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertAnalyserLog(Log log) {
-        AnalyserLogsDao.instance.insertOne(log);
+        AnalyserLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertTestingLog(Log log) {
-        LogsDao.instance.insertOne(log);
+        LogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertAgenticTestingLog(Log log) {
-        AgenticTestingLogsDao.instance.insertOne(log);
+        AgenticTestingLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertProtectionLog(Log log) {
-        ProtectionLogsDao.instance.insertOne(log);
+        ProtectionLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertCyborgLog(Log log) {
-        CyborgLogsDao.instance.insertOne(log);
+        CyborgLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertAwsApiGatewayLog(Log log) {
-        AwsApiGatewayLogsDao.instance.insertOne(log);
+        AwsApiGatewayLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertGuardrailsServiceLog(Log log) {
-        GuardrailsServiceLogsDao.instance.insertOne(log);
+        GuardrailsServiceLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertEndpointShieldLog(LogsEndpointShield log) {
@@ -2242,6 +2287,15 @@ public class DbLayer {
 
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName,
             String leaseToken, int leaseSeconds) {
+        return findPendingTestingRunResultSummary(now, delta, miniTestingName, leaseToken, leaseSeconds, 0);
+    }
+
+    static final int DEFAULT_RECLAIM_AFTER_SECONDS = 5 * 60;
+
+    /** reclaimAfterSeconds: how old a RUNNING summary must be before it is reclaimed; non-positive means the default. */
+    public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName,
+            String leaseToken, int leaseSeconds, int reclaimAfterSeconds) {
+        int reclaimAfter = reclaimAfterSeconds > 0 ? reclaimAfterSeconds : DEFAULT_RECLAIM_AFTER_SECONDS;
         try {
 
             Bson filter = Filters.or(
@@ -2279,9 +2333,12 @@ public class DbLayer {
                         Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
                         Filters.or(
                                 Filters.and(
-                                        Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5 * 60),
+                                        Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - reclaimAfter),
                                         Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)),
-                                Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now))
+                                // gt 0: summaries inserted by lease-unaware modules carry leaseExpiryTs=0 (int default), not a real lease
+                                Filters.and(
+                                        Filters.gt(TestingRunResultSummary.LEASE_EXPIRY_TS, 0),
+                                        Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now)))
                 );
 
                 trrs = findPendingTestingRunResultSummaryBasedOnPriority(filterRunning, miniTestingName);
@@ -2885,18 +2942,25 @@ public class DbLayer {
         Map<TestingIssuesId, TestingRunResult> map = new HashMap<>();
         Map<String, TestSourceConfig> sourceConfigCache = new HashMap<>();
         for (TestingRunResult runResult : testingRunResults) {
-            String subCategory = runResult.getTestSubType();
-            TestSourceConfig config = null;
-            if (subCategory != null && subCategory.startsWith("http")) {
-                config = sourceConfigCache.computeIfAbsent(subCategory, DbLayer::findTestSourceConfig);
-            }
-            TestingIssuesId issueId = new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
-                    subCategory, config != null ? config.getId() : null);
+            TestingIssuesId issueId = issueIdFor(runResult, sourceConfigCache, DbLayer::findTestSourceConfig);
             if (getIssuesIdFromMap(issueId, map) == null) {
                 map.put(issueId, runResult);
             }
         }
         return map;
+    }
+
+    /** The issue id a result is recorded under (AUTOMATED_TESTING source). Shared by issue writes and the
+     *  summary count so both resolve a result to the same TestingRunIssues document. */
+    private static TestingIssuesId issueIdFor(TestingRunResult runResult, Map<String, TestSourceConfig> sourceConfigCache,
+            Function<String, TestSourceConfig> sourceConfigLookup) {
+        String subCategory = runResult.getTestSubType();
+        TestSourceConfig config = null;
+        if (subCategory != null && subCategory.startsWith("http")) {
+            config = sourceConfigCache.computeIfAbsent(subCategory, sourceConfigLookup);
+        }
+        return new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
+                subCategory, config != null ? config.getId() : null);
     }
 
     /** Linear-scan lookup of the map's canonical key equal to issuesId - see
@@ -3152,6 +3216,105 @@ public class DbLayer {
 
     }
 
+    private static final int ISSUE_COUNT_PAGE_SIZE = 1000;
+
+    /** Counts and bookkeeping of one {@link #countIssuesExcludingIgnored} pass. */
+    static final class IssueCountResult {
+        final Map<String, Integer> countIssues;
+        final int resultsExamined;
+        final int ignoredExcluded;
+
+        IssueCountResult(Map<String, Integer> countIssues, int resultsExamined, int ignoredExcluded) {
+            this.countIssues = countIssues;
+            this.resultsExamined = resultsExamined;
+            this.ignoredExcluded = ignoredExcluded;
+        }
+    }
+
+    /**
+     * Final per-severity issue count for a summary: every vulnerable result of the summary, except those
+     * whose TestingRunIssues document is IGNORED. A vulnerable result with no issue document (or none that
+     * can be derived) is still counted - nothing says it was ignored.
+     *
+     * Throws if the issue lookup fails: the caller must not write a count it could not verify, so an
+     * ignored issue is never silently counted as open.
+     */
+    public static Map<String, Integer> calcTotalCountIssuesExcludingIgnored(ObjectId summaryId) {
+        long start = System.currentTimeMillis();
+        String summaryHex = summaryId.toHexString();
+        IssueCountResult result = countIssuesExcludingIgnored(
+                (limit, skip) -> fetchLatestTestingRunResultBySummaryId(summaryHex, limit, skip),
+                DbLayer::fetchIssuesByIds,
+                DbLayer::findTestSourceConfig);
+        loggerMaker.infoAndAddToDb(String.format(
+                "Recomputed countIssues for summary %s (account %s): %s, vulnerable results examined: %d, ignored excluded: %d, took %d ms",
+                summaryHex, Context.accountId.get(), result.countIssues, result.resultsExamined,
+                result.ignoredExcluded, System.currentTimeMillis() - start), LogDb.DB_ABS);
+        return result.countIssues;
+    }
+
+    /** Pure core of {@link #calcTotalCountIssuesExcludingIgnored}; fetchers are injected so it is testable
+     *  without Mongo. One issue lookup per page of results. */
+    static IssueCountResult countIssuesExcludingIgnored(BiFunction<Integer, Integer, List<TestingRunResult>> pageFetcher,
+            Function<Set<TestingIssuesId>, List<TestingRunIssues>> issueFetcher,
+            Function<String, TestSourceConfig> sourceConfigLookup) {
+        Map<String, Integer> countIssues = new HashMap<>();
+        countIssues.put(Severity.CRITICAL.toString(), 0);
+        countIssues.put(Severity.HIGH.toString(), 0);
+        countIssues.put(Severity.MEDIUM.toString(), 0);
+        countIssues.put(Severity.LOW.toString(), 0);
+        Map<String, TestSourceConfig> sourceConfigCache = new HashMap<>();
+        int examined = 0;
+        int ignoredExcluded = 0;
+
+        int skip = 0;
+        while (true) {
+            List<TestingRunResult> page = pageFetcher.apply(ISSUE_COUNT_PAGE_SIZE, skip);
+            if (page == null || page.isEmpty()) {
+                break;
+            }
+
+            List<TestingIssuesId> pageIds = new ArrayList<>(page.size());
+            Set<TestingIssuesId> idsToLookUp = new HashSet<>();
+            for (TestingRunResult runResult : page) {
+                TestingIssuesId issueId = null;
+                if (runResult.getApiInfoKey() != null && runResult.getTestSubType() != null) {
+                    issueId = issueIdFor(runResult, sourceConfigCache, sourceConfigLookup);
+                    idsToLookUp.add(issueId);
+                }
+                pageIds.add(issueId);
+            }
+
+            // Fetched ids come back with exactly the case we queried (Mongo $in is exact), so a plain map
+            // keyed on TestingIssuesId resolves them despite equals/hashCode not agreeing on case.
+            Set<TestingIssuesId> ignoredIds = new HashSet<>();
+            if (!idsToLookUp.isEmpty()) {
+                for (TestingRunIssues issue : issueFetcher.apply(idsToLookUp)) {
+                    if (issue.getTestRunIssueStatus() == TestRunIssueStatus.IGNORED) {
+                        ignoredIds.add(issue.getId());
+                    }
+                }
+            }
+
+            for (int i = 0; i < page.size(); i++) {
+                examined++;
+                TestingIssuesId issueId = pageIds.get(i);
+                if (issueId != null && ignoredIds.contains(issueId)) {
+                    ignoredExcluded++;
+                    continue;
+                }
+                String severity = getSeverityFromTestingRunResult(page.get(i)).toString();
+                countIssues.merge(severity, 1, Integer::sum);
+            }
+
+            if (page.size() < ISSUE_COUNT_PAGE_SIZE) {
+                break;
+            }
+            skip += ISSUE_COUNT_PAGE_SIZE;
+        }
+        return new IssueCountResult(countIssues, examined, ignoredExcluded);
+    }
+
     public static List<TestRoles> fetchTestRoles() {
         return TestRolesDao.instance.findAll(new BasicDBObject());
     }
@@ -3397,7 +3560,7 @@ public class DbLayer {
             loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
         }
         if (!disableLogWrites) {
-            MetricDataDao.instance.insertMany(metricData);
+            MetricDataDao.instance.insertMany(metricData, WriteConcern.W1);
         }
 
         int accountId = Context.accountId.get();
@@ -3448,10 +3611,9 @@ public class DbLayer {
     }
 
 
+    // Read-only: the postgres command write-back is unused, and this is polled every minute per mini-runtime.
     public static DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
-        Integer accountId = Context.accountId.get();
-        Bson updates = Updates.combine(Updates.set("postgresResult", prevResult), Updates.set("oldPostgresCommand", prevCommand));
-        return DataControlSettingsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("_id", accountId), updates);
+        return DataControlSettingsDao.instance.findOne(Filters.eq("_id", Context.accountId.get()));
     }
 
     public static void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
@@ -3853,7 +4015,7 @@ public class DbLayer {
     }
 
     public static void insertDataIngestionLog(Log log) {
-        DataIngestionLogsDao.instance.insertOne(log);
+        DataIngestionLogsDao.instance.insertOne(log, WriteConcern.W1);
     }
 
     public static void insertMCPAuditDataLog(McpAuditInfo auditInfo) {

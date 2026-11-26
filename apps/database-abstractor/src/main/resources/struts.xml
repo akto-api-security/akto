@@ -35,6 +35,17 @@
         <action name="metrics" class="com.akto.action.InfraMetricsAction">
         </action>
 
+        <action name="api/fetchRevokedTokenIds" class="com.akto.action.TokenStatusAction" method="fetchRevokedTokenIds">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/exchangeToken" class="com.akto.action.TokenExchangeAction" method="exchangeToken">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2653,6 +2664,96 @@
         </result>
         <result name="ERROR" type="json">
           <param name="statusCode">422</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+      </action>
+
+      <action name="api/storeRedteamObservations" class="com.akto.action.RedteamLearningsAction" method="storeRedteamObservations">
+        <interceptor-ref name="json"/>
+        <interceptor-ref name="defaultStack" />
+        <result name="SUCCESS" type="json">
+          <param name="root">response</param>
+        </result>
+        <result name="ERROR" type="json">
+          <param name="statusCode">422</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+        <result name="SERVER_ERROR" type="json">
+          <param name="statusCode">500</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+      </action>
+
+      <action name="api/fetchRedteamConsolidationInput" class="com.akto.action.RedteamLearningsAction" method="fetchRedteamConsolidationInput">
+        <interceptor-ref name="json"/>
+        <interceptor-ref name="defaultStack" />
+        <result name="SUCCESS" type="json">
+          <param name="root">response</param>
+        </result>
+        <result name="ERROR" type="json">
+          <param name="statusCode">422</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+        <result name="SERVER_ERROR" type="json">
+          <param name="statusCode">500</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+      </action>
+
+      <action name="api/saveRedteamProfile" class="com.akto.action.RedteamLearningsAction" method="saveRedteamProfile">
+        <interceptor-ref name="json"/>
+        <interceptor-ref name="defaultStack" />
+        <result name="SUCCESS" type="json">
+          <param name="root">response</param>
+        </result>
+        <result name="ERROR" type="json">
+          <param name="statusCode">422</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+        <result name="SERVER_ERROR" type="json">
+          <param name="statusCode">500</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+      </action>
+
+      <action name="api/fetchLatestRedteamProfile" class="com.akto.action.RedteamLearningsAction" method="fetchLatestRedteamProfile">
+        <interceptor-ref name="json"/>
+        <interceptor-ref name="defaultStack" />
+        <result name="SUCCESS" type="json">
+          <param name="root">response</param>
+        </result>
+        <result name="ERROR" type="json">
+          <param name="statusCode">422</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+        <result name="SERVER_ERROR" type="json">
+          <param name="statusCode">500</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+      </action>
+
+      <action name="api/fetchRedteamLearningsSettings" class="com.akto.action.RedteamLearningsAction" method="fetchRedteamLearningsSettings">
+        <interceptor-ref name="json"/>
+        <interceptor-ref name="defaultStack" />
+        <result name="SUCCESS" type="json">
+          <param name="root">response</param>
+        </result>
+        <result name="ERROR" type="json">
+          <param name="statusCode">422</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+        <result name="SERVER_ERROR" type="json">
+          <param name="statusCode">500</param>
           <param name="ignoreHierarchy">false</param>
           <param name="includeProperties">^actionErrors.*</param>
         </result>
