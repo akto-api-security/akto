@@ -26,6 +26,11 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending(ModuleInfo.EXPIRES_AT), ttlOptions);
     }
 
+    public void createModuleTypeNameIndexIfAbsent() {
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo.NAME }, true);
+    }
+
     @Override
     public Class<ModuleInfo> getClassT() {
         return ModuleInfo.class;

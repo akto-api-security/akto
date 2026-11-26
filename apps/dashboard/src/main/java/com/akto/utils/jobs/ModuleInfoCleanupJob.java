@@ -12,7 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
- * Adds the expiresAt TTL index to module_info for every active account. Runs once per process start
+ * Adds the expiresAt TTL index and the moduleType+name index to module_info for every active account. Runs once per process start
  * on its own thread, so building the index on a large collection cannot hold up startup. Idempotent:
  * once the index exists, a restart is a no-op.
  */
@@ -31,8 +31,10 @@ public class ModuleInfoCleanupJob {
                     loggerMaker.warnAndAddToDb("Module info expiresAt TTL index start for account " + accountId);
                     ModuleInfoDao.instance.createTtlIndexIfAbsent();
                     loggerMaker.warnAndAddToDb("Module info expiresAt TTL index ensured for account " + accountId);
+                    ModuleInfoDao.instance.createModuleTypeNameIndexIfAbsent();
+                    loggerMaker.warnAndAddToDb("Module info moduleType+name index ensured for account " + accountId);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error creating module info TTL index for account " + accountId
+                    loggerMaker.errorAndAddToDb(e, "Error creating module info indexes for account " + accountId
                             + ": " + e.getMessage());
                 }
             }
