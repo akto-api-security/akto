@@ -964,6 +964,11 @@ public class DbAction extends ActionSupport {
             loggerMaker.errorAndAddToDb(e, "Error while updating heartbeat: " + e);
         }
 
+        // Heartbeat above is always kept; the metrics write below is skipped when DISABLE_LOG_WRITES is set.
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
+
         // update metrics
         try {
             TrafficCollectorMetricsDao.instance.updateCount(trafficCollectorMetrics);
@@ -2024,8 +2029,8 @@ public class DbAction extends ActionSupport {
 
     private static final List<Integer> HIGHER_STI_LIMIT_ACCOUNT_IDS = Arrays.asList(1736798101, 1718042191);
     private static final int STI_LIMIT = 20_000_000;
-    // When true, log-insert and traffic-metrics APIs return success without writing to Kafka/DB.
-    private static final boolean disableLogWrites = Boolean.parseBoolean(System.getenv().getOrDefault("DISABLE_LOG_WRITES", "false"));
+    // When true, log-insert and metrics APIs return success without writing to Kafka/DB.
+    public static final boolean disableLogWrites = Boolean.parseBoolean(System.getenv().getOrDefault("DISABLE_LOG_WRITES", "false"));
     private static final int higherStiLimit = Integer.parseInt(System.getenv().getOrDefault("HIGHER_STI_LIMIT", String.valueOf(5_000_000)));
 
     public String fetchEstimatedDocCount() {
@@ -2377,6 +2382,9 @@ public class DbAction extends ActionSupport {
      * unordered. The dashboard sorts by _id, so lines read back in sequence.
      */
     public String bulkInsertEndpointShieldLogs() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         if (logs == null || logs.isEmpty()) {
             return Action.SUCCESS.toUpperCase();
         }
@@ -2460,6 +2468,9 @@ public class DbAction extends ActionSupport {
     }
 
     public String insertAnalyserLog() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         try {
             int accId = Context.accountId.get();
             if (accId == 1733164172) {
@@ -3516,6 +3527,9 @@ public class DbAction extends ActionSupport {
     }
 
     public String insertAgenticTestingLog() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertAgenticTestingLog(dbLog);
@@ -3578,6 +3592,9 @@ public class DbAction extends ActionSupport {
     }
 
     public String insertRuntimeMetricsData() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         try {
             DbLayer.insertRuntimeMetricsData(metricsData);
         } catch (Exception e) {
@@ -4332,6 +4349,9 @@ public class DbAction extends ActionSupport {
     }
 
     public String insertDataIngestionLog() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertDataIngestionLog(dbLog);
@@ -4440,6 +4460,9 @@ public class DbAction extends ActionSupport {
     }
 
     public String insertPuppeteerLog() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             PupeteerLogsDao.instance.insertOne(dbLog);
@@ -4451,6 +4474,9 @@ public class DbAction extends ActionSupport {
     }
 
     public String insertSmartTestingLog() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             SmartTestingLogsDao.instance.insertOne(dbLog);
@@ -4619,6 +4645,9 @@ public class DbAction extends ActionSupport {
     private static final Set<Integer> dastLogsCappedCollectionReady = ConcurrentHashMap.newKeySet();
 
     public String insertDastLog() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         try {
             int accountId = Context.accountId.get();
             // Self-healing: guarantees dast_logs is created CAPPED (bounded size/doc count) before
@@ -4646,6 +4675,9 @@ public class DbAction extends ActionSupport {
     private static final Set<Integer> miniTestingOrchestratorLogsReady = ConcurrentHashMap.newKeySet();
 
     public String insertMiniTestingOrchestratorLog() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         try {
             int accountId = Context.accountId.get();
             if (miniTestingOrchestratorLogsReady.add(accountId)) {

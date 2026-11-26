@@ -38,6 +38,9 @@ public class EndpointShieldDiagnosticAction extends ActionSupport {
     private String id;
 
     public String insertEndpointShieldDiagnostic() {
+        if (DbAction.disableLogWrites) {
+            return SUCCESS.toUpperCase();
+        }
         EndpointShieldDiagnostic d = diagnostic;
         if (d == null || StringUtils.isBlank(d.getDeviceId())) {
             addActionError("diagnostic.deviceId is required");

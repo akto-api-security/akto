@@ -331,6 +331,11 @@ public class KafkaUtils {
         if (shieldLogBuffer == null || shieldLogBuffer.isEmpty()) {
             return;
         }
+        if (com.akto.action.DbAction.disableLogWrites) {
+            // Drop already-queued logs too, so enabling the flag stops writes immediately.
+            shieldLogBuffer.clear();
+            return;
+        }
         for (Map.Entry<Integer, List<LogsEndpointShield>> entry : shieldLogBuffer.entrySet()) {
             try {
                 Context.accountId.set(entry.getKey());
