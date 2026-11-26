@@ -43,6 +43,12 @@ class ScanRequest(BaseModel):
     # prompt). Omitted requests fall back to segmenting `text` alone.
     system_prompt: str = ""
     enrichment: str = ""
+    # Caller's Akto account, sent by guardrails-service; only logged.
+    account_id: str = ""
+
+
+def _log_scan_account(body: ScanRequest) -> None:
+    logger.info("[scan] account=%s scanner=%s", body.account_id or "-", body.scanner_name)
 
 
 class GuardrailsLLMRequest(BaseModel):
@@ -138,6 +144,7 @@ def scanners():
 
 @app.post("/scan")
 async def scan(body: ScanRequest):
+    _log_scan_account(body)
     started = time.perf_counter()
     result = await scan_payload(body.model_dump(), schedule_fn=_schedule_background)
     total_ms = (time.perf_counter() - started) * 1000.0
@@ -156,6 +163,8 @@ async def scan(body: ScanRequest):
 
 @app.post("/scan/batch")
 async def scan_batch(body: list[ScanRequest]):
+    for item in body:
+        _log_scan_account(item)
     return [await scan_payload(item.model_dump(), schedule_fn=_schedule_background) for item in body]
 
 
