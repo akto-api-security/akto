@@ -3548,13 +3548,20 @@ public class DbLayer {
     }
 
 
+    // Read once at class load; env vars don't change at runtime.
+    private static final boolean disableLogWrites = Boolean.parseBoolean(System.getenv().getOrDefault("DISABLE_LOG_WRITES", "false"));
+
     public static void ingestMetricsData(List<MetricData> metricData) {
+        // When DISABLE_LOG_WRITES is set, skip the metrics_data DB writes (cleanup + insert)
+        // but keep forwarding to New Relic / OpenTelemetry below.
         // First check if cleanup should be performed
-        if (MetricDataDao.instance.shouldPerformCleanup()) {
+        if (!disableLogWrites && MetricDataDao.instance.shouldPerformCleanup()) {
             long deletedCount = MetricDataDao.instance.deleteOldMetrics();
             loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
         }
-        MetricDataDao.instance.insertMany(metricData, WriteConcern.W1);
+        if (!disableLogWrites) {
+            MetricDataDao.instance.insertMany(metricData, WriteConcern.W1);
+        }
 
         int accountId = Context.accountId.get();
         boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
