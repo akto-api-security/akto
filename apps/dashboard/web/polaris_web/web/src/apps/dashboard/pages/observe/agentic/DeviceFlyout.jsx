@@ -218,7 +218,7 @@ function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = 
         // Anything the device talks to directly, not behind a recognized AI Agent — its own
         // sibling branch off the device, same as an agent's, instead of being dropped just because
         // this device also happens to have agents.
-        const directChildren = agents.filter(a => ["MCP Server", "LLM", "Skill", "Plugin"].includes(a.type));
+        const directChildren = agents.filter(a => ["MCP Server", "LLM", "Skill", "Plugin"].includes(a.type) && !a.skillOwners?.length);
 
         const COL1_X = 40, COL2_X = 250, COL3_X = 470, COL4_X = 690;
         const centerIn = (top, blockH) => top + (blockH - TOPO_NODE_H) / 2;
