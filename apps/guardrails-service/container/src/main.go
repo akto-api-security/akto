@@ -61,6 +61,7 @@ func main() {
 	if cfg.DatabaseAbstractorToken != "" {
 		os.Setenv("AKTO_API_TOKEN", cfg.DatabaseAbstractorToken)
 	}
+	mcp.SetScannerAccountID(auth.AccountIDFromServiceToken())
 
 	if cfg.ThreatKafka.Enabled {
 		producer, err := kafka.NewThreatProducer(cfg, logger)
