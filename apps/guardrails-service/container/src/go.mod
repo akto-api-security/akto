@@ -127,4 +127,4 @@ require (
 	modernc.org/sqlite v1.40.1 // indirect
 )
 
-replace github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20261126064031-c1736a9ff0fd
+replace github.com/akto-api-security/akto-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20261126064252-0d698f4fc623
