@@ -405,6 +405,8 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     public List<ApiInfo.ApiInfoKey> fetchEndpointsBySubType(SingleTypeInfo.SubType subType, int skip, int limit) {
         Bson filter = Filters.eq("subType", subType.getName());
         List<Bson> pipeline = getPipelineForEndpoints(filter);
+        // stable order so skip/limit pages don't overlap or miss endpoints
+        pipeline.add(Aggregates.sort(Sorts.ascending("_id")));
         pipeline.add(Aggregates.skip(skip));
         pipeline.add(Aggregates.limit(limit));
         return processPipelineForEndpoint(pipeline);
@@ -422,11 +424,11 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         }
 
         Bson projections = Projections.fields(
-                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method", SingleTypeInfo._COLLECTION_IDS)
+                Projections.include("apiCollectionId", "url", "method")
         );
 
+        // no sort before the group: $group does not keep input order, so sorting every STI row was wasted work
         pipeline.add(Aggregates.project(projections));
-        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
         pipeline.add(Aggregates.group(groupedId));
         return pipeline;
     }

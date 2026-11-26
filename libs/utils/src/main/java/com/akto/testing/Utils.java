@@ -7,6 +7,7 @@ import static com.akto.test_editor.execution.Operations.modifyCookie;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -582,37 +583,63 @@ public class Utils {
                             Filters.eq(TestingRunResult.VULNERABLE, true)
                         );
         boolean isNewTestingSummary = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(testingRunResultSummaryId, true);
-        List<TestingRunResult> allVulResults = new ArrayList<>();
-        if(!isNewTestingSummary){
-            allVulResults = TestingRunResultDao.instance.findAll(filterQ, projection);
-        }else{
-            allVulResults = VulnerableTestingRunResultDao.instance.findAll(
-                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId), projection
-            );
-        }
-        
-
-        Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = TestingUtils.
-                listOfIssuesIdsFromTestingRunResults(allVulResults, true, false);
-
-        Bson inQuery = Filters.and(Filters.in(Constants.ID, testingIssuesIdsMap.keySet().toArray()), Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN));
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(inQuery));
-        pipeline.add(Aggregates.group(
-            "$" + TestingRunIssues.KEY_SEVERITY, Accumulators.sum("count",1)
-        ));
+        TestingRunResultDao resultDao = isNewTestingSummary ? VulnerableTestingRunResultDao.instance : TestingRunResultDao.instance;
+        Bson resultFilter = isNewTestingSummary
+                ? Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId)
+                : filterQ;
 
 
-        MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-        while(cursor.hasNext()){
-            BasicDBObject dbObject = cursor.next();
-            String id = dbObject.getString("_id");
-            int val = dbObject.getInt("count");
-
-            countIssuesMap.put(id, val);
+        Set<List<Object>> countedIssues = new HashSet<>();
+        Map<String, Integer> openIssuesBySeverity = new HashMap<>();
+        try (MongoCursor<TestingRunResult> results = resultDao.findCursor(resultFilter, projection, ISSUE_COUNT_BATCH_SIZE)) {
+            List<TestingRunResult> batch = new ArrayList<>(ISSUE_COUNT_BATCH_SIZE);
+            while (results.hasNext()) {
+                batch.add(results.next());
+                if (batch.size() == ISSUE_COUNT_BATCH_SIZE || !results.hasNext()) {
+                    List<TestingIssuesId> newIssueIds = new ArrayList<>();
+                    for (TestingIssuesId issueId : TestingUtils.listOfIssuesIdsFromTestingRunResults(batch, true, false).keySet()) {
+                        if (countedIssues.add(issueDedupKey(issueId))) {
+                            newIssueIds.add(issueId);
+                        }
+                    }
+                    addOpenIssuesBySeverity(newIssueIds, openIssuesBySeverity);
+                    batch.clear();
+                }
+            }
         }
 
+        countIssuesMap.putAll(openIssuesBySeverity);
         return countIssuesMap;
+    }
+
+    private static final int ISSUE_COUNT_BATCH_SIZE = 1000;
+
+    // TestingIssuesId.equals ignores the subcategory's case but its hashCode does not, so a HashSet of ids would
+    // count "SQLi" and "sqli" twice where listOfIssuesIdsFromTestingRunResults keeps one
+    private static List<Object> issueDedupKey(TestingIssuesId issueId) {
+        String subCategory = issueId.getTestSubCategory();
+        return Arrays.asList(issueId.getApiInfoKey(), issueId.getTestErrorSource(),
+                subCategory != null ? subCategory.toLowerCase() : null, issueId.getTestCategoryFromSourceConfig());
+    }
+
+    // adds the OPEN issues among these ids to the per-severity counts
+    private static void addOpenIssuesBySeverity(List<TestingIssuesId> issueIds, Map<String, Integer> counts) {
+        if (issueIds.isEmpty()) {
+            return;
+        }
+        List<Bson> pipeline = Arrays.asList(
+            Aggregates.match(Filters.and(
+                Filters.in(Constants.ID, issueIds.toArray()),
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN))),
+            Aggregates.group("$" + TestingRunIssues.KEY_SEVERITY, Accumulators.sum("count", 1))
+        );
+        try (MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor()) {
+            while (cursor.hasNext()) {
+                BasicDBObject dbObject = cursor.next();
+                counts.merge(dbObject.getString("_id"), dbObject.getInt("count"), Integer::sum);
+            }
+        }
     }
 
     public static List<TestingRunResult> fetchLatestTestingRunResult(Bson filter){
