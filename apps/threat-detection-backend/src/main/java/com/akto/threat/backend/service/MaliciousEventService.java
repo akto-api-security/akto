@@ -1474,7 +1474,7 @@ public class MaliciousEventService {
       return "by IDs: " + eventIds;
     } else if (filterMap != null && !filterMap.isEmpty()) {
       Document query = buildQueryFromFilter(filterMap, null, accountId);
-      return "by filter: " + query.toJson();
+      return query == null ? "" : "by filter: " + query.toJson();
     }
     return "";
   }
@@ -1650,7 +1650,7 @@ public class MaliciousEventService {
     return query;
   }
 
-  private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource, String accountId) {
+  Document buildQueryFromFilter(Map<String, Object> filter, String contextSource, String accountId) {
     Document query = new Document();
 
     // Handle ips/actors filter
@@ -1731,6 +1731,16 @@ public class MaliciousEventService {
     // A bulk action on a filtered view must reach exactly the rows the view shows.
     andDocument(query, caseOwnerCondition((List<String>) filter.get("caseOwners")));
     andDocument(query, caseNotesCondition((Boolean) filter.get("hasCaseNotes")));
+
+    List<String> hosts = (List<String>) filter.get("hosts");
+    if (hosts != null && !hosts.isEmpty()) {
+      query.append("host", new Document("$in", hosts));
+    }
+
+    // No recognised filter: refuse, else the bulk update/delete would hit every event of the context
+    if (query.isEmpty()) {
+      return null;
+    }
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
     Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
