@@ -48,7 +48,7 @@ function Section({ title, description, action, children }) {
 const DRILL_PAGE_SIZE = { highRiskAgents: 10, postureScore: 10 }
 const REGENERATE_POLL_MS = 5000
 
-const DEFAULT_DATE_RANGE = values.ranges[3] // "Last 30 days" — same default the other posture pages use
+const DEFAULT_DATE_RANGE = func.getDefaultDateRange(values.ranges[3]) // "Last 30 days" by default; "All time" for selected accounts
 
 function dateRangeFromSearchParams(searchParams) {
     const sinceParam = searchParams.get('since')
@@ -263,6 +263,10 @@ function AgenticPosture() {
                 <InsightCardsSection cards={insightCards} summaries={insightSummaries} summariesLoading={insightSummariesLoading} onOpenRoute={navigate} onOpenDrill={openDrill} />
             </Section>
 
+            <Section title="Changes Since Last Week" description="What's new in the environment — this is what keeps posture operational, not a static snapshot.">
+                <ChangesSinceLastWeekSection changesThisWeek={pageData.changesThisWeek} />
+            </Section>
+
             <Section
                 title="Dangerous Execution Paths"
                 description="End-to-end chains where untrusted input reaches a privileged action against a sensitive resource with a control missing in between."
@@ -276,10 +280,6 @@ function AgenticPosture() {
 
             <Section title="Coverage & Governance" description="Posture is only as reliable as what Argus can see.">
                 <CoverageGovernanceSection coverageGovernance={pageData.coverageGovernance} />
-            </Section>
-
-            <Section title="Changes Since Last Week" description="What's new in the environment — this is what keeps posture operational, not a static snapshot.">
-                <ChangesSinceLastWeekSection changesThisWeek={pageData.changesThisWeek} />
             </Section>
         </VerticalStack>
     )

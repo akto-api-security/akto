@@ -42,6 +42,8 @@ public class ArgusInventoryService {
     public static final class Query {
         // One of the flags in ArgusInventoryRow.matchesFlag.
         private String flag;
+        // One of atRisk, attention, healthy, from the table's Posture filter; it narrows whatever flag is also set.
+        private String posture;
         private String platform;
         private List<String> platforms;
         // A team name, or "none" for agents with no owning team.
@@ -101,6 +103,7 @@ public class ArgusInventoryService {
 
     private boolean matches(ArgusInventoryRow row, Query query, String text) {
         if (StringUtils.isNotBlank(query.getFlag()) && !row.matchesFlag(query.getFlag())) return false;
+        if (StringUtils.isNotBlank(query.getPosture()) && !row.matchesFlag(query.getPosture())) return false;
         if (StringUtils.isNotBlank(query.getPlatform()) && !row.getPlatform().equals(query.getPlatform())) return false;
         if (query.getPlatforms() != null && !query.getPlatforms().isEmpty() && !query.getPlatforms().contains(row.getPlatform())) return false;
         if (StringUtils.isNotBlank(query.getTeam()) && !hasTeam(row, query.getTeam())) return false;

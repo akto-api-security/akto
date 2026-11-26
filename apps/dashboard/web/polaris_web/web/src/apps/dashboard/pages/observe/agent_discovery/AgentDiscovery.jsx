@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Badge, Banner, Box, Button, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
@@ -11,11 +11,10 @@ import { fetchDiscovery, useSnoozed } from './discoveryApi'
 import DiscoveryKpiRow, { DiscoveryFunnel } from './DiscoveryKpiRow'
 import TodoCard from './TodoCard'
 import { CoverageCard, PlatformsCard } from './CoverageCards'
+import { ALL_ASSETS_URL, agentPath } from './inventory/inventoryUtils'
 
-const INVENTORY_PATH = '/dashboard/observe/inventory'
 const POLICIES_PATH = '/dashboard/guardrails/policies'
 const CONNECT_PATH = '/dashboard/quick-start'
-const agentPath = (id) => `/dashboard/agentic-posture/agent/${id}`
 
 // Answers scroll inside this height, so the page below the bar does not move as the conversation grows.
 const ASK_MAX_HEIGHT = '420px'
@@ -31,6 +30,7 @@ const ASK_SUGGESTIONS = [
 
 function AgentDiscovery() {
     const navigate = useNavigate()
+    const location = useLocation()
     const snoozed = useSnoozed()
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -52,10 +52,14 @@ function AgentDiscovery() {
         return () => { cancelled = true }
     }, [])
 
+    // The asset's back arrow returns to this page.
+    const openAsset = (asset) => navigate(agentPath(asset.id), { state: { backUrl: location.pathname + location.search } })
+
     // Where the fix is made: policies for coverage, the asset itself when there is one, else the list of assets.
     const review = (todo) => {
         if (todo.id === 'coverage') navigate(POLICIES_PATH)
-        else navigate(todo.count === 1 ? agentPath(todo.assets[0].id) : INVENTORY_PATH)
+        else if (todo.count === 1) openAsset(todo.assets[0])
+        else navigate(ALL_ASSETS_URL)
     }
 
     let body
@@ -81,14 +85,14 @@ function AgentDiscovery() {
                 <div ref={askRef}>
                     <AskBar label="Ask Argus" placeholder={ASK_ARGUS_PLACEHOLDER} suggestions={ASK_SUGGESTIONS} chatScope={ARGUS_CHAT_SCOPE} chatData={data} request={askRequest} maxResultsHeight={ASK_MAX_HEIGHT} suggestionsLabel="" />
                 </div>
-                <DiscoveryKpiRow kpis={kpis} onOpenInventory={() => navigate(INVENTORY_PATH)} />
+                <DiscoveryKpiRow kpis={kpis} onOpenInventory={() => navigate(ALL_ASSETS_URL)} />
                 <DiscoveryFunnel funnel={funnel} />
                 <HorizontalGrid columns={{ xs: 1, lg: ['twoThirds', 'oneThird'] }} gap="4">
                     <TodoCard
                         todos={open}
                         snoozedCount={todos.length - open.length}
                         onReview={review}
-                        onOpenAsset={(asset) => navigate(agentPath(asset.id))}
+                        onOpenAsset={openAsset}
                         onAsk={(todo) => ask(`Explain this and how to fix it: ${todo.title}`)}
                         onSnooze={(todo) => snoozed.snooze(todo.id)}
                         onShowSnoozed={snoozed.clear}

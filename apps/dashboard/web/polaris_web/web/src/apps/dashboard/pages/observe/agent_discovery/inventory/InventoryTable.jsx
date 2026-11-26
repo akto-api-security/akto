@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Badge, Box, Button, HorizontalStack, ProgressBar, Tag, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Button, HorizontalStack, IndexFiltersMode, ProgressBar, Tag, Text, VerticalStack } from '@shopify/polaris'
 import func from '@/util/func'
 import GithubServerTable from '../../../../components/tables/GithubServerTable'
 import Dot from './Dot'
 import { fetchAgents } from './inventoryApi'
-import { ago, createdOn, filterChips, plural } from './inventoryUtils'
+import { TABLE_STATE_KEY, ago, createdOn, filterChips, plural } from './inventoryUtils'
 
 const HIGH_RISK_AT = 50
 const RISK_BAR_WIDTH = '72px'
@@ -13,7 +13,7 @@ const EXPORT_PAGE = 500
 
 // textValue is what the CSV export writes where the cell is a component.
 const headers = [
-    { title: 'Agent', text: 'Agent', value: 'nameComp', textValue: 'name' },
+    { title: 'Asset', text: 'Asset', value: 'nameComp', textValue: 'name' },
     { title: 'Source', text: 'Source', value: 'sourceComp', textValue: 'platform', filterKey: 'platform' },
     { title: 'Owning teams', text: 'Owning teams', value: 'teamsComp', textValue: 'teamsText' },
     { title: 'Tools', text: 'Tools', value: 'toolsComp', textValue: 'toolsText' },
@@ -33,7 +33,7 @@ const sortOptions = [
     { label: 'Created', value: 'createdTs asc', directionLabel: 'Oldest', sortKey: 'createdTs', columnIndex: 7 },
 ]
 
-const resourceName = { singular: 'agent', plural: 'agents' }
+const resourceName = { singular: 'asset', plural: 'assets' }
 
 function rowOf(agent, generatedAt, colors) {
     const high = agent.risk >= HIGH_RISK_AT
@@ -97,29 +97,35 @@ export async function exportAgents() {
         } while (rows.length < total)
         func.exportTableAsCSV(headers, rows, 'agent-inventory')
     } catch (error) {
-        func.setToast(true, true, 'Failed to export the agents')
+        func.setToast(true, true, 'Failed to export the assets')
     }
 }
 
-// The agents that pass the filter, paged by the backend, with chips that say what is filtered and a way to remove each.
-function InventoryTable({ platforms, colors, filter, onFilter, onOpen }) {
+// The assets (agents and MCP servers) that pass the filter, paged by the backend, with chips that say what is filtered and a way to remove each.
+function InventoryTable({ platforms, posture, colors, filter, onFilter, onOpen }) {
     const [matchCount, setMatchCount] = useState(null)
     const chips = filterChips(filter)
+    // Source and Posture are the table's own filters, like the ones on the other tables.
     const filters = useMemo(() => [{
         key: 'platform', label: 'Source', title: 'Source', type: 'select', multiple: true,
         choices: platforms.map((platform) => ({ label: platform.name, value: platform.name })),
-    }], [platforms])
+    }, {
+        key: 'posture', label: 'Posture', title: 'Posture', type: 'select', singleSelect: true,
+        choices: posture.map((group) => ({ label: `${group.label} · ${group.count}`, value: group.key })),
+    }], [platforms, posture])
+    const postureLabels = useMemo(() => Object.fromEntries(posture.map((group) => [group.key, group.label])), [posture])
+    const disambiguateLabel = useCallback((key, value) => (key === 'posture' ? postureLabels[value[0]] || value[0] : func.convertToDisambiguateLabelObj(value, null, 2)), [postureLabels])
 
     const fetchData = useCallback(async (sortKey, sortOrder, skip, limit, tableFilters, filterOperators, queryValue) => {
         const scope = { ...filter }
         delete scope.flagLabel
         try {
             // The table sends -1 for "asc" and 1 for "desc", the reverse of Mongo.
-            const page = await fetchAgents({ ...scope, platforms: tableFilters?.platform || [], queryValue, sortKey, sortOrder: sortOrder === -1 ? 1 : -1, skip, limit })
+            const page = await fetchAgents({ ...scope, platforms: tableFilters?.platform || [], posture: tableFilters?.posture?.[0], queryValue, sortKey, sortOrder: sortOrder === -1 ? 1 : -1, skip, limit })
             setMatchCount(page.total)
             return { value: page.agents.map((agent) => rowOf(agent, page.generatedAt, colors)), total: page.total }
         } catch (error) {
-            func.setToast(true, true, 'Failed to load the agents')
+            func.setToast(true, true, 'Failed to load the assets')
             return { value: [], total: 0 }
         }
     }, [filter, colors])
@@ -133,10 +139,10 @@ function InventoryTable({ platforms, colors, filter, onFilter, onOpen }) {
 
     return (
         <VerticalStack gap="3">
-            <Text variant="headingMd" as="h2">All agents</Text>
-            {chips.length > 0 && (
+            <Text variant="headingMd" as="h2">All assets</Text>
+            {Object.keys(filter).length > 0 && (
                 <HorizontalStack gap="2" blockAlign="center">
-                    {matchCount !== null && <Text as="span" fontWeight="semibold">{`${plural(matchCount, 'agent')} match`}</Text>}
+                    {matchCount !== null && <Text as="span" fontWeight="semibold">{`${plural(matchCount, 'asset')} match`}</Text>}
                     {chips.map((chip) => <Tag key={chip.key} onRemove={() => remove(chip.key)}>{chip.label}</Tag>)}
                     <Button plain onClick={() => onFilter({})}>Clear all</Button>
                 </HorizontalStack>
@@ -151,7 +157,9 @@ function InventoryTable({ platforms, colors, filter, onFilter, onOpen }) {
                 headers={headers}
                 headings={headers}
                 filters={filters}
-                disambiguateLabel={(key, value) => func.convertToDisambiguateLabelObj(value, null, 2)}
+                filterStateUrl={TABLE_STATE_KEY}
+                mode={IndexFiltersMode.Default}
+                disambiguateLabel={disambiguateLabel}
                 sortOptions={sortOptions}
                 pageLimit={PAGE_LIMIT}
                 selectable={false}

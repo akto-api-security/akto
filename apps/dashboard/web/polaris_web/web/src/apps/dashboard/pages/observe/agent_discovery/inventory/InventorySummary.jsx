@@ -6,7 +6,7 @@ import LineChart from '../../../../components/charts/LineChart'
 import Dot from './Dot'
 import MiniBar from './MiniBar'
 import { revokeIdentity } from './inventoryApi'
-import { POSTURE_COLORS, ago, lastUsedText, percent, plural } from './inventoryUtils'
+import { POSTURE_COLORS, ago, breakAtDots, lastUsedText, percent, plural } from './inventoryUtils'
 
 const DONUT_SIZE = 168
 const PLATFORM_DONUT_SIZE = 76
@@ -43,7 +43,7 @@ function Hero({ data, onFilter }) {
     const donut = donutOf(posture, Object.fromEntries(posture.map((group) => [group.key, group.count])))
     const [atRisk, attention] = posture
     const series = [
-        { name: 'All agents', color: TREND_COLORS.total, data: trend.map((p) => [p.ts * 1000, p.total]) },
+        { name: 'All assets', color: TREND_COLORS.total, data: trend.map((p) => [p.ts * 1000, p.total]) },
         { name: 'At risk', color: TREND_COLORS.atRisk, data: trend.map((p) => [p.ts * 1000, p.atRisk]) },
     ]
     const last = trend[trend.length - 1]
@@ -210,14 +210,15 @@ function Recent({ recent, generatedAt, colors, onOpen, onFilter }) {
                 </HorizontalStack>
                 {recent.map((asset) => (
                     <HorizontalStack key={asset.id} gap="3" blockAlign="start" wrap={false}>
-                        <Box paddingBlockStart="2"><Dot color={colors[asset.platform]} size={10} /></Box>
-                        <Box width="100%">
+                        <Box paddingBlockStart="1"><Dot color={colors[asset.platform]} size={10} /></Box>
+                        {/* minWidth 0 lets a long host name wrap inside the card instead of pushing the policy label out. */}
+                        <Box width="100%" minWidth="0">
                             <VerticalStack gap="0">
-                                <Box><Button plain monochrome removeUnderline onClick={() => onOpen(asset.id)}><Text as="span" fontWeight="semibold">{asset.name}</Text></Button></Box>
+                                <Box><Button plain monochrome removeUnderline textAlign="left" onClick={() => onOpen(asset.id)}><Text as="span" fontWeight="semibold" breakWord>{breakAtDots(asset.name)}</Text></Button></Box>
                                 <Text variant="bodySm" color="subdued">{`${ago(asset.createdTs, generatedAt)} · ${asset.platform} · ${asset.type}`}</Text>
                             </VerticalStack>
                         </Box>
-                        <Box minWidth="96px">
+                        <Box minWidth="100px">
                             {asset.policies > 0
                                 ? <Text as="p" variant="bodySm" color="success" alignment="end">Policy attached</Text>
                                 : <Text as="p" variant="bodySm" color="critical" alignment="end">No policy</Text>}
@@ -250,13 +251,14 @@ function Quiet({ quiet, generatedAt, onIdentities, onRevoked }) {
                 {quiet.items.length === 0 && <Text variant="bodyMd" color="subdued">No identities have gone quiet in the last 30 days.</Text>}
                 {quiet.items.map((identity) => (
                     <HorizontalStack key={identity.id} gap="3" blockAlign="center" wrap={false}>
-                        <Box width="100%">
+                        {/* minWidth 0 lets a long identity name truncate instead of pushing Revoke out of the card. */}
+                        <Box width="100%" minWidth="0">
                             <VerticalStack gap="0">
                                 <Text as="span" fontWeight="semibold" truncate>{identity.name}</Text>
-                                <Text variant="bodySm" color="subdued">{`Last used ${lastUsedText(identity.lastUsedTs, generatedAt)} · ${identity.agentName || identity.accessLevel}`}</Text>
+                                <Text variant="bodySm" color="subdued" truncate>{`Last used ${lastUsedText(identity.lastUsedTs, generatedAt)} · ${identity.agentName || identity.accessLevel}`}</Text>
                             </VerticalStack>
                         </Box>
-                        <Button size="slim" outline destructive onClick={() => revoke(identity)}>Revoke</Button>
+                        <Box minWidth="64px"><Button size="slim" outline destructive onClick={() => revoke(identity)}>Revoke</Button></Box>
                     </HorizontalStack>
                 ))}
             </VerticalStack>

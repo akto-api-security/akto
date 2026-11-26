@@ -20,7 +20,7 @@ const ROW_HEIGHT = 48;
 const tagOwner = (row) => row.username || row.owner;
 
 const employeeColumns = (dataOptions) => [
-    { field: "username", headerName: "Employee", flex: 2, minWidth: 200, cellRenderer: EmployeeCellRenderer, checkboxSelection: true, headerCheckboxSelection: true },
+    { field: "username", headerName: "User", flex: 2, minWidth: 200, cellRenderer: EmployeeCellRenderer, checkboxSelection: true, headerCheckboxSelection: true },
     { field: "teams", headerName: "Team", flex: 1, minWidth: 140, sortable: false, cellRenderer: TeamsCellRenderer, ...setFilter(dataOptions.teams, (value) => value), filterValueGetter: (params) => (params.data?.teams?.length ? params.data.teams : [UNTAGGED_TEAM]) },
     { field: "deviceCount", headerName: "Devices", width: 100, cellRenderer: CountCellRenderer },
     { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
@@ -230,7 +230,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     const [openFilter, setOpenFilter] = useState(null);
     const [refreshKey, setRefreshKey] = useState(0);
     const tabs = [
-        { id: "employees", content: "Employees", badge: counts.employees != null ? counts.employees.toLocaleString("en-US") : undefined },
+        { id: "employees", content: "Users", badge: counts.employees != null ? counts.employees.toLocaleString("en-US") : undefined },
         { id: "devices", content: "Devices", badge: counts.devices != null ? counts.devices.toLocaleString("en-US") : undefined },
     ];
 
@@ -248,7 +248,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 return { value, total: response?.atlasTotal || 0 };
             })
             .catch(() => {
-                func.setToast(true, true, `Failed to load ${isEmployees ? "employees" : "devices"}`);
+                func.setToast(true, true, `Failed to load ${isEmployees ? "users" : "devices"}`);
                 setRows([]);
                 return { value: [], total: 0 };
             })

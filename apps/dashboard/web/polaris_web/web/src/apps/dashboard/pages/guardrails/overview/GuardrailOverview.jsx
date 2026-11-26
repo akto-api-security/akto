@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Badge, Banner, Box, Button, HorizontalGrid, HorizontalStack, VerticalStack } from '@shopify/polaris'
+import { Banner, Box, Button, HorizontalGrid, HorizontalStack, VerticalStack } from '@shopify/polaris'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
@@ -23,6 +23,7 @@ import ViolationsTrendCard from './ViolationsTrendCard'
 import TopPoliciesCard from './TopPoliciesCard'
 import ViolationHeatmap from './ViolationHeatmap'
 import NeedsAttentionCard from './NeedsAttentionCard'
+import ThreatWorldMap from '../../threat_detection/components/ThreatWorldMap'
 
 const EXPORT_LIMIT = 2000
 
@@ -40,7 +41,7 @@ function GuardrailOverview() {
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
         searchParams,
-        (sp) => dateRangeFromSearchParams(sp) || DEFAULT_DATE_RANGE
+        (sp) => dateRangeFromSearchParams(sp) || func.getAllTimeRangeForAccounts() || DEFAULT_DATE_RANGE
     )
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -148,6 +149,7 @@ function GuardrailOverview() {
                         loadingMore={loadingMore === 'topPolicies'}
                     />
                 </HorizontalGrid>
+                <ThreatWorldMap startTimestamp={startTimestamp} endTimestamp={endTimestamp} style={{ width: '100%' }} />
                 <ViolationHeatmap
                     heatmap={heatmap}
                     policySeverity={policySeverity}
@@ -196,13 +198,10 @@ function GuardrailOverview() {
     return (
         <PageWithMultipleCards
             title={
-                <HorizontalStack gap="2" blockAlign="center">
-                    <TitleWithInfo
-                        titleText="Guardrail overview"
-                        tooltipContent="Violations caught by your guardrail policies across your agents, and what needs attention first."
-                    />
-                    <Badge status="info">Beta</Badge>
-                </HorizontalStack>
+                <TitleWithInfo
+                    titleText="Guardrail overview"
+                    tooltipContent="Violations caught by your guardrail policies across your agents, and what needs attention first."
+                />
             }
             isFirstPage
             secondaryActions={

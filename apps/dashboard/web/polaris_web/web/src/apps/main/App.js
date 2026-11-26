@@ -148,6 +148,7 @@ import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsP
 import AgenticDiscoveryOverview from "../dashboard/pages/observe/atlas/discovery/AgenticDiscoveryOverview.jsx";
 import AgentDiscovery from "../dashboard/pages/observe/agent_discovery/AgentDiscovery.jsx";
 import AgentInventory from "../dashboard/pages/observe/agent_discovery/inventory/AgentInventory.jsx";
+import CollectionsRoute from "../dashboard/pages/observe/agent_discovery/inventory/CollectionsRoute.jsx";
 import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
@@ -266,7 +267,7 @@ const router = createBrowserRouter([
                             },
                             {
                                 path: "inventory",
-                                element: <ApiCollections/>
+                                element: <CollectionsRoute/>
                             },
                             {
                                 path: "agentic-assets-legacy",
@@ -291,6 +292,11 @@ const router = createBrowserRouter([
                             {
                                 path: "agent-inventory",
                                 element: <AgentInventory/>
+                            },
+                            {
+                                // The same agent page as agentic-posture/agent/:collectionId, opened from Inventory so the nav stays on Inventory.
+                                path: "agent-inventory/agent/:collectionId",
+                                element: <AgenticPostureAgentDetail/>
                             },
                             {
                                 path: "users-and-devices",

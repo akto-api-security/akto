@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
-import { Badge, Button, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
+import { Button, HorizontalGrid, Text } from "@shopify/polaris";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import { ACTIVITY_TAB, THREAT_ACTIVITY_PATH, clearSavedActivityFilters, openThreatActivityPage } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
@@ -17,6 +17,7 @@ import TopAgenticAssetsCard from "./TopAgenticAssetsCard";
 import guardrailsApi from "../api";
 import { LOAD_FAILED } from "./atlasOverviewUtils";
 import { policyLink } from "../overview/GuardrailOverview";
+import ThreatWorldMap from "../../threat_detection/components/ThreatWorldMap";
 
 const LIST_PAGE_SIZE = 5;
 
@@ -24,7 +25,7 @@ function AtlasGuardrailsOverview() {
     const navigate = useNavigate();
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        func.getLast30DaysRange(),
+        func.getDefaultDateRange(func.getLast30DaysRange()),
     );
     const [kpis, setKpis] = useState(null);
     const [triage, setTriage] = useState(null);
@@ -95,6 +96,12 @@ function AtlasGuardrailsOverview() {
             <DecisionsTrendCard decisions={decisions} onOpenActivity={openActivity} />
             <PolicyViolationsCard data={policies} onOpenActivity={openActivity} onTune={openPolicy} />
         </HorizontalGrid>,
+        <ThreatWorldMap
+            key="world-map"
+            startTimestamp={startTimestamp}
+            endTimestamp={endTimestamp}
+            style={{ width: "100%" }}
+        />,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
             <ViolationsSourcesCard data={violationsSources} pageSize={listPageSize} onOpenActivity={openActivity} />
             <TopEmployeesCard data={topEmployees} pageSize={listPageSize} onOpenActivity={openActivity} />
@@ -104,12 +111,7 @@ function AtlasGuardrailsOverview() {
 
     return (
         <PageWithMultipleCards
-            title={
-                <HorizontalStack gap="2" blockAlign="center">
-                    <Text as="h1" variant="headingLg">Guardrail overview</Text>
-                    <Badge status="info">Beta</Badge>
-                </HorizontalStack>
-            }
+            title={<Text as="h1" variant="headingLg">Guardrail overview</Text>}
             subtitle="Violations across all managed devices and discovered AI agents, apps and MCP servers"
             isFirstPage
             secondaryActions={

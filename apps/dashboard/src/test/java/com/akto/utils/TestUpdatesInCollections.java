@@ -26,6 +26,7 @@ import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -71,7 +72,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         }
 
         httpCallParser.syncFunction(httpResponseParamsList, false, true, null);
-        httpCallParser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit, SyncLimit.noLimit, SyncLimit.noLimit,
+        httpCallParser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit, FeatureAccess.fullAccess,
             Source.HAR);
     }
 

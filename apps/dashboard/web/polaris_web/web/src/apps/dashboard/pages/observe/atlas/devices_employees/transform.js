@@ -22,7 +22,7 @@ const FOOTPRINT_EDGE_COLOR = "#E1E3E5";
 
 const CSV_COLUMNS = {
     employees: [
-        ["Employee", (row) => row.username],
+        ["User", (row) => row.username],
         ["Teams", (row) => row.teams],
         ["Devices", (row) => row.devices],
         ["AI tools", (row) => row.toolCount],
@@ -59,7 +59,7 @@ function statSubtexts(deviceStats) {
     if (offlineDevices > 0) agentActiveParts.push(`${formatCount(offlineDevices)} offline 7+ days`);
     const unapprovedParts = [];
     if (unapprovedTeams > 0) unapprovedParts.push(`Across ${plural(unapprovedTeams, "team")}`);
-    if (unapprovedNoTeam > 0) unapprovedParts.push(`${formatCount(unapprovedNoTeam)} ${unapprovedNoTeam === 1 ? "employee" : "employees"} with no team`);
+    if (unapprovedNoTeam > 0) unapprovedParts.push(`${formatCount(unapprovedNoTeam)} ${unapprovedNoTeam === 1 ? "user" : "users"} with no team`);
     const managedParts = [];
     if (desktopDevices > 0) managedParts.push(`${formatCount(desktopDevices)} desktop`);
     if (browserDevices > 0) managedParts.push(`${formatCount(browserDevices)} browsers`);
@@ -340,7 +340,7 @@ const transform = {
     },
     footprintGraph: (kind, detail, view) => (kind === "device"
         ? footprintModel({ label: detail.name, sub: detail.hook ? INFERENCE_HOOKS_LABEL : detail.compliance ? CLAUDE_COMPLIANCE_LABEL : osLabel(detail.os) }, [detail], ["Device", "AI tools", "MCP servers, plugins and skills"], view)
-        : footprintModel({ label: detail.username, sub: (detail.teams || []).join(", ") || "Employee", devicesColumn: true }, detail.deviceDetails || [], ["Employee", "Devices", "AI tools", "MCP servers, plugins and skills"], view)),
+        : footprintModel({ label: detail.username, sub: (detail.teams || []).join(", ") || "User", devicesColumn: true }, detail.deviceDetails || [], ["User", "Devices", "AI tools", "MCP servers, plugins and skills"], view)),
     employeeAiToolCount: (employee) => (employee.deviceDetails || []).reduce(
         (total, device) => total + device.toolCount - (device.toolsByCategory?.mcp || 0), 0),
     pluginCount: (tools) => tools.filter((tool) => tool.plugin).length,
