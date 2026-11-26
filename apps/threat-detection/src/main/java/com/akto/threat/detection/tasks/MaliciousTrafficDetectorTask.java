@@ -209,13 +209,29 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
       return true;
     }
 
-    if (responseParam.getPath().contains("/api/threat_detection") || responseParam.getPath().contains("/api/dashboard") || responseParam.getPath().contains("/api/ingestData")) {
+    if (isAktoInternalPath(responseParam.getPath())) {
       return true;
     }
 
     List<String> hosts = headers.get("host");
     if (hosts == null || hosts.isEmpty()) return false;
     return hosts.contains(Constants.AKTO_THREAT_PROTECTION_BACKEND_HOST);
+  }
+
+  /**
+   * Akto's own calls: the threat backend's /api/dashboard/* and /api/threat_detection/* routes, and
+   * data ingestion's /api/ingestData. Matched as path prefixes rather than substrings, so a client's
+   * own endpoint such as /api/dashboard is still checked for threats.
+   */
+  static boolean isAktoInternalPath(String url) {
+    if (url == null) return false;
+    String path = url;
+    int scheme = path.indexOf("://");
+    if (scheme >= 0) {
+      int slash = path.indexOf('/', scheme + 3);
+      path = slash >= 0 ? path.substring(slash) : "/";
+    }
+    return path.startsWith("/api/threat_detection/") || path.startsWith("/api/dashboard/") || path.startsWith("/api/ingestData");
   }
 
   private boolean isDebugRequest(HttpResponseParams responseParam) {
