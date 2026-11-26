@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.mongodb.WriteConcern;
+import com.mongodb.client.MongoCollection;
 import com.akto.dao.*;
 import com.akto.dao.agent_classifiers.AgentGuardCorpusDao;
 import com.akto.dao.agent_classifiers.AgentGuardCorpusQueueDao;
@@ -232,6 +233,13 @@ public class DbLayer {
         );
     }
 
+    // Heartbeats are high-volume and idempotent (the next heartbeat overwrites this one), so they
+    // don't need majority acknowledgement. The cluster default is w:majority, which makes every
+    // heartbeat wait for the secondaries and stall whenever replication lags.
+    private static MongoCollection<ModuleInfo> moduleInfoHeartbeatCollection() {
+        return ModuleInfoDao.instance.getMCollection().withWriteConcern(WriteConcern.W1);
+    }
+
     public static ModuleInfo updateModuleInfo(ModuleInfo moduleInfo) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -290,7 +298,7 @@ public class DbLayer {
         }
         updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getModuleType(), moduleInfo.getAdditionalData()));
 
-        ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
+        ModuleInfo result = moduleInfoHeartbeatCollection().findOneAndUpdate(
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 withTokenId(Updates.combine(updateList)),
                 updateOptions);
@@ -643,7 +651,7 @@ public class DbLayer {
             bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
         }
 
-        ModuleInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+        moduleInfoHeartbeatCollection().bulkWrite(bulkUpdates);
 
         for (ModuleInfo moduleInfo : moduleInfoList) {
             syncAgentUserFromModuleInfo(moduleInfo);
@@ -724,7 +732,7 @@ public class DbLayer {
             Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType())
         );
 
-        ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(filter,
+        ModuleInfo result = moduleInfoHeartbeatCollection().findOneAndUpdate(filter,
                 withTokenId(Updates.combine(
                         //putting class name because findOneAndUpdate doesn't put class name by default
                         Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
