@@ -260,20 +260,47 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
+        return fillApiCollectionsUrlCount(apiCollections, filter, Collections.emptyMap());
+    }
+
+    // countsFromStats (collection id -> count) are used as they are, only the other collections are counted live
+    List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter, Map<Integer, Integer> countsFromStats) {
         long fillStart = System.currentTimeMillis();
-        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(filter, apiCollections);
-        loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] buildEndpointsCount took " + (System.currentTimeMillis() - fillStart) + "ms");
+        List<ApiCollection> collectionsToCountLive = apiCollections.stream().filter(c -> !countsFromStats.containsKey(c.getId())).collect(Collectors.toList());
+        Map<Integer, Integer> countMap = collectionsToCountLive.isEmpty() ? Collections.emptyMap()
+                : ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(filter, collectionsToCountLive);
+        loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] buildEndpointsCount took " + (System.currentTimeMillis() - fillStart) + "ms, fromStats=" + countsFromStats.size());
         long loopStart = System.currentTimeMillis();
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
-            apiCollection.setUrlsCount(resolveUrlsCount(apiCollection, countMap.get(apiCollectionId)));
+            Integer countFromStats = countsFromStats.get(apiCollectionId);
+            apiCollection.setUrlsCount(countFromStats != null ? countFromStats : resolveUrlsCount(apiCollection, countMap.get(apiCollectionId)));
 
             // Populate URLs for MCP collections using the service
             populateCollectionUrls(apiCollection);
         }
         loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] loop + populateUrls took " + (System.currentTimeMillis() - loopStart) + "ms");
         return apiCollections;
+    }
+
+    // counts the stats refresh already holds, for collections safe to show as they are (deactivated, uncounted and urls-fallback ones stay live); also starts a counts-only refresh when due
+    Map<Integer, Integer> endpointCountsFromStats(List<ApiCollection> apiCollections) {
+        Map<Integer, Integer> countsFromStats = new HashMap<>();
+        // counts this old mean the refresh stopped, so count live instead
+        int maxStatsAgeSeconds = 5 * CollectionStatsRefresher.Metric.ENDPOINTS_COUNT.getTtlSeconds();
+        if (Context.now() - CollectionStatsRefresher.refreshEndpointsCountIfDue() > maxStatsAgeSeconds) return countsFromStats;
+
+        List<Integer> activeCollectionIds = apiCollections.stream().map(ApiCollection::getId)
+                .filter(id -> !deactivatedCollections.contains(id)).collect(Collectors.toList());
+        for (ApiCollectionStats stats : ApiCollectionStatsDao.instance.findAll(Filters.in(ApiCollectionStats.ID, activeCollectionIds),
+                Projections.include(ApiCollectionStats.ID, ApiCollectionStats.ENDPOINTS_COUNT, ApiCollectionStats.URLS_FALLBACK_COUNT))) {
+            int endpointsCount = stats.getEndpointsCount(), urlsFallbackCount = stats.getUrlsFallbackCount();
+            // 0 may be a row never counted, and a count equal to the urls fallback may be that fallback (live list loads no urls), so both are counted live
+            boolean isTrafficCount = endpointsCount > 0 && (urlsFallbackCount == 0 || endpointsCount != urlsFallbackCount);
+            if (isTrafficCount) countsFromStats.put(stats.getId(), endpointsCount);
+        }
+        return countsFromStats;
     }
 
     private String nameRegex;
@@ -447,7 +474,7 @@ public class ApiCollectionsAction extends UserAction {
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size()+ ", loggedInUser=" + loggedInUser);
         stepStart = System.currentTimeMillis();
 
-        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections), endpointCountsFromStats(this.apiCollections));
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] fillApiCollectionsUrlCount took " + (System.currentTimeMillis() - stepStart) + "ms");
         stepStart = System.currentTimeMillis();
 
@@ -520,7 +547,7 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(ApiCollection.HOST_NAME, deviceHostNames), ApiCollectionsDao.LIST_PROJECTION);
         AgenticObserveUtil.retainSkillsWithApiInfo(this.apiCollections);
 
-        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections), endpointCountsFromStats(this.apiCollections));
 
         for (ApiCollection c : this.apiCollections) {
             List<CollectionTags> tags = c.getTagsList();
