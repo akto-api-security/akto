@@ -247,7 +247,7 @@ async def _run_guardrails_llm(body: GuardrailsLLMRequest, route: str, relaxed: b
     elapsed_ms = (time.perf_counter() - start) * 1000
     logger.debug(f"[GuardrailsLLM] response: {content!r}")
     logger.info(
-        f"[GuardrailsLLM] route={route} account={account} provider={provider.name} source={source} prompt_len={len(body.prompt)} "
-        f"relaxed={relaxed} response_len={len(content)} ms={elapsed_ms:.0f}"
+        f"[GuardrailsLLM] route={route} account={account} provider={provider.name} source={source} "
+        f"prompt_len={len(body.prompt)} relaxed={relaxed} response_len={len(content)} ms={elapsed_ms:.0f}"
     )
     return {"content": content}
