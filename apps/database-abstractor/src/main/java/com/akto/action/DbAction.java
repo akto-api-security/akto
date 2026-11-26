@@ -4698,6 +4698,9 @@ public class DbAction extends ActionSupport {
     }
 
     public String insertAwsApiGatewayLog() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         try {
             // Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             // AwsApiGatewayLogsDao.instance.insertOne(dbLog);
@@ -4709,6 +4712,9 @@ public class DbAction extends ActionSupport {
     }
 
     public String insertGuardrailsServiceLog() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         try {
             // Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             // GuardrailsServiceLogsDao.instance.insertOne(dbLog);
