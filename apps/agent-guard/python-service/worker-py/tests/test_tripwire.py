@@ -305,19 +305,27 @@ async def test_a_slow_tripwire_never_delays_the_scan():
 
 
 async def test_a_tripwire_slower_than_its_timeout_is_cut_off(monkeypatch):
-    monkeypatch.setattr(model_map, "_TRIPWIRE_TIMEOUT_MS", 50)
+    monkeypatch.setattr(model_map.settings, "TRIPWIRE_TIMEOUT_MS", "50")
     r, took, stored = await _scan_and_store(_slow(5, _trip(0.99)))
     assert took < 0.15 and r["details"]["tripwire"] == {"completed": False}
     await asyncio.sleep(0.2)
     assert stored == [["qwen"]]
 
 
-async def test_the_timeout_is_500ms():
+async def test_the_timeout_comes_from_TRIPWIRE_TIMEOUT_MS(monkeypatch):
+    monkeypatch.setattr(model_map.settings, "TRIPWIRE_TIMEOUT_MS", "300")
     _, _, stored = await _scan_and_store(_slow(5, _trip(0.99)))
-    await asyncio.sleep(0.35)
+    await asyncio.sleep(0.2)
     assert stored == []
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.4)
     assert stored == [["qwen"]]
+
+
+async def test_the_default_timeout_is_5s(monkeypatch):
+    monkeypatch.setattr(model_map.settings, "TRIPWIRE_TIMEOUT_MS", "")
+    _, _, stored = await _scan_and_store(_slow(1, _trip(0.99)))
+    await asyncio.sleep(1.2)
+    assert stored == [["qwen", "tripwire"]]  # a 1 s answer, cut off under the old 500 ms, is now recorded
 
 
 async def test_tripwire_runs_alongside_the_cascade_not_after_it():
