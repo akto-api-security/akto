@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Badge, Banner, Box, Button, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Banner, Box, Button, Card, HorizontalGrid, Text, VerticalStack } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
 import TitleWithInfo from '../../../components/shared/TitleWithInfo'
@@ -115,13 +115,10 @@ function AgentDiscovery() {
     return (
         <PageWithMultipleCards
             title={
-                <HorizontalStack gap="2" blockAlign="center">
-                    <TitleWithInfo
-                        titleText="Agent discovery"
-                        tooltipContent="The agents, MCP servers and tools Argus found in your traffic, what nobody has reviewed, and what to do first."
-                    />
-                    <Badge status="info">Beta</Badge>
-                </HorizontalStack>
+                <TitleWithInfo
+                    titleText="Agent discovery"
+                    tooltipContent="The agents, MCP servers and tools Argus found in your traffic, what nobody has reviewed, and what to do first."
+                />
             }
             isFirstPage
             primaryAction={<Button primary onClick={() => navigate(CONNECT_PATH)}>Connect agent platform</Button>}

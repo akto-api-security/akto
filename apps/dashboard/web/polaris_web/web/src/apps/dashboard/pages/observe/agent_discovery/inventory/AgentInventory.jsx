@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Badge, Banner, Box, HorizontalStack, Tabs, VerticalStack } from '@shopify/polaris'
+import { Banner, Box, Tabs, VerticalStack } from '@shopify/polaris'
 import PersistStore from '../../../../../main/PersistStore'
 import PageWithMultipleCards from '../../../../components/layouts/PageWithMultipleCards'
 import SpinnerCentered from '../../../../components/progress/SpinnerCentered'
@@ -87,13 +87,10 @@ function AgentInventory() {
     return (
         <PageWithMultipleCards
             title={
-                <HorizontalStack gap="2" blockAlign="center">
-                    <TitleWithInfo
-                        titleText="Agent inventory"
-                        tooltipContent="Every agent and MCP server Argus found in your traffic, with its risk, tools and last activity."
-                    />
-                    <Badge status="info">Beta</Badge>
-                </HorizontalStack>
+                <TitleWithInfo
+                    titleText="Agent inventory"
+                    tooltipContent="Every agent and MCP server Argus found in your traffic, with its risk, tools and last activity."
+                />
             }
             subtitle={subtitle}
             isFirstPage
