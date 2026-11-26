@@ -90,6 +90,12 @@ public class YamlTestTemplate extends SecurityTestTemplate {
 
     @Override
     public ValidationResult filter() {
+        // smart testing never runs in this module, so a template that only smart testing may run is skipped here,
+        // before any other work
+        boolean onlySmartTestingAllowed = varMap.containsKey("onlySmartTestingAllowed") && Boolean.TRUE.equals(varMap.get("onlySmartTestingAllowed"));
+        if (onlySmartTestingAllowed) {
+            return new ValidationResult(false, "This test runs only in smart testing");
+        }
         // loggerMaker.debugAndAddToDb("filter started" + logId, LogDb.TESTING);
         List<String> authHeaders = AuthValidator.getHeaders(this.auth, this.authMechanism, this.customAuthTypes);
         // loggerMaker.debugAndAddToDb("found authHeaders " + authHeaders + " " + logId, LogDb.TESTING);
@@ -105,6 +111,12 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 return validationResult;
             }
         }
+        // no filteration when template allowed for smart testing
+        boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+        if(templateAllowsAutomated){
+            return new ValidationResult(true, "");
+        }
+
         ValidationResult isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
         // loggerMaker.debugAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
         return isValid;
