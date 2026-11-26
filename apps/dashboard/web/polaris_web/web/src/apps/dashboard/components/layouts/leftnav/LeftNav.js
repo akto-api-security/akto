@@ -630,14 +630,11 @@ export default function LeftNav() {
                     ),
                     icon: DiamondAlertMinor,
                     onClick: () => {
-                        // Atlas (Endpoint Security) and Argus (Agentic Security) land on their guardrails
-                        // Overview; other categories on Threat Actors.
-                        if (dashboardCategory === CATEGORY_ENDPOINT_SECURITY) {
-                            handleSelect("dashboard_atlas_guardrails_overview");
-                            navigate("/dashboard/guardrails/atlas-overview");
-                        } else if (dashboardCategory === CATEGORY_AGENTIC_SECURITY) {
-                            handleSelect("dashboard_guardrails_overview");
-                            navigate("/dashboard/guardrails/overview");
+                        // Atlas (Endpoint Security) and Argus (Agentic Security) land on Guardrail Activity;
+                        // other categories on Threat Actors.
+                        if (dashboardCategory === CATEGORY_ENDPOINT_SECURITY || dashboardCategory === CATEGORY_AGENTIC_SECURITY) {
+                            handleSelect("dashboard_threat_activity");
+                            navigate("/dashboard/protection/threat-activity");
                         } else {
                             handleSelect("dashboard_threat_actor");
                             navigate("/dashboard/protection/threat-actor");
