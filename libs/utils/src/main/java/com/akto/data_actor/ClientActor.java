@@ -5,6 +5,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.LongSupplier;
 
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
@@ -4005,10 +4007,31 @@ public class ClientActor extends DataActor {
 
     public static final String AUTHORIZATION = "Authorization";
 
+    static final long TOKEN_EXCHANGE_INITIAL_RETRY_DELAY_MS = 5_000L;
+    static final long TOKEN_EXCHANGE_MAX_RETRY_DELAY_MS = 5 * 60_000L;
+
     private static volatile String exchangedAuthToken;
     private static volatile String pendingModuleType;
-    private static volatile boolean exchangeAttempted = false;
+    // First attempt finished (whatever its outcome). Until then every caller waits for it, see ensureModuleTypeExchanged.
+    private static volatile boolean firstExchangeDone = false;
+    // Nothing left to try: either the exchange succeeded or the backend refused it in a way a retry will not change
+    // (e.g. a legacy token that cannot be exchanged), so the raw token is kept for good.
+    private static volatile boolean exchangeSettled = false;
+    private static volatile long nextExchangeAttemptAtMs = 0;
+    private static volatile long exchangeRetryDelayMs = TOKEN_EXCHANGE_INITIAL_RETRY_DELAY_MS;
+    // Guards against two exchanges at once, and against re-entry from a logger that writes through this actor.
+    private static final AtomicBoolean exchangeInFlight = new AtomicBoolean(false);
     private static final Object EXCHANGE_LOCK = new Object();
+
+    // Test seams: the request that performs the exchange, and the clock used to schedule retries.
+    interface TokenExchangeTransport {
+        OriginalHttpResponse send(OriginalHttpRequest request) throws Exception;
+    }
+    static volatile TokenExchangeTransport tokenExchangeTransport = request ->
+            ApiExecutor.sendRequestBackOff(request, true, null, false, null, ClientActor::isTransientExchangeStatus);
+    static volatile LongSupplier exchangeClock = System::currentTimeMillis;
+
+    enum ExchangeOutcome { EXCHANGED, REFUSED, TRANSIENT_FAILURE }
 
     // Called from Main's static init to record which scope this service should exchange for.
     // Deliberately NOT triggering the actual exchange here: fetchInstance()/ClientActor construction
@@ -4029,26 +4052,64 @@ public class ClientActor extends DataActor {
     }
 
     private static void ensureModuleTypeExchanged() {
-        if (pendingModuleType == null) {
+        String moduleType = pendingModuleType;
+        if (moduleType == null || exchangeSettled) {
             return;
         }
-        // Deliberately no unsynchronized fast-path check on exchangeAttempted here: that would let a
-        // second thread read exchangeAttempted=true (set the instant the first thread enters this
-        // block, before its network call even finishes) and race ahead using the still-unexchanged
-        // token. Every caller must actually acquire this lock, so a concurrent caller blocks until
-        // the in-flight exchange attempt has fully finished (success or failure) before proceeding.
-        synchronized (EXCHANGE_LOCK) {
-            if (exchangeAttempted) {
+        if (firstExchangeDone) {
+            // A previous attempt failed for a reason that may pass (backend down, 5xx, timeout). One caller retries
+            // once the backoff has elapsed; everyone else carries on with the token currently in use rather than
+            // waiting on the network.
+            if (exchangeClock.getAsLong() < nextExchangeAttemptAtMs || !exchangeInFlight.compareAndSet(false, true)) {
                 return;
             }
-            exchangeAttempted = true;
-            initModuleType(pendingModuleType);
+            try {
+                recordExchangeOutcome(tryExchangeToken(moduleType));
+            } finally {
+                exchangeInFlight.set(false);
+            }
+            return;
         }
+        // Deliberately no unsynchronized fast-path for the first attempt: a second thread must not race ahead
+        // with the still-unexchanged token while the first exchange is in flight. Every caller acquires this
+        // lock, so a concurrent caller blocks until the first attempt has fully finished (success or failure).
+        synchronized (EXCHANGE_LOCK) {
+            if (firstExchangeDone || !exchangeInFlight.compareAndSet(false, true)) {
+                return;
+            }
+            try {
+                recordExchangeOutcome(tryExchangeToken(moduleType));
+            } finally {
+                firstExchangeDone = true;
+                exchangeInFlight.set(false);
+            }
+        }
+    }
+
+    private static void recordExchangeOutcome(ExchangeOutcome outcome) {
+        if (outcome != ExchangeOutcome.TRANSIENT_FAILURE) {
+            exchangeSettled = true;
+            return;
+        }
+        long delay = exchangeRetryDelayMs;
+        nextExchangeAttemptAtMs = exchangeClock.getAsLong() + delay;
+        exchangeRetryDelayMs = Math.min(delay * 2, TOKEN_EXCHANGE_MAX_RETRY_DELAY_MS);
+        loggerMaker.warn("Token exchange for moduleType " + pendingModuleType + " will be retried in " + (delay / 1000) + "s");
+    }
+
+    // A 5xx, a timeout or a rate limit may pass, so the exchange is tried again later. Any other non-200 status is a
+    // refusal that the same token would get again.
+    static boolean isTransientExchangeStatus(int status) {
+        return status >= 500 || status == 408 || status == 429;
     }
 
     // Trades the raw provisioned token for one scoped to moduleType, if the raw token supports it.
     // Any failure (legacy/unscoped token, network error, etc.) is swallowed and the raw token keeps being used as-is.
     public static void initModuleType(String moduleType) {
+        tryExchangeToken(moduleType);
+    }
+
+    static ExchangeOutcome tryExchangeToken(String moduleType) {
         try {
             loggerMaker.warn("Attempting database abstractor token exchange for moduleType " + moduleType);
             Map<String, List<String>> headers = new HashMap<>();
@@ -4058,20 +4119,38 @@ public class ClientActor extends DataActor {
             obj.put("moduleType", moduleType);
 
             OriginalHttpRequest request = new OriginalHttpRequest(url + "/exchangeToken", "", "POST", obj.toString(), headers, "");
-            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            OriginalHttpResponse response = tokenExchangeTransport.send(request);
             if (response == null || response.getStatusCode() != 200 || response.getBody() == null) {
                 loggerMaker.warn("Token exchange for moduleType " + moduleType + " not applied (status "
                         + (response == null ? "null" : response.getStatusCode()) + "); continuing with raw token");
-                return;
+                boolean transientFailure = response == null || isTransientExchangeStatus(response.getStatusCode());
+                return transientFailure ? ExchangeOutcome.TRANSIENT_FAILURE : ExchangeOutcome.REFUSED;
             }
 
             String newToken = BasicDBObject.parse(response.getBody()).getString("token");
             if (newToken != null && !newToken.isEmpty()) {
                 exchangedAuthToken = newToken;
                 loggerMaker.warn("Database abstractor token exchanged successfully for moduleType " + moduleType);
+                return ExchangeOutcome.EXCHANGED;
             }
+            loggerMaker.warn("Token exchange for moduleType " + moduleType + " returned no token; continuing with raw token");
+            return ExchangeOutcome.REFUSED;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error exchanging database abstractor token for moduleType " + moduleType + ": " + e, LoggerMaker.LogDb.RUNTIME);
+            return ExchangeOutcome.TRANSIENT_FAILURE;
+        }
+    }
+
+    // Tests only: forget every exchange made so far.
+    static void resetTokenExchangeForTests() {
+        synchronized (EXCHANGE_LOCK) {
+            exchangedAuthToken = null;
+            pendingModuleType = null;
+            firstExchangeDone = false;
+            exchangeSettled = false;
+            nextExchangeAttemptAtMs = 0;
+            exchangeRetryDelayMs = TOKEN_EXCHANGE_INITIAL_RETRY_DELAY_MS;
+            exchangeInFlight.set(false);
         }
     }
 
