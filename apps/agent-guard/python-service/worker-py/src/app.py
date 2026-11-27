@@ -43,11 +43,24 @@ class ScanRequest(BaseModel):
     # prompt). Omitted requests fall back to segmenting `text` alone.
     system_prompt: str = ""
     enrichment: str = ""
+    # Caller's Akto account, sent by guardrails-service; only logged.
+    account_id: str = ""
+
+
+def _log_scan_account(body: ScanRequest) -> None:
+    logger.info(
+        "[scan] account=%s scanner=%s enrichment=%s",
+        body.account_id or "-",
+        body.scanner_name,
+        body.enrichment or "-",
+    )
 
 
 class GuardrailsLLMRequest(BaseModel):
     prompt: str
     model: str = ""
+    # Caller's Akto account, sent by guardrails-service; only logged.
+    account_id: str = ""
 
 
 @asynccontextmanager
@@ -138,6 +151,7 @@ def scanners():
 
 @app.post("/scan")
 async def scan(body: ScanRequest):
+    _log_scan_account(body)
     started = time.perf_counter()
     result = await scan_payload(body.model_dump(), schedule_fn=_schedule_background)
     total_ms = (time.perf_counter() - started) * 1000.0
@@ -156,6 +170,8 @@ async def scan(body: ScanRequest):
 
 @app.post("/scan/batch")
 async def scan_batch(body: list[ScanRequest]):
+    for item in body:
+        _log_scan_account(item)
     return [await scan_payload(item.model_dump(), schedule_fn=_schedule_background) for item in body]
 
 
@@ -166,7 +182,7 @@ async def guardrails_llm(body: GuardrailsLLMRequest):
     Primary = the FINAL_ARBITER entry of the model config (DEFAULT_MODEL_CONFIG_JSON, else the built-in default).
     Backup = its FINAL_ARBITER_BACKUP entry, tried when the primary fails; no such entry = no backup.
     """
-    return await _run_guardrails_llm(body, relaxed=False)
+    return await _run_guardrails_llm(body, "/guardrails/llm", relaxed=False)
 
 
 @app.post("/guardrails/llm/async")
@@ -175,14 +191,14 @@ async def guardrails_llm_async(body: GuardrailsLLMRequest):
     (reason, evidence, remediation): a larger reply ceiling, since nobody is waiting on them. Runs on
     ENRICHMENT_MODEL_CONFIG_JSON when set, so this load stays off the core guardrails model; unset,
     it uses the core model exactly as /guardrails/llm does."""
-    return await _run_guardrails_llm(body, relaxed=True, enrichment=True)
+    return await _run_guardrails_llm(body, "/guardrails/llm/async", relaxed=True, enrichment=True)
 
 
 @app.post("/guardrails/llm/session")
 async def guardrails_llm_session(body: GuardrailsLLMRequest):
     """The session risk summary. Also runs after the turn, so it gets the larger reply ceiling, but
     the summary feeds the next turn's verdict, so it always stays on the core model."""
-    return await _run_guardrails_llm(body, relaxed=True)
+    return await _run_guardrails_llm(body, "/guardrails/llm/session", relaxed=True)
 
 
 @app.post("/ocr")
@@ -207,8 +223,9 @@ async def reachback_test(body: dict[str, Any]):
         return JSONResponse(status_code=502, content=exc.as_dict())
 
 
-async def _run_guardrails_llm(body: GuardrailsLLMRequest, relaxed: bool, enrichment: bool = False):
+async def _run_guardrails_llm(body: GuardrailsLLMRequest, route: str, relaxed: bool, enrichment: bool = False):
     start = time.perf_counter()
+    account = body.account_id or "-"
     logger.debug(f"[GuardrailsLLM] request received: model={body.model!r} prompt_len={len(body.prompt)}")
     config = get_enrichment_config() if enrichment else None
     source = "enrichment" if config else "default"
@@ -225,12 +242,12 @@ async def _run_guardrails_llm(body: GuardrailsLLMRequest, relaxed: bool, enrichm
             content = await provider.complete(body.prompt)
     except Exception as exc:
         failed_ms = (time.perf_counter() - start) * 1000
-        logger.warning(f"[GuardrailsLLM] call failed: {exc!r} ms={failed_ms:.0f}")
+        logger.warning(f"[GuardrailsLLM] call failed: route={route} account={account} {exc!r} ms={failed_ms:.0f}")
         raise HTTPException(status_code=502, detail=f"guardrails LLM call failed: {exc!r}") from exc
     elapsed_ms = (time.perf_counter() - start) * 1000
     logger.debug(f"[GuardrailsLLM] response: {content!r}")
     logger.info(
-        f"[GuardrailsLLM] provider={provider.name} source={source} prompt_len={len(body.prompt)} "
-        f"relaxed={relaxed} response_len={len(content)} ms={elapsed_ms:.0f}"
+        f"[GuardrailsLLM] route={route} account={account} provider={provider.name} source={source} "
+        f"prompt_len={len(body.prompt)} relaxed={relaxed} response_len={len(content)} ms={elapsed_ms:.0f}"
     )
     return {"content": content}

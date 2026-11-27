@@ -75,7 +75,33 @@ public class ClaudeAdapter implements ProviderAdapter {
             frame.toolCalls = calls.isEmpty() ? null : calls;
         }
         frame.prompt = flatten(msgs);
+        if (!toolCall) {
+            splitAtLastResponse(frame, msgs);
+        }
         return frame;
+    }
+
+    /**
+     * Claude resends the whole conversation on every prompt event, and the earlier
+     * turns got their verdict when they were new. Only the messages after the last
+     * assistant turn (the new user message, plus any tool results it carries) still
+     * need one; the verdict prompt stays null — judge the whole transcript — when
+     * there is no assistant turn or nothing follows it. That assistant turn is the
+     * model's response to the previous prompt, which Anthropic never sends on its
+     * own, so it is carried as lastResponse to be judged once, here.
+     */
+    @SuppressWarnings("unchecked")
+    private void splitAtLastResponse(ParsedRequest frame, List<Object> msgs) {
+        for (int i = msgs.size() - 1; i >= 0; i--) {
+            Object m = msgs.get(i);
+            if (m instanceof Map && "assistant".equals(stringOrEmpty(((Map<String, Object>) m).get("role")))) {
+                String response = flatten(msgs.subList(i, i + 1));
+                String tail = flatten(msgs.subList(i + 1, msgs.size()));
+                frame.lastResponse = response.isEmpty() ? null : response;
+                frame.verdictPrompt = tail.isEmpty() ? null : tail;
+                return;
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")

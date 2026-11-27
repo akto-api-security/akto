@@ -123,7 +123,11 @@ public class GuardrailOverviewService {
 
   // Runs the pipeline over the account's events and hands each result row on, as the cursor yields it.
   private void forEachRow(String accountId, List<Document> pipeline, Consumer<Document> onRow) {
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+    forEachRow(accountId, pipeline, null, onRow);
+  }
+
+  private void forEachRow(String accountId, List<Document> pipeline, Document hint, Consumer<Document> onRow) {
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
       while (cursor.hasNext()) {
         onRow.accept(cursor.next());
       }
@@ -199,7 +203,7 @@ public class GuardrailOverviewService {
 
     List<Long> elapsed = new ArrayList<>();
     // The last $group gives one row holding every elapsed time.
-    forEachRow(accountId, pipeline, doc -> {
+    forEachRow(accountId, pipeline, ThreatUtils.caseTimelineIndexHint(accountId), doc -> {
       for (Number n : doc.getList("elapsed", Number.class, Collections.emptyList())) {
         elapsed.add(n.longValue());
       }

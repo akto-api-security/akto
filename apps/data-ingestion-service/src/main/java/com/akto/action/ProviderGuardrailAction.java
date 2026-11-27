@@ -115,6 +115,17 @@ public class ProviderGuardrailAction extends ActionSupport {
 
     private Map<String, Object> process(ParsedRequest frame, ParsedRequest.ToolCall call) {
         Map<String, Object> requestData = buildEnvelope(frame, call);
+        // Judge only what is new; the full transcript in requestPayload is still ingested.
+        if (call == null && frame.verdictPrompt != null) {
+            requestData.put(Gateway.GUARDRAILS_REQUEST_PAYLOAD,
+                    toJson(Collections.singletonMap("body", frame.verdictPrompt)));
+        }
+        // The model's last response, judged against response policies and recorded on the trace.
+        // It already reached the user, so the verdict below ignores it (request side only).
+        if (call == null && frame.lastResponse != null) {
+            requestData.put("responsePayload", toJson(Collections.singletonMap("body", frame.lastResponse)));
+            requestData.put("response_guardrails", "true");
+        }
         requestData.put("guardrails", "true");
         requestData.put("ingest_data", "true");
         return extractGuardrailsResult(gateway.processHttpProxy(requestData));
@@ -294,7 +305,7 @@ public class ProviderGuardrailAction extends ActionSupport {
         if (result == null) {
             return null;
         }
-        Object guardrailsResult = result.get("guardrailsResult");
+        Object guardrailsResult = result.get(Gateway.REQUEST_GUARDRAILS_RESULT);
         return guardrailsResult instanceof Map ? (Map<String, Object>) guardrailsResult : null;
     }
 

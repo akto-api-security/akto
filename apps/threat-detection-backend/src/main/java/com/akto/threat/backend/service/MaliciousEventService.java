@@ -577,9 +577,9 @@ public class MaliciousEventService {
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
     boolean minimalFields = request.hasMinimalFields() && request.getMinimalFields();
-    List<String> excludedFields = new ArrayList<>();
+    List<String> excludedFields = new ArrayList<>(Arrays.asList("latestApiOrig", "payload"));
     if (minimalFields) {
-      excludedFields.addAll(Arrays.asList("latestApiOrig","payload","remediation", "evidenceLine", "humanResponse", "owaspCategories"));
+      excludedFields.addAll(Arrays.asList("remediation", "evidenceLine", "humanResponse", "owaspCategories"));
     }
 
     Document query = buildListFilterQuery(accountId, filter, contextSource);
@@ -643,12 +643,9 @@ public class MaliciousEventService {
     ActivityRows activityRows = groupActivities
         ? listActivityRows(accountId, query, sort, sortBySeverity, sortByRiskScore, riskScoreDir, excludedFields, skip, limit, regexMaxTimeMs)
         : null;
-    // $unset rejects an empty field list, so only add it when minimalFields populated excludedFields.
     List<Document> matchStages = new ArrayList<>();
     matchStages.add(new Document("$match", query));
-    if (!excludedFields.isEmpty()) {
-      matchStages.add(new Document("$unset", excludedFields));
-    }
+    matchStages.add(new Document("$unset", excludedFields));
     if (dedupeLatestPerHostActorEndpoint) {
       MongoCursor<Document> countCursor = maliciousEventDao.aggregateRaw(accountId, Arrays.asList(
           new Document("$match", query),
@@ -695,6 +692,7 @@ public class MaliciousEventService {
       total = countWithEvaluationModes(accountId, countScope, evaluationModeConditions, regexMaxTimeMs);
       cursor = maliciousEventDao.getCollection(accountId)
           .find(query)
+          .hint(ThreatUtils.detectedAtOrderedHint(accountId, query))
           .maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS)
           .projection(Projections.exclude(excludedFields))
           .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
@@ -974,23 +972,19 @@ public class MaliciousEventService {
         // _id breaks ties so pages stay stable when several rows share a detectedAt.
         sortStages.add(new Document("$sort", new Document("detectedAt", dir).append("_id", dir)));
       }
-      List<String> dropped = new ArrayList<>(excludedFields);
-      if (!dropped.contains("latestApiOrig")) {
-        dropped.add("latestApiOrig");
-      }
       Document pageWindow = new Document("$limit", skip + limit);
 
       List<Document> unkeyedPage = new ArrayList<>();
       unkeyedPage.add(new Document("$match", unkeyed));
       unkeyedPage.addAll(sortStages);
       unkeyedPage.add(pageWindow);
-      unkeyedPage.add(new Document("$unset", dropped));
+      unkeyedPage.add(new Document("$unset", excludedFields));
 
       // Keyed rows are the outer pipeline so the index hint applies to them.
       List<Document> pipeline = new ArrayList<>(rowStages);
       pipeline.addAll(sortStages);
       pipeline.add(pageWindow);
-      pipeline.add(new Document("$unset", dropped));
+      pipeline.add(new Document("$unset", excludedFields));
       pipeline.add(new Document("$unionWith", new Document("coll", events.getNamespace().getCollectionName())
           .append("pipeline", unkeyedPage)));
       pipeline.addAll(sortStages);
@@ -1048,9 +1042,7 @@ public class MaliciousEventService {
           new Document("$sort", new Document("detectedAt", -1)),
           new Document("$skip", toSkip),
           new Document("$limit", take)));
-      if (!excludedFields.isEmpty()) {
-        page.add(new Document("$unset", excludedFields));
-      }
+      page.add(new Document("$unset", excludedFields));
       pages.add(page);
       toSkip = 0;
       toTake -= take;
@@ -1473,7 +1465,7 @@ public class MaliciousEventService {
       return "by IDs: " + eventIds;
     } else if (filterMap != null && !filterMap.isEmpty()) {
       Document query = buildQueryFromFilter(filterMap, null, accountId);
-      return "by filter: " + query.toJson();
+      return query == null ? "" : "by filter: " + query.toJson();
     }
     return "";
   }
@@ -1649,7 +1641,7 @@ public class MaliciousEventService {
     return query;
   }
 
-  private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource, String accountId) {
+  Document buildQueryFromFilter(Map<String, Object> filter, String contextSource, String accountId) {
     Document query = new Document();
 
     // Handle ips/actors filter
@@ -1730,6 +1722,16 @@ public class MaliciousEventService {
     // A bulk action on a filtered view must reach exactly the rows the view shows.
     andDocument(query, caseOwnerCondition((List<String>) filter.get("caseOwners")));
     andDocument(query, caseNotesCondition((Boolean) filter.get("hasCaseNotes")));
+
+    List<String> hosts = (List<String>) filter.get("hosts");
+    if (hosts != null && !hosts.isEmpty()) {
+      query.append("host", new Document("$in", hosts));
+    }
+
+    // No recognised filter: refuse, else the bulk update/delete would hit every event of the context
+    if (query.isEmpty()) {
+      return null;
+    }
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
     Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);

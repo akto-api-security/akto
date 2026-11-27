@@ -24,6 +24,9 @@ public class Gateway {
     public static final String GUARDRAILS_REQUEST_PAYLOAD = "guardrailsRequestPayload";
     // Optional comma-separated policy names the guardrails service narrows its policies to.
     public static final String GUARDRAILS_POLICY_NAME = "policyName";
+    // The request side's result alone, next to the merged guardrailsResult, for callers that judge
+    // a response after the fact and only record it: their allow/deny must not depend on it.
+    public static final String REQUEST_GUARDRAILS_RESULT = "requestGuardrailsResult";
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -78,7 +81,9 @@ public class Gateway {
                 Map<String, Object> guardrailsResult = null;
 
                 if (runRequestGuardrails) {
-                    guardrailsResult = mergeGuardrailsResults(guardrailsResult, callGuardrails(requestData, false));
+                    Map<String, Object> requestResult = callGuardrails(requestData, false);
+                    result.put(REQUEST_GUARDRAILS_RESULT, requestResult);
+                    guardrailsResult = mergeGuardrailsResults(guardrailsResult, requestResult);
                 }
                 if (runResponseGuardrails) {
                     guardrailsResult = mergeGuardrailsResults(guardrailsResult, callGuardrails(requestData, true));

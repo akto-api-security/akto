@@ -49,7 +49,7 @@ _DEFAULT_TIER_TIMEOUT_MS = 5000
 _DEFAULT_ARBITER_TIMEOUT_MS = 10000
 _DEFAULT_ARBITER_BACKUP_TIMEOUT_MS = 5000
 
-_TRIPWIRE_TIMEOUT_MS = 500
+_DEFAULT_TRIPWIRE_TIMEOUT_MS = 5000
 _TRIPWIRE = {"provider": "tripwire"}  # the observer's entry, for its timeout and error labels
 
 ScannerEntry = tuple[Any, dict[str, Any]]
@@ -177,7 +177,7 @@ class ModelMapScanner:
         tier2 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER2]
         arbiters = [se for se in scanners if se[1].get("modelRole") == _ROLE_ARBITER]
 
-        observed = self._submit(observers, _TRIPWIRE_TIMEOUT_MS)
+        observed = self._submit(observers, int(settings.TRIPWIRE_TIMEOUT_MS or _DEFAULT_TRIPWIRE_TIMEOUT_MS))
         try:
             t1 = self._submit(tier1, _DEFAULT_TIER_TIMEOUT_MS)
             t2 = self._submit(tier2, _DEFAULT_TIER_TIMEOUT_MS)

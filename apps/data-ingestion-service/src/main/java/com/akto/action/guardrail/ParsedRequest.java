@@ -21,6 +21,18 @@ public class ParsedRequest {
 
     /** The transcript flattened into a single scannable string. */
     public String prompt;
+    /**
+     * The part of the transcript that still needs a verdict, when narrower than
+     * {@link #prompt} (e.g. only the turn after the last assistant message).
+     * Null means judge the whole prompt. The full prompt is still ingested.
+     */
+    public String verdictPrompt;
+    /**
+     * The model's last response in the transcript (the latest assistant turn),
+     * when present. It already reached the user, so it is judged against
+     * response policies and recorded, never used to deny the request.
+     */
+    public String lastResponse;
     /** Vendor's per-request id (Claude's request_id == webhook-id). */
     public String requestId;
     /** Vendor's conversation id, when present. */

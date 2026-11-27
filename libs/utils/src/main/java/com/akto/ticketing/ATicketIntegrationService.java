@@ -193,6 +193,13 @@ public abstract class ATicketIntegrationService<T> {
     }
 
     private void updateIssueWithTicketInfo(TestingIssuesId issueId, String ticketId, String ticketUrl) {
+        TestingRunIssuesDao.instance.updateOneNoUpsert(
+            Filters.eq(Constants.ID, issueId),
+            ticketInfoUpdates(ticketId, ticketUrl)
+        );
+    }
+
+    protected Bson ticketInfoUpdates(String ticketId, String ticketUrl) {
         List<Bson> updates = new ArrayList<>(Arrays.asList(
             Updates.set(getTicketUrlFieldName(), ticketUrl),
             Updates.set(TestingRunIssues.TICKET_ID, ticketId),
@@ -202,10 +209,7 @@ public abstract class ATicketIntegrationService<T> {
         if (StringUtils.isNotBlank(getTicketCreatedVia())) {
             updates.add(Updates.set(TestingRunIssues.TICKET_CREATED_VIA, getTicketCreatedVia()));
         }
-        TestingRunIssuesDao.instance.updateOneNoUpsert(
-            Filters.eq(Constants.ID, issueId),
-            Updates.combine(updates)
-        );
+        return Updates.combine(updates);
     }
 
     protected String getTicketCreatedVia() {

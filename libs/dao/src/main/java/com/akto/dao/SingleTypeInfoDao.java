@@ -17,6 +17,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.Constants;
+import com.akto.util.Pair;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -405,6 +406,8 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     public List<ApiInfo.ApiInfoKey> fetchEndpointsBySubType(SingleTypeInfo.SubType subType, int skip, int limit) {
         Bson filter = Filters.eq("subType", subType.getName());
         List<Bson> pipeline = getPipelineForEndpoints(filter);
+        // stable order so skip/limit pages don't overlap or miss endpoints
+        pipeline.add(Aggregates.sort(Sorts.ascending("_id")));
         pipeline.add(Aggregates.skip(skip));
         pipeline.add(Aggregates.limit(limit));
         return processPipelineForEndpoint(pipeline);
@@ -422,11 +425,11 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         }
 
         Bson projections = Projections.fields(
-                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method", SingleTypeInfo._COLLECTION_IDS)
+                Projections.include("apiCollectionId", "url", "method")
         );
 
+        // no sort before the group: $group does not keep input order, so sorting every STI row was wasted work
         pipeline.add(Aggregates.project(projections));
-        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
         pipeline.add(Aggregates.group(groupedId));
         return pipeline;
     }
@@ -726,19 +729,27 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
 
     }
 
-    /** Distinct sensitive apis (any request or response row of a sensitive type) per collection. */
-    public Map<Integer, Integer> getSensitiveApisCountPerCollection(Bson customFilter) {
+    /** Per collection: sensitive sub types and distinct sensitive apis (any request or response row of a sensitive type), in one pass. */
+    public Pair<Map<Integer, List<String>>, Map<Integer, Integer>> getSensitiveInfoPerCollection(Bson customFilter) {
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
                                         .append(SingleTypeInfo._URL, "$url")
                                         .append(SingleTypeInfo._METHOD, "$method");
         List<Bson> pipeline = generateFilterForSubtypes(new ArrayList<>(), groupedId, false, customFilter);
-        pipeline.add(Aggregates.group("$_id." + SingleTypeInfo._API_COLLECTION_ID, Accumulators.sum(_COUNT, 1)));
+        pipeline.add(Aggregates.group("$_id." + SingleTypeInfo._API_COLLECTION_ID,
+                Accumulators.sum(_COUNT, 1), Accumulators.addToSet("subTypes", "$subTypes")));
 
+        Map<Integer, List<String>> subTypes = new HashMap<>();
         Map<Integer, Integer> counts = new HashMap<>();
         for (BasicDBObject row : SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).allowDiskUse(true)) {
-            counts.put(row.getInt(Constants.ID), row.getInt(_COUNT));
+            int apiCollectionId = row.getInt(Constants.ID);
+            counts.put(apiCollectionId, row.getInt(_COUNT));
+            Set<String> collectionSubTypes = new HashSet<>();
+            for (Object apiSubTypes : (List<?>) row.get("subTypes")) {
+                for (Object subType : (List<?>) apiSubTypes) collectionSubTypes.add((String) subType);
+            }
+            subTypes.put(apiCollectionId, new ArrayList<>(collectionSubTypes));
         }
-        return counts;
+        return new Pair<>(subTypes, counts);
     }
 
     public static final int LARGE_LIMIT = 10_000;

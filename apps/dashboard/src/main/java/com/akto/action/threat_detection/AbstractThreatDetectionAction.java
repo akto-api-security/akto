@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -46,9 +47,9 @@ public class AbstractThreatDetectionAction extends UserAction {
   private static final Map<String, CachedMaliciousEventResponse> maliciousEventsCache = new ConcurrentHashMap<>();
 
   private static final class CachedMaliciousEventResponse {
-    final MaliciousEventResponse response;
+    final CompletableFuture<MaliciousEventResponse> response;
     final long loadedAtMs;
-    CachedMaliciousEventResponse(MaliciousEventResponse response, long loadedAtMs) {
+    CachedMaliciousEventResponse(CompletableFuture<MaliciousEventResponse> response, long loadedAtMs) {
       this.response = response;
       this.loadedAtMs = loadedAtMs;
     }
@@ -199,17 +200,25 @@ public class AbstractThreatDetectionAction extends UserAction {
       additionalFilters = scopedFilters;
     }
     String cacheKey = maliciousEventsCacheKey(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
-    CachedMaliciousEventResponse cached = maliciousEventsCache.get(cacheKey);
-    if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < MALICIOUS_EVENTS_CACHE_TTL_MS) {
-      return cached.response;
+    long now = System.currentTimeMillis();
+    CachedMaliciousEventResponse mine = new CachedMaliciousEventResponse(new CompletableFuture<>(), now);
+    CachedMaliciousEventResponse entry = maliciousEventsCache.compute(cacheKey,
+        (k, existing) -> existing != null && now - existing.loadedAtMs < MALICIOUS_EVENTS_CACHE_TTL_MS ? existing : mine);
+    if (entry != mine) {
+      MaliciousEventResponse shared = entry.response.join();
+      return shared != null ? shared : new MaliciousEventResponse(new ArrayList<>(), 0);
     }
-    MaliciousEventResponse fresh = fetchAllMaliciousReqUncached(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
-    if (fresh == null) {
-      // a failed fetch is not "no events": don't cache it, so the next request tries again
-      return new MaliciousEventResponse(new ArrayList<>(), 0);
+    maliciousEventsCache.entrySet().removeIf(e -> now - e.getValue().loadedAtMs >= MALICIOUS_EVENTS_CACHE_TTL_MS);
+    MaliciousEventResponse fresh = null;
+    try {
+      fresh = fetchAllMaliciousReqUncached(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
+    } finally {
+      if (fresh == null) {
+        maliciousEventsCache.remove(cacheKey, mine);
+      }
+      mine.response.complete(fresh);
     }
-    maliciousEventsCache.put(cacheKey, new CachedMaliciousEventResponse(fresh, System.currentTimeMillis()));
-    return fresh;
+    return fresh != null ? fresh : new MaliciousEventResponse(new ArrayList<>(), 0);
   }
 
   /** Users limited to specific collections (Argus) - see ArgusCollectionScope. */
@@ -270,7 +279,7 @@ public class AbstractThreatDetectionAction extends UserAction {
   private static String maliciousEventsCacheKey(int startTimestamp, int endTimestamp, int limit,
                                                  Map<String, Object> additionalFilters, String skillEvalMode,
                                                  boolean minimalFields) {
-    return Context.accountId.get() + "|" + startTimestamp + "|" + endTimestamp + "|" + limit
+    return Context.accountId.get() + "|" + Context.contextSource.get() + "|" + startTimestamp + "|" + endTimestamp + "|" + limit
         + "|" + additionalFilters + "|" + skillEvalMode + "|" + minimalFields;
   }
 

@@ -209,7 +209,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
       return true;
     }
 
-    if (responseParam.getPath().contains("/api/threat_detection") || responseParam.getPath().contains("/api/dashboard") || responseParam.getPath().contains("/api/ingestData")) {
+    if (responseParam.getPath().contains("/api/threat_detection/") || responseParam.getPath().contains("/api/dashboard/") || responseParam.getPath().contains("/api/ingestData")) {
       return true;
     }
 

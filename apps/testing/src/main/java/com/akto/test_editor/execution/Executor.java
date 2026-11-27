@@ -156,12 +156,13 @@ public class Executor {
         origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
+        boolean onlySmartTestingAllowed = varMap.containsKey("onlySmartTestingAllowed") && Boolean.TRUE.equals(varMap.get("onlySmartTestingAllowed"));
 
         boolean allowAllCombinations = executionListBuilder.isAllowAllCombinations();
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         boolean isParallelExecution = executionType.equals("parallel");
-        if (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution) {
+        if ((executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution) && !onlySmartTestingAllowed) {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
@@ -176,7 +177,7 @@ public class Executor {
             return yamlTestResult;
         }
 
-        if (executionType.equals("passive")) {
+        if (executionType.equals("passive") && !onlySmartTestingAllowed) {
             ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
             TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
             if (res != null) {
@@ -203,59 +204,64 @@ public class Executor {
         }
 
         boolean vulnerable = false;
-        for (RawApi testReq: testRawApis) {
-            if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
-                continue;
-            }
-            if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
-                break;
-            }
-            try {
-                // follow redirects = true for now
-                TestResult res = null;
-                if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
-                    // execute agentic test here
-                    res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
-                }else{
-                    String url = testReq.getRequest().getUrl();
-                    if (url.contains("sampl-aktol-1exannwybqov-67928726")) {
-                        try {
-                            URI uri = new URI(url);
-                            String newUrl = "https://vulnerable-server.akto.io" + uri.getPath();
-                            testReq.getRequest().setUrl(newUrl);
-                        } catch (Exception e) {
-                            // TODO: handle exception
+        if (onlySmartTestingAllowed) {
+            // do not execute normal testing
+            loggerMaker.infoAndAddToDb("Skipping normal testing as only smart testing is allowed", LogDb.TESTING);
+        } else {
+            for (RawApi testReq: testRawApis) {
+                if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
+                    continue;
+                }
+                if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
+                    break;
+                }
+                try {
+                    // follow redirects = true for now
+                    TestResult res = null;
+                    if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
+                        // execute agentic test here
+                        res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
+                    }else{
+                        String url = testReq.getRequest().getUrl();
+                        if (url.contains("sampl-aktol-1exannwybqov-67928726")) {
+                            try {
+                                URI uri = new URI(url);
+                                String newUrl = "https://vulnerable-server.akto.io" + uri.getPath();
+                                testReq.getRequest().setUrl(newUrl);
+                            } catch (Exception e) {
+                                // TODO: handle exception
+                            }
                         }
+                        List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                        String contentTypeString = "";
+                        if(!contentType.isEmpty()){
+                            contentTypeString = contentType.get(0);
+                        }
+                        if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
+                            // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
+                            // we are adding custom header here and when sending request we will remove them
+                            testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
+                            testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));
+                        }
+
+                        // Add SSE endpoint header for MCP collections
+                        McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
+
+                        testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK, false);
+                        requestSent = true;
+                        ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                        res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
                     }
-                    List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
-                    String contentTypeString = "";
-                    if(!contentType.isEmpty()){
-                        contentTypeString = contentType.get(0);
-                    }
-                    if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
-                        // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
-                        // we are adding custom header here and when sending request we will remove them
-                        testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
-                        testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
+                    if (res != null) {
+                        result.add(res);
+                        vulnerable = res.getVulnerable();
                     }
 
-                    // Add SSE endpoint header for MCP collections
-                    McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
-
-                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK, false);
-                    requestSent = true;
-                    ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
-                    res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                } catch(Exception e) {
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
+                    error_messages.add("Error executing test request: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage());
                 }
-                if (res != null) {
-                    result.add(res);
-                    vulnerable = res.getVulnerable();
-                }
-                
-            } catch(Exception e) {
-                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
-                error_messages.add("Error executing test request: " + e.getMessage());
-                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage());
             }
         }
         

@@ -3,8 +3,8 @@ package com.akto.service.collections;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiCollection;
+import com.akto.util.Pair;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -17,12 +17,7 @@ class BaseCollectionStatsSource extends AbstractCollectionStatsSource {
     }
 
     @Override
-    protected Map<Integer, ? extends Iterable<String>> buildSensitiveMap() {
-        return SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(new ArrayList<>());
-    }
-
-    @Override
-    protected Map<Integer, Integer> buildSensitiveApiCounts() {
-        return SingleTypeInfoDao.instance.getSensitiveApisCountPerCollection(deactivatedFilter());
+    protected Pair<Map<Integer, List<String>>, Map<Integer, Integer>> buildSensitiveStats() {
+        return SingleTypeInfoDao.instance.getSensitiveInfoPerCollection(deactivatedFilter());
     }
 }

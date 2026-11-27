@@ -564,6 +564,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filterBuilder.setLatestApiOrigRegex(this.latestApiOrigRegex);
     }
 
+    if (this.hosts != null && !this.hosts.isEmpty()) {
+      filterBuilder.addAllHosts(this.hosts);
+    }
+
     if (this.startTimestamp > 0 || this.endTimestamp > 0) {
       TimeRangeFilter.Builder timeRangeBuilder = TimeRangeFilter.newBuilder();
       if (this.startTimestamp > 0) {

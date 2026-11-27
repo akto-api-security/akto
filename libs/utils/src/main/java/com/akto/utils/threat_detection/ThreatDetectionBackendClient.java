@@ -29,7 +29,7 @@ public final class ThreatDetectionBackendClient {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
-    private static final OkHttpClient listMaliciousRequestsClient = httpClient.newBuilder().readTimeout(30, TimeUnit.SECONDS).build();
+    private static final OkHttpClient listMaliciousRequestsClient = httpClient.newBuilder().readTimeout(120, TimeUnit.SECONDS).build();
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
     private static final String RECORD_MALICIOUS_EVENT_PATH = "/api/threat_detection/record_malicious_event";

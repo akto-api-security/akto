@@ -5,7 +5,12 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Ti
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
@@ -45,5 +50,22 @@ public class MaliciousEventServiceFilterTest {
   void activeStatusFilterIsTheActiveTab() {
     assertTrue(query(ListMaliciousRequestsRequest.Filter.newBuilder().setStatusFilter("ACTIVE"))
         .contains("\"status\": \"ACTIVE\""));
+  }
+
+  @Test
+  void bulkFilterWithNoRecognisedConditionMatchesNothing() {
+    assertNull(service.buildQueryFromFilter(Collections.singletonMap("statusFilter", "ALL"), "AGENTIC", "1000"));
+    assertNull(service.buildQueryFromFilter(Collections.singletonMap("unknown", "x"), "AGENTIC", "1000"));
+  }
+
+  @Test
+  void bulkFilterKeepsTheHost() {
+    Map<String, Object> filter = new HashMap<>();
+    filter.put("hosts", Collections.singletonList("device-1.agent.server"));
+    filter.put("urls", Collections.singletonList("/tools/call"));
+    String json = service.buildQueryFromFilter(filter, "AGENTIC", "1000").toJson();
+
+    assertTrue(json.contains("\"host\": {\"$in\": [\"device-1.agent.server\"]}"), json);
+    assertTrue(json.contains("\"latestApiEndpoint\": {\"$in\": [\"/tools/call\"]}"), json);
   }
 }

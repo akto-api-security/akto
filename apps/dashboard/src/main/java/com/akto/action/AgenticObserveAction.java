@@ -226,7 +226,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                                     Filters.regex(ApiInfo.ID_URL, "/config/")
                             ),
                             Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivated)
-                    ));
+                    ),
+                    // only the fields the loop below reads, full api_info docs are large
+                    Projections.include(Constants.ID, ApiInfo.RISK_SCORE, ApiInfo.RISK_SCORE_FACTORS,
+                            ApiInfo.RISK_SCORE_FACTORS_SCORE, ApiInfo.TAGS_STRING));
 
             BasicDBObject skillScoreMap = new BasicDBObject();
             BasicDBObject skillRiskScoreFactors = new BasicDBObject();

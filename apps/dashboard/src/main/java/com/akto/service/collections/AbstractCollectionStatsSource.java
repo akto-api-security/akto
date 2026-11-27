@@ -10,6 +10,7 @@ import com.akto.dto.ApiCollectionStatsMeta;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.service.TimedService;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.Pair;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
@@ -29,11 +30,8 @@ abstract class AbstractCollectionStatsSource extends TimedService implements Col
     /** Raw per collection counts, before ApiCollectionsAction.resolveUrlsCount applies its fallbacks. */
     protected abstract Map<Integer, Integer> buildCountMap(List<ApiCollection> collections);
 
-    /** collection id -> sensitive sub types. */
-    protected abstract Map<Integer, ? extends Iterable<String>> buildSensitiveMap();
-
-    /** collection id -> distinct apis with sensitive data (request or response). */
-    protected abstract Map<Integer, Integer> buildSensitiveApiCounts();
+    /** collection id -> sensitive sub types, and collection id -> distinct apis with sensitive data (request or response). */
+    protected abstract Pair<Map<Integer, List<String>>, Map<Integer, Integer>> buildSensitiveStats();
 
     @Override
     public void refreshEndpointsCount() {
@@ -82,21 +80,18 @@ abstract class AbstractCollectionStatsSource extends TimedService implements Col
     @Override
     public void refreshSensitive() {
         int startedAt = Context.now();
-        Map<Integer, ? extends Iterable<String>> sensitiveMap = timed("sensitive sub types per collection (" + getClass().getSimpleName() + ")",
-                this::buildSensitiveMap, Map::size);
+        Pair<Map<Integer, List<String>>, Map<Integer, Integer>> sensitiveStats = timed(
+                "sensitive sub types and api counts per collection (" + getClass().getSimpleName() + ")",
+                this::buildSensitiveStats, stats -> stats.getFirst().size());
+        Map<Integer, List<String>> sensitiveMap = sensitiveStats.getFirst();
+        Map<Integer, Integer> sensitiveApis = sensitiveStats.getSecond();
         timed("write sensitive sub types", () -> {
             try (ApiCollectionStatsMetricWriter writer = new ApiCollectionStatsMetricWriter(ApiCollectionStats.SENSITIVE_SUB_TYPES, startedAt)) {
-                sensitiveMap.forEach((id, subTypes) -> {
-                    List<String> list = new ArrayList<>();
-                    subTypes.forEach(list::add);
-                    writer.set(id, list);
-                });
+                sensitiveMap.forEach(writer::set);
                 // the rows not written above have no sensitive data (any more)
                 writer.resetUnwritten(new ArrayList<String>());
             }
         });
-        Map<Integer, Integer> sensitiveApis = timed("count sensitive apis per collection (" + getClass().getSimpleName() + ")",
-                this::buildSensitiveApiCounts, Map::size);
         timed("write sensitive api counts", () -> {
             try (ApiCollectionStatsMetricWriter writer = new ApiCollectionStatsMetricWriter(ApiCollectionStats.SENSITIVE_APIS_COUNT, startedAt)) {
                 sensitiveApis.forEach(writer::set);

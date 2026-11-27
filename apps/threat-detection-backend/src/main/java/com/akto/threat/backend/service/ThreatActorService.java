@@ -1729,19 +1729,26 @@ public class ThreatActorService {
     actorPipeline.add(new Document("$group",
         new Document("_id", "$actor")
             .append("attackCount", new Document("$sum", 1))
-            .append("country", new Document("$first", "$country"))
             .append("latestAttack", new Document("$first", "$filterId"))));
     actorPipeline.add(new Document("$sort", new Document("attackCount", -1)));
     actorPipeline.add(new Document("$limit", limit));
 
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, actorPipeline).cursor()) {
+    Document hint = ThreatUtils.coverIndexHint(accountId, match);
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, actorPipeline), hint).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
+        String actor = doc.getString("_id");
+        Document latest = actor == null ? null : maliciousEventDao.getDocumentCollection(accountId)
+            .find(new Document(contextFilter).append("actor", actor))
+            .projection(new Document("country", 1))
+            .sort(new Document("detectedAt", -1))
+            .first();
+        String country = latest == null ? null : latest.getString("country");
         topActors.add(
             FetchDashboardTopDataResponse.TopActorData.newBuilder()
-                .setActor(doc.getString("_id") != null ? doc.getString("_id") : "")
+                .setActor(actor != null ? actor : "")
                 .setAttackCount(doc.getInteger("attackCount", 0))
-                .setCountry(doc.getString("country") != null ? doc.getString("country") : "")
+                .setCountry(country != null ? country : "")
                 .setLatestAttack(doc.getString("latestAttack") != null ? doc.getString("latestAttack") : "")
                 .build());
       }
@@ -1762,7 +1769,7 @@ public class ThreatActorService {
     apiPipeline.add(new Document("$limit", limit));
 
     List<FetchDashboardTopDataResponse.TopApiData> topApis = new ArrayList<>();
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, apiPipeline).cursor()) {
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, apiPipeline), hint).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         Document id = doc.get("_id", Document.class);

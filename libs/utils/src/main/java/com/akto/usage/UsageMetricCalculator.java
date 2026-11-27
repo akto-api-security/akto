@@ -36,16 +36,34 @@ import org.bson.conversions.Bson;
 public class UsageMetricCalculator {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricCalculator.class);
     public static Set<Integer> getDemos() {
-        ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-
         Set<Integer> demos = new HashSet<>();
         demos.add(1111111111);
 
-        if (juiceShop != null) {
-            demos.add(juiceShop.getId());
+        Integer juiceShopId = getJuiceShopId();
+        if (juiceShopId != null) {
+            demos.add(juiceShopId);
         }
 
         return demos;
+    }
+
+    // findByName scans every api_collections doc and getDemos runs on most requests, so cache the id (or its absence) per account
+    private static final Map<Integer, Pair<Integer, Integer>> juiceShopIdCache = new ConcurrentHashMap<>();
+
+    private static Integer getJuiceShopId() {
+        Integer accountId = Context.accountId.get();
+        int now = Context.now();
+        Pair<Integer, Integer> cached = accountId == null ? null : juiceShopIdCache.get(accountId);
+        if (cached != null && cached.getSecond() + REFRESH_INTERVAL >= now) {
+            return cached.getFirst();
+        }
+
+        ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+        Integer juiceShopId = juiceShop == null ? null : juiceShop.getId();
+        if (accountId != null) {
+            juiceShopIdCache.put(accountId, new Pair<>(juiceShopId, now));
+        }
+        return juiceShopId;
     }
 
     /*
@@ -237,7 +255,10 @@ public class UsageMetricCalculator {
 
 
     private static int calculateEndpoints(Set<Integer> collectionsIdsToDiscard) {
-        collectionsIdsToDiscard.addAll(getDemosAndDeactivated());
+        // Billed figure: read deactivated collections fresh, not through the 2-minute getDeactivated()
+        // cache, which would count a just-deactivated collection (same as calculateAgenticAssets).
+        collectionsIdsToDiscard.addAll(getDeactivatedLatest());
+        collectionsIdsToDiscard.addAll(getDemos());
         return (int) SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), collectionsIdsToDiscard, false);
     }
 

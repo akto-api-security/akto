@@ -3,10 +3,13 @@ package com.akto.usage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -108,6 +111,27 @@ public class TestUsageMetricCalculator extends MongoBasedTest {
     public void activeEndpointsCountsOnlyApiAndDastCollections() {
         // plain API (2) + DAST (1); agentic, endpoint-source and deactivated collections are excluded.
         assertEquals(3, UsageMetricCalculator.calculateActiveEndpoints());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void activeEndpointsIgnoresStaleDeactivatedCache() throws Exception {
+        // getDeactivated() caches per account for 2 minutes in a static map, so any earlier code in the
+        // same JVM can leave it stale. A billed count must still exclude collections deactivated since.
+        Field fetchedAt = UsageMetricCalculator.class.getDeclaredField("lastDeactivatedFetchedMap");
+        Field cached = UsageMetricCalculator.class.getDeclaredField("deactivatedCollectionsMap");
+        fetchedAt.setAccessible(true);
+        cached.setAccessible(true);
+        Map<Integer, Integer> fetchedAtMap = (Map<Integer, Integer>) fetchedAt.get(null);
+        Map<Integer, Set<Integer>> cachedMap = (Map<Integer, Set<Integer>>) cached.get(null);
+        try {
+            cachedMap.put(ACCOUNT_ID, new HashSet<>());
+            fetchedAtMap.put(ACCOUNT_ID, Context.now());
+            assertEquals(3, UsageMetricCalculator.calculateActiveEndpoints());
+        } finally {
+            cachedMap.remove(ACCOUNT_ID);
+            fetchedAtMap.remove(ACCOUNT_ID);
+        }
     }
 
     @Test

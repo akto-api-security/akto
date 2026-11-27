@@ -508,6 +508,15 @@ function TestRunResultPage(props) {
     })
   }
 
+  async function linkLinearTicket(issueId, linearTicket) {
+    await issuesApi.linkLinearTicket([issueId], linearTicket).then(async (res) => {
+      await fetchData();
+      setToast(true, false, res?.errorMessage || "Linear ticket linked")
+    }).catch((err) => {
+      setToast(true, true, err?.response?.data?.actionErrors?.[0] || "Error linking Linear ticket")
+    })
+  }
+
   async function setData(testingRunResult, runIssues) {
 
     let tmp = testSubCategoryMap ? testSubCategoryMap : subCategoryMap
@@ -576,6 +585,7 @@ function TestRunResultPage(props) {
           createJiraTicket={createJiraTicket}
           createDevRevTicket={createDevRevTicket}
           createLinearTicket={createLinearTicket}
+          linkLinearTicket={linkLinearTicket}
           createPortIOTicket={createPortIOTicket}
           jiraIssueUrl={jiraIssueUrl}
           hexId={hexId}

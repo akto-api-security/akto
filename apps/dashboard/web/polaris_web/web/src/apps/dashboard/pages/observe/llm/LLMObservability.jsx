@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { Badge, Box, Card, Divider, HorizontalGrid, HorizontalStack, LegacyTabs, Modal, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Card, Divider, HorizontalGrid, HorizontalStack, LegacyTabs, Modal, Text, VerticalStack } from "@shopify/polaris";
 import { produce } from "immer";
 
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
@@ -357,7 +357,6 @@ export default function LLMObservability() {
         <>
             <PageWithMultipleCards
                 title="Traces"
-                titleMetadata={<Badge status="info">Beta</Badge>}
                 isFirstPage
                 primaryAction={
                     <DateRangeFilter

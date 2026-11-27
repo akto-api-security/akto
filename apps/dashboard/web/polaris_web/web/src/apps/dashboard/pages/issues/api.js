@@ -161,6 +161,13 @@ export default {
             data: {testingIssuesIdList, teamId, aktoDashboardHost}
         })
     },
+    linkLinearTicket(testingIssuesIdList, linearTicket) {
+        return request({
+            url: 'api/linkLinearTicket',
+            method: 'post',
+            data: {testingIssuesIdList, linearTicket}
+        })
+    },
     createPortIOTickets(testingIssuesIdList, aktoDashboardHost) {
         return request({
             url: 'api/createPortIOTickets',

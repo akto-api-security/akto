@@ -207,7 +207,21 @@ public class ThreatUtils {
     private static final Set<String> EVAL_TYPE_COVER_ACCOUNTS = ConcurrentHashMap.newKeySet();
     private static final Set<String> EVAL_TYPE_INDEX_ACCOUNTS = ConcurrentHashMap.newKeySet();
 
+    public static final String LATEST_API_IP_INDEX = "idx_ctx_latestApiIp_status_detectedAt_evalType";
+    private static final Document LATEST_API_IP_INDEX_KEYS = new Document("contextSource", 1).append("latestApiIp", 1)
+        .append("status", 1).append("detectedAt", -1).append(MaliciousEventDto.EVAL_TYPE, 1);
+    public static final String CASE_TIMELINE_INDEX = "idx_caseTimeline_activityType_context_detectedAt";
+    private static final Document CASE_TIMELINE_INDEX_KEYS = new Document("caseTimeline.activityType", 1)
+        .append("contextSource", 1).append("detectedAt", -1);
+
+    public static Document caseTimelineIndexHint(String accountId) {
+        return EVAL_TYPE_COVER_ACCOUNTS.contains(accountId) ? CASE_TIMELINE_INDEX_KEYS : null;
+    }
+
     public static Document coverIndexHint(String accountId, Document match) {
+        if (EVAL_TYPE_COVER_ACCOUNTS.contains(accountId) && fieldValue(match, "latestApiIp") != null && fieldValue(match, "contextSource") != null) {
+            return LATEST_API_IP_INDEX_KEYS;
+        }
         if (!USE_EVAL_TYPE_READS || !"ENDPOINT".equals(fieldValue(match, "contextSource"))) {
             return null;
         }
@@ -220,6 +234,14 @@ public class ThreatUtils {
         Document keys = new Document();
         EVAL_TYPE_COVER_FIELDS.forEach(field -> keys.append(field, "detectedAt".equals(field) ? -1 : 1));
         return keys;
+    }
+
+    public static Document detectedAtOrderedHint(String accountId, Document match) {
+        if (fieldValue(match, "latestApiIp") == null && !(fieldValue(match, MaliciousEventDto.EVAL_TYPE) instanceof String)
+            && !(fieldValue(match, "status") instanceof String)) {
+            return null;
+        }
+        return coverIndexHint(accountId, match);
     }
 
     public static Document evalTypeIndexHint(String accountId) {
@@ -684,6 +706,8 @@ public class ThreatUtils {
         requiredIndexes.put("idx_detectedAt_latestApiEndpoint", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("latestApiEndpoint")));
         requiredIndexes.put("idx_context_detectedAt_severity", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("severity")));
         requiredIndexes.put("idx_context_detectedAt_status", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("status")));
+        requiredIndexes.put(LATEST_API_IP_INDEX, LATEST_API_IP_INDEX_KEYS);
+        requiredIndexes.put(CASE_TIMELINE_INDEX, CASE_TIMELINE_INDEX_KEYS);
         requiredIndexes.put("idx_detected_context_actor_country", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("filterId"), Indexes.ascending("actor"), Indexes.ascending("country")));
         requiredIndexes.put("idx_refId", Indexes.ascending("refId"));
         requiredIndexes.put("idx_context_detectedAt_host", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("host")));

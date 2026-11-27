@@ -1183,6 +1183,8 @@ public class TestExecutor {
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
+        Boolean agenticTestingAllowed = testConfig.getInfo().getAgenticTestingAllowed();
+        Boolean onlySmartTestingAllowed = testConfig.getInfo().getOnlySmartTestingAllowed();
 
         ApiCollection apiCollection = TestingConfigurations.getInstance().getApiCollectionMap().get(apiInfoKey.getApiCollectionId());
         // Copilot Studio bots expose a /copilot/conversation endpoint that is a duplicate of the
@@ -1229,6 +1231,12 @@ public class TestExecutor {
         varMap.put("accountId", Context.accountId.get());
         varMap.put("apiInfoKey", apiInfoKey.toString());
         varMap.put("testSubType", testSubType);
+        if(agenticTestingAllowed != null) {
+            varMap.put("agenticTestingAllowed", agenticTestingAllowed);
+        }
+        if(onlySmartTestingAllowed != null){
+            varMap.put("onlySmartTestingAllowed", onlySmartTestingAllowed);
+        }
         if (testRunId != null && testRunResultSummaryId != null) {
             varMap.put("testRunId", testRunId.toHexString());
             varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());

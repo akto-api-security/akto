@@ -60,8 +60,11 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         Map<String, Set<String>> result = new HashMap<>();
         for (ModuleInfo m : modules) {
             Map<String, Object> ad = m.getAdditionalData();
-            if (ad == null || ad.get("username") == null) continue;
-            String username = String.valueOf(ad.get("username")).trim();
+            if (ad == null) continue;
+            // Fall back to email for identities that report no username (e.g. browser extension, Claude Desktop).
+            Object rawUsername = ad.get("username") != null ? ad.get("username") : ad.get("email");
+            if (rawUsername == null) continue;
+            String username = String.valueOf(rawUsername).trim();
             String deviceId = m.getName() == null ? "" : m.getName().trim();
             if (username.isEmpty() || deviceId.isEmpty()) continue;
             result.computeIfAbsent(username, k -> new HashSet<>()).add(deviceId);
