@@ -218,8 +218,9 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
         }
 
         List<TestingIssuesId> issueIds = testingIssuesIdList.stream().distinct().collect(Collectors.toList());
-        long found = TestingRunIssuesDao.instance.count(Filters.in(Constants.ID, issueIds));
-        long linked = TestingRunIssuesDao.instance.updateManyNoUpsert(
+        int found = TestingRunIssuesDao.instance.findAll(Filters.in(Constants.ID, issueIds),
+            Projections.include(Constants.ID)).size();
+        int linkedCount = (int) TestingRunIssuesDao.instance.updateManyNoUpsert(
             Filters.and(
                 Filters.in(Constants.ID, issueIds),
                 Filters.in(TestingRunIssues.LINEAR_ISSUE_URL, Arrays.asList(null, ""))
@@ -230,9 +231,8 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
             )
         ).getModifiedCount();
 
-        int linkedCount = (int) linked;
-        int existingCount = (int) (found - linked);
-        int notFoundCount = (int) (issueIds.size() - found);
+        int existingCount = found - linkedCount;
+        int notFoundCount = issueIds.size() - found;
         logger.infoAndAddToDb("Linked " + linkedCount + " issues to Linear ticket " + ticket.getIdentifier(),
             LoggerMaker.LogDb.DASHBOARD);
         return new TicketCreationResult(linkedCount, notFoundCount, existingCount,
