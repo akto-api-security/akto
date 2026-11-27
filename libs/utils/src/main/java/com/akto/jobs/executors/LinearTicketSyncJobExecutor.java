@@ -20,7 +20,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -129,8 +128,7 @@ public class LinearTicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams
     private int applyAktoStatusToLinear(String token, TestingRunIssues issue, LinearIssueState linear,
         Map<String, List<LinearWorkflowState>> statesByTeam) throws Exception {
         TestRunIssueStatus aktoStatus = issue.getTestRunIssueStatus();
-        List<String> targetTypes = LinearStatusMapping.targetStateTypes(aktoStatus);
-        if (targetTypes == null) {
+        if (LinearStatusMapping.targetStateTypes(aktoStatus) == null) {
             return 0;
         }
 
@@ -145,17 +143,9 @@ public class LinearTicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams
             statesByTeam.put(current.getTeamId(), states);
         }
 
-        Optional<LinearWorkflowState> target = Optional.empty();
-        for (String type : targetTypes) {
-            target = states.stream()
-                .filter(state -> type.equals(state.getType()))
-                .min(Comparator.comparingDouble(LinearWorkflowState::getPosition));
-            if (target.isPresent()) {
-                break;
-            }
-        }
+        Optional<LinearWorkflowState> target = LinearStatusMapping.targetState(states, aktoStatus);
         if (!target.isPresent()) {
-            logger.warn("No Linear state of type {} for ticket {}", targetTypes, issue.getTicketId());
+            logger.warn("No Linear state for Akto status {} on ticket {}", aktoStatus, issue.getTicketId());
             return 0;
         }
 

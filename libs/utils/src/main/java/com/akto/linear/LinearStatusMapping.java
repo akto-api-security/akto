@@ -1,11 +1,14 @@
 package com.akto.linear;
 
+import com.akto.linear.LinearApiClient.LinearWorkflowState;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -35,5 +38,22 @@ public final class LinearStatusMapping {
 
     public static List<String> targetStateTypes(TestRunIssueStatus status) {
         return status == null ? null : AKTO_TO_STATE_TYPES.get(status);
+    }
+
+    public static Optional<LinearWorkflowState> targetState(List<LinearWorkflowState> states,
+        TestRunIssueStatus status) {
+        List<String> types = targetStateTypes(status);
+        if (types == null || states == null) {
+            return Optional.empty();
+        }
+        for (String type : types) {
+            Optional<LinearWorkflowState> state = states.stream()
+                .filter(candidate -> type.equals(candidate.getType()))
+                .min(Comparator.comparingDouble(LinearWorkflowState::getPosition));
+            if (state.isPresent()) {
+                return state;
+            }
+        }
+        return Optional.empty();
     }
 }

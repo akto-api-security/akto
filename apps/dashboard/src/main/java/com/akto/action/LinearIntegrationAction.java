@@ -33,6 +33,7 @@ public class LinearIntegrationAction extends UserAction {
     private String teamId;
     private String errorMessage;
     private String aktoDashboardHost;
+    private String linearTicket;
 
     @Audit(description = "User saved Linear API key", resource = Resource.LINEAR_INTEGRATION, operation = Operation.CREATE)
     public String addLinearIntegration() {
@@ -125,6 +126,20 @@ public class LinearIntegrationAction extends UserAction {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error creating Linear tickets: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    @Audit(description = "User linked an existing Linear ticket", resource = Resource.LINEAR_INTEGRATION, operation = Operation.UPDATE)
+    public String linkLinearTicket() {
+        try {
+            TicketCreationResult result = new LinearIntegrationService()
+                .linkExistingTicket(testingIssuesIdList, linearTicket);
+            errorMessage = result.getMessage();
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error linking Linear ticket: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             addActionError(e.getMessage());
             return Action.ERROR.toUpperCase();
         }
