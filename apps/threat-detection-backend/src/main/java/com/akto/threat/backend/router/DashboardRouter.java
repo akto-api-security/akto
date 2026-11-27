@@ -39,6 +39,8 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.google.protobuf.Message;
 import org.bson.Document;
 import io.vertx.core.Vertx;
+import io.vertx.core.json.JsonObject;
+import com.akto.threat.backend.tasks.QRadarForwarder;
 import io.vertx.ext.web.RequestBody;
 import io.vertx.ext.web.Router;
 import java.util.List;
@@ -67,6 +69,10 @@ public class DashboardRouter implements ARouter {
         this.threatActorService = threatActorService;
         this.threatApiService = threatApiService;
         this.guardrailOverviewService = new GuardrailOverviewService(MaliciousEventDao.instance, dsService);
+    }
+
+    private static boolean isHttpUrl(String url) {
+        return url != null && url.matches("(?i)^https?://\\S+$");
     }
 
     private String getContextSourceHeader(io.vertx.ext.web.RoutingContext ctx) {
@@ -481,6 +487,37 @@ public class DashboardRouter implements ARouter {
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
         
+        router
+            .post("/fetchQRadarIntegration")
+            .blockingHandler(ctx -> ctx.response().setStatusCode(200)
+                .end(QRadarForwarder.fetchConfig(ctx.get("accountId")).toJson()));
+
+        router
+            .post("/saveQRadarIntegration")
+            .blockingHandler(ctx -> {
+                JsonObject req = ctx.body().asJsonObject();
+                String url = req == null ? null : req.getString("url");
+                if (!isHttpUrl(url)) {
+                    ctx.response().setStatusCode(400).end(new JsonObject().put("errorMessage", "A valid http(s) URL is required").encode());
+                    return;
+                }
+                QRadarForwarder.saveConfig(ctx.get("accountId"), url, req.getString("authToken"), req.getBoolean("enabled", false));
+                ctx.response().setStatusCode(200).end("{}");
+            });
+
+        router
+            .post("/testQRadarIntegration")
+            .blockingHandler(ctx -> {
+                JsonObject req = ctx.body().asJsonObject();
+                String url = req == null ? null : req.getString("url");
+                if (!isHttpUrl(url)) {
+                    ctx.response().setStatusCode(400).end(new JsonObject().put("errorMessage", "A valid http(s) URL is required").encode());
+                    return;
+                }
+                String error = QRadarForwarder.sendTestEvent(ctx.get("accountId"), url, req.getString("authToken"));
+                ctx.response().setStatusCode(200).end(new JsonObject().put("error", error).encode());
+            });
+
         router
             .post("/addSplunkIntegration")
             .blockingHandler(ctx -> {

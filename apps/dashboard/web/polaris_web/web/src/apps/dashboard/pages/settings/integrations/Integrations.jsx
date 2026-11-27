@@ -167,6 +167,12 @@ function Integrations() {
       source: '/public/datadog-1.svg'
     }
 
+    let qradarObj = {
+      id: 'qradar',
+      name: 'IBM QRadar',
+      source: '/public/qradar.svg'
+    }
+
     let agentConfigObj ={
       id: 'agents',
       name:'Agents',
@@ -290,7 +296,7 @@ function Integrations() {
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, linearObj, portIOObj, wizObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
-    const siemItems = [splunkObj, datadogObj];
+    const siemItems = [splunkObj, datadogObj, qradarObj];
     const monitoringItems = [newRelicObj, openTelemetryObj]
     switch (tabId) {
       case 'traffic':

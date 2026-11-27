@@ -15,5 +15,9 @@ public class MongoDBCollection {
       "api_distribution_data";
     public static final String API_RATE_LIMIT_BUCKET_STATISTICS =
       "api_rate_limit_bucket_statistics";
+    public static final String SIEM_OUTBOX = "siem_outbox";
+    // common db
+    public static final String SIEM_INTEGRATIONS = "siem_integrations";
+    public static final String SIEM_FORWARDER_LOCK = "siem_forwarder_lock";
   }
 }

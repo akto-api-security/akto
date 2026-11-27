@@ -757,6 +757,27 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchQRadarIntegration() {
+        return request({
+            url: '/api/fetchQRadarIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    saveQRadarIntegration(url, authToken, enabled) {
+        return request({
+            url: '/api/saveQRadarIntegration',
+            method: 'post',
+            data: { url, authToken, enabled }
+        })
+    },
+    testQRadarIntegration(url, authToken) {
+        return request({
+            url: '/api/testQRadarIntegration',
+            method: 'post',
+            data: { url, authToken }
+        })
+    },
     testDatadogIntegration(apiKey, datadogSite) {
         return request({
             url: '/api/testDatadogIntegration',

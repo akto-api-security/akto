@@ -143,6 +143,7 @@ const PAGE_REQUIRES = {
     '/dashboard/settings/integrations/jira': 'api/fetchIntegration',
     '/dashboard/settings/integrations/splunk': 'api/fetchSplunkIntegration',
     '/dashboard/settings/integrations/datadog': 'api/fetchDatadogIntegration',
+    '/dashboard/settings/integrations/qradar': 'api/fetchQRadarIntegration',
     '/dashboard/settings/integrations/aws_waf': 'api/fetchAwsWafIntegration',
     '/dashboard/settings/integrations/cloudflare_waf': 'api/fetchCloudflareWafIntegration',
     '/dashboard/settings/integrations/postman': 'api/getPostmanCredential',

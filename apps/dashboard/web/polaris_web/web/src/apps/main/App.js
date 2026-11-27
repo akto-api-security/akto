@@ -108,6 +108,7 @@ import ScriptsPage from "../dashboard/pages/testing/scripts/ScriptsPage";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
 import Datadog from "../dashboard/pages/settings/integrations/Datadog";
+import QRadar from "../dashboard/pages/settings/integrations/QRadar";
 import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
@@ -564,6 +565,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/datadog",
                         element: <Datadog/>,
+                    },
+                    {
+                        path: "integrations/qradar",
+                        element: <QRadar/>,
                     },
                     {
                         path: "integrations/f5_waf",

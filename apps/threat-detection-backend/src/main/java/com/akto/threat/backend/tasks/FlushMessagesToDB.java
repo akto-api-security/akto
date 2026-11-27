@@ -165,6 +165,7 @@ public class FlushMessagesToDB {
             if (event.getDedupeKey() != null) {
                 MaliciousEventDao.instance.upsertByDedupeKey(accountId, event);
             } else {
+                QRadarForwarder.enqueue(accountId, event); // queued first, so a stored event is never missed
                 MaliciousEventDao.instance.insertOne(accountId, event);
             }
             lastSuccessfulMongoWriteEpochMs.set(System.currentTimeMillis());
