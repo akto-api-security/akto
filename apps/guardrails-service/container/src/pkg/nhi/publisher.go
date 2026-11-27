@@ -59,7 +59,7 @@ func (p *Publisher) Publish(pctx PublishContext, findings []extract.Finding) {
 			ContextSource: pctx.ContextSource,
 			AgentName:     coalesce(f.AgentName, pctx.AgentName),
 			AgentType:     coalesce(f.AgentType, pctx.AgentType),
-			Owner:         ownerFromLabel(pctx.DeviceLabel),
+			Owner:         owner(pctx.DeviceLabel, pctx.OwnerEmail),
 			AccessLevel:   defaultAccessLevel(f.IdentityType),
 			Status:        "ACTIVE",
 			RiskLevel:     f.RiskLevel,
@@ -103,11 +103,11 @@ func coalesce(a, b string) string {
 	return b
 }
 
-func ownerFromLabel(label string) *Owner {
-	if label == "" {
+func owner(label, email string) *Owner {
+	if label == "" && email == "" {
 		return nil
 	}
-	return &Owner{Name: label}
+	return &Owner{Name: label, Email: email}
 }
 
 // defaultAccessLevel is a conservative guess at what the credential can do.
