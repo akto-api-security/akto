@@ -88,6 +88,7 @@ import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.notifications.slack.TestingFailureSlackCopy;
 import com.akto.trafficFilter.HostFilter;
+import com.akto.trafficFilter.EndpointCollectionCache;
 import com.akto.trafficFilter.ParamFilter;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
@@ -1428,7 +1429,10 @@ public class DbAction extends ActionSupport {
                         int apiCollectionId = Integer.valueOf(mObj.get("apiCollectionId").toString());
                         String url = (String) mObj.get("url");
                         String method = (String) mObj.get("method");
-                        if (url != null && method != null && !ParamFilter.isNewEntry(accId, apiCollectionId, url,
+                        // ENDPOINT context source (browser LLM etc.) is never throttled; only API security traffic is.
+                        if (url != null && method != null
+                                && !EndpointCollectionCache.isEndpointCollection(accId, apiCollectionId, Context.now())
+                                && !ParamFilter.isNewEntry(accId, apiCollectionId, url,
                                 method, ParamFilter.BLOOM_PARAM_SAMPLE_DATA)) {
                             indicesToDelete.add(i);
                         }
@@ -1578,7 +1582,9 @@ public class DbAction extends ActionSupport {
                                 method = entry.getValue().toString();
                             }
                         }
-                        if (url != null && method != null && apiCollectionId != 0 && !ParamFilter.isNewEntry(accId,
+                        if (url != null && method != null && apiCollectionId != 0
+                                && !EndpointCollectionCache.isEndpointCollection(accId, apiCollectionId, Context.now())
+                                && !ParamFilter.isNewEntry(accId,
                                 apiCollectionId, url, method, ParamFilter.BLOOM_PARAM_SENSITIVE_SAMPLE_DATA)) {
                             indicesToDelete.add(i);
                         }
