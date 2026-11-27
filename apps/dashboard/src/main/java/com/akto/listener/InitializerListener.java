@@ -282,6 +282,8 @@ public class InitializerListener implements ServletContextListener {
     private static final ScheduledExecutorService usageScheduler = Executors.newScheduledThreadPool(1);
     // Index builds can be slow, so they get their own thread instead of delaying the jobs on `scheduler`.
     private static final ScheduledExecutorService indexSyncScheduler = Executors.newSingleThreadScheduledExecutor();
+    // Trimming loops over every account, so it gets its own thread instead of delaying the jobs on `scheduler`.
+    private static final ScheduledExecutorService trimCappedCollectionsScheduler = Executors.newSingleThreadScheduledExecutor();
     static final String INDEX_SYNC_ENABLED_ENV = "ENABLE_INDEX_SYNC_JOB";
     static final int INDEX_SYNC_INTERVAL_SECONDS = 24 * 60 * 60;
     static final int INDEX_SYNC_INITIAL_DELAY_MINUTES = 30;
@@ -2724,7 +2726,6 @@ public class InitializerListener implements ServletContextListener {
 
                     logger.warn("Started Okta user sync scheduler", LogDb.DASHBOARD);
                     oktaUserSyncCron.setUpOktaUserSyncScheduler();
-                    trimCappedCollectionsJob();
                     setUpIndexSyncScheduler();
 
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
@@ -2750,7 +2751,10 @@ public class InitializerListener implements ServletContextListener {
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
-                    }                    
+                    }
+
+                    // Scheduled after the per-account init above finishes, so the two don't overlap.
+                    trimCappedCollectionsJob();
 
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
@@ -2943,7 +2947,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private void trimCappedCollectionsJob() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
+        trimCappedCollectionsScheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 // Only one container should trim per day.
                 Context.accountId.set(1000_000);
