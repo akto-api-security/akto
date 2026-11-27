@@ -70,7 +70,7 @@ public class JwtAuthenticator {
             throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
 
          PublicKey publicKey = getPublicKey();
-         return Jwts.parserBuilder()
+         return Jwts.parser()
                  .setSigningKey(publicKey)
                  .build()
                  .parseClaimsJws(jwsString);

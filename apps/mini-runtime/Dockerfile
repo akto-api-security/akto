@@ -3,7 +3,8 @@ WORKDIR /app
 
 RUN apt-get update -y \
     && apt-get upgrade -y \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -f /usr/bin/pebble
 
 # CVE-2026-91403: drop all eMudhra roots per openjdk.org/emudhra's 2026/10/24 update (now
 # includes G1/G2, not just the compromised G3); fail build if any remain. Remove once Temurin's

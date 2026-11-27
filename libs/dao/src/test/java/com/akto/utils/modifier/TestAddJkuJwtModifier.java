@@ -28,7 +28,7 @@ public class TestAddJkuJwtModifier {
        String modifiedJWT = addJkuJWTModifier.jwtModify("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiZXhwIjoxNTE2MjM5MDkwfQ.qnloZdeBgTtHUtvyhpo37TaxF1CZOLRI0rztKoITjm0NLJBpRqHB9mryP_Zy4FgV8MXDJb0-83pwjqOh8bdIWQKGukQaEL-dwetXCv9N8rWu3yud1ETtgvSNf5_k7X4X02ZbXeOW-qG39E60xtqvPySZ0zlaHbttZfpYus7SrklFoPFZFtDvzAXamFuLjZ1DIrgrW0i7BHl2CmwyEJS2IB3vpYdJzeN0ONlw7WYuVGxfG7BHeyUl7fI51dZHzYEBxvR4o0bZHxRqEWPQDwqAmc2Nbf_LA9p1muJakxT8DgNMxb3cbwusKpes9Ff7seBy1_tFke5HTViB4tO__XOeNw");
 
        // this will fail if invalid JWT (signature + time)
-        Jws<Claims> jws = Jwts.parserBuilder()
+        Jws<Claims> jws = Jwts.parser()
                 .setSigningKey(publicKey)
                 .build()
                 .parseClaimsJws(modifiedJWT);
@@ -43,7 +43,7 @@ public class TestAddJkuJwtModifier {
         modifiedJWT = addJkuJWTModifier.jwtModify("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.NHVaYe26MbtOYhSKkoKYdFVomg4i8ZJd8_-RU8VNbftc4TSMb4bXP3l3YlNWACwyXPGffz5aXHc6lty1Y2t4SWRqGteragsVdZufDn5BlnJl9pdR_kdVFUsra2rWKEofkZeIC4yWytE58sMIihvo9H1ScmmVwBcQP6XETqYd0aSHp1gOa9RdUPDvoXQ5oqygTqVtxaDr6wUFKrKItgBMzWIdNZ6y7O9E0DhEPTbE9rfBo6KTFsHAZnMg4k68CDp2woYIaXbmYTWcvbzIuHO7_37GT79XdIwkm95QJ7hYC9RiwrV7mesbY4PAahERJawntho0my942XheVLmGwLMBkQ");
 
         // this will fail if invalid JWT (signature + time)
-        jws = Jwts.parserBuilder()
+        jws = Jwts.parser()
                 .setSigningKey(publicKey)
                 .build()
                 .parseClaimsJws(modifiedJWT);
