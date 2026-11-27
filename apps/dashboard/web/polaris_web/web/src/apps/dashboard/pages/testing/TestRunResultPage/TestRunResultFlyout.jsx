@@ -22,6 +22,7 @@ import settingFunctions from '../../settings/module.js'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import LinearTicketCreationModal from '../../../components/shared/LinearTicketCreationModal.jsx'
+import LinkLinearTicketModal from './LinkLinearTicketModal.jsx'
 import { getLinearKey } from '../../../components/shared/LinearTicketDisplay'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
@@ -44,7 +45,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, createLinearTicket, createPortIOTicket, linearIssueUrl, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, createLinearTicket, linkLinearTicket, createPortIOTicket, linearIssueUrl, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
     const [remediationText, setRemediationText] = useState("")
     const { canCall, canCallAll } = usePermissions()
     const [fullDescription, setFullDescription] = useState(false)
@@ -73,6 +74,7 @@ function TestRunResultFlyout(props) {
     const [linearModalActive, setLinearModalActive] = useState(false)
     const [linearTeams, setLinearTeams] = useState([])
     const [linearTeamId, setLinearTeamId] = useState('')
+    const [linkLinearModalActive, setLinkLinearModalActive] = useState(false)
     const [ticketMenuActive, setTicketMenuActive] = useState(false)
 
     const [description, setDescription] = useState("")
@@ -474,7 +476,8 @@ function TestRunResultFlyout(props) {
     ]
 
     const connectedTicketTools = ticketTools.filter(tool => tool.integrated)
-    const showTicketMenu = connectedTicketTools.length > 1
+    const canLinkLinearTicket = window.LINEAR_INTEGRATED === 'true' && !!issueDetails?.id && !hasTicket(linearIssueUrl)
+    const showTicketMenu = connectedTicketTools.length > 1 || canLinkLinearTicket
 
     const ticketMenuItem = (tool) => {
         const created = hasTicket(tool.ticketUrl)
@@ -723,7 +726,16 @@ function TestRunResultFlyout(props) {
                                     preferredPosition="below"
                                     preferredAlignment="right"
                                 >
-                                    <ActionList actionRole="menuitem" items={connectedTicketTools.map(ticketMenuItem)} />
+                                    <ActionList actionRole="menuitem" items={connectedTicketTools.flatMap(tool => [
+                                        ticketMenuItem(tool),
+                                        ...(tool.id === 'linear' && canLinkLinearTicket ? [{
+                                            content: 'Link existing Linear ticket',
+                                            prefix: <Avatar size="extraSmall" shape="round" source="/public/linear.svg" />,
+                                            suffix: <Text as="span" variant="bodySm" color="subdued">Link</Text>,
+                                            disabled: !canCall('api/linkLinearTicket'),
+                                            onAction: () => { setTicketMenuActive(false); setLinkLinearModalActive(true) }
+                                        }] : [])
+                                    ])} />
                                 </Popover>
                             )}
                             <JiraTicketCreationModal
@@ -790,6 +802,13 @@ function TestRunResultFlyout(props) {
                                 issueId={issueDetails.id}
                             />
                            
+                            {canLinkLinearTicket ?
+                                <LinkLinearTicketModal
+                                    modalActive={linkLinearModalActive}
+                                    setModalActive={setLinkLinearModalActive}
+                                    handleLinkAction={(linearTicket) => linkLinearTicket(issueDetails.id, linearTicket)}
+                                /> : <></>}
+
                             {!showTicketMenu && window.PORT_IO_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchPortIOIntegration', 'api/createPortIOTickets')}><Button id={"create-port-ticket-button"} primary onClick={handlePortClick} disabled={!!linearIssueUrl}>Create Linear Ticket via Port.io</Button></AllowedAction> : <></>}
 
                             { window?.WIZ_INTEGRATED === 'true' ? 

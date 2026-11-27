@@ -42,7 +42,7 @@ public final class LinearApiClient {
     private static final String ISSUES_UPDATED_QUERY =
         "query IssuesUpdated($first: Int!, $after: String, $filter: IssueFilter) { issues(first: $first, after: $after, filter: $filter) { nodes { id identifier updatedAt state { id type } team { id } } pageInfo { hasNextPage endCursor } } }";
     private static final String ISSUE_QUERY =
-        "query IssueByIdentifier($id: String!) { issue(id: $id) { id identifier updatedAt state { id type } team { id } } }";
+        "query IssueByIdentifier($id: String!) { issue(id: $id) { id identifier url updatedAt state { id type } team { id } } }";
     private static final String TEAM_STATES_QUERY =
         "query TeamStates($id: String!) { team(id: $id) { states { nodes { id type position } } } }";
     private static final String ISSUE_UPDATE_MUTATION =
@@ -80,6 +80,7 @@ public final class LinearApiClient {
         private final int updatedAt;
         private final String stateType;
         private final String teamId;
+        private final String url;
     }
 
     @Getter
@@ -124,11 +125,14 @@ public final class LinearApiClient {
     }
 
     public static LinearIssue createIssue(String token, String teamId, String title, String description,
-        int priority) throws Exception {
+        int priority, String stateId) throws Exception {
         BasicDBObject input = new BasicDBObject("teamId", teamId)
             .append("title", title)
             .append("description", description)
             .append("priority", priority);
+        if (StringUtils.isNotBlank(stateId)) {
+            input.append("stateId", stateId);
+        }
 
         BasicDBObject payload = mutationPayload(
             execute(token, ISSUE_CREATE_MUTATION, new BasicDBObject("input", input)), "issueCreate");
@@ -201,7 +205,8 @@ public final class LinearApiClient {
         return new LinearIssueState(issue.getString("id"), issue.getString("identifier"),
             StringUtils.isBlank(updatedAt) ? 0 : (int) Instant.parse(updatedAt).getEpochSecond(),
             state != null ? state.getString("type") : null,
-            team != null ? team.getString("id") : null);
+            team != null ? team.getString("id") : null,
+            issue.getString("url"));
     }
 
     public static void createAttachment(String token, String issueId, String title, String subtitle, String url,

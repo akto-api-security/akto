@@ -1,6 +1,7 @@
 package com.akto.linear;
 
 import com.akto.dao.LinearIntegrationDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.linear_integration.LinearIntegration;
@@ -13,16 +14,21 @@ import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.linear.LinearApiClient.LinearIssue;
+import com.akto.linear.LinearApiClient.LinearIssueState;
 import com.akto.linear.LinearApiClient.LinearTeam;
+import com.akto.linear.LinearApiClient.LinearWorkflowState;
 import com.akto.log.LoggerMaker;
 import com.akto.ticketing.ATicketIntegrationService;
 import com.akto.ticketing.TicketSyncScheduler;
+import com.akto.util.Constants;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.utils.CurlUtils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import java.util.Arrays;
@@ -30,6 +36,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
@@ -60,6 +67,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
     }
 
     private String apiToken;
+    private final Map<String, List<LinearWorkflowState>> teamStatesCache = new HashMap<>();
 
     public LinearIntegrationService(String apiToken) {
         this.apiToken = apiToken;
@@ -182,6 +190,66 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
             updated.setApiToken(null);
         }
         return updated;
+    }
+
+    public TicketCreationResult linkExistingTicket(List<TestingIssuesId> testingIssuesIdList, String ticketRef)
+        throws Exception {
+        if (testingIssuesIdList == null || testingIssuesIdList.isEmpty()) {
+            throw new Exception("Select at least one issue to link.");
+        }
+        String identifier = parseTicketIdentifier(ticketRef);
+
+        LinearIntegration integration = fetchIntegration();
+        if (integration == null || StringUtils.isBlank(integration.getApiToken())) {
+            throw new Exception("Linear Integration is not configured.");
+        }
+
+        LinearIssueState ticket;
+        try {
+            ticket = LinearApiClient.fetchIssue(integration.getApiToken(), identifier);
+        } catch (Exception e) {
+            throw new Exception("Could not find Linear ticket " + identifier + ": " + e.getMessage());
+        }
+
+        Map<String, LinearTeamMapping> teamMappings = integration.getTeamMappings();
+        if (teamMappings == null || !teamMappings.containsKey(ticket.getTeamId())) {
+            throw new Exception("Linear ticket " + ticket.getIdentifier()
+                + " belongs to a team that is not added to the Linear integration in Akto.");
+        }
+
+        List<TestingIssuesId> issueIds = testingIssuesIdList.stream().distinct().collect(Collectors.toList());
+        long found = TestingRunIssuesDao.instance.count(Filters.in(Constants.ID, issueIds));
+        long linked = TestingRunIssuesDao.instance.updateManyNoUpsert(
+            Filters.and(
+                Filters.in(Constants.ID, issueIds),
+                Filters.in(TestingRunIssues.LINEAR_ISSUE_URL, Arrays.asList(null, ""))
+            ),
+            Updates.combine(
+                ticketInfoUpdates(ticket.getIdentifier(), ticket.getUrl()),
+                Updates.set(TestingRunIssues.LAST_UPDATED, Context.now())
+            )
+        ).getModifiedCount();
+
+        int linkedCount = (int) linked;
+        int existingCount = (int) (found - linked);
+        int notFoundCount = (int) (issueIds.size() - found);
+        logger.infoAndAddToDb("Linked " + linkedCount + " issues to Linear ticket " + ticket.getIdentifier(),
+            LoggerMaker.LogDb.DASHBOARD);
+        return new TicketCreationResult(linkedCount, notFoundCount, existingCount,
+            String.format("Linked %d issues to %s. Already had a Linear ticket %d. Not found %d.",
+                linkedCount, ticket.getIdentifier(), existingCount, notFoundCount));
+    }
+
+    static String parseTicketIdentifier(String ticketRef) throws Exception {
+        String ref = StringUtils.trimToEmpty(ticketRef);
+        if (ref.contains("/issue/")) {
+            ref = StringUtils.substringBefore(StringUtils.substringAfter(ref, "/issue/"), "/");
+        }
+        ref = StringUtils.substringBefore(StringUtils.substringBefore(ref, "?"), "#");
+        if (StringUtils.isBlank(ref)) {
+            throw new Exception("Enter a Linear ticket URL or key, for example ENG-123.");
+        }
+        return ref.toUpperCase();
     }
 
     public LinearIntegration fetchLinearIntegration() {
@@ -321,13 +389,33 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
                 endpointDetails, aktoIssueUrl);
 
             LinearIssue issue = LinearApiClient.createIssue(authToken, teamId, title, description,
-                resolvePriority(integration.getTeamMappings(), teamId, severity));
+                resolvePriority(integration.getTeamMappings(), teamId, severity),
+                resolveInitialStateId(authToken, teamId, issueId));
 
             linkAktoIssue(authToken, issue, aktoIssueUrl, testInfo, severity);
 
             return new TicketInfo(issue.getIdentifier(), issue.getUrl());
         } catch (Exception e) {
             logger.errorAndAddToDb("Exception creating Linear issue: " + e.getMessage(),
+                LoggerMaker.LogDb.DASHBOARD);
+            return null;
+        }
+    }
+
+    private String resolveInitialStateId(String authToken, String teamId, TestingIssuesId issueId) {
+        try {
+            TestingRunIssues aktoIssue = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issueId),
+                Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS));
+            GlobalEnums.TestRunIssueStatus status = aktoIssue != null && aktoIssue.getTestRunIssueStatus() != null
+                ? aktoIssue.getTestRunIssueStatus() : GlobalEnums.TestRunIssueStatus.OPEN;
+            List<LinearWorkflowState> states = teamStatesCache.get(teamId);
+            if (states == null) {
+                states = LinearApiClient.fetchTeamStates(authToken, teamId);
+                teamStatesCache.put(teamId, states);
+            }
+            return LinearStatusMapping.targetState(states, status).map(LinearWorkflowState::getId).orElse(null);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Could not resolve Linear state for issue " + issueId + ": " + e.getMessage(),
                 LoggerMaker.LogDb.DASHBOARD);
             return null;
         }
