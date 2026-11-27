@@ -131,6 +131,7 @@ import DevicesEmployeesPage from "../dashboard/pages/observe/atlas/devices_emplo
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
+import CreatePolicyWizard from "../dashboard/pages/guardrails/wizard/CreatePolicyWizard";
 import GuardrailViolations from "../dashboard/pages/guardrails/violations/ViolationsPage";
 import GuardrailOverview from "../dashboard/pages/guardrails/overview/GuardrailOverview";
 import Misconfigurations from "../dashboard/pages/guardrails/Misconfigurations";
@@ -455,6 +456,22 @@ const router = createBrowserRouter([
                             {
                                 path: "activity",
                                 element: func.isDemoAccount() ? <GuardrailDetectionDemo/> : <GuardrailDetection/>
+                            },
+                            {
+                                path: "policies/new/blueprint",
+                                element: <CreatePolicyWizard/>
+                            },
+                            {
+                                path: "policies/new/protections",
+                                element: <CreatePolicyWizard/>
+                            },
+                            {
+                                path: "policies/new/scope",
+                                element: <CreatePolicyWizard/>
+                            },
+                            {
+                                path: "policies/new",
+                                element: <CreatePolicyWizard/>
                             },
                             {
                                 path: "policies",
