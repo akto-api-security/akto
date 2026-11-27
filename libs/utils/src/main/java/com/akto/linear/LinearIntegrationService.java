@@ -58,6 +58,10 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
     private static final List<String> MAPPED_SEVERITIES = Arrays.asList(Severity.CRITICAL.name(),
         Severity.HIGH.name(), Severity.MEDIUM.name(), Severity.LOW.name());
     private static final Map<String, String> DEFAULT_SEVERITY_TO_PRIORITY = new HashMap<>();
+    static final int MAX_DESCRIPTION_LENGTH = 250000;
+    private static final String CODE_FENCE = "```";
+    private static final String TRUNCATION_NOTE =
+        "\n\n> Truncated to fit Linear's description limit. The full request and response are in Akto.\n";
 
     static {
         DEFAULT_SEVERITY_TO_PRIORITY.put(Severity.CRITICAL.name(), PRIORITY_URGENT);
@@ -463,7 +467,22 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
             body.append("---\n\n## Request/Response Details\n\n").append(requestResponseData);
         }
 
-        return body.toString();
+        return fitToLinearLimit(body.toString());
+    }
+
+    static String fitToLinearLimit(String description) {
+        if (description.length() <= MAX_DESCRIPTION_LENGTH) {
+            return description; 
+        }
+        int end = MAX_DESCRIPTION_LENGTH - TRUNCATION_NOTE.length() - CODE_FENCE.length() - 1;
+        if (Character.isHighSurrogate(description.charAt(end - 1))) {
+            end--;
+        }
+        StringBuilder truncated = new StringBuilder(description.substring(0, end));
+        if (StringUtils.countMatches(truncated, CODE_FENCE) % 2 == 1) {
+            truncated.append('\n').append(CODE_FENCE);
+        }
+        return truncated.append(TRUNCATION_NOTE).toString();
     }
 
     private static String buildRequestResponseData(TestingRunResult testingRunResult) {
