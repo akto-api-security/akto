@@ -14,10 +14,8 @@
     <artifactId>mini-runtime</artifactId>
     <packaging>jar</packaging>
 
-    <!-- Security pins for transitive deps (via libs/dao and swagger-inflector) bundled in the mini-runtime image -->
     <dependencyManagement>
         <dependencies>
-            <!-- CVE-2025-12383; bom keeps all jersey modules on one version -->
             <dependency>
                 <groupId>org.glassfish.jersey</groupId>
                 <artifactId>jersey-bom</artifactId>
@@ -25,13 +23,11 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <!-- CVE-2025-48924 -->
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
                 <version>3.20.0</version>
             </dependency>
-            <!-- CVE-2026-59171 -->
             <dependency>
                 <groupId>org.json</groupId>
                 <artifactId>json</artifactId>

@@ -48,7 +48,7 @@ public class JWT {
 
         PublicKey publicKey= getPublicKey(publicKeyPath);
 
-        return Jwts.parserBuilder()
+        return Jwts.parser()
                 .setSigningKey(publicKey)
                 .build()
                 .parseClaimsJws(jwsString);
