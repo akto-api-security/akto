@@ -17,6 +17,7 @@ import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
+import com.akto.threat.backend.tasks.QRadarForwarder;
 import com.akto.threat.backend.cron.PercentilesCron;
 import com.akto.threat.backend.cron.ArchiveOldMaliciousEventsCron;
 import com.akto.threat.backend.cron.RiskScoreSyncCron;
@@ -86,6 +87,7 @@ public class Main {
             .setValueSerializer(Serializer.STRING)
             .build();
 
+    QRadarForwarder.start(threatProtectionMongo);
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
     MaliciousEventService maliciousEventService =
