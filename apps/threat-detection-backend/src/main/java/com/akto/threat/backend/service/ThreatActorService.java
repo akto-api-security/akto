@@ -1388,6 +1388,13 @@ public class ThreatActorService {
       String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, String contextSource,
       String status, String skillEvalMode, String configEvalMode, Document hostScopeMatch) {
 
+    return fetchTopNData(accountId, startTs, endTs, latestAttackList, limit, contextSource, status, skillEvalMode, configEvalMode, hostScopeMatch, false);
+  }
+
+  public FetchTopNDataResponse fetchTopNData(
+      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, String contextSource,
+      String status, String skillEvalMode, String configEvalMode, Document hostScopeMatch, boolean topHostsOnly) {
+
     List<Document> pipeline = new ArrayList<>();
 
         // Match stage (only apply time range filter; ignore latestAttackList)
@@ -1450,16 +1457,18 @@ public class ThreatActorService {
 
     List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
-      while (cursor.hasNext()) {
-        Document doc = cursor.next();
-        topApis.add(
-            FetchTopNDataResponse.TopApiData.newBuilder()
-                .setEndpoint(doc.getString("endpoint"))
-                .setMethod(doc.getString("method"))
-                .setAttacks(doc.getInteger("attacks"))
-                .setSeverity(doc.getString("severity"))
-                .build());
+    if (!topHostsOnly) {
+      try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline), hint).cursor()) {
+        while (cursor.hasNext()) {
+          Document doc = cursor.next();
+          topApis.add(
+              FetchTopNDataResponse.TopApiData.newBuilder()
+                  .setEndpoint(doc.getString("endpoint"))
+                  .setMethod(doc.getString("method"))
+                  .setAttacks(doc.getInteger("attacks"))
+                  .setSeverity(doc.getString("severity"))
+                  .build());
+        }
       }
     }
 

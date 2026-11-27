@@ -51,9 +51,10 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents as expandRowsToEvents } from "@/apps/dashboard/pages/threat_detection/utils/activityGroups";
-import { dateRangeFromSearchParams, fetchEndpointViolationCounts } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
+import { dateRangeFromSearchParams } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
+import useViolationsSummary from "./useViolationsSummary";
 import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "./ViolationFlyoutSections";
 import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText, normalizeReasonPunctuation } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
@@ -693,10 +694,13 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onAssetClick, activeAssetFilter, onClearAssetSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, currentTab, latencyData, startTimestamp, endTimestamp }) {
-    if (summaryLoading) return <SpinnerCentered />;
-    if (!summaryData) return null;
+function SummaryPanel({ loading, error, children }) {
+    if (loading) return <Card><SpinnerCentered /></Card>;
+    if (error) return <Card><Text color="critical">Could not load this summary. Refresh the page to retry.</Text></Card>;
+    return children;
+}
 
+function ViolationsDashboard({ summaryData, usernameMap, summary, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onAssetClick, activeAssetFilter, onClearAssetSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, currentTab, latencyData, startTimestamp, endTimestamp }) {
     const { severityDistribution, categoryTotal, statusCounts, topPolicies, topHosts, byType, skillsEvaluationsCount, misconfiguredSettingsCount, humanApprovalCount } = summaryData;
 
     const totalBreakdown = ["CRITICAL", "HIGH", "MEDIUM", "LOW"].map(k => ({
@@ -784,50 +788,54 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
     const isAktoUser = window.USER_NAME?.includes('@akto.io') && !func.isDemoAccount();
 
     const openCard = (
-        <Box
-            className="violations-card-wrap"
-            style={selectedCard === "open" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
-            onClick={onOpenCardClick}
-        >
-            <AgenticStatsCard
-                title="Open Violations"
-                titleTooltip="Active violations that need attention, broken down by severity. Click a severity to filter the table below."
-                total={statusCounts.ACTIVE || 0}
-                delta={0}
-                deltaColor="subdued"
-                breakdown={totalBreakdown}
-                onFilterClick={onSeverityClick}
-                activeFilter={activeSeverityFilter}
-                bodyGap="4"
-            />
-        </Box>
+        <SummaryPanel loading={summary.severity.loading || summary.counts.loading} error={summary.severity.error || summary.counts.error}>
+            <Box
+                className="violations-card-wrap"
+                style={selectedCard === "open" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
+                onClick={onOpenCardClick}
+            >
+                <AgenticStatsCard
+                    title="Open Violations"
+                    titleTooltip="Active violations that need attention, broken down by severity. Click a severity to filter the table below."
+                    total={statusCounts.ACTIVE || 0}
+                    delta={0}
+                    deltaColor="subdued"
+                    breakdown={totalBreakdown}
+                    onFilterClick={onSeverityClick}
+                    activeFilter={activeSeverityFilter}
+                    bodyGap="4"
+                />
+            </Box>
+        </SummaryPanel>
     );
 
     const isOtherCardFamily = selectedCard === "other" || selectedCard === "other-view";
     const otherCard = (
-        <Box
-            className="violations-card-wrap"
-            style={isOtherCardFamily ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
-            onClick={onOtherCardClick}
-        >
-            <AgenticStatsCard
-                title="Other Violations"
-                titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
-                // Sum the same breakdown segments rendered below, so the headline number can never
-                // drift from the bar (it previously hardcoded Under Review + Ignored only, missing
-                // Skills Evaluations / Misconfigured Settings on Atlas).
-                total={otherBreakdown.reduce((sum, seg) => sum + (seg.count || 0), 0)}
-                delta={0}
-                deltaColor="subdued"
-                breakdown={otherBreakdown}
-                onFilterClick={onOtherBreakdownClick}
-                // currentTab (not activeStatusValue) drives the highlight — activeStatusValue is
-                // hardcoded to "ACTIVE" for Skills Evaluations/Misconfigured Settings/Needs Approval
-                // (required for the backend fetch), so it'd never match those breakdown keys.
-                activeFilter={isOtherCardFamily ? new Set([currentTab.toUpperCase()]) : undefined}
-                bodyGap="4"
-            />
-        </Box>
+        <SummaryPanel loading={summary.counts.loading} error={summary.counts.error}>
+            <Box
+                className="violations-card-wrap"
+                style={isOtherCardFamily ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
+                onClick={onOtherCardClick}
+            >
+                <AgenticStatsCard
+                    title="Other Violations"
+                    titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
+                    // Sum the same breakdown segments rendered below, so the headline number can never
+                    // drift from the bar (it previously hardcoded Under Review + Ignored only, missing
+                    // Skills Evaluations / Misconfigured Settings on Atlas).
+                    total={otherBreakdown.reduce((sum, seg) => sum + (seg.count || 0), 0)}
+                    delta={0}
+                    deltaColor="subdued"
+                    breakdown={otherBreakdown}
+                    onFilterClick={onOtherBreakdownClick}
+                    // currentTab (not activeStatusValue) drives the highlight — activeStatusValue is
+                    // hardcoded to "ACTIVE" for Skills Evaluations/Misconfigured Settings/Needs Approval
+                    // (required for the backend fetch), so it'd never match those breakdown keys.
+                    activeFilter={isOtherCardFamily ? new Set([currentTab.toUpperCase()]) : undefined}
+                    bodyGap="4"
+                />
+            </Box>
+        </SummaryPanel>
     );
 
     return (
@@ -856,67 +864,73 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
             )}
 
             <HorizontalGrid columns={3} gap="4">
-                <AgenticTopListCard
-                    title={isEndpointSecurityCategory() ? "Violations by Top Users" : "Violations by Top Agentic Assets"}
-                    titleTooltip={isEndpointSecurityCategory()
-                        ? "Top 5 users by number of violations. Click a user to filter the table below."
-                        : "Top 5 agentic assets by number of violations. Click an asset to filter the table below."}
-                    columns={[{ label: isEndpointSecurityCategory() ? "User" : "Agentic Asset" }, { label: "Violations" }]}
-                    rows={isEndpointSecurityCategory() ? hostRows : assetRows}
-                    renderIcon={isEndpointSecurityCategory()
-                        ? (row) => <OsIcon os={row.os} size={20} />
-                        : (row) => <AssetIcon type={null} assetTagValue={row.assetTagValue} size={20} />}
-                    activeRows={isEndpointSecurityCategory() ? activeHostFilter : activeAssetNames}
-                    onClearSelection={isEndpointSecurityCategory() ? onClearHostSelection : onClearAssetSelection}
-                />
-                <AgenticTopListCard
-                    title="Top Policies Triggered"
-                    titleTooltip="Top 5 guardrail policies by number of active violations. Click a policy to filter the table below."
-                    columns={[{ label: "Policy" }, { label: "Count" }]}
-                    rows={policyRows}
-                    renderIcon={() => null}
-                    activeRows={activePolicyFilter}
-                    onClearSelection={onClearPolicySelection}
-                />
-                <Card padding="0">
-                    <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3">
-                        <HorizontalStack gap="1" blockAlign="center">
-                            <Text variant="headingSm">Violations by Type</Text>
-                            <InfoTooltipIcon content="Active violations grouped by type. Click a segment or label to filter the table below." />
-                        </HorizontalStack>
-                    </Box>
-                    <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
-                        <VerticalStack gap="2">
-                            <HorizontalStack align="center">
-                                <DonutChart
-                                    data={byType}
-                                    title={categoryTotal}
-                                    subtitle="Violations"
-                                    size={180}
-                                    pieInnerSize="55%"
-                                    onSegmentClick={onTypeClick}
-                                />
+                <SummaryPanel loading={summary.hosts.loading} error={summary.hosts.error}>
+                    <AgenticTopListCard
+                        title={isEndpointSecurityCategory() ? "Violations by Top Users" : "Violations by Top Agentic Assets"}
+                        titleTooltip={isEndpointSecurityCategory()
+                            ? "Top 5 users by number of violations. Click a user to filter the table below."
+                            : "Top 5 agentic assets by number of violations. Click an asset to filter the table below."}
+                        columns={[{ label: isEndpointSecurityCategory() ? "User" : "Agentic Asset" }, { label: "Violations" }]}
+                        rows={isEndpointSecurityCategory() ? hostRows : assetRows}
+                        renderIcon={isEndpointSecurityCategory()
+                            ? (row) => <OsIcon os={row.os} size={20} />
+                            : (row) => <AssetIcon type={null} assetTagValue={row.assetTagValue} size={20} />}
+                        activeRows={isEndpointSecurityCategory() ? activeHostFilter : activeAssetNames}
+                        onClearSelection={isEndpointSecurityCategory() ? onClearHostSelection : onClearAssetSelection}
+                    />
+                </SummaryPanel>
+                <SummaryPanel loading={summary.category.loading} error={summary.category.error}>
+                    <AgenticTopListCard
+                        title="Top Policies Triggered"
+                        titleTooltip="Top 5 guardrail policies by number of active violations. Click a policy to filter the table below."
+                        columns={[{ label: "Policy" }, { label: "Count" }]}
+                        rows={policyRows}
+                        renderIcon={() => null}
+                        activeRows={activePolicyFilter}
+                        onClearSelection={onClearPolicySelection}
+                    />
+                </SummaryPanel>
+                <SummaryPanel loading={summary.category.loading} error={summary.category.error}>
+                    <Card padding="0">
+                        <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3">
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text variant="headingSm">Violations by Type</Text>
+                                <InfoTooltipIcon content="Active violations grouped by type. Click a segment or label to filter the table below." />
                             </HorizontalStack>
-                            {Object.keys(byType).length > 0 && (
-                                <HorizontalStack gap="2" wrap align="center">
-                                    {Object.entries(byType).map(([label, seg]) => (
-                                        <Box
-                                            key={label}
-                                            className="agentic-chip"
-                                            style={activeTypeFilter === label ? { borderColor: "var(--p-color-border)", background: "var(--p-color-bg-subdued)" } : undefined}
-                                            onClick={() => onTypeClick?.(label)}
-                                        >
-                                            <HorizontalStack gap="1" blockAlign="center">
-                                                <Box className="agentic-dot" style={{ "--dot-color": seg.color }} />
-                                                <Text variant="bodySm" color={activeTypeFilter === label ? undefined : "subdued"} fontWeight={activeTypeFilter === label ? "semibold" : undefined}>{label} ({seg.text})</Text>
-                                            </HorizontalStack>
-                                        </Box>
-                                    ))}
+                        </Box>
+                        <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
+                            <VerticalStack gap="2">
+                                <HorizontalStack align="center">
+                                    <DonutChart
+                                        data={byType}
+                                        title={categoryTotal}
+                                        subtitle="Violations"
+                                        size={180}
+                                        pieInnerSize="55%"
+                                        onSegmentClick={onTypeClick}
+                                    />
                                 </HorizontalStack>
-                            )}
-                        </VerticalStack>
-                    </Box>
-                </Card>
+                                {Object.keys(byType).length > 0 && (
+                                    <HorizontalStack gap="2" wrap align="center">
+                                        {Object.entries(byType).map(([label, seg]) => (
+                                            <Box
+                                                key={label}
+                                                className="agentic-chip"
+                                                style={activeTypeFilter === label ? { borderColor: "var(--p-color-border)", background: "var(--p-color-bg-subdued)" } : undefined}
+                                                onClick={() => onTypeClick?.(label)}
+                                            >
+                                                <HorizontalStack gap="1" blockAlign="center">
+                                                    <Box className="agentic-dot" style={{ "--dot-color": seg.color }} />
+                                                    <Text variant="bodySm" color={activeTypeFilter === label ? undefined : "subdued"} fontWeight={activeTypeFilter === label ? "semibold" : undefined}>{label} ({seg.text})</Text>
+                                                </HorizontalStack>
+                                            </Box>
+                                        ))}
+                                    </HorizontalStack>
+                                )}
+                            </VerticalStack>
+                        </Box>
+                    </Card>
+                </SummaryPanel>
             </HorizontalGrid>
         </VerticalStack>
     );
@@ -952,8 +966,7 @@ function Violations() {
     const [rows, setRows] = useState([]);
     const [payloadSearch, setPayloadSearch] = useState("");
     const [advancedFilters, setAdvancedFilters] = useState([]);
-    const [summaryData, setSummaryData] = useState(null);
-    const [summaryLoading, setSummaryLoading] = useState(true);
+    const [summaryRefresh, setSummaryRefresh] = useState(0);
     const [selectedViolation, setSelectedViolation] = useState(null);
     const [pendingReveal, setPendingReveal] = useState(null);
     const [revealing, setRevealing] = useState(false);
@@ -1066,6 +1079,72 @@ function Violations() {
 
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
+
+    const currentSummaryModes = evaluationModesForTab(currentTab);
+    const summary = useViolationsSummary({
+        startTimestamp,
+        endTimestamp,
+        status: activeStatusValue,
+        ...currentSummaryModes,
+        endpoint: isEndpointSecurityCategory(),
+        agentic: isAgenticSecurityCategory(),
+        refresh: summaryRefresh,
+    });
+    const summaryData = useMemo(() => {
+        const severityResp = summary.severity.data;
+        const categoryResp = summary.category.data;
+        const topNResp = summary.hosts.data;
+        const partitionCounts = summary.counts.data;
+        const skillsEvaluationsCount = partitionCounts?.skillsEvaluations || 0;
+        const misconfiguredSettingsCount = partitionCounts?.misconfiguredSettings || 0;
+        const humanApprovalCount = partitionCounts?.humanApproval;
+        const severityDistribution = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+        let totalCount = 0;
+        (severityResp?.categoryCounts || []).forEach(item => {
+            const sev = String(item.subCategory || item.severity || '').toUpperCase();
+            if (severityDistribution[sev] !== undefined) {
+                severityDistribution[sev] = item.count || 0;
+                totalCount += item.count || 0;
+            }
+        });
+
+        const statusCounts = {
+            ACTIVE: partitionCounts?.active,
+            IGNORED: partitionCounts?.ignored,
+            UNDER_REVIEW: partitionCounts?.underReview,
+            FIXED: 0,
+        };
+
+        const subcategoryMap = {};
+        (categoryResp?.categoryCounts || []).forEach(item => {
+            const sub = item.category || item.subCategory || "Unknown";
+            subcategoryMap[sub] = (subcategoryMap[sub] || 0) + (item.count || 0);
+        });
+        const topPolicies = Object.entries(subcategoryMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([name, count]) => ({ name, count }));
+
+        const byType = {};
+        const typeToSubCategories = {};
+        Object.entries(subcategoryMap).forEach(([name, count]) => {
+            const type = classifyPolicyType(name);
+
+            if (!byType[type]) byType[type] = { text: 0, color: TYPE_COLORS[type] || "#999", filterKey: type };
+            byType[type].text += count;
+            if (!typeToSubCategories[type]) typeToSubCategories[type] = [];
+            typeToSubCategories[type].push(name);
+        });
+        const categoryTotal = Object.values(byType).reduce((sum, v) => sum + v.text, 0);
+
+        const topHosts = (topNResp?.topHosts || []).map(h => ({
+            name: h.host || "-",
+            count: h.attacks || 0,
+            host: h.host || "",
+        }));
+
+        return { severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, topHosts, byType, typeToSubCategories, skillsEvaluationsCount, misconfiguredSettingsCount, humanApprovalCount };
+    }, [summary.severity.data, summary.category.data, summary.hosts.data, summary.counts.data]);
 
     // ─── Load username map once ──────────────────────────────────────────────
     useEffect(() => {
@@ -1201,6 +1280,10 @@ function Violations() {
     const [tableKey, setTableKey] = useState(0);
     const [groupActivities, setGroupActivities] = useState(true);
     const triggerTableRefresh = useCallback(() => setTableKey(k => k + 1), []);
+    const triggerDataRefresh = useCallback(() => {
+        setSummaryRefresh(value => value + 1);
+        triggerTableRefresh();
+    }, [triggerTableRefresh]);
 
     const handleAssetClick = useCallback((hosts) => {
         const list = Array.isArray(hosts) ? hosts : [hosts];
@@ -1289,11 +1372,14 @@ function Violations() {
     // copy-pasted here from SusDataTable.jsx/ThreatCompliancePage.jsx; centralised so there's
     // one fetch, and skipped entirely if a prior page already populated the SessionStore map.
     useEffect(() => {
+        let cancelled = false;
         loadGuardrailComplianceMap().then((capabilityMap) => {
+            if (cancelled) return;
             guardrailComplianceMapRef.current = capabilityMap;
-            triggerTableRefresh();
+            gridRef.current?.api?.refreshServerSide({ purge: false });
         });
-    }, [triggerTableRefresh]);
+        return () => { cancelled = true; };
+    }, []);
 
     const submitInlineApprove = useCallback(async () => {
         const policyName = approveRow?.filterId;
@@ -1319,13 +1405,13 @@ function Violations() {
             func.setToast(true, false, `Approved ${serverId} ${scope}`);
             setApproveRow(null);
             await refreshApprovedByPolicy();
-            triggerTableRefresh();
+            triggerDataRefresh();
         } catch {
             // Error toast already surfaced by the request interceptor; keep the modal open.
         } finally {
             setApproveLoading(false);
         }
-    }, [approveRow, approveMode, approveDays, refreshApprovedByPolicy, triggerTableRefresh]);
+    }, [approveRow, approveMode, approveDays, refreshApprovedByPolicy, triggerDataRefresh]);
 
     const handleHumanApproval = useCallback(async (row, response) => {
         if (!row?.id) return;
@@ -1338,14 +1424,14 @@ function Violations() {
                 const verb = response === HUMAN_RESPONSE.APPROVED ? "approved" : "blocked";
                 func.setToast(true, false, `Event ${verb}`);
                 setSelectedViolation(prev => prev?.id === row.id ? { ...prev, humanResponse: response } : prev);
-                triggerTableRefresh();
+                triggerDataRefresh();
             } else {
                 func.setToast(true, true, "Failed to update human approval");
             }
         } catch {
             func.setToast(true, true, "Failed to update human approval");
         }
-    }, [expandToGroupEvents, triggerTableRefresh]);
+    }, [expandToGroupEvents, triggerDataRefresh]);
 
     // The flyout saved a status and/or case change ({ status?, caseOwner?, caseNotes? }): show it in the open
     // flyout at once — with the timeline entries the server adds for it — and refresh the table.
@@ -1359,8 +1445,8 @@ function Violations() {
             );
             return { ...prev, _status: next.status, caseOwner: next.caseOwner, caseNotes: next.caseNotes, caseTimeline: next.caseTimeline };
         });
-        triggerTableRefresh();
-    }, [triggerTableRefresh]);
+        triggerDataRefresh();
+    }, [triggerDataRefresh]);
 
     // Same label the Agentic Asset column renders, so each filter option maps to the hosts behind it.
     const assetHostsByLabel = useMemo(() => {
@@ -1381,109 +1467,6 @@ function Violations() {
         () => buildColDefs(extendedFilterValues, isNeedsApprovalTab && func.canManageGuardrailPolicies(), openInlineApprove, isHumanApprovalTab, handleHumanApproval, isSkillsEvaluationsTab || isMisconfiguredTab, isUnderReviewTab ? caseOwners : null),
         [extendedFilterValues, isNeedsApprovalTab, openInlineApprove, isHumanApprovalTab, handleHumanApproval, isSkillsEvaluationsTab, isMisconfiguredTab, isUnderReviewTab, caseOwners],
     );
-
-    // ─── Fetch summary stats from existing backend APIs ─────────────────────
-    // Replaces the old client-side computeSummary() that required all data loaded.
-    // Uses the same APIs as ThreatDashboardPage: fetchCountBySeverity, fetchThreatCategoryCount, getDailyThreatActorsCount.
-    // Context-source header is auto-added by the request interceptor — no special handling needed.
-    useEffect(() => {
-        async function loadSummary() {
-            setSummaryLoading(true);
-            try {
-                // Atlas (ENDPOINT): Active / Under Review / Ignored / Skills Evaluations / Misconfigured
-                // Settings come from fetchEndpointViolationCounts — the same row counts the tabs show, and
-                // the same numbers the Guardrails Dashboard totals use. getDailyThreatActorsCount's status
-                // totals (dailyResp) don't exclude /config/ events, so they're only the fallback for other
-                // categories or a failed request.
-                const wantsPartitionCounts = isEndpointSecurityCategory();
-                const wantsHumanApprovalCount = isAgenticSecurityCategory();
-                // The Open Violations card is the Active tab, so its severity chips exclude the same
-                // partitions; Top Users follows whichever tab is open, like the table its clicks filter.
-                const activeTabModes = evaluationModesForTab("active");
-                const currentTabModes = evaluationModesForTab(currentTab);
-                const results = await Promise.allSettled([
-                    threatDetectionApi.fetchCountBySeverity(startTimestamp, endTimestamp, "ACTIVE", activeTabModes.skillEvaluationMode, activeTabModes.configEvaluationMode),
-                    threatDetectionApi.fetchThreatCategoryCount(startTimestamp, endTimestamp, activeStatusValue),
-                    threatDetectionApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
-                    threatDetectionApi.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5, activeStatusValue, currentTabModes.skillEvaluationMode, currentTabModes.configEvaluationMode),
-                    wantsPartitionCounts
-                        ? fetchEndpointViolationCounts(startTimestamp, endTimestamp)
-                        : Promise.resolve(null),
-                    wantsHumanApprovalCount
-                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "HUMAN_APPROVAL", undefined, undefined, undefined, undefined, undefined, false, [], undefined, undefined, undefined, undefined, HUMAN_RESPONSE.PENDING)
-                        : Promise.resolve(null),
-                ]);
-
-                const severityResp = results[0].status === 'fulfilled' ? results[0].value : {};
-                const categoryResp = results[1].status === 'fulfilled' ? results[1].value : {};
-                const dailyResp    = results[2].status === 'fulfilled' ? results[2].value : {};
-                const topNResp     = results[3].status === 'fulfilled' ? results[3].value : {};
-                const partitionCounts = results[4].status === 'fulfilled' ? results[4].value : null;
-                const humanApprovalCountResp = results[5].status === 'fulfilled' ? results[5].value : null;
-                const skillsEvaluationsCount = partitionCounts?.skillsEvaluations || 0;
-                const misconfiguredSettingsCount = partitionCounts?.misconfiguredSettings || 0;
-                const humanApprovalCount = humanApprovalCountResp?.total || 0;
-
-                // Severity counts
-                const severityDistribution = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-                let totalCount = 0;
-                (severityResp?.categoryCounts || []).forEach(item => {
-                    const sev = String(item.subCategory || item.severity || '').toUpperCase();
-                    if (severityDistribution[sev] !== undefined) {
-                        severityDistribution[sev] = item.count || 0;
-                        totalCount += item.count || 0;
-                    }
-                });
-
-                const statusCounts = {
-                    ACTIVE: partitionCounts?.active ?? (dailyResp?.totalActiveStatus || 0),
-                    IGNORED: partitionCounts?.ignored ?? (dailyResp?.totalIgnoredStatus || 0),
-                    UNDER_REVIEW: partitionCounts?.underReview ?? (dailyResp?.totalUnderReviewStatus || 0),
-                    FIXED: 0,
-                };
-
-                // Top policies from category counts. category over subCategory - subCategory can
-                // be a raw config-path string (e.g. "mcp_servers.computer-use.command" for a
-                // config-risk finding), not a name meant to stand alone as a policy label.
-                const subcategoryMap = {};
-                (categoryResp?.categoryCounts || []).forEach(item => {
-                    const sub = item.category || item.subCategory || "Unknown";
-                    subcategoryMap[sub] = (subcategoryMap[sub] || 0) + (item.count || 0);
-                });
-                const topPolicies = Object.entries(subcategoryMap)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 5)
-                    .map(([name, count]) => ({ name, count }));
-
-                // By type — derive from category data, also build reverse map for filtering
-                const byType = {};
-                const typeToSubCategories = {};
-                Object.entries(subcategoryMap).forEach(([name, count]) => {
-                    const type = classifyPolicyType(name);
-
-                    if (!byType[type]) byType[type] = { text: 0, color: TYPE_COLORS[type] || "#999", filterKey: type };
-                    byType[type].text += count;
-                    if (!typeToSubCategories[type]) typeToSubCategories[type] = [];
-                    typeToSubCategories[type].push(name);
-                });
-                const categoryTotal = Object.values(byType).reduce((sum, v) => sum + v.text, 0);
-
-                // Top hosts from topN response
-                const topHosts = (topNResp?.topHosts || []).map(h => ({
-                    name: h.host || "-",
-                    count: h.attacks || 0,
-                    host: h.host || "",
-                }));
-
-                setSummaryData({ severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, topHosts, byType, typeToSubCategories, skillsEvaluationsCount, misconfiguredSettingsCount, humanApprovalCount });
-            } catch {
-                setSummaryData(null);
-            } finally {
-                setSummaryLoading(false);
-            }
-        }
-        loadSummary();
-    }, [startTimestamp, endTimestamp, activeStatusValue, currentTab, tableKey]);
 
     // ─── Fetch latency data ──────────────────────────────────────────────────
     useEffect(() => {
@@ -1685,14 +1668,14 @@ function Violations() {
             if (response?.updateSuccess) {
                 func.setToast(true, false, `${ids.length} event${ids.length === 1 ? "" : "s"} ${pastTenseLabel} successfully`);
                 clearBulkSelection();
-                triggerTableRefresh();
+                triggerDataRefresh();
             } else {
                 func.setToast(true, true, "Failed to update selected events");
             }
         } catch {
             func.setToast(true, true, "Failed to update selected events");
         }
-    }, [getSelectedIds, expandToGroupEvents, clearBulkSelection, triggerTableRefresh]);
+    }, [getSelectedIds, expandToGroupEvents, clearBulkSelection, triggerDataRefresh]);
 
     const handleBulkDelete = useCallback(async () => {
         const ids = expandToGroupEvents(getSelectedIds());
@@ -1703,14 +1686,14 @@ function Violations() {
             if (response?.deleteSuccess) {
                 func.setToast(true, false, `${ids.length} event${ids.length === 1 ? "" : "s"} deleted successfully`);
                 clearBulkSelection();
-                triggerTableRefresh();
+                triggerDataRefresh();
             } else {
                 func.setToast(true, true, "Failed to delete selected events");
             }
         } catch {
             func.setToast(true, true, "Failed to delete selected events");
         }
-    }, [getSelectedIds, expandToGroupEvents, clearBulkSelection, triggerTableRefresh]);
+    }, [getSelectedIds, expandToGroupEvents, clearBulkSelection, triggerDataRefresh]);
 
     const handleBulkHumanApproval = useCallback(async (response) => {
         const ids = expandToGroupEvents(getSelectedPendingIds());
@@ -1724,14 +1707,14 @@ function Violations() {
                 const verb = response === HUMAN_RESPONSE.APPROVED ? "approved" : "blocked";
                 func.setToast(true, false, `${ids.length} event${ids.length === 1 ? "" : "s"} ${verb}`);
                 clearBulkSelection();
-                triggerTableRefresh();
+                triggerDataRefresh();
             } else {
                 func.setToast(true, true, "Failed to update selected events");
             }
         } catch {
             func.setToast(true, true, "Failed to update selected events");
         }
-    }, [getSelectedPendingIds, expandToGroupEvents, clearBulkSelection, triggerTableRefresh]);
+    }, [getSelectedPendingIds, expandToGroupEvents, clearBulkSelection, triggerDataRefresh]);
 
     const bulkActions = useMemo(() => {
         // AgGridTable disables (with the reason) actions whose `requires` the role can't call
@@ -1804,11 +1787,6 @@ function Violations() {
     // Security, matching where skillEvaluationMode/configEvaluationMode actually take effect
     // server-side.
     const tabItems = useMemo(() => {
-        // Live counts (Active/Under Review/Ignored) come straight from the same
-        // getDailyThreatActorsCount response summaryData already holds - matching the tab-count
-        // badges GithubServerTable renders for the old UI's equivalent tabs. Skills Evaluations
-        // and Misconfigured Settings don't get a number (client-side/server-partition views with
-        // no cheap total to show upfront, same as old UI's "Beta" labels).
         const statusCounts = summaryData?.statusCounts || {};
         const withCount = (label, key) => {
             const count = statusCounts[key];
@@ -1927,7 +1905,7 @@ function Violations() {
             key="dashboard"
             summaryData={summaryData}
             usernameMap={usernameMap}
-            loading={summaryLoading}
+            summary={summary}
             onSeverityClick={handleSeverityClick}
             activeSeverityFilter={activeSeverityFilter}
             onPolicyClick={handlePolicyClick}
