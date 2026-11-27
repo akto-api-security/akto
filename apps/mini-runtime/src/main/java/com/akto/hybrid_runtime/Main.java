@@ -371,8 +371,23 @@ public class Main {
         return null;
     }
 
-    // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
+        try {
+            runMain();
+        } catch (Throwable t) {
+            // A failure here (e.g. the backend erroring during start-up) used to end only the main
+            // thread: the heartbeat and other non-daemon threads kept the JVM alive, so the module
+            // looked healthy while processing nothing, and start.sh never restarted it.
+            loggerMaker.errorAndAddToDb("Fatal error in mini-runtime main, exiting so it is restarted: " + t);
+            t.printStackTrace();
+            // Exit from a separate thread: once registered, the shutdown hook joins the main thread,
+            // so calling System.exit() on this thread would deadlock.
+            new Thread(() -> System.exit(1), "mini-runtime-fatal-exit").start();
+        }
+    }
+
+    // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
+    private static void runMain() {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = KafkaConfig.getTopicName();
