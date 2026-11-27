@@ -2724,6 +2724,7 @@ public class InitializerListener implements ServletContextListener {
 
                     logger.warn("Started Okta user sync scheduler", LogDb.DASHBOARD);
                     oktaUserSyncCron.setUpOktaUserSyncScheduler();
+                    trimCappedCollectionsJob();
                     setUpIndexSyncScheduler();
 
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
@@ -2749,7 +2750,7 @@ public class InitializerListener implements ServletContextListener {
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
-                    }
+                    }                    
 
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
@@ -2764,7 +2765,6 @@ public class InitializerListener implements ServletContextListener {
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
                         updateApiGroupsForAccounts();
                         setupAutomatedApiGroupsScheduler();
-                        trimCappedCollectionsJob();
                         setUpPiiAndTestSourcesScheduler();
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
@@ -2945,6 +2945,14 @@ public class InitializerListener implements ServletContextListener {
     private void trimCappedCollectionsJob() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                // Only one container should trim per day.
+                Context.accountId.set(1000_000);
+                boolean dibs = callDibs(Cluster.TRIM_CAPPED_COLLECTIONS_CRON, 23 * 60 * 60, 60);
+                if (!dibs) {
+                    logger.debugAndAddToDb("Cron for trimming capped collections not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    return;
+                }
+
                 logger.debug("Starting trimCappedCollectionsJob for all accounts at " + Context.now());
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
