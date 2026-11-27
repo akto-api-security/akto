@@ -11,7 +11,7 @@ function QRadar() {
     const [url, setUrl] = useState('');
     const [authToken, setAuthToken] = useState('');
     const [enabled, setEnabled] = useState(false);
-    const [status, setStatus] = useState(null);
+    const [saved, setSaved] = useState(false);
 
     async function fetchIntegration() {
         const resp = await settingRequests.fetchQRadarIntegration()
@@ -19,7 +19,7 @@ function QRadar() {
         if (config?.url) {
             setUrl(config.url)
             setEnabled(config.enabled || false)
-            setStatus(config)
+            setSaved(true)
         }
     }
 
@@ -38,8 +38,6 @@ function QRadar() {
     useEffect(() => {
         fetchIntegration()
     }, [])
-
-    const failing = status?.lastErrorAt > (status?.lastSuccessAt || 0)
 
     const QRadarCard = (
         <LegacyCard
@@ -66,7 +64,7 @@ function QRadar() {
                         onFunc={true}
                         field={authToken}
                         label="Authorization header (optional)"
-                        helpText={status?.url ? "Leave blank to keep the saved value." : undefined}
+                        helpText={saved ? "Leave blank to keep the saved value." : undefined}
                     />
                     <Checkbox
                         label="Forward threat events to QRadar"
@@ -75,17 +73,6 @@ function QRadar() {
                     />
                 </VerticalStack>
             </LegacyCard.Section>
-            {status?.enabled ? (
-                <LegacyCard.Section>
-                    <VerticalStack gap={"1"}>
-                        <Text color="subdued">
-                            {status.lastSuccessAt ? `Last sent ${func.prettifyEpoch(status.lastSuccessAt)}` : "Nothing sent yet"}
-                            {` · ${status.pendingCount || 0} waiting · ${status.failedCount || 0} failed`}
-                        </Text>
-                        {failing ? <Text color="critical">{`Failing since ${func.prettifyEpoch(status.lastErrorAt)}: ${status.lastError}`}</Text> : null}
-                    </VerticalStack>
-                </LegacyCard.Section>
-            ) : null}
         </LegacyCard>
     )
 

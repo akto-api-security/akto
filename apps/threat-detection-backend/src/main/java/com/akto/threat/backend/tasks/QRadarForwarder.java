@@ -122,9 +122,6 @@ public class QRadarForwarder {
     Document config = integrations().find(eq("_id", configId(accountId))).first();
     if (config == null) return new Document();
     config.remove("authToken");
-    MongoCollection<Document> outbox = outbox(accountId);
-    config.append("pendingCount", outbox.countDocuments(and(eq("destination", DESTINATION), in("status", PENDING, SENDING))));
-    config.append("failedCount", outbox.countDocuments(and(eq("destination", DESTINATION), eq("status", FAILED))));
     return config;
   }
 
@@ -208,7 +205,6 @@ public class QRadarForwarder {
     SendResult result = post(config.getString("url"), config.getString("authToken"), toBody(events));
     if (result.error == null) {
       outbox.deleteMany(eq("batchId", batchId));
-      integrations().updateOne(eq("_id", configId(accountId)), Updates.set("lastSuccessAt", Context.now()));
       return true;
     }
 
@@ -302,8 +298,6 @@ public class QRadarForwarder {
 
   private static void recordError(String accountId, String error) {
     logger.errorAndAddToDb("QRadar forwarding failed for account " + accountId + ": " + error);
-    integrations().updateOne(eq("_id", configId(accountId)),
-        Updates.combine(Updates.set("lastError", error), Updates.set("lastErrorAt", Context.now())));
   }
 
   /**
