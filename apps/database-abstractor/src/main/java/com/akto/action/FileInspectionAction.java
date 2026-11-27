@@ -70,7 +70,6 @@ public class FileInspectionAction extends ActionSupport {
 
     private String fetchRules(Bson kindFilter, String name) {
         try {
-            FileInspectionRuleDao.getInstance().createIndicesIfAbsent();
             Bson filter = Filters.and(Filters.gt(FileInspectionRule.UPDATED_TS, (int) updatedAfter), kindFilter);
             this.rules = FileInspectionRuleDao.getInstance().findAll(
                 filter, 0, 500,
@@ -98,7 +97,6 @@ public class FileInspectionAction extends ActionSupport {
                 addActionError("deviceId is required");
                 return ERROR.toUpperCase();
             }
-            FileInspectionResultDao.instance.createIndicesIfAbsent();
             result.setAccountId(Context.accountId.get());
             if (result.getExecutedAt() == 0) {
                 result.setExecutedAt(Context.now());
@@ -132,7 +130,6 @@ public class FileInspectionAction extends ActionSupport {
      */
     public String addFileInspectionRule() {
         try {
-            FileInspectionRuleDao.getInstance().createIndicesIfAbsent();
 
             String validation = validatePath(path);
             if (validation != null) {
@@ -188,7 +185,6 @@ public class FileInspectionAction extends ActionSupport {
      */
     public String fetchFileInspectionResults() {
         try {
-            FileInspectionResultDao.instance.createIndicesIfAbsent();
             int pageSize = limit > 0 && limit <= RESULTS_PAGE_MAX ? limit : RESULTS_PAGE_MAX;
             Bson filter = sinceExecutedAt > 0
                 ? Filters.gt(FileInspectionResult.EXECUTED_AT, (int) sinceExecutedAt)
