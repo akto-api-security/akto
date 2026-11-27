@@ -2,6 +2,7 @@ package com.akto.testing;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import io.prometheus.metrics.exporter.httpserver.HTTPServer;
@@ -181,6 +182,33 @@ public class OrchestratorControlTest {
         // the run finished; the next poll is refused and the pod holds nothing
         assertFalse(OrchestratorControl.tryStartPolling());
         assertEquals("{\"busy\":false,\"draining\":true}", call("GET", "/status").body);
+    }
+
+    @Test
+    public void tokenDerivedFromAbstractorTokenMatchesOrchestrator() {
+        // the same vector is asserted in the orchestrator's Go tests (internal/config)
+        String expected = "7292c474db0ac419c9940f3edd7ed8f71c229a3f9dc505ab5a51cf0ae301d2ba";
+        assertEquals(expected, OrchestratorControl.deriveToken("test-database-abstractor-token"));
+        assertEquals(expected, OrchestratorControl.deriveToken("  test-database-abstractor-token\n"));
+        assertEquals(expected, OrchestratorControl.resolveToken(null, "test-database-abstractor-token"));
+        assertEquals(expected, OrchestratorControl.resolveToken("  ", "test-database-abstractor-token"));
+    }
+
+    @Test
+    public void explicitTokenWinsAndNothingToDeriveFromMeansNoToken() {
+        assertEquals("explicit", OrchestratorControl.resolveToken("explicit", "test-database-abstractor-token"));
+        assertNull(OrchestratorControl.resolveToken(null, null));
+        assertNull(OrchestratorControl.resolveToken("", " "));
+    }
+
+    @Test
+    public void noTokenRefusesEveryCaller() throws IOException {
+        OrchestratorControl.configure(true, null, DEFAULT_TTL_MILLIS);
+        assertEquals(401, call("GET", "/status", null).code);
+        assertEquals(401, call("GET", "/status", "anything").code);
+        assertEquals(401, call("POST", "/drain", "").code);
+        // nothing was drained
+        assertTrue(OrchestratorControl.tryStartPolling());
     }
 
     @Test
