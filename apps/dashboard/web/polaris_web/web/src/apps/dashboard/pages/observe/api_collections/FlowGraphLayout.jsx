@@ -14,6 +14,7 @@ function FlowGraphLayout({
   emptyMessage = 'No data found',
   bannerTitle,
   bannerStats = [],
+  bannerContent,
   showData,
   miniMapNodeColor = '#5c6ac4',
   onNodeClick,
@@ -35,6 +36,7 @@ function FlowGraphLayout({
             </Box>
           ))}
         </HorizontalStack>
+        {bannerContent}
       </VerticalStack>
     </Card>
   );
@@ -49,7 +51,7 @@ function FlowGraphLayout({
 
   return (
     <div style={{ padding: '20px' }}>
-      <Banner />
+      {Banner()}
 
       {!showData ? (
         <div style={{ textAlign: 'center', padding: '40px' }}>

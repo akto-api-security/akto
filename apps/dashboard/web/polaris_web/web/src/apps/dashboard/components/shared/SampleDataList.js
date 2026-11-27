@@ -5,7 +5,7 @@ import {
   Text,
   VerticalStack,
   HorizontalStack, Box, LegacyCard, HorizontalGrid,
-  Pagination, Key, Badge} from '@shopify/polaris';
+  Pagination, Key, Badge, Link} from '@shopify/polaris';
 import SampleDataComponent from './SampleDataComponent';
 import SampleData from './SampleData';
 import ValidationReasonBanner from './ValidationReasonBanner';
@@ -72,7 +72,11 @@ const SEQUENCE_ANOMALY_FILTER_ID = 'SequenceAnomaly';
 // The threat client's reason lists the unusual steps ("...: A → B (reused: id); C → D"), each one a call made right
 // after another call in an order real users don't follow; "(reused: ...)" names request parameters that carried
 // values from the previous call's response
-function UnusualSessionPath({ steps }) {
+// Opens the collection's session explorer on the step's first API, with the second one to explain
+const explorerUrl = (apiCollectionId, from, to) =>
+    `/dashboard/observe/inventory/${apiCollectionId}?view=explorer&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+
+function UnusualSessionPath({ steps, apiCollectionId }) {
     const parsed = steps.map(([from, to]) => {
         const match = to.match(/^(.*) \(reused: (.*)\)$/);
         return { from, to: match ? match[1] : to, reused: match ? match[2] : null };
@@ -89,6 +93,7 @@ function UnusualSessionPath({ steps }) {
                     {parsed.map((step, index) => (
                         <List.Item key={index}>
                             {step.from} → {step.to}{step.reused ? ` (sent ${step.reused} from the previous response)` : ''}
+                            {apiCollectionId ? <> · <Link url={explorerUrl(apiCollectionId, step.from, step.to)} external>Show in session explorer</Link></> : null}
                         </List.Item>
                     ))}
                 </List>
@@ -116,7 +121,7 @@ function DetectionReason({ sampleData }) {
     const pathStart = reason.indexOf(': ');
     if (sampleData?.filterId === SEQUENCE_ANOMALY_FILTER_ID && pathStart >= 0) {
         const steps = reason.slice(pathStart + 2).split('; ').map((step) => step.split(' → ')).filter((step) => step.length === 2);
-        if (steps.length > 0) return <UnusualSessionPath steps={steps} />;
+        if (steps.length > 0) return <UnusualSessionPath steps={steps} apiCollectionId={sampleData?.apiCollectionId} />;
     }
 
     return (

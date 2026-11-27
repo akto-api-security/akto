@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { EdgeText, getBezierPath } from 'react-flow-renderer';
+import { Banner, Box, Text, VerticalStack } from '@shopify/polaris';
 import api from '../api';
 import FlowGraphLayout from './FlowGraphLayout';
 import { createCustomNode } from './FlowGraphComponents';
+import DropdownSearch from '../../../components/shared/DropdownSearch';
 import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const LABEL_WIDTH = 200;
@@ -32,14 +34,15 @@ function TextLabel({ data }) {
 // Label drawn level, just before the target box, where fanned lines are already apart
 function ExplorerEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) {
   const markerId = `explorer-arrow-${id}`;
+  const color = data.color || '#8c9196';
   return (
     <g>
       <defs>
         <marker id={markerId} markerWidth="14" markerHeight="14" refX="9" refY="7" orient="auto" markerUnits="userSpaceOnUse">
-          <path d="M0,0 L9,7 L0,14" fill="none" stroke="#8c9196" />
+          <path d="M0,0 L9,7 L0,14" fill="none" stroke={color} />
         </marker>
       </defs>
-      <path id={id} className="react-flow__edge-path" d={getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })} style={{ stroke: '#8c9196', strokeWidth: data.width, fill: 'none' }} markerEnd={`url(#${markerId})`} />
+      <path id={id} className="react-flow__edge-path" d={getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })} style={{ stroke: color, strokeWidth: data.width, fill: 'none' }} markerEnd={`url(#${markerId})`} />
       {data.label ? (
         <EdgeText x={targetX - LABEL_OFFSET} y={targetY - 14} label={data.label} labelStyle={{ fontSize: 13, fill: '#202223' }} labelShowBg labelBgStyle={{ fill: '#ffffff', stroke: '#c9cccf', strokeWidth: 0.5 }} labelBgPadding={[6, 3]} labelBgBorderRadius={4} />
       ) : null}
@@ -56,7 +59,20 @@ const parseKey = (key) => {
   return { method: parts[parts.length - 1], url: parts.slice(1, -1).join(' ') };
 };
 
-const edge = (id, source, target, label, width) => ({ id, source, target, sourceHandle: 'b', targetHandle: 't', type: 'explorerEdge', data: { label, width } });
+const describe = (key) => {
+  const { method, url } = parseKey(key);
+  return `${method} ${url}`;
+};
+
+// An event reason names APIs as "METHOD /url" without the query string or trailing slash
+const matchesReason = (key, reasonApi) => {
+  const { method, url } = parseKey(key);
+  return `${method} ${url.split('?')[0].replace(/\/+$/, '') || '/'}` === reasonApi;
+};
+
+const UNUSUAL_COLOR = '#d72c0d';
+
+const edge = (id, source, target, label, width, color) => ({ id, source, target, sourceHandle: 'b', targetHandle: 't', type: 'explorerEdge', data: { label, width, color } });
 
 const share = (weight, total) => {
   const percent = 100 * weight / total;
@@ -65,7 +81,7 @@ const share = (weight, total) => {
 
 // Starting APIs in the left column; the clicked path continues from the selected one, and the
 // last clicked API's next steps fan out to the right, busiest on top
-function explorerGraph(starts, startsShown, steps, fan, fanShown) {
+function explorerGraph(starts, startsShown, steps, fan, fanShown, highlightKey) {
   const nodes = [];
   const edges = [];
   const visibleStarts = starts.slice(0, startsShown);
@@ -105,7 +121,7 @@ function explorerGraph(starts, startsShown, steps, fan, fanShown) {
   rows.forEach((row, index) => {
     const id = `c${index}`;
     nodes.push({ id, type: 'sequencesNode', position: { x, y: top + index * ROW_HEIGHT }, data: { ...parseKey(row.key), key: row.key, action: 'next', label: share(row.count, fan.pathCount) } });
-    edges.push(edge(`${parentId}-${id}`, parentId, id, share(row.count, fan.pathCount), Math.max(1.5, 6 * row.count / topCount)));
+    edges.push(edge(`${parentId}-${id}`, parentId, id, share(row.count, fan.pathCount), Math.max(1.5, 6 * row.count / topCount), row.key === highlightKey ? UNUSUAL_COLOR : null));
   });
   extras.forEach((extra, index) => {
     nodes.push({ id: `extra${index}`, type: 'textLabel', position: { x, y: top + (rows.length + index) * ROW_HEIGHT + 12 }, selectable: false, data: { ...extra, align: 'left' } });
@@ -126,8 +142,9 @@ const toFan = (resp) => ({
   pathCount: resp?.pathWeight || 0,
 });
 
-// apiCollectionId 0 means the whole account
-function SequencesFlow({ apiCollectionId }) {
+// apiCollectionId 0 means the whole account. focusFrom/focusTo ("METHOD /url", from a threat event's reason)
+// open the explorer on focusFrom and explain whether sessions ever went from it to focusTo
+function SequencesFlow({ apiCollectionId, focusFrom, focusTo }) {
   const collectionId = Number(apiCollectionId) || 0;
   const [loading, setLoading] = useState(true);
   const [starts, setStarts] = useState([]);
@@ -135,6 +152,7 @@ function SequencesFlow({ apiCollectionId }) {
   const [steps, setSteps] = useState([]);
   const [fan, setFan] = useState(null);
   const [fanShown, setFanShown] = useState(PAGE);
+  const [focus, setFocus] = useState(null);
   const fanCache = useRef(new Map());
   const flowInstance = useRef(null);
 
@@ -164,31 +182,56 @@ function SequencesFlow({ apiCollectionId }) {
     return { rows, pathCount: direct.pathCount };
   }, [loadFan]);
 
-  const goTo = useCallback(async (nextSteps) => {
+  // showKey: a fan entry to keep visible even if it is past the first page
+  const goTo = useCallback(async (nextSteps, showKey) => {
     try {
-      setFan(await loadNewSteps(nextSteps.map((s) => s.key)));
-      setFanShown(PAGE);
+      const nextFan = await loadNewSteps(nextSteps.map((s) => s.key));
+      const showIndex = showKey ? nextFan.rows.findIndex((row) => row.key === showKey) : -1;
+      setFan(nextFan);
+      setFanShown(Math.max(PAGE, showIndex + 1));
       setSteps(nextSteps);
     } catch (error) {
       console.error('Error fetching session steps:', error);
     }
   }, [loadNewSteps]);
 
-  // Opens on the busiest API, already fanned out
+  // Opens on focusFrom when given, else on the busiest API, already fanned out
   const openExplorer = useCallback(async () => {
     try {
       fanCache.current = new Map();
       const startRows = toFan(await api.fetchSessionSteps(collectionId, [])).rows;
-      setStarts(startRows);
+      const fromRow = focusFrom ? startRows.find((row) => matchesReason(row.key, focusFrom)) : null;
+      const toRow = fromRow && focusTo ? startRows.find((row) => matchesReason(row.key, focusTo)) : null;
+      setStarts(fromRow ? [fromRow, ...startRows.filter((row) => row !== fromRow)] : startRows);
       setStartsShown(PAGE);
       setSteps([]);
       setFan(null);
-      if (startRows.length) await goTo([{ key: startRows[0].key }]);
+      if (fromRow && focusTo) {
+        // Detection looks at the call made right after focusFrom, so the proof uses that fan, not the look-through one
+        const direct = await loadFan([fromRow.key]);
+        const seen = toRow ? direct.rows.find((row) => row.key === toRow.key) : null;
+        setFocus({ fromKey: fromRow.key, toKey: toRow?.key, seenShare: seen && direct.pathCount ? share(seen.count, direct.pathCount) : null });
+      } else {
+        setFocus(null);
+      }
+      const first = fromRow || startRows[0];
+      if (first) await goTo([{ key: first.key }], toRow?.key);
     } catch (error) {
       console.error('Error fetching session steps:', error);
       setStarts([]);
     }
-  }, [collectionId, goTo]);
+  }, [collectionId, focusFrom, focusTo, loadFan, goTo]);
+
+  // A searched API moves to the top of the starting column, so its path and fan are drawn from there
+  const selectStart = useCallback((key) => {
+    const row = starts.find((start) => start.key === key);
+    if (!row) return;
+    setStarts([row, ...starts.filter((start) => start !== row)]);
+    setStartsShown(PAGE);
+    goTo([{ key }]);
+  }, [starts, goTo]);
+
+  const searchOptions = useMemo(() => starts.map((row) => ({ label: describe(row.key), value: row.key })), [starts]);
 
   useEffect(() => {
     setLoading(true);
@@ -204,7 +247,9 @@ function SequencesFlow({ apiCollectionId }) {
     else if (action === 'more-fan') setFanShown((shown) => shown + PAGE);
   }, [steps, goTo]);
 
-  const graph = useMemo(() => explorerGraph(starts, startsShown, steps, fan, fanShown), [starts, startsShown, steps, fan, fanShown]);
+  const focusShown = focus && steps.length === 1 && steps[0].key === focus.fromKey;
+  const graph = useMemo(() => explorerGraph(starts, startsShown, steps, fan, fanShown, focusShown ? focus.toKey : null),
+    [starts, startsShown, steps, fan, fanShown, focusShown, focus]);
 
   // Zoom after a click on the path or the fan, not when more starting APIs are listed
   const bounds = graph.bounds;
@@ -218,6 +263,28 @@ function SequencesFlow({ apiCollectionId }) {
     if (bounds) instance.fitBounds(bounds, { padding: 0.05 });
   }, [bounds]);
 
+  const bannerContent = (
+    <VerticalStack gap="4">
+      <Box maxWidth="560px">
+        <DropdownSearch
+          id="session-explorer-search"
+          placeholder={"Search " + mapLabel('API', getDashboardCategory()) + "s in this collection"}
+          optionsList={searchOptions}
+          setSelected={selectStart}
+        />
+      </Box>
+      {focusShown ? (
+        <Banner title="Why this step was unusual" status="critical">
+          <Text variant="bodyMd">
+            {focus.seenShare
+              ? `${focusTo} came right after ${focusFrom} in only ${focus.seenShare} of the calls that followed it, too rarely to count as a normal step.`
+              : `After ${focusFrom}, sessions went on to the ${fan?.rows.length || 0} APIs shown. ${focusTo} is not one of them: no session called it right after ${focusFrom}.`}
+          </Text>
+        </Banner>
+      ) : null}
+    </VerticalStack>
+  );
+
   return (
     <FlowGraphLayout
       loading={loading}
@@ -230,6 +297,7 @@ function SequencesFlow({ apiCollectionId }) {
       emptyMessage="No session data recorded yet for this collection"
       bannerTitle="Session explorer"
       bannerStats={[]}
+      bannerContent={bannerContent}
       showData={graph.nodes.length > 0}
       onNodeClick={onNodeClick}
       onInit={onInit}

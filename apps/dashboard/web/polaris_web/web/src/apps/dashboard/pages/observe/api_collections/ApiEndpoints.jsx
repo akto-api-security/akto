@@ -303,7 +303,9 @@ function ApiEndpoints(props) {
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
     const [exportOpen, setExportOpen] = useState(false)
-    const [showSequencesFlow, setShowSequencesFlow] = useState(false)
+    // ?view=explorer&from=&to= opens the session explorer on a threat event's unusual step
+    const explorerParams = new URLSearchParams(location.search)
+    const [showSequencesFlow, setShowSequencesFlow] = useState(explorerParams.get('view') === 'explorer')
     const [showSwaggerDependenciesFlow, setShowSwaggerDependenciesFlow] = useState(false)
     const [showSchemaView, setShowSchemaView] = useState(false)
     // 'graphql' | 'rest' | null — single state prevents both being active simultaneously
@@ -2070,7 +2072,7 @@ function ApiEndpoints(props) {
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
                 />] : showSequencesFlow ? [
-                <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
+                <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId} focusFrom={explorerParams.get('from')} focusTo={explorerParams.get('to')} />
             ] : showSwaggerDependenciesFlow ? [
                 <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />
             ] : showSchemaView ? [
