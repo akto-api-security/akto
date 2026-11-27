@@ -5,6 +5,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.EndpointInfoViewDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.EndpointInfoView;
+import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -57,7 +58,11 @@ class ViewCollectionStatsSource extends AbstractCollectionStatsSource {
     }
 
     @Override
-    protected Map<Integer, ? extends Iterable<String>> buildSensitiveMap() {
+    protected Pair<Map<Integer, List<String>>, Map<Integer, Integer>> buildSensitiveStats() {
+        return new Pair<>(buildSensitiveMap(), buildSensitiveApiCounts());
+    }
+
+    private Map<Integer, List<String>> buildSensitiveMap() {
         List<Bson> pipeline = Arrays.asList(
                 Aggregates.match(SENSITIVE_FILTER),
                 Aggregates.unwind(field(EndpointInfoView.SENSITIVE_SUB_TYPES)),
@@ -69,8 +74,7 @@ class ViewCollectionStatsSource extends AbstractCollectionStatsSource {
                         row -> ((List<?>) row.get(SUB_TYPES)).stream().map(String::valueOf).collect(Collectors.toList())));
     }
 
-    @Override
-    protected Map<Integer, Integer> buildSensitiveApiCounts() {
+    private Map<Integer, Integer> buildSensitiveApiCounts() {
         List<Bson> pipeline = Arrays.asList(
                 Aggregates.match(SENSITIVE_FILTER),
                 Aggregates.group(field(EndpointInfoView.API_COLLECTION_ID), Accumulators.sum(ApiCollectionStatsDao.COUNT, 1)));

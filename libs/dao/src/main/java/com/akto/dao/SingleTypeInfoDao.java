@@ -17,6 +17,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.Constants;
+import com.akto.util.Pair;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -728,19 +729,27 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
 
     }
 
-    /** Distinct sensitive apis (any request or response row of a sensitive type) per collection. */
-    public Map<Integer, Integer> getSensitiveApisCountPerCollection(Bson customFilter) {
+    /** Per collection: sensitive sub types and distinct sensitive apis (any request or response row of a sensitive type), in one pass. */
+    public Pair<Map<Integer, List<String>>, Map<Integer, Integer>> getSensitiveInfoPerCollection(Bson customFilter) {
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
                                         .append(SingleTypeInfo._URL, "$url")
                                         .append(SingleTypeInfo._METHOD, "$method");
         List<Bson> pipeline = generateFilterForSubtypes(new ArrayList<>(), groupedId, false, customFilter);
-        pipeline.add(Aggregates.group("$_id." + SingleTypeInfo._API_COLLECTION_ID, Accumulators.sum(_COUNT, 1)));
+        pipeline.add(Aggregates.group("$_id." + SingleTypeInfo._API_COLLECTION_ID,
+                Accumulators.sum(_COUNT, 1), Accumulators.addToSet("subTypes", "$subTypes")));
 
+        Map<Integer, List<String>> subTypes = new HashMap<>();
         Map<Integer, Integer> counts = new HashMap<>();
         for (BasicDBObject row : SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).allowDiskUse(true)) {
-            counts.put(row.getInt(Constants.ID), row.getInt(_COUNT));
+            int apiCollectionId = row.getInt(Constants.ID);
+            counts.put(apiCollectionId, row.getInt(_COUNT));
+            Set<String> collectionSubTypes = new HashSet<>();
+            for (Object apiSubTypes : (List<?>) row.get("subTypes")) {
+                for (Object subType : (List<?>) apiSubTypes) collectionSubTypes.add((String) subType);
+            }
+            subTypes.put(apiCollectionId, new ArrayList<>(collectionSubTypes));
         }
-        return counts;
+        return new Pair<>(subTypes, counts);
     }
 
     public static final int LARGE_LIMIT = 10_000;
