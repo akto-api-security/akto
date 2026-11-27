@@ -103,7 +103,7 @@ start_java() {
     # Start Java (stdout+stderr → FIFO)
     # --add-opens: Java 17 strong-encapsulation opens needed by reflective libraries
     # (MongoDB POJO codec, etc.). Single-token "=" form.
-    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m \
+    java -XX:+ExitOnOutOfMemoryError -XX:-UseBASE64Intrinsics -Xmx${XMX_MEM}m \
         --add-opens=java.base/java.lang=ALL-UNNAMED \
         --add-opens=java.base/java.util=ALL-UNNAMED \
         --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
