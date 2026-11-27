@@ -1,4 +1,5 @@
-FROM fedora:44
+# Pinned to a fedora:44 build that ships libbrotli 1.2.1-1.fc44 (fixes CVE-2026-111497).
+FROM fedora:44@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e
 
 WORKDIR /app
 
