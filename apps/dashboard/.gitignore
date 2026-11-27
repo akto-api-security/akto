@@ -7,3 +7,4 @@ web/dist
 .classpath
 .idea/
 .vscode/launch.json
+scripts/config.env
