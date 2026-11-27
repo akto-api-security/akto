@@ -124,11 +124,14 @@ public final class LinearApiClient {
     }
 
     public static LinearIssue createIssue(String token, String teamId, String title, String description,
-        int priority) throws Exception {
+        int priority, String stateId) throws Exception {
         BasicDBObject input = new BasicDBObject("teamId", teamId)
             .append("title", title)
             .append("description", description)
             .append("priority", priority);
+        if (StringUtils.isNotBlank(stateId)) {
+            input.append("stateId", stateId);
+        }
 
         BasicDBObject payload = mutationPayload(
             execute(token, ISSUE_CREATE_MUTATION, new BasicDBObject("input", input)), "issueCreate");
