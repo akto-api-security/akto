@@ -1,6 +1,7 @@
 package com.akto.linear;
 
 import com.akto.dao.LinearIntegrationDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.linear_integration.LinearIntegration;
@@ -13,14 +14,18 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.linear.LinearApiClient.LinearIssue;
 import com.akto.linear.LinearApiClient.LinearTeam;
+import com.akto.linear.LinearApiClient.LinearWorkflowState;
 import com.akto.log.LoggerMaker;
 import com.akto.ticketing.ATicketIntegrationService;
+import com.akto.util.Constants;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.utils.CurlUtils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import java.util.Arrays;
@@ -49,6 +54,10 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
     private static final List<String> MAPPED_SEVERITIES = Arrays.asList(Severity.CRITICAL.name(),
         Severity.HIGH.name(), Severity.MEDIUM.name(), Severity.LOW.name());
     private static final Map<String, String> DEFAULT_SEVERITY_TO_PRIORITY = new HashMap<>();
+    static final int MAX_DESCRIPTION_LENGTH = 250000;
+    private static final String CODE_FENCE = "```";
+    private static final String TRUNCATION_NOTE =
+        "\n\n> Truncated to fit Linear's description limit. The full request and response are in Akto.\n";
 
     static {
         DEFAULT_SEVERITY_TO_PRIORITY.put(Severity.CRITICAL.name(), PRIORITY_URGENT);
@@ -58,6 +67,7 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
     }
 
     private String apiToken;
+    private final Map<String, List<LinearWorkflowState>> teamStatesCache = new HashMap<>();
 
     public LinearIntegrationService(String apiToken) {
         this.apiToken = apiToken;
@@ -291,13 +301,33 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
                 endpointDetails, aktoIssueUrl);
 
             LinearIssue issue = LinearApiClient.createIssue(authToken, teamId, title, description,
-                resolvePriority(integration, teamId, severity));
+                resolvePriority(integration, teamId, severity),
+                resolveInitialStateId(authToken, teamId, issueId));
 
             linkAktoIssue(authToken, issue, aktoIssueUrl, testInfo, severity);
 
             return new TicketInfo(issue.getIdentifier(), issue.getUrl());
         } catch (Exception e) {
             logger.errorAndAddToDb("Exception creating Linear issue: " + e.getMessage(),
+                LoggerMaker.LogDb.DASHBOARD);
+            return null;
+        }
+    }
+
+    private String resolveInitialStateId(String authToken, String teamId, TestingIssuesId issueId) {
+        try {
+            TestingRunIssues aktoIssue = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issueId),
+                Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS));
+            GlobalEnums.TestRunIssueStatus status = aktoIssue != null && aktoIssue.getTestRunIssueStatus() != null
+                ? aktoIssue.getTestRunIssueStatus() : GlobalEnums.TestRunIssueStatus.OPEN;
+            List<LinearWorkflowState> states = teamStatesCache.get(teamId);
+            if (states == null) {
+                states = LinearApiClient.fetchTeamStates(authToken, teamId);
+                teamStatesCache.put(teamId, states);
+            }
+            return LinearStatusMapping.targetState(states, status).map(LinearWorkflowState::getId).orElse(null);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Could not resolve Linear state for issue " + issueId + ": " + e.getMessage(),
                 LoggerMaker.LogDb.DASHBOARD);
             return null;
         }
@@ -345,7 +375,22 @@ public class LinearIntegrationService extends ATicketIntegrationService<LinearIn
             body.append("---\n\n## Request/Response Details\n\n").append(requestResponseData);
         }
 
-        return body.toString();
+        return fitToLinearLimit(body.toString());
+    }
+
+    static String fitToLinearLimit(String description) {
+        if (description.length() <= MAX_DESCRIPTION_LENGTH) {
+            return description;
+        }
+        int end = MAX_DESCRIPTION_LENGTH - TRUNCATION_NOTE.length() - CODE_FENCE.length() - 1;
+        if (Character.isHighSurrogate(description.charAt(end - 1))) {
+            end--;
+        }
+        StringBuilder truncated = new StringBuilder(description.substring(0, end));
+        if (StringUtils.countMatches(truncated, CODE_FENCE) % 2 == 1) {
+            truncated.append('\n').append(CODE_FENCE);
+        }
+        return truncated.append(TRUNCATION_NOTE).toString();
     }
 
     private static String buildRequestResponseData(TestingRunResult testingRunResult) {
