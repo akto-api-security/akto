@@ -4,7 +4,7 @@ import AgGridRow from "../../../../components/tables/rows/AgGridRow";
 import { OsIcon } from "../../agentic/DeviceEndpoints";
 import MisconfiguredBadge from "../../agentic/MisconfiguredBadge";
 import { RiskScoreCellRenderer, SeverityBadge } from "../../agentic/AgenticCellRenderers";
-import { BROWSER_ICONS, GENERIC_BROWSER_ICON, HEALTH_BADGE_STATUS, HEALTH_LABELS, INFERENCE_HOOKS_LABEL, MODE_LABELS, OS_ICON_KEYS, formatNumber, osLabel } from "./peopleConstants";
+import { BROWSER_ICONS, CLAUDE_COMPLIANCE_LABEL, GENERIC_BROWSER_ICON, HEALTH_BADGE_STATUS, HEALTH_LABELS, INFERENCE_HOOKS_LABEL, MODE_LABELS, OS_ICON_KEYS, formatNumber, osLabel } from "./peopleConstants";
 
 function Unavailable({ what }) {
     return (
@@ -73,6 +73,7 @@ export function TagsCellRenderer({ value }) {
 export function OsCellRenderer({ data }) {
     if (!data) return null;
     if (data.hook) return <AgGridRow icon={<OsIcon />} label={INFERENCE_HOOKS_LABEL} />;
+    if (data.compliance) return <AgGridRow icon={<OsIcon />} label={CLAUDE_COMPLIANCE_LABEL} />;
     if (data.extension) return <AgGridRow icon={<BrowserIcon browser={data.browser} />} label={browserLabel(data.browser)} />;
     return <AgGridRow icon={<OsIcon os={OS_ICON_KEYS[data.os]} />} label={osLabel(data.os) || "—"} />;
 }
@@ -112,6 +113,7 @@ export function LastSeenCellRenderer({ value }) {
 
 export function AgentCellRenderer({ data }) {
     if (!data) return null;
+    if (data.hook || data.compliance) return <Text as="span" variant="bodySm" color="subdued">No Atlas agent</Text>;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
             <Badge size="small" status={HEALTH_BADGE_STATUS[data.health]}>{HEALTH_LABELS[data.health]}</Badge>

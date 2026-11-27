@@ -2,7 +2,7 @@ import { Box, Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import SpinnerCentered from "../../../../components/progress/SpinnerCentered";
 import {
-    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, EMPTY_PEOPLE_FILTERS, FLYOUT_GRAPH_LIMIT, INFERENCE_HOOKS_LABEL, INFERENCE_HOOKS_OPTION, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
+    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, CLAUDE_COMPLIANCE_LABEL, CLAUDE_COMPLIANCE_OPTION, EMPTY_PEOPLE_FILTERS, FLYOUT_GRAPH_LIMIT, INFERENCE_HOOKS_LABEL, INFERENCE_HOOKS_OPTION, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
 } from "./peopleConstants";
 import { getDomainForFavicon } from "../../agentic/mcpClientHelper";
 
@@ -34,7 +34,7 @@ const CSV_COLUMNS = {
     ],
     devices: [
         ["Device", (row) => row.label || row.name],
-        ["Source", (row) => (row.hook ? INFERENCE_HOOKS_LABEL : row.extension ? row.browser : osLabel(row.os))],
+        ["Source", (row) => (row.hook ? INFERENCE_HOOKS_LABEL : row.compliance ? CLAUDE_COMPLIANCE_LABEL : row.extension ? row.browser : osLabel(row.os))],
         ["Owner", (row) => row.owner],
         ["Tags", (row) => (row.tags || []).map((tag) => `${tag.key}=${tag.value}`)],
         ["Atlas agent", (row) => HEALTH_LABELS[row.health] || row.health],
@@ -53,7 +53,7 @@ const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 function statSubtexts(deviceStats) {
     const {
-        managedDevices, desktopDevices, browserDevices, desktopActive, browserActive, offlineDevices, totalEmployees, unapprovedTeams, unapprovedNoTeam, monitorOnlyDevices, inferenceHookDevices, devicesWithAiTools,
+        managedDevices, desktopDevices, browserDevices, desktopActive, browserActive, offlineDevices, totalEmployees, unapprovedTeams, unapprovedNoTeam, monitorOnlyDevices, inferenceHookDevices, complianceDevices, devicesWithAiTools,
     } = deviceStats;
     const agentActiveParts = [`${formatCount(desktopActive)} desktop`, `${formatCount(browserActive)} browsers`];
     if (offlineDevices > 0) agentActiveParts.push(`${formatCount(offlineDevices)} offline 7+ days`);
@@ -64,6 +64,7 @@ function statSubtexts(deviceStats) {
     if (desktopDevices > 0) managedParts.push(`${formatCount(desktopDevices)} desktop`);
     if (browserDevices > 0) managedParts.push(`${formatCount(browserDevices)} browsers`);
     if (inferenceHookDevices > 0) managedParts.push(`${formatCount(inferenceHookDevices)} via Claude inference hooks`);
+    if (complianceDevices > 0) managedParts.push(`${formatCount(complianceDevices)} via ${CLAUDE_COMPLIANCE_LABEL}`);
     return {
         managedDevices: managedParts.length ? { text: managedParts.join(" · ") } : null,
         agentActive: agentActiveParts.length ? { text: agentActiveParts.join(" · "), color: offlineDevices > 0 ? "critical" : undefined } : null,
@@ -157,7 +158,7 @@ function footprintModel(root, devices, heads, view) {
     visibleDevices.shown.forEach((device, deviceIndex) => {
         const deviceId = withDevices ? `device-${deviceIndex}` : "root";
         if (withDevices) {
-            deviceNodes.push({ id: deviceId, category: "external", iconSrc: deviceIcon(device), label: device.name, sub: device.hook ? "No Atlas agent" : [osLabel(device.os), HEALTH_LABELS[device.health] || device.health].filter(Boolean).join(" · "), status: device.health === "healthy" ? "neutral" : "review" });
+            deviceNodes.push({ id: deviceId, category: "external", iconSrc: deviceIcon(device), label: device.name, sub: device.hook ? "No Atlas agent" : device.compliance ? `${CLAUDE_COMPLIANCE_LABEL} · No Atlas agent` : [osLabel(device.os), HEALTH_LABELS[device.health] || device.health].filter(Boolean).join(" · "), status: device.health === "healthy" ? "neutral" : "review" });
             link("root", deviceId, "ok");
         }
         const tools = device.tools || [];
@@ -307,7 +308,7 @@ const transform = {
     filterOptions: (overview) => ({
         teams: overview?.teamOptions || [],
         tags: overview?.tagOptions || [],
-        osBrowser: [...(overview?.osMatrix || []).filter((row) => row.os !== "unknown").map((row) => `os:${row.os}`), ...(overview?.browserMatrix || []).map((row) => `browser:${row.browser}`), ...(overview?.inferenceHookDevices > 0 ? [INFERENCE_HOOKS_OPTION] : [])],
+        osBrowser: [...(overview?.osMatrix || []).filter((row) => row.os !== "unknown").map((row) => `os:${row.os}`), ...(overview?.browserMatrix || []).map((row) => `browser:${row.browser}`), ...(overview?.inferenceHookDevices > 0 ? [INFERENCE_HOOKS_OPTION] : []), ...(overview?.complianceDevices > 0 ? [CLAUDE_COMPLIANCE_OPTION] : [])],
         healthStates: HEALTH_ORDER.filter((state) => (overview?.agentHealth?.[state] || 0) > 0),
         guardrailModes: Object.keys(MODE_LABELS).filter((mode) => (overview?.guardrailModes?.[mode] || 0) > 0),
         categories: CATEGORY_ORDER.filter((category) => (overview?.categoryTotals?.[category] || 0) > 0),
@@ -338,7 +339,7 @@ const transform = {
         return { ...view, skills };
     },
     footprintGraph: (kind, detail, view) => (kind === "device"
-        ? footprintModel({ label: detail.name, sub: detail.hook ? INFERENCE_HOOKS_LABEL : osLabel(detail.os) }, [detail], ["Device", "AI tools", "MCP servers, plugins and skills"], view)
+        ? footprintModel({ label: detail.name, sub: detail.hook ? INFERENCE_HOOKS_LABEL : detail.compliance ? CLAUDE_COMPLIANCE_LABEL : osLabel(detail.os) }, [detail], ["Device", "AI tools", "MCP servers, plugins and skills"], view)
         : footprintModel({ label: detail.username, sub: (detail.teams || []).join(", ") || "User", devicesColumn: true }, detail.deviceDetails || [], ["User", "Devices", "AI tools", "MCP servers, plugins and skills"], view)),
     employeeAiToolCount: (employee) => (employee.deviceDetails || []).reduce(
         (total, device) => total + device.toolCount - (device.toolsByCategory?.mcp || 0), 0),
@@ -378,6 +379,7 @@ const transform = {
         agentIssues: filters.agentIssues,
         usesAi: filters.usesAi,
         inferenceHooksOnly: filters.inferenceHooksOnly,
+        complianceOnly: filters.complianceOnly,
         agentActive: filters.agentActive,
         guardrailModes: filters.guardrailModes,
         riskMin: filters.riskMin,

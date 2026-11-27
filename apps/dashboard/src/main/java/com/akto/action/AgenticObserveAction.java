@@ -3438,6 +3438,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return Comparator.comparing((BasicDBObject r) -> String.valueOf(r.get("endpoint")), String.CASE_INSENSITIVE_ORDER);
     }
 
+    private static String toChildPathKey(String name) {
+        return name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+    }
+
     // Mirrors agenticPageBuilders.js's child row shape within one device, grouped by service name
     // (toChildPathKey(extractServiceName(hostName))) rather than across the whole account.
     private BasicDBObject buildDeviceChildren(String deviceId, List<ApiCollection> collections,
@@ -3454,6 +3458,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         // under the same device to this agent's own owner tag (mcp-client/ai-agent value).
         Map<String, Integer> pluginCountByOwnerTag = new HashMap<>();
         Map<String, String> ownerTagByPathKey = new HashMap<>();
+        Map<String, String> skillNameByKey = new LinkedHashMap<>();
+        Map<String, Set<String>> skillOwnersByKey = new HashMap<>();
+        Map<String, Integer> skillLastTraffic = new HashMap<>();
 
         for (ApiCollection c : collections) {
             if (c == null || c.isDeactivated()) continue;
@@ -3465,7 +3472,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             String serviceName = extractServiceNameForGrouping(hostName);
             if (StringUtils.isBlank(serviceName)) serviceName = hostName;
-            String pathKey = serviceName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+            String pathKey = toChildPathKey(serviceName);
             if (StringUtils.isBlank(pathKey)) pathKey = "unknown";
 
             String idStr = String.valueOf(c.getId());
@@ -3542,6 +3549,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 int[] acc = childViolations.computeIfAbsent(pathKey, k -> new int[4]);
                 for (int i = 0; i < 4; i++) acc[i] += cv[i];
             }
+            if (c.getSkills() != null) {
+                for (String skill : c.getSkills()) {
+                    if (StringUtils.isBlank(skill)) continue;
+                    String skillKey = toChildPathKey(skill);
+                    if (StringUtils.isBlank(skillKey)) continue;
+                    skillNameByKey.putIfAbsent(skillKey, skill.trim());
+                    skillOwnersByKey.computeIfAbsent(skillKey, k -> new LinkedHashSet<>()).add(child.getString("endpoint"));
+                    skillLastTraffic.merge(skillKey, collTraffic, Math::max);
+                }
+            }
         }
 
         List<BasicDBObject> rows = new ArrayList<>();
@@ -3566,6 +3583,28 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             violationsObj.put("high", cv != null ? cv[1] : 0);
             violationsObj.put("medium", cv != null ? cv[2] : 0);
             violationsObj.put("low", cv != null ? cv[3] : 0);
+            row.put("violations", violationsObj);
+            rows.add(row);
+        }
+
+        for (Map.Entry<String, String> e : skillNameByKey.entrySet()) {
+            String skillKey = e.getKey();
+            BasicDBObject standalone = children.get(skillKey);
+            if (standalone != null && AgenticObserveUtil.CLIENT_TYPE_SKILL.equals(standalone.getString("type"))) continue;
+            BasicDBObject row = new BasicDBObject();
+            row.put("path", Arrays.asList(deviceId, "skill-" + skillKey));
+            row.put("id", "device-" + deviceId + "-skill-" + skillKey);
+            row.put("endpoint", formatComponentDisplayName(e.getValue()));
+            row.put("rawServiceName", e.getValue());
+            row.put("type", AgenticObserveUtil.CLIENT_TYPE_SKILL);
+            row.put("skillOwners", new ArrayList<>(skillOwnersByKey.getOrDefault(skillKey, Collections.emptySet())));
+            row.put("riskScore", 0.0);
+            row.put("lastTrafficEpoch", skillLastTraffic.getOrDefault(skillKey, 0));
+            BasicDBObject violationsObj = new BasicDBObject();
+            violationsObj.put("critical", 0);
+            violationsObj.put("high", 0);
+            violationsObj.put("medium", 0);
+            violationsObj.put("low", 0);
             row.put("violations", violationsObj);
             rows.add(row);
         }
