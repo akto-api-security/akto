@@ -41,13 +41,6 @@ export default {
                 attemptIds
             }
         })
-    },
-
-    getAPICatalog() {
-        return request({
-            url: '/api/getAPICatalog',
-            method: 'get'
-        })
     }
 
 }
