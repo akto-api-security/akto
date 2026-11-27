@@ -127,6 +127,23 @@ public class CollectionStatsRefresher {
         return new Freshness(refreshedAt, pending);
     }
 
+    // starts a refresh of only the endpoint counts when due (never the first attr sync) and returns when they were last computed, 0 if never
+    public static int refreshEndpointsCountIfDue() {
+        int now = Context.now();
+        int accountId = Context.accountId.get();
+        Map<Metric, ApiCollectionStatsMeta> meta = loadMeta();
+        ApiCollectionStatsMeta endpointsCountMeta = meta.get(Metric.ENDPOINTS_COUNT);
+        if (refreshedAt(meta.get(Metric.ATTRS_FULL)) > 0 && isStale(endpointsCountMeta, Metric.ENDPOINTS_COUNT, false, now)
+                && tryClaim(Metric.ENDPOINTS_COUNT, now)) {
+            try {
+                EXECUTOR.execute(() -> runInAccount(accountId, Metric.ENDPOINTS_COUNT));
+            } catch (RejectedExecutionException e) {
+                release(Metric.ENDPOINTS_COUNT, 0);
+            }
+        }
+        return refreshedAt(endpointsCountMeta);
+    }
+
     /** Merges fields into the shared meta row that carries the summary card numbers. */
     static void saveSummary(Bson update) {
         ApiCollectionStatsMetaDao.instance.getMCollection().updateOne(
