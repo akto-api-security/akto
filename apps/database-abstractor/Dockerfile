@@ -1,4 +1,5 @@
-FROM eclipse-temurin:17-jre-noble
+# Pinned to an eclipse-temurin:17-jre-noble build that ships libbrotli1 1.1.0-2ubuntu0.1 (fixes CVE-2026-111497).
+FROM eclipse-temurin:17-jre-noble@sha256:ad806840ae514b83d3d8e3a00a5c1b7302fb0a6ae02bbbaf8a8bf1ffdf5367c6
 
 # Ubuntu 24.04 LTS base (supported to 2029, ships NO python -> no python 2.7/3.9 EOL findings).
 # The base already provides curl/tar/gzip/free/useradd and scans grype-clean (0 crit/high),
