@@ -7,6 +7,7 @@ import com.akto.dto.endpoint_shield.FileInspectionResult;
 import com.akto.dto.endpoint_shield.FileInspectionRule;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.log.StepTimer;
 import com.akto.utils.blob.AzureBlobClient;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -84,6 +85,7 @@ public class FileInspectionAction extends ActionSupport {
     }
 
     public String uploadFileInspectionResult() {
+        StepTimer timer = new StepTimer("uploadFileInspectionResult");
         try {
             if (result == null) {
                 addActionError("result is required");
@@ -102,20 +104,25 @@ public class FileInspectionAction extends ActionSupport {
                 result.setExecutedAt(Context.now());
             }
             uploadMatchBlobs(result);
+            timer.mark("blobUpload");
 
             Bson filter = Filters.and(
                     Filters.eq(FileInspectionResult.RULE_ID, result.getRuleId()),
                     Filters.eq(FileInspectionResult.DEVICE_ID, result.getDeviceId())
             );
             FileInspectionResult existing = FileInspectionResultDao.instance.findOne(filter);
+            timer.mark("findExisting");
             if (existing != null) {
                 result.setId(existing.getId());
             } else {
                 result.setId(new ObjectId());
             }
             FileInspectionResultDao.instance.replaceOne(filter, result);
+            timer.mark("replace");
+            timer.logIfSlow(loggerMaker, "matches=" + (result.getMatches() == null ? 0 : result.getMatches().size()) + " inserted=" + (existing == null));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
+            timer.logIfSlow(loggerMaker, "failed=true");
             loggerMaker.errorAndAddToDb("uploadFileInspectionResult failed: " + e.getMessage(), LogDb.DB_ABS);
             addActionError("Failed to upload result");
             return ERROR.toUpperCase();

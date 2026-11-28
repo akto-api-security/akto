@@ -82,6 +82,7 @@ import com.akto.dto.SequenceCount;
 import com.akto.dto.DeviceDomainConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.log.StepTimer;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
@@ -3915,11 +3916,15 @@ public class DbAction extends ActionSupport {
     }
 
     public String createCollectionForHostAndVpc() {
+        StepTimer timer = new StepTimer("createCollectionForHostAndVpc");
         try {
             if (!isLatestRagDetection && tagsList != null) {
                 tagsList.removeIf(t -> t != null && Constants.AKTO_RAG_DATABASE_TAG.equals(t.getKeyName()));
             }
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId), accessType, skills);
+            List<CollectionTags> tagsToUpdate = checkTagsNeedUpdates(tagsList, colId);
+            timer.mark("bloomCheck");
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsToUpdate, accessType, skills);
+            timer.mark("collectionUpsert");
             boolean isMcpServer = tagsList != null
                 && tagsList.stream().anyMatch(t -> Constants.AKTO_MCP_SERVER_TAG.equals(t.getKeyName()));
             if (isMcpServer) {
@@ -3941,11 +3946,13 @@ public class DbAction extends ActionSupport {
                     loggerMaker.errorAndAddToDb(e, "Error creating or inserting MCP audit info: " + e.toString());
                 }
             }
+            timer.mark("mcpAudit");
             boolean isBrowserLlm = tagsList != null
                 && tagsList.stream().anyMatch(t -> Constants.AKTO_BROWSER_LLM_TAG.equals(t.getKeyName()));
             if (isBrowserLlm) {
                 insertBrowserLlmAuditInfo(host);
             }
+            timer.mark("browserLlmAudit");
             if (mcpServerCollectionInfo != null) {
                 try {
                     DbLayer.upsertEndpointMcpConfig(mcpServerCollectionInfo);
@@ -3953,7 +3960,11 @@ public class DbAction extends ActionSupport {
                     loggerMaker.errorAndAddToDb(e, "Error upserting endpoint mcp config: " + e.toString());
                 }
             }
+            timer.mark("mcpConfig");
+            timer.logIfSlow(loggerMaker, "colId=" + colId + " tagsChanged=" + (tagsToUpdate != null)
+                + " mcpServer=" + isMcpServer + " browserLlm=" + isBrowserLlm + " mcpConfig=" + (mcpServerCollectionInfo != null));
         } catch (Exception e) {
+            timer.logIfSlow(loggerMaker, "colId=" + colId + " failed=true");
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();
         }
@@ -7491,6 +7502,7 @@ public class DbAction extends ActionSupport {
         // the batch means losing a whole device's data until the next tick.
         int ok = 0;
         int failed = 0;
+        StepTimer timer = new StepTimer("upsertNhiIdentities");
         for (NhiIdentity i : nhiIdentities) {
             try {
                 DbLayer.upsertNhiIdentity(i);
@@ -7500,6 +7512,9 @@ public class DbAction extends ActionSupport {
                 loggerMaker.errorAndAddToDb(inner, "upsertNhiIdentities: one record failed (continuing): " + inner.toString());
             }
         }
+        timer.mark("records");
+        timer.logIfSlow(loggerMaker, "records=" + nhiIdentities.size() + " ok=" + ok + " failed=" + failed
+            + " avgPerRecordMs=" + (timer.totalMs() / nhiIdentities.size()));
         nhiUpsertedCount = ok;
         if (failed > 0) {
             loggerMaker.errorAndAddToDb("upsertNhiIdentities: " + failed + "/" + nhiIdentities.size() + " records failed");

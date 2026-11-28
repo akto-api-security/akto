@@ -153,6 +153,7 @@ import com.akto.dto.upload.SwaggerFileUpload;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.log.StepTimer;
 import com.akto.new_relic.NewRelicUtils;
 import com.akto.open_telemetry.OpenTelemetryUtils;
 import com.akto.dao.billing.UningestedApiOverageDao;
@@ -2856,17 +2857,21 @@ public class DbLayer {
      */
     public static boolean bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds,
             boolean doNotMarkIssuesAsFixed, String leaseToken, int leaseSeconds) {
+        StepTimer timer = new StepTimer("bulkRecordTestingRunResults");
         if (rerunDeleteIds != null) {
             for (String id : rerunDeleteIds) {
                 deleteTestingRunResults(id);
             }
         }
+        timer.mark("rerunDeletes");
 
         if (testingRunResults == null || testingRunResults.isEmpty()) {
+            timer.logIfSlow(loggerMaker, "results=0 rerunDeletes=" + (rerunDeleteIds == null ? 0 : rerunDeleteIds.size()));
             return true;
         }
 
         bulkWriteTestingRunResults(testingRunResults);
+        timer.mark("bulkWrite");
 
         Map<ObjectId, Integer> countBySummary = new HashMap<>();
         for (TestingRunResult trr : testingRunResults) {
@@ -2877,8 +2882,12 @@ public class DbLayer {
             leaseHeld &= updateTestResultsCountInTestSummary(entry.getKey().toHexString(), entry.getValue(),
                     leaseToken, leaseSeconds);
         }
+        timer.mark("summaryCounts");
 
         recordIssuesForTestingRunResults(testingRunResults, doNotMarkIssuesAsFixed);
+        timer.mark("recordIssues");
+        timer.logIfSlow(loggerMaker, "results=" + testingRunResults.size() + " summaries=" + countBySummary.size()
+            + " rerunDeletes=" + (rerunDeleteIds == null ? 0 : rerunDeleteIds.size()));
         return leaseHeld;
     }
 
@@ -4872,7 +4881,9 @@ public class DbLayer {
             loggerMaker.errorAndAddToDb("upsertNhiIdentity: missing required field, dropping record");
             return;
         }
+        StepTimer timer = new StepTimer("upsertNhiIdentity(record)");
         NhiIdentityDao.instance.createIndicesIfAbsent();
+        timer.mark("indices");
         int now = Context.now();
         final String scannerActor = "endpoint-shield-scanner";
 
@@ -4883,6 +4894,7 @@ public class DbLayer {
         );
 
         NhiIdentity existing = NhiIdentityDao.instance.findOne(filter);
+        timer.mark("findExisting");
         boolean rotated = existing != null
             && existing.getHash() != null
             && !existing.getHash().equals(identity.getHash());
@@ -4969,18 +4981,26 @@ public class DbLayer {
         updates.add(Updates.set(NhiIdentity.EXPIRY_DATE, identity.getExpiryDate()));
 
         NhiIdentityDao.instance.updateOne(filter, Updates.combine(updates));
+        timer.mark("upsert");
 
         // Evaluate policies inline so violations appear immediately after each upsert.
         try {
             com.akto.dto.nhi_governance.NhiIdentity evaled =
                     NhiIdentityDao.instance.findOne(filter);
+            timer.mark("reread");
             if (evaled != null) {
                 com.akto.utils.nhi_governance.NhiPolicyEvaluator.evaluate(evaled);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "upsertNhiIdentity: policy eval failed: " + e.getMessage());
         }
+        timer.mark("policyEval");
+        // Lower threshold than the request line: a request makes 5-30 of these calls in sequence.
+        timer.logIfSlow(loggerMaker, NHI_SLOW_RECORD_MS, "deviceId=" + identity.getDeviceId()
+            + " source=" + identity.getSource() + " inserted=" + (existing == null) + " rotated=" + rotated);
     }
+
+    private static final long NHI_SLOW_RECORD_MS = 500;
 
     public static List<BasicDBObject> getAgentCorpus(String hostName) {
         return AgentGuardCorpusDao.instance.findBucketsByAgentHost(hostName);
