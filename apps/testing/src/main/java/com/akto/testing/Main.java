@@ -98,6 +98,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -278,6 +279,31 @@ public class Main {
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 10 * 60;
     private static final int DEFAULT_DELTA_IGNORE_TIME = TestingRunResultSummariesDao.DEFAULT_DELTA_IGNORE_TIME_SECONDS;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
+
+    // Main polling loop: poll every 1s while there is work, back off up to 10s when idle.
+    private static final long MIN_POLL_SLEEP_MS = 1000;
+    private static final long MAX_POLL_SLEEP_MS = 10_000;
+
+    // accountId -> {timeForScheduledSummaries, fetchedAt}. Only accessed from the main polling thread.
+    private static final Map<Integer, int[]> scheduledSummariesDeltaCache = new HashMap<>();
+    private static final int SCHEDULED_SUMMARIES_DELTA_CACHE_TTL_SECONDS = 60;
+
+    // testRunId is per instance (common DB), so clearing it once is enough until a run is picked up again.
+    private static boolean heartBeatTestingRunIdCleared = false;
+
+    private static int getTimeForScheduledSummaries(int accountId) {
+        int now = Context.now();
+        int[] cached = scheduledSummariesDeltaCache.get(accountId);
+        if (cached != null && now - cached[1] < SCHEDULED_SUMMARIES_DELTA_CACHE_TTL_SECONDS) {
+            return cached[0];
+        }
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+            Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
+        );
+        int deltaTime = accountSettings != null ? accountSettings.getTimeForScheduledSummaries() : DEFAULT_DELTA_IGNORE_TIME;
+        scheduledSummariesDeltaCache.put(accountId, new int[]{deltaTime, now});
+        return deltaTime;
+    }
 
     private static TestingRun findPendingTestingRun(int userDeltaTime) {
         int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
@@ -603,20 +629,19 @@ public class Main {
         }
 
         SingleTypeInfo.init();
+        long pollSleepMs = MIN_POLL_SLEEP_MS;
         while (true) {
+            AtomicBoolean pickedUpTestingRun = new AtomicBoolean(false);
             AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
                 int accountId = account.getId();
-                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
-                    Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
-                );
 
-                TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, "");
+                if (!heartBeatTestingRunIdCleared) {
+                    TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, "");
+                    heartBeatTestingRunIdCleared = true;
+                }
 
                 int start = Context.now();
-                int defaultTime = DEFAULT_DELTA_IGNORE_TIME;
-                if(accountSettings != null){
-                    defaultTime =  accountSettings.getTimeForScheduledSummaries();
-                }
+                int defaultTime = getTimeForScheduledSummaries(accountId);
                 TestingConfigurations config = TestingConfigurations.getInstance();
                 TestingRunResultSummary trrs = findPendingTestingRunResultSummary(defaultTime);
                 boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
@@ -634,6 +659,7 @@ public class Main {
                 if (testingRun == null) {
                     return;
                 }
+                pickedUpTestingRun.set(true);
 
                 if (handleRerunTestingRunResult(trrs)) {
                     return;
@@ -644,6 +670,7 @@ public class Main {
                 }
                 loggerMaker.info("Testing run eligible for instance: " + testingRun.getHexId() + " for account: " + accountId + " at:" + Context.now() + " on: " + testingInstanceId);
                 TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
+                heartBeatTestingRunIdCleared = false;
 
                 if (testingRun.getState().equals(State.STOPPED)) {
                     loggerMaker.debugAndAddToDb("Testing run stopped");
@@ -933,7 +960,8 @@ public class Main {
                 
 
             }, "testing");
-            Thread.sleep(1000);
+            pollSleepMs = pickedUpTestingRun.get() ? MIN_POLL_SLEEP_MS : Math.min(pollSleepMs * 2, MAX_POLL_SLEEP_MS);
+            Thread.sleep(pollSleepMs);
         }
     }
 
