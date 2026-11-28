@@ -21,7 +21,7 @@ export default function useViolationsSummary({ startTimestamp, endTimestamp, sta
         startTimestamp, endTimestamp, "ACTIVE", endpoint ? "exclude" : undefined, endpoint ? "exclude" : undefined,
     ), [startTimestamp, endTimestamp, endpoint]);
     const fetchCategory = useCallback(() => api.fetchThreatCategoryCount(
-        startTimestamp, endTimestamp, status,
+        startTimestamp, endTimestamp, status, true,
     ), [startTimestamp, endTimestamp, status]);
     const fetchHosts = useCallback(() => api.fetchThreatTopNData(
         startTimestamp, endTimestamp, [], 5, status, skillEvaluationMode, configEvaluationMode, true,

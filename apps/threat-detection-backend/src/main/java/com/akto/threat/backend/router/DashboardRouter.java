@@ -423,7 +423,8 @@ public class DashboardRouter implements ARouter {
                     threatApiService.getSubCategoryWiseCount(
                         ctx.get("accountId"),
                         req,
-                        contextSource
+                        contextSource,
+                        Boolean.parseBoolean(ctx.request().getHeader("x-group-by-type"))
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             }, false);

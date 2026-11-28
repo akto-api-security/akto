@@ -52,6 +52,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   int endTs;
   String severityStatusFilter;
   boolean topHostsOnly;
+  @lombok.Setter boolean groupByType;
 
   @Getter int totalAnalysed;
   @Getter int totalAttacks;
@@ -134,7 +135,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       return SUCCESS.toUpperCase();
     }
     Map<String, String> categoryDisplayNames = getCategoryDisplayNames();
-    List<ThreatCategoryCount> counts = fetchSubcategoryWiseCounts(startTs, endTs, latestAttack, severityStatusFilter, hostScope);
+    List<ThreatCategoryCount> counts = fetchSubcategoryWiseCounts(startTs, endTs, latestAttack, severityStatusFilter, hostScope, groupByType);
     if (counts == null) {
       return fetchThreatCategoryCount(); // the backend rejected the host scope
     }

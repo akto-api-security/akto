@@ -203,6 +203,11 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated, queuedI
     const [selectedTab, setSelectedTab] = useState(0);
     const [violationsTotal, setViolationsTotal] = useState(null);
     const isDevice = target?.kind === "device";
+    const violationWindow = useMemo(() => {
+        if (!target) return {};
+        const endTimestamp = Math.floor(Date.now() / 300000) * 300;
+        return { startTimestamp: endTimestamp - 7 * 86400, endTimestamp };
+    }, [target]);
 
     useEffect(() => {
         if (!target) return undefined;
@@ -243,7 +248,7 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated, queuedI
     const tabs = !ready ? [] : [
         { id: "overview", content: "Overview" },
         { id: "assets", content: "Agentic Assets" },
-        { id: "violations", content: `Violations (${formatNumber(violationsTotal ?? detail.violationCount)})` },
+        { id: "violations", content: `Violations (7d) (${formatNumber(violationsTotal ?? detail.violationCount)})` },
     ];
     const activeTab = tabs[selectedTab]?.id;
     const riskFactors = ready ? riskFactorsOf(detail, isDevice) : [];
@@ -306,6 +311,8 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated, queuedI
                 {ready && activeTab === "assets" && !isDevice && <EmployeeAssets key={target.id} options={transform.assetDeviceOptions(detail)} />}
                 {ready && activeTab === "violations" && (
                     <ViolationsTab
+                        skillEvaluationMode="exclude"
+                        {...violationWindow}
                         hostNames={hostNames}
                         deviceId={deviceId}
                         onTotalChange={setViolationsTotal}

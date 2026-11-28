@@ -475,6 +475,11 @@ public class AbstractThreatDetectionAction extends UserAction {
   // hostScope: see backendHostScope(); null counts the whole account. Null result when the backend rejected the host scope.
   protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
       int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter, Map<String, Object> hostScope) {
+    return fetchSubcategoryWiseCounts(startTimestamp, endTimestamp, latestAttack, statusFilter, hostScope, false);
+  }
+
+  protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
+      int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter, Map<String, Object> hostScope, boolean groupByType) {
     try {
       String url = String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl());
       MediaType JSON = MediaType.parse("application/json; charset=utf-8");
@@ -498,6 +503,7 @@ public class AbstractThreatDetectionAction extends UserAction {
           .addHeader("Authorization", "Bearer " + this.getApiToken())
           .addHeader("Content-Type", "application/json")
           .addHeader("x-context-source", contextSourceValue)
+          .addHeader("x-group-by-type", Boolean.toString(groupByType))
           .build();
 
       try (Response resp = httpClient.newCall(request).execute()) {

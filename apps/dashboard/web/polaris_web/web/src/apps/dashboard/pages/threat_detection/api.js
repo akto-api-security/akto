@@ -140,8 +140,9 @@ const threatDetectionRequests = {
             data: { enabled: enabled }
         })
     },
-    fetchThreatCategoryCount(startTs, endTs, severityStatusFilter) {
+    fetchThreatCategoryCount(startTs, endTs, severityStatusFilter, groupByType = false) {
         const data = { startTs, endTs };
+        if (groupByType) data.groupByType = true;
         if (severityStatusFilter) data.severityStatusFilter = severityStatusFilter;
         return request({
             url: '/api/fetchThreatCategoryCount',

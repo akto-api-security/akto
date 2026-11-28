@@ -1087,34 +1087,9 @@ public class MaliciousEventService {
   }
 
   // Order is precedence, mirroring deriveAgenticType in the dashboard's violationsData.js.
-  private static final String[][] AGENTIC_TYPE_RULES = {
-      {"Tool", "tool"}, {"Skill", "skill"}, {"Resource", "resource"}, {"Prompt", "prompt"},
-      {"Config", "config|setting"}, {"Tool", "mcp|server"}, {"Prompt", "message|completion|chat"}
-  };
   private Document agenticTypeCondition(List<String> types) {
-    if (types == null || types.isEmpty()) {
-      return null;
-    }
-    Set<String> wanted = new HashSet<>(types);
-    List<Document> anyOf = new ArrayList<>();
-    StringBuilder earlier = new StringBuilder();
-    for (String[] rule : AGENTIC_TYPE_RULES) {
-      if (wanted.contains(rule[0])) {
-        List<Document> allOf = new ArrayList<>();
-        allOf.add(new Document("latestApiEndpoint", Pattern.compile(rule[1], Pattern.CASE_INSENSITIVE)));
-        if (earlier.length() > 0) {
-          allOf.add(new Document("latestApiEndpoint",
-              new Document("$not", Pattern.compile(earlier.toString(), Pattern.CASE_INSENSITIVE))));
-        }
-        anyOf.add(new Document("$and", allOf));
-      }
-      earlier.append(earlier.length() > 0 ? "|" : "").append("(?:").append(rule[1]).append(")");
-    }
-    if (wanted.contains("Prompt")) {
-      anyOf.add(new Document("latestApiEndpoint",
-          new Document("$not", Pattern.compile(earlier.toString(), Pattern.CASE_INSENSITIVE))));
-    }
-    return anyOf.isEmpty() ? null : new Document("$or", anyOf);
+    return types == null || types.isEmpty() ? null
+        : new Document("$expr", new Document("$in", Arrays.asList(ThreatUtils.violationTypeExpression(), types)));
   }
 
   private Document behaviourCondition(List<String> behaviours) {
@@ -1515,6 +1490,34 @@ public class MaliciousEventService {
 
   // Mongo query for a list filter in the given context. Shared by the violations list and the
   // guardrail overview aggregations, so both count exactly the same events for the same filter.
+  private Document resolveAttributedHosts(String accountId, ListMaliciousRequestsRequest.Filter filter, String contextSource) {
+    Document scope = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
+    if (filter.hasDetectedAtTimeRange()) {
+      TimeRangeFilter range = filter.getDetectedAtTimeRange();
+      Document bounds = new Document();
+      if (range.hasStart()) bounds.append("$gte", range.getStart());
+      if (range.hasEnd()) bounds.append("$lte", range.getEnd());
+      if (!bounds.isEmpty()) scope.append("detectedAt", bounds);
+    }
+    Set<String> hosts = new HashSet<>(filter.getHostsList());
+    Set<String> looseKeys = new HashSet<>(filter.getLooseHostKeysList());
+    Set<String> devices = new HashSet<>(filter.getClaudeDeviceIdsList());
+    List<Document> pipeline = Arrays.asList(new Document("$match", scope), new Document("$group", new Document("_id", "$host")));
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline),
+        ThreatUtils.coverIndexHint(accountId, scope)).maxTime(ThreatUtils.REGEX_MAX_TIME_MS, TimeUnit.MILLISECONDS).cursor()) {
+      while (cursor.hasNext()) {
+        String host = cursor.next().getString("_id");
+        if (host == null) continue;
+        String[] parts = host.split("\\.", -1);
+        boolean loose = looseKeys.contains(parts[0] + " " + parts[parts.length - 1]);
+        boolean config = host.matches("(?i)^[^.]+\\.(claude-settings|claude)$")
+            && (filter.getMatchClaudeConfig() || devices.contains(parts[0]));
+        if (loose || config) hosts.add(host);
+      }
+    }
+    return new Document("host", new Document("$in", new ArrayList<>(hosts)));
+  }
+
   public Document buildListFilterQuery(String accountId, ListMaliciousRequestsRequest.Filter filter, String contextSource) {
     Document query = new Document();
     if (!filter.getActorsList().isEmpty()) {
@@ -1559,6 +1562,9 @@ public class MaliciousEventService {
     // mirrors (ViolationsTab.jsx's hostSet/looseHostSet/claudeDeviceIds).
     Document hostMatch = ThreatUtils.hostAttributionMatch(filter.getHostsList(), filter.getLooseHostKeysList(),
         filter.getClaudeDeviceIdsList(), filter.hasMatchClaudeConfig() && filter.getMatchClaudeConfig());
+    if ("ENDPOINT".equals(contextSource) && (!filter.getLooseHostKeysList().isEmpty() || !filter.getClaudeDeviceIdsList().isEmpty())) {
+      hostMatch = resolveAttributedHosts(accountId, filter, contextSource);
+    }
     List<Document> extraAndClauses = new ArrayList<>();
     if (hostMatch != null) {
       extraAndClauses.add(hostMatch);

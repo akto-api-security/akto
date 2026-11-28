@@ -44,6 +44,22 @@ public class ThreatUtils {
     return regex;
   }
 
+  public static Document violationTypeExpression() {
+    List<Document> branches = new ArrayList<>();
+    String[][] rules = {{"Tool", "tool"}, {"Skill", "skill"}, {"Resource", "resource"}, {"Prompt", "prompt"},
+        {"Config", "config|setting"}, {"Tool", "mcp|server"}, {"Prompt", "message|completion|chat"}};
+    for (String[] rule : rules) {
+      branches.add(new Document("case", new Document("$regexMatch", new Document("input",
+          new Document("$ifNull", Arrays.asList("$latestApiEndpoint", ""))).append("regex", rule[1]).append("options", "i")))
+          .append("then", rule[0]));
+    }
+    for (String type : Arrays.asList("Tool", "Skill", "Config", "LLM")) {
+      branches.add(new Document("case", new Document("$eq", Arrays.asList(
+          new Document("$toUpper", "$latestApiMethod"), type.toUpperCase(java.util.Locale.ROOT)))).append("then", type));
+    }
+    return new Document("$switch", new Document("branches", branches).append("default", "Prompt"));
+  }
+
   public static Document hostAttributionMatch(List<String> hosts, List<String> looseHostKeys,
                                               List<String> claudeDeviceIds, boolean matchClaudeConfig) {
     List<Document> hostOrConditions = new ArrayList<>();
