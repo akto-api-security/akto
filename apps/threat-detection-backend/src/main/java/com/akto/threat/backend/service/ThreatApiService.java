@@ -132,30 +132,24 @@ public class ThreatApiService {
   public ThreatCategoryWiseCountResponse getSubCategoryWiseCount(
     String accountId, ThreatCategoryWiseCountRequest req, String contextSource) {
 
-    return getSubCategoryWiseCount(accountId, req, contextSource, false);
-  }
-
-  public ThreatCategoryWiseCountResponse getSubCategoryWiseCount(
-    String accountId, ThreatCategoryWiseCountRequest req, String contextSource, boolean groupByType) {
-
     // Skip cache when latestAttackList is present — results are filter-specific
     if (!req.getLatestAttackList().isEmpty()) {
-      return computeSubCategoryWiseCount(accountId, req, contextSource, groupByType);
+      return computeSubCategoryWiseCount(accountId, req, contextSource);
     }
 
     String statusKey = (req.getStatus() != null && !req.getStatus().isEmpty()) ? req.getStatus() : "ALL";
     String cacheKey = "subCategoryCount|get_subcategory_wise_count|" + accountId + "|" + contextSource
         + "|" + DashboardFilterCache.bucketDay(req.getStartTs())
         + "|" + DashboardFilterCache.bucketDay(req.getEndTs())
-        + "|" + statusKey + "|" + groupByType
+        + "|" + statusKey
         + (req.hasHostScope() ? "|" + req.getHostScope().toString() : "");
 
     return subCategoryCountCache.get(cacheKey,
-        () -> computeSubCategoryWiseCount(accountId, req, contextSource, groupByType));
+        () -> computeSubCategoryWiseCount(accountId, req, contextSource));
   }
 
   private ThreatCategoryWiseCountResponse computeSubCategoryWiseCount(
-    String accountId, ThreatCategoryWiseCountRequest req, String contextSource, boolean groupByType) {
+    String accountId, ThreatCategoryWiseCountRequest req, String contextSource) {
 
     List<Document> pipeline = new ArrayList<>();
     Document match = new Document();
@@ -191,7 +185,7 @@ public class ThreatApiService {
     pipeline.add(new Document("$group",
         new Document("_id",
             new Document("category", "$category")
-            .append("subCategory", groupByType ? ThreatUtils.violationTypeExpression() : "$subCategory"))
+            .append("subCategory", "$subCategory"))
             .append("count", new Document("$sum", 1))));
 
     // 5. Sort by count descending

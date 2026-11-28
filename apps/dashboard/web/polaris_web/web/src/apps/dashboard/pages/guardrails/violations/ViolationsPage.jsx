@@ -572,6 +572,21 @@ function deriveAgenticType(url, method) {
     return METHOD_TO_TYPE[m] || "Prompt";
 }
 
+// Classify by POLICY/category name. Used only for the "Violations by Type" pie, which is built
+// from a server-side aggregate (category/subCategory names, no URL) - deriveAgenticType can't be
+// used there. The per-row Type column uses deriveAgenticType instead (see typeLabel below), so
+// the pie and the table can disagree on a given row's bucket; that's an accepted tradeoff since
+// the aggregate endpoint doesn't return per-event request URLs to classify by shape.
+function classifyPolicyType(name) {
+    const lower = (name || "").toLowerCase();
+    if (lower.includes("prompt") || lower.includes("injection"))       return "Prompt";
+    if (lower.includes("skill") || lower.includes("malicious_skill"))  return "Skill";
+    if (lower.includes("config") || lower.includes("setting"))         return "Config";
+    if (lower.includes("tool") || lower.includes("mcp"))               return "Tool";
+    if (lower.includes("llm"))                                         return "LLM";
+    return "Other";
+}
+
 // Transform a single backend event into a table row.
 // Kept lightweight — runs only on the current page of results (not all data).
 // Skills Evaluations / Misconfigured Settings partitions (Atlas/ENDPOINT only): "only" on their own
@@ -590,6 +605,8 @@ function evaluationModesForTab(tab) {
 function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceMap) {
     const meta = parseMetadata(event.metadata);
     // typeLabel (request-shape, from the actual URL/method) drives the Type column and the
+    // flyout's Values tab extraction - not classifyPolicyType(policyName), which is user-editable
+    // text and would misclassify (or dump into "Other") the moment someone renames a policy.
     const typeLabel = deriveAgenticType(event.url, event.method);
     const policyName = meta.rule_violated || meta.npolicy_name || event.filterId || "-";
 
@@ -967,6 +984,10 @@ function Violations() {
     const [activeSeverityFilter, setActiveSeverityFilter] = useState(new Set());
     const [activePolicyFilter, setActivePolicyFilter] = useState(new Set());
     const [activeTypeFilter, setActiveTypeFilter] = useState(null);
+    // Type (pie) filter is driven straight into the server fetch instead of the policyName
+    // set-filter: the pie's subcategory names come from a different endpoint than the set
+    // filter's known values, so setColumnFilterModel would silently drop them.
+    const [activeTypeSubCategories, setActiveTypeSubCategories] = useState([]);
 
     // Single source of truth for the tab bar, mirroring the old UI's SusDataTable tab ids exactly:
     // 'active' | 'under_review' | 'ignored' | 'needs_approval' | 'skills_evaluations' |
@@ -1105,10 +1126,14 @@ function Violations() {
             .map(([name, count]) => ({ name, count }));
 
         const byType = {};
-        (categoryResp?.categoryCounts || []).forEach(item => {
-            const type = item.subCategory;
+        const typeToSubCategories = {};
+        Object.entries(subcategoryMap).forEach(([name, count]) => {
+            const type = classifyPolicyType(name);
+
             if (!byType[type]) byType[type] = { text: 0, color: TYPE_COLORS[type] || "#999", filterKey: type };
-            byType[type].text += item.count || 0;
+            byType[type].text += count;
+            if (!typeToSubCategories[type]) typeToSubCategories[type] = [];
+            typeToSubCategories[type].push(name);
         });
         const categoryTotal = Object.values(byType).reduce((sum, v) => sum + v.text, 0);
 
@@ -1118,7 +1143,7 @@ function Violations() {
             host: h.host || "",
         }));
 
-        return { severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, topHosts, byType, skillsEvaluationsCount, misconfiguredSettingsCount, humanApprovalCount };
+        return { severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, topHosts, byType, typeToSubCategories, skillsEvaluationsCount, misconfiguredSettingsCount, humanApprovalCount };
     }, [summary.severity.data, summary.category.data, summary.hosts.data, summary.counts.data]);
 
     // ─── Load username map once ──────────────────────────────────────────────
@@ -1233,14 +1258,23 @@ function Violations() {
     }, [location.search]);
 
     const handleTypeClick = useCallback((typeName) => {
-        setActiveTypeFilter(previous => previous === typeName ? null : typeName);
-    }, []);
+        const mapping = summaryData?.typeToSubCategories || {};
+        const subCategories = mapping[typeName] || [];
+        if (activeTypeFilter === typeName) {
+            setActiveTypeFilter(null);
+            setActiveTypeSubCategories([]);
+        } else {
+            setActiveTypeFilter(typeName);
+            setActiveTypeSubCategories(subCategories);
+        }
+    }, [summaryData, activeTypeFilter]);
 
+    // Re-fetch the server-side rows whenever the pie's type filter changes (skip the initial mount).
     const typeFilterFirstRun = useRef(true);
     useEffect(() => {
         if (typeFilterFirstRun.current) { typeFilterFirstRun.current = false; return; }
         gridRef.current?.api?.refreshServerSide({ purge: true });
-    }, [activeTypeFilter]);
+    }, [activeTypeSubCategories]);
 
     // ─── Card selection (Open vs Other) ─────────────────────────────────────
     const [tableKey, setTableKey] = useState(0);
@@ -1489,7 +1523,9 @@ function Violations() {
             // An empty host list means "no host filter" to the backend, so an empty intersection needs a value that matches nothing.
             if (hostFilter.length === 0) hostFilter = ["__no_match__"];
         }
-        const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter])];
+        // Union the column filter, the "Top Policies" card selection, and the pie's type filter
+        // (all map to the backend latestAttack).
+        const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter, ...activeTypeSubCategories])];
         const statusFilter = activeStatusValue;
         const { skillEvaluationMode, configEvaluationMode } = evaluationModesForTab(currentTab);
         // Needs Approval is a CLIENT-side view over ACTIVE events (no server-side "behaviour"
@@ -1531,7 +1567,7 @@ function Violations() {
             undefined,
             !groupActivities,
             {
-                agenticTypes: activeTypeFilter ? [activeTypeFilter] : (typeFilterEnabled() && !isSkillsEvaluationsTab && !isMisconfiguredTab ? filters?.type : undefined),
+                agenticTypes: typeFilterEnabled() && !isSkillsEvaluationsTab && !isMisconfiguredTab ? filters?.type : undefined,
                 behaviours: atlasFilters ? filters?.action : undefined,
                 ...caseFilterRequestParams(currentTab, filters),
             },
@@ -1554,7 +1590,7 @@ function Violations() {
             }
             return { value: transformed, total, rawEvents };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activePolicyFilter, activeAssetFilter, assetHostsByLabel, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, isUnderReviewTab, guardrailApprovedByPolicy, advancedFilters, groupActivities, activeTypeFilter]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, assetHostsByLabel, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, isUnderReviewTab, guardrailApprovedByPolicy, advancedFilters, groupActivities]);
 
     const onServerFetch = useCallback((args) => {
         lastServerFetchArgsRef.current = args;
