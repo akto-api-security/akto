@@ -273,7 +273,7 @@ public class ThreatUtils {
 
     static boolean filtersOnlyCoverFields(Document match) {
         for (Map.Entry<String, Object> condition : match.entrySet()) {
-            if ("$and".equals(condition.getKey())) {
+            if ("$and".equals(condition.getKey()) || "$or".equals(condition.getKey())) {
                 for (Object clause : (List<?>) condition.getValue()) {
                     if (!(clause instanceof Document) || !filtersOnlyCoverFields((Document) clause)) {
                         return false;

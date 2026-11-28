@@ -51,6 +51,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   int startTs;
   int endTs;
   String severityStatusFilter;
+  boolean topHostsOnly;
 
   @Getter int totalAnalysed;
   @Getter int totalAttacks;
@@ -400,7 +401,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     Map<String, Object> hostScope = backendHostScope();
     if (hostScope == null && isLimitedToOwnAgents()) {
       OwnAgentThreatStats stats = ownAgentStats();
-      this.topApis = stats.topApis(8);
+      this.topApis = topHostsOnly ? new ArrayList<>() : stats.topApis(8);
       this.topHosts = stats.topHosts(8);
       return SUCCESS.toUpperCase();
     }
@@ -409,6 +410,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.addHeader("Content-Type", "application/json");
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
     addEvaluationModeHeaders(post);
+    if (topHostsOnly) {
+      post.addHeader("x-top-hosts-only", "true");
+    }
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -601,6 +605,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   public void setLatestAttack(List<String> latestAttack) {
     this.latestAttack = latestAttack;
+  }
+
+  public void setTopHostsOnly(boolean topHostsOnly) {
+    this.topHostsOnly = topHostsOnly;
   }
 
   public void setSeverityStatusFilter(String severityStatusFilter) {

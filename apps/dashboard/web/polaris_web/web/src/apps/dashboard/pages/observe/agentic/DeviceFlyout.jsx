@@ -618,7 +618,7 @@ export function AgenticsTab({ deviceId }) {
 // claudeDeviceIds always includes this device's own id (not just hosts already seen ending in
 // ".claude") so an orphan claude-config-scanner event still attributes correctly even if no real
 // Claude collection has been seen for this device yet — matches the original client-side filter.
-export function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp, onTotalChange, onViolationClick, columnDefs = VIOLATIONS_COL_DEFS }) {
+export function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp, onTotalChange, onViolationClick, columnDefs = VIOLATIONS_COL_DEFS, skillEvaluationMode }) {
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         if (!hostNames.length && !deviceId) {
             return Promise.resolve({ value: [], total: 0 });
@@ -637,7 +637,7 @@ export function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTim
         const sortBySeverity = sortKey === "severity";
 
         return fetchAgenticViolationsPage({
-            startTimestamp, endTimestamp,
+            startTimestamp, endTimestamp, skillEvaluationMode,
             hosts: hostNames,
             looseHostKeys,
             claudeDeviceIds: Array.from(claudeDeviceIds),
@@ -656,7 +656,7 @@ export function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTim
                 total: res.total,
             };
         });
-    }, [hostNames, deviceId, startTimestamp, endTimestamp, onTotalChange]);
+    }, [hostNames, deviceId, startTimestamp, endTimestamp, onTotalChange, skillEvaluationMode]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;

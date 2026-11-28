@@ -1645,7 +1645,7 @@ export default {
         return resp?.success || false
     },
 
-    async fetchSuspectSampleData({ skip = 0, startTimestamp, endTimestamp, hosts = [], limit = 100000, sort, sortBySeverity, searchText, looseHostKeys = [], claudeDeviceIds = [], matchClaudeConfig } = {}) {
+    async fetchSuspectSampleData({ skip = 0, startTimestamp, endTimestamp, hosts = [], limit = 100000, sort, sortBySeverity, searchText, looseHostKeys = [], claudeDeviceIds = [], matchClaudeConfig, skillEvaluationMode } = {}) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -1655,6 +1655,7 @@ export default {
                 ...(startTimestamp ? { startTimestamp } : {}),
                 ...(endTimestamp   ? { endTimestamp }   : {}),
                 latestAttack: [],
+                ...(skillEvaluationMode ? { skillEvaluationMode } : {}),
                 limit,
                 ...(hosts?.length  ? { hosts }          : {}),
                 ...(sortBySeverity ? { sortBySeverity }  : {}),

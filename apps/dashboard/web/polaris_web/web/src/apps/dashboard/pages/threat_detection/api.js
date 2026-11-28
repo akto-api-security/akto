@@ -293,12 +293,13 @@ const threatDetectionRequests = {
             data: {startTs, endTs}
         })
     },
-    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5, severityStatusFilter, skillEvaluationMode, configEvaluationMode) {
+    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5, severityStatusFilter, skillEvaluationMode, configEvaluationMode, topHostsOnly = false) {
         return request({
             url: '/api/fetchThreatTopNData',
             method: 'post',
             data: {
                 startTs, endTs, latestAttack: latestAttack || [], limit,
+                ...(topHostsOnly ? { topHostsOnly: true } : {}),
                 ...(severityStatusFilter ? { severityStatusFilter } : {}),
                 ...(skillEvaluationMode ? { skillEvaluationMode } : {}),
                 ...(configEvaluationMode ? { configEvaluationMode } : {}),

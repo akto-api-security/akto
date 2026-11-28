@@ -754,7 +754,8 @@ public class DashboardRouter implements ARouter {
                         req.getStatus(),
                         ctx.request().getHeader("x-skill-eval-mode"),
                         ctx.request().getHeader("x-config-eval-mode"),
-                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null,
+                        Boolean.parseBoolean(ctx.request().getHeader("x-top-hosts-only"))
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

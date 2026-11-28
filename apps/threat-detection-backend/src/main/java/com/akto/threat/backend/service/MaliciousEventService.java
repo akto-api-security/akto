@@ -1515,6 +1515,41 @@ public class MaliciousEventService {
 
   // Mongo query for a list filter in the given context. Shared by the violations list and the
   // guardrail overview aggregations, so both count exactly the same events for the same filter.
+  private Document resolveAttributedHosts(String accountId, ListMaliciousRequestsRequest.Filter filter, String contextSource) {
+    Document scope = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
+    if (filter.hasDetectedAtTimeRange()) {
+      TimeRangeFilter range = filter.getDetectedAtTimeRange();
+      Document bounds = new Document();
+      if (range.hasStart()) bounds.append("$gte", range.getStart());
+      if (range.hasEnd()) bounds.append("$lte", range.getEnd());
+      if (!bounds.isEmpty()) scope.append("detectedAt", bounds);
+    }
+    Set<String> hosts = new HashSet<>(filter.getHostsList());
+    Set<String> configHosts = new HashSet<>();
+    Set<String> looseKeys = new HashSet<>(filter.getLooseHostKeysList());
+    Set<String> devices = new HashSet<>(filter.getClaudeDeviceIdsList());
+    List<Document> pipeline = Arrays.asList(new Document("$match", scope), new Document("$group", new Document("_id", new Document("host", "$host").append("evalType", "$evalType"))));
+    try (MongoCursor<Document> cursor = ThreatUtils.withHint(maliciousEventDao.aggregateRaw(accountId, pipeline),
+        ThreatUtils.coverIndexHint(accountId, scope)).maxTime(ThreatUtils.REGEX_MAX_TIME_MS, TimeUnit.MILLISECONDS).cursor()) {
+      while (cursor.hasNext()) {
+        Document identity = cursor.next().get("_id", Document.class);
+        String host = identity.getString("host");
+        if (host == null) continue;
+        String[] parts = host.split("\\.", -1);
+        boolean loose = looseKeys.contains(parts[0] + " " + parts[parts.length - 1]);
+        boolean config = MaliciousEventDto.EVAL_TYPE_CONFIG.equals(identity.getString("evalType"))
+            && (filter.getMatchClaudeConfig() || devices.contains(parts[0]));
+        if (loose) hosts.add(host);
+        if (config) configHosts.add(host);
+      }
+    }
+    Document hostMatch = new Document("host", new Document("$in", new ArrayList<>(hosts)));
+    if (configHosts.isEmpty()) return hostMatch;
+    Document configMatch = new Document(MaliciousEventDto.EVAL_TYPE, MaliciousEventDto.EVAL_TYPE_CONFIG)
+        .append("host", new Document("$in", new ArrayList<>(configHosts)));
+    return new Document("$or", Arrays.asList(hostMatch, configMatch));
+  }
+
   public Document buildListFilterQuery(String accountId, ListMaliciousRequestsRequest.Filter filter, String contextSource) {
     Document query = new Document();
     if (!filter.getActorsList().isEmpty()) {
@@ -1559,6 +1594,9 @@ public class MaliciousEventService {
     // mirrors (ViolationsTab.jsx's hostSet/looseHostSet/claudeDeviceIds).
     Document hostMatch = ThreatUtils.hostAttributionMatch(filter.getHostsList(), filter.getLooseHostKeysList(),
         filter.getClaudeDeviceIdsList(), filter.hasMatchClaudeConfig() && filter.getMatchClaudeConfig());
+    if ("ENDPOINT".equals(contextSource) && (!filter.getLooseHostKeysList().isEmpty() || !filter.getClaudeDeviceIdsList().isEmpty() || filter.getMatchClaudeConfig())) {
+      hostMatch = resolveAttributedHosts(accountId, filter, contextSource);
+    }
     List<Document> extraAndClauses = new ArrayList<>();
     if (hostMatch != null) {
       extraAndClauses.add(hostMatch);

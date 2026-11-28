@@ -55,9 +55,9 @@ export async function fetchAgenticViolations({ startTimestamp, endTimestamp, hos
 // AgGridTable's SSRM contract) — a separate function from fetchAgenticViolations (which several
 // other callers, e.g. DeviceFlyout.jsx, still use expecting a plain unpaginated array) so this
 // tab's pagination/search/sort additions can't affect them.
-export async function fetchAgenticViolationsPage({ startTimestamp, endTimestamp, hosts = [], looseHostKeys = [], claudeDeviceIds = [], matchClaudeConfig, skip = 0, limit = 20, sort, sortBySeverity, searchText } = {}) {
+export async function fetchAgenticViolationsPage({ startTimestamp, endTimestamp, hosts = [], looseHostKeys = [], claudeDeviceIds = [], matchClaudeConfig, skillEvaluationMode, skip = 0, limit = 20, sort, sortBySeverity, searchText } = {}) {
     const resp = await observeApi.fetchSuspectSampleData({
-        startTimestamp, endTimestamp, hosts, looseHostKeys, claudeDeviceIds, matchClaudeConfig, skip, limit, sort, sortBySeverity, searchText,
+        startTimestamp, endTimestamp, hosts, looseHostKeys, claudeDeviceIds, matchClaudeConfig, skillEvaluationMode, skip, limit, sort, sortBySeverity, searchText,
     });
     return {
         violations: (resp?.maliciousEvents || []).map(normalizeEvent),
