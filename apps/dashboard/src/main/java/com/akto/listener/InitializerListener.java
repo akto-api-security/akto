@@ -282,6 +282,8 @@ public class InitializerListener implements ServletContextListener {
     private static final ScheduledExecutorService usageScheduler = Executors.newScheduledThreadPool(1);
     // Index builds can be slow, so they get their own thread instead of delaying the jobs on `scheduler`.
     private static final ScheduledExecutorService indexSyncScheduler = Executors.newSingleThreadScheduledExecutor();
+    // Trimming loops over every account, so it gets its own thread instead of delaying the jobs on `scheduler`.
+    private static final ScheduledExecutorService trimCappedCollectionsScheduler = Executors.newSingleThreadScheduledExecutor();
     static final String INDEX_SYNC_ENABLED_ENV = "ENABLE_INDEX_SYNC_JOB";
     static final int INDEX_SYNC_INTERVAL_SECONDS = 24 * 60 * 60;
     static final int INDEX_SYNC_INITIAL_DELAY_MINUTES = 30;
@@ -2751,6 +2753,9 @@ public class InitializerListener implements ServletContextListener {
                         setupUsageScheduler();
                     }
 
+                    // Scheduled after the per-account init above finishes, so the two don't overlap.
+                    trimCappedCollectionsJob();
+
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         crons.insertHistoricalDataJob();
@@ -2764,7 +2769,6 @@ public class InitializerListener implements ServletContextListener {
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
                         updateApiGroupsForAccounts();
                         setupAutomatedApiGroupsScheduler();
-                        trimCappedCollectionsJob();
                         setUpPiiAndTestSourcesScheduler();
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
@@ -2943,8 +2947,16 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private void trimCappedCollectionsJob() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
+        trimCappedCollectionsScheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                // Only one container should trim per day.
+                Context.accountId.set(1000_000);
+                boolean dibs = callDibs(Cluster.TRIM_CAPPED_COLLECTIONS_CRON, 23 * 60 * 60, 60);
+                if (!dibs) {
+                    logger.debugAndAddToDb("Cron for trimming capped collections not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    return;
+                }
+
                 logger.debug("Starting trimCappedCollectionsJob for all accounts at " + Context.now());
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
