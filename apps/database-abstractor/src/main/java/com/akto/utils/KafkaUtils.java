@@ -34,6 +34,7 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.log.StepTimer;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -176,27 +177,43 @@ public class KafkaUtils {
             Map<Integer, List<LogsEndpointShield>> shieldLogBuffer = new HashMap<>();
             while (true) {
                 ConsumerRecords<String, String> records = this.consumer.poll(Duration.ofMillis(10000));
+                // Timer starts after poll returns so idle waiting for records is not counted.
+                StepTimer timer = new StepTimer("kafka-consumer-poll");
                 try {
                     this.consumer.commitSync();
                 } catch (Exception e) {
                     throw e;
                 }
+                timer.mark("commit");
 
                 shieldLogBuffer.clear();
+                Map<String, long[]> perMethod = new HashMap<>(); // triggerMethod -> {count, totalMs, maxMs}
                 for (ConsumerRecord<String,String> r: records) {
+                    long msgStart = System.currentTimeMillis();
+                    String method = "error";
                     try {
                         lastSyncOffset++;
                         if (lastSyncOffset % 100 == 0) {
                             logger.info("Committing offset at position: " + lastSyncOffset);
                         }
 
-                        parseAndTriggerWrites(r.value(), shieldLogBuffer);
+                        method = parseAndTriggerWrites(r.value(), shieldLogBuffer);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error in parseAndTriggerWrites " + e);
                         continue;
+                    } finally {
+                        long ms = System.currentTimeMillis() - msgStart;
+                        long[] s = perMethod.computeIfAbsent(String.valueOf(method), k -> new long[3]);
+                        s[0]++;
+                        s[1] += ms;
+                        s[2] = Math.max(s[2], ms);
                     }
                 }
+                timer.mark("process");
                 flushEndpointShieldLogs(shieldLogBuffer);
+                timer.mark("flushShieldLogs");
+                timer.logIfSlow(loggerMaker, "records=" + records.count() + " perMethod=" + formatPerMethodTimings(perMethod)
+                    + (timer.totalMs() >= MAX_POLL_INTERVAL_WARN_MS ? " WARN_NEAR_MAX_POLL_INTERVAL_300s" : ""));
             }
         } catch (WakeupException ignored) {
           // nothing to catch. This exception is called from the shutdown hook.
@@ -208,6 +225,25 @@ public class KafkaUtils {
         } finally {
             this.consumer.close();
         }
+    }
+
+    // Kafka's default max.poll.interval.ms is 300s; past it the consumer is evicted and the next
+    // commitSync throws (which exits the process above). Flag polls getting close to it.
+    private static final long MAX_POLL_INTERVAL_WARN_MS = 240_000;
+
+    /** "method=count x total ms (max ms)" entries, slowest total first. */
+    private static String formatPerMethodTimings(Map<String, long[]> perMethod) {
+        List<Map.Entry<String, long[]>> entries = new ArrayList<>(perMethod.entrySet());
+        entries.sort((a, b) -> Long.compare(b.getValue()[1], a.getValue()[1]));
+        StringBuilder sb = new StringBuilder("[");
+        for (Map.Entry<String, long[]> e : entries) {
+            if (sb.length() > 1) {
+                sb.append(", ");
+            }
+            long[] s = e.getValue();
+            sb.append(e.getKey()).append('=').append(s[0]).append("x/").append(s[1]).append("ms(max ").append(s[2]).append("ms)");
+        }
+        return sb.append(']').toString();
     }
 
     public void initKafkaProducer() {
@@ -223,7 +259,8 @@ public class KafkaUtils {
         parseAndTriggerWrites(message, null);
     }
 
-    public static void parseAndTriggerWrites(String message, Map<Integer, List<LogsEndpointShield>> shieldLogBuffer) throws Exception {
+    /** @return the message's triggerMethod (used by the consumer loop for per-method timing). */
+    public static String parseAndTriggerWrites(String message, Map<Integer, List<LogsEndpointShield>> shieldLogBuffer) throws Exception {
         DbAction dbAction = new DbAction();
         ESClientAction esClientAction = new ESClientAction();
         Map<String, Object> json = gson.fromJson(message, Map.class);
@@ -245,14 +282,14 @@ public class KafkaUtils {
             } else {
                 DbLayer.insertEndpointShieldLog(esLog);
             }
-            return;
+            return triggerMethod;
         }
 
         if ("storeAgentQueryRecords".equals(triggerMethod)) {
             List<AgentQueryRecord> agentQueryRecords = mapper.readValue(payload, new TypeReference<List<AgentQueryRecord>>(){});
             esClientAction.setAgentQueryRecords(agentQueryRecords);
             esClientAction.storeAgentQueryRecords();
-            return;
+            return triggerMethod;
         }
 
         // TestingRunResult writes are raw-document inserts, not BulkUpdates filter+diff pairs, so
@@ -263,7 +300,7 @@ public class KafkaUtils {
             BasicDBObject raw = gson.fromJson(payload, BasicDBObject.class);
             dbAction.setTestingRunResult(raw);
             dbAction.insertTestingRunResults();
-            return;
+            return triggerMethod;
         }
 
         List<BulkUpdates> bulkWrites = mapper.readValue(payload, new TypeReference<List<BulkUpdates>>(){});
@@ -320,6 +357,7 @@ public class KafkaUtils {
             default:
                 break;
         }
+        return triggerMethod;
     }
 
     /**
